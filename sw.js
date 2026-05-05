@@ -1,9 +1,9 @@
 const CACHE_NAME = 'timeblock-v2';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/app.js'
+  './',
+  './index.html',
+  './style.css',
+  './app.js'
   // CDNs e fontes externas ficam de fora para evitar falhas de CORS na instalação do SW
 ];
 

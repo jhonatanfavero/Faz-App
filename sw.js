@@ -1,4 +1,4 @@
-const CACHE_NAME = 'timeblock-v6';
+const CACHE_NAME = 'timeblock-v7';
 const ASSETS = [
   './',
   './index.html',

@@ -583,7 +583,6 @@ window.promptCloneQtd = function(type) {
     document.getElementById('clone-sheet').classList.add('translate-y-full'); // Esconde a aba de baixo
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-    setTimeout(() => { input.focus(); input.select(); }, 100);
 }
 
 window.confirmCloneQtd = function() {
@@ -803,7 +802,6 @@ window.openSheet = () => {
     sheet.classList.remove('translate-y-full');
     fab.style.transform = 'scale(0)';
     if(listBtn) listBtn.style.transform = 'scale(0)';
-    setTimeout(() => input.focus(), 300);
 }
 
 window.openListSheet = () => {
@@ -812,7 +810,6 @@ window.openListSheet = () => {
     listSheet.classList.remove('translate-y-full');
     fab.style.transform = 'scale(0)';
     if(listBtn) listBtn.style.transform = 'scale(0)';
-    setTimeout(() => backlogInput.focus(), 300);
 }
 
 window.closeAllSheets = () => {

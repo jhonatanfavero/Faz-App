@@ -423,7 +423,8 @@ function renderTimeline() {
     });
     
     const endOfDay = END_HOUR * 60;
-    if (cursorMin < endOfDay) {
+    // V2.0 - Não adicionar espaço final quando filtros ativos
+    if (cursorMin < endOfDay && !showOnlyDelayed && !showOnlyCompleted) {
         renderQueue.push({ id: `e_${cursorMin}`, type: 'empty', startMin: cursorMin, duration: endOfDay - cursorMin });
     }
     

@@ -365,7 +365,7 @@ function renderTimeline() {
     END_HOUR = storedEnd !== null ? parseInt(storedEnd) : 24;
     TOTAL_MINS = (END_HOUR - START_HOUR) * 60;
 
-    // V2.0 - Retração dinâmica de janela
+    // V2.0 - Retração dinâmica de janela para filtros
     if (showOnlyDelayed || showOnlyCompleted) {
         let filteredForWindow = db.filter(b => b.date === getActiveDateStr());
         
@@ -385,16 +385,17 @@ function renderTimeline() {
             TOTAL_MINS = (END_HOUR - START_HOUR) * 60;
         }
     }
-    renderGrid();
+
+    renderGrid(); // V2.0 - Renderiza grade após ajustar janela
 
     // Filtra os blocos referentes ao dia que estamos visualizando
     let dailyDb = db.filter(b => b.date === getActiveDateStr());
     
+    // V2.0 - Aplicar filtros DEPOIS de definir dailyDb
     if (showOnlyDelayed) {
         dailyDb = dailyDb.filter(b => b.type === 'past' || b.wasDelayed);
     }
-    
-    // V2.0 - BLOCO 2
+
     if (showOnlyCompleted) {
         dailyDb = dailyDb.filter(b => b.completed === true);
     }

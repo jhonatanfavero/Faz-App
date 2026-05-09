@@ -265,7 +265,8 @@ function runRealTimeEngine() {
         `<span class="font-bold text-zinc-800">${dateStr}</span>`;
 
     const nowLine = document.getElementById('now-line');
-    if (isToday && currentRealMins >= START_HOUR * 60 && currentRealMins <= END_HOUR * 60) {
+    // V2.0 - Ocultar linha quando filtros ativos
+    if ((isToday && currentRealMins >= START_HOUR * 60 && currentRealMins <= END_HOUR * 60) && !showOnlyDelayed && !showOnlyCompleted) {
         const topPx = (currentRealMins - (START_HOUR * 60)) * PX_PER_MIN;
         nowLine.style.top = `${topPx}px`;
         nowLine.style.display = 'flex';

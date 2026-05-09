@@ -229,9 +229,14 @@ function runRealTimeEngine() {
     }
     
     const options = { weekday: 'long', day: 'numeric', month: 'long' };
+    
+    // V2.0 - BLOCO 2
+    let dateStr = activeDateObj.toLocaleDateString('pt-BR', options);
+    dateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+    
     document.getElementById('header-date').innerHTML = 
-        (isToday ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> ` : `<i class="ph ph-calendar text-zinc-400"></i> `) + 
-        activeDateObj.toLocaleDateString('pt-BR', options);
+        (isToday ? `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span> ` : `<i class="ph ph-calendar text-zinc-400 text-lg"></i> `) + 
+        `<span class="font-bold text-zinc-800">${dateStr}</span>`;
 
     const nowLine = document.getElementById('now-line');
     if (isToday && currentRealMins >= START_HOUR * 60 && currentRealMins <= END_HOUR * 60) {

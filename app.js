@@ -223,7 +223,10 @@ function runRealTimeEngine() {
     const diffDays = Math.round((activeDateObj - now) / (1000 * 60 * 60 * 24));
     
     // Atualiza Textos do Cabeçalho
-    document.getElementById('header-title').innerText = diffDays === 0 ? "Hoje" : (diffDays === 1 ? "Amanhã" : "Agenda");
+    const headerTitle = document.getElementById('header-title');
+    if (headerTitle) {
+        headerTitle.innerText = diffDays === 0 ? "Hoje" : (diffDays === 1 ? "Amanhã" : "Agenda");
+    }
     
     const options = { weekday: 'long', day: 'numeric', month: 'long' };
     document.getElementById('header-date').innerHTML = 

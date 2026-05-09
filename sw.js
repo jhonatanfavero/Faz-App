@@ -1,5 +1,5 @@
-// V2.0 - CORREÇÃO 2E
-const CACHE_NAME = 'timeblock-v17';
+// V2.0 - OTIMIZAÇÃO 2F
+const CACHE_NAME = 'timeblock-v18';
 const ASSETS = [
   './',
   './index.html',

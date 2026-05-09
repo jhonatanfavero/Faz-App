@@ -1,6 +1,4 @@
-// V2.0 - OTIMIZAÇÃO 2F
-const CACHE_NAME = 'timeblock-v18';
-const ASSETS = [
+// V2.0 - TS = [
   './',
   './index.html',
   './style.css',

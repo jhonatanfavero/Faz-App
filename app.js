@@ -13,6 +13,8 @@ let currentRealMins = 0;
 let pendingIntent = null; 
 let selectedDur = 30;
 let showOnlyDelayed = false;
+// V2.0 - BLOCO 2
+let showOnlyCompleted = false;
 let taskToClone = null;
 let pendingCloneType = '';
 let selectedTagId = null;
@@ -209,8 +211,30 @@ window.toggleFilterDelayed = function() {
     const btn = document.getElementById('filter-delayed-btn');
     if (showOnlyDelayed) {
         btn.classList.replace('bg-indigo-50', 'bg-indigo-100');
+        // V2.0 - BLOCO 3: Desliga o outro filtro se estiver ativo
+        if (showOnlyCompleted) {
+            showOnlyCompleted = false;
+            document.getElementById('filter-completed-btn').classList.replace('bg-emerald-100', 'bg-emerald-50');
+        }
     } else {
         btn.classList.replace('bg-indigo-100', 'bg-indigo-50');
+    }
+    renderTimeline();
+}
+
+// V2.0 - BLOCO 3
+window.toggleFilterCompleted = function() {
+    showOnlyCompleted = !showOnlyCompleted;
+    const btn = document.getElementById('filter-completed-btn');
+    if (showOnlyCompleted) {
+        btn.classList.replace('bg-emerald-50', 'bg-emerald-100');
+        // V2.0 - BLOCO 3: Desliga o outro filtro se estiver ativo
+        if (showOnlyDelayed) {
+            showOnlyDelayed = false;
+            document.getElementById('filter-delayed-btn').classList.replace('bg-indigo-100', 'bg-indigo-50');
+        }
+    } else {
+        btn.classList.replace('bg-emerald-100', 'bg-emerald-50');
     }
     renderTimeline();
 }
@@ -223,12 +247,20 @@ function runRealTimeEngine() {
     const diffDays = Math.round((activeDateObj - now) / (1000 * 60 * 60 * 24));
     
     // Atualiza Textos do Cabeçalho
-    document.getElementById('header-title').innerText = diffDays === 0 ? "Hoje" : (diffDays === 1 ? "Amanhã" : "Agenda");
+    const headerTitle = document.getElementById('header-title');
+    if (headerTitle) {
+        headerTitle.innerText = diffDays === 0 ? "Hoje" : (diffDays === 1 ? "Amanhã" : "Agenda");
+    }
     
     const options = { weekday: 'long', day: 'numeric', month: 'long' };
+    
+    // V2.0 - BLOCO 2
+    let dateStr = activeDateObj.toLocaleDateString('pt-BR', options);
+    dateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+    
     document.getElementById('header-date').innerHTML = 
-        (isToday ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> ` : `<i class="ph ph-calendar text-zinc-400"></i> `) + 
-        activeDateObj.toLocaleDateString('pt-BR', options);
+        (isToday ? `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span> ` : `<i class="ph ph-calendar text-zinc-400 text-lg"></i> `) + 
+        `<span class="font-bold text-zinc-800">${dateStr}</span>`;
 
     const nowLine = document.getElementById('now-line');
     if (isToday && currentRealMins >= START_HOUR * 60 && currentRealMins <= END_HOUR * 60) {
@@ -332,6 +364,11 @@ function renderTimeline() {
     
     if (showOnlyDelayed) {
         dailyDb = dailyDb.filter(b => b.type === 'past' || b.wasDelayed);
+    }
+    
+    // V2.0 - BLOCO 2
+    if (showOnlyCompleted) {
+        dailyDb = dailyDb.filter(b => b.completed === true);
     }
 
     // Remove tarefas que estejam totalmente fora da janela de visualização do usuário

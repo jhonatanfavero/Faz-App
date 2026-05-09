@@ -1,5 +1,5 @@
-// V2.0 - BLOCO 2
-const CACHE_NAME = 'timeblock-v12';
+// V2.0 - BLOCO 2 (Filtro Concluídos)
+const CACHE_NAME = 'timeblock-v13';
 const ASSETS = [
   './',
   './index.html',

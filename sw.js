@@ -1,5 +1,5 @@
-// V2.0 - BLOCO 2 (Filtro Concluídos)
-const CACHE_NAME = 'timeblock-v13';
+// V2.0 - BLOCO 3 (UX Filtros)
+const CACHE_NAME = 'timeblock-v14';
 const ASSETS = [
   './',
   './index.html',

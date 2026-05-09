@@ -1,4 +1,6 @@
-// V2.0 - TS = [
+// V2.0 - CORREÇÃO 2H
+const CACHE_NAME = 'timeblock-v20';
+const ASSETS = [
   './',
   './index.html',
   './style.css',

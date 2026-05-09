@@ -359,6 +359,34 @@ function showToast(msg) { const t = document.getElementById('toast'); document.g
 function renderTimeline() {
     container.innerHTML = ''; 
     
+    let storedStart = localStorage.getItem('tb_start_hour');
+    let storedEnd = localStorage.getItem('tb_end_hour');
+    START_HOUR = storedStart !== null ? parseInt(storedStart) : 0;
+    END_HOUR = storedEnd !== null ? parseInt(storedEnd) : 24;
+    TOTAL_MINS = (END_HOUR - START_HOUR) * 60;
+
+    // V2.0 - Retração dinâmica de janela
+    if (showOnlyDelayed || showOnlyCompleted) {
+        let filteredForWindow = db.filter(b => b.date === getActiveDateStr());
+        
+        if (showOnlyDelayed) {
+            filteredForWindow = filteredForWindow.filter(b => b.type === 'past' || b.wasDelayed);
+        }
+        if (showOnlyCompleted) {
+            filteredForWindow = filteredForWindow.filter(b => b.completed === true);
+        }
+        
+        if (filteredForWindow.length > 0) {
+            const minStart = Math.min(...filteredForWindow.map(b => b.startMin));
+            const maxEnd = Math.max(...filteredForWindow.map(b => b.startMin + b.duration));
+            
+            START_HOUR = Math.max(0, Math.floor(minStart / 60) - 1);
+            END_HOUR = Math.min(24, Math.ceil(maxEnd / 60) + 1);
+            TOTAL_MINS = (END_HOUR - START_HOUR) * 60;
+        }
+    }
+    renderGrid();
+
     // Filtra os blocos referentes ao dia que estamos visualizando
     let dailyDb = db.filter(b => b.date === getActiveDateStr());
     

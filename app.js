@@ -412,7 +412,8 @@ function renderTimeline() {
     let renderQueue = [];
     
     dailyDb.forEach(fb => {
-        if (fb.startMin > cursorMin) {
+        // V2.0 - Não renderizar espaços vazios quando filtros ativos
+        if (fb.startMin > cursorMin && !showOnlyDelayed && !showOnlyCompleted) {
             renderQueue.push({ id: `e_${cursorMin}`, type: 'empty', startMin: cursorMin, duration: fb.startMin - cursorMin });
         }
         renderQueue.push(fb);
@@ -1216,7 +1217,15 @@ renderTagSelector();
 // Pula pro momento atual
 setTimeout(() => {
     const scrollEl = document.getElementById('timeline-scroll');
-    const targetY = (currentRealMins - (START_HOUR * 60)) * PX_PER_MIN - (scrollEl.clientHeight / 2);
+    let targetY;
+    
+    // V2.0 - Scroll inteligente para filtros
+    if (showOnlyDelayed || showOnlyCompleted) {
+        targetY = 0; // Filtros sempre mostram do topo
+    } else {
+        targetY = (currentRealMins - (START_HOUR * 60)) * PX_PER_MIN - (scrollEl.clientHeight / 2);
+    }
+    
     scrollEl.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
 }, 300);
 

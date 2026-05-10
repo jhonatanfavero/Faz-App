@@ -1,5 +1,5 @@
-// V2.0 - COMBO A (Modais)
-const CACHE_NAME = 'timeblock-v25';
+// V2.0 - CORREÇÕES A1 + A2
+const CACHE_NAME = 'timeblock-v26';
 const ASSETS = [
   './',
   './index.html',

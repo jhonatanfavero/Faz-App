@@ -1,5 +1,5 @@
-// V3.0 - v40.2.7 (Cards na busca multi-dia com todas as ações da agenda + selos por data)
-const CACHE_NAME = 'timeblock-v40-2-7';
+// V3.0 - v40.2.8 (Fix: ações nos cards da busca mantêm a busca aberta - lápis, lixeira, microblocks)
+const CACHE_NAME = 'timeblock-v40-2-8';
 const ASSETS = [
   './',
   './index.html',

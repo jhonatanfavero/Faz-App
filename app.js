@@ -310,6 +310,7 @@ window.openSearchBar = function() {
 }
 
 // V40.2.6: Detecta clique fora da busca pra fechar
+// V40.2.8: refinado - não fecha quando clica em cards da lista, modais, sheets ou overlays
 function handleClickOutsideSearch(e) {
     const row = document.getElementById('search-bar-row');
     // Se a busca não está aberta, remove listener (cleanup defensivo)
@@ -322,11 +323,26 @@ function handleClickOutsideSearch(e) {
     // Se o clique foi DENTRO da search-bar-row (input, X, ou qualquer filho), ignora
     if (row.contains(e.target)) return;
     
-    // Se o clique foi num resultado de busca (card clicável), ignora — goToBlockFromSearch já fecha
+    // V40.2.8: Se o clique foi dentro de um CARD (.block-item), 
+    // SHEET (.translate-y-full pode abrir), MODAL (#edit-task-modal, #delete-task-modal, etc),
+    // ou OVERLAY → NÃO fecha (deixa a ação acontecer)
     let el = e.target;
     while (el && el !== document.body) {
-        if (el.getAttribute && el.getAttribute('onclick') && el.getAttribute('onclick').indexOf('goToBlockFromSearch') !== -1) {
-            return; // deixa o onclick funcionar
+        if (!el.classList) { el = el.parentNode; continue; }
+        // Cards da lista de busca
+        if (el.classList.contains('block-item')) return;
+        // Modais e sheets que cobrem a tela
+        if (el.id === 'edit-task-modal' || el.id === 'delete-task-modal' || 
+            el.id === 'clone-sheet' || el.id === 'clone-qtd-modal' ||
+            el.id === 'time-picker-modal' || el.id === 'overlay' ||
+            el.id === 'list-sheet' || el.id === 'sheet' || el.id === 'config-sheet' ||
+            el.id === 'tags-sheet' || el.id === 'reports-sheet' ||
+            el.id === 'link-note-sheet' || el.id === 'linked-note-view-modal' ||
+            el.id === 'thought-modal' || el.id === 'period-select-sheet') return;
+        // Resultado de busca clicado
+        if (el.getAttribute && el.getAttribute('onclick') && 
+            el.getAttribute('onclick').indexOf('goToBlockFromSearch') !== -1) {
+            return;
         }
         el = el.parentNode;
     }
@@ -896,6 +912,8 @@ window.cloneManual = function() {
     document.getElementById('floating-task').classList.remove('hidden');
     document.getElementById('floating-task').classList.add('flex');
     closeAllSheets();
+    // V40.2.8: se estava na busca, fecha pra mostrar a agenda (Cópia única precisa colar em espaço livre)
+    if (searchQuery) closeSearchBar();
     renderTimeline();
     showToast("Pronto para colar! Navegue até o dia e toque num espaço livre.");
 }
@@ -931,6 +949,7 @@ window.confirmCloneQtd = function() {
     }
     saveDb();
     closeAllSheets();
+    renderTimeline(); // V40.2.8: re-render pra atualizar lista de busca se estiver ativa
     showToast(`Clonado com sucesso!`);
 }
 

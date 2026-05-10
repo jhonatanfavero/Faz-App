@@ -1,5 +1,5 @@
-// V2.0 - CORREÇÕES A1 + A2
-const CACHE_NAME = 'timeblock-v26';
+// V2.0 - CORREÇÃO B1 (Time Picker Conflito)
+const CACHE_NAME = 'timeblock-v29';
 const ASSETS = [
   './',
   './index.html',

@@ -18,6 +18,7 @@ let showOnlyCompleted = false;
 let taskToClone = null;
 let pendingCloneType = '';
 let selectedTagId = null;
+let headerHidden = false; // V2.0 - Estado do header
 
 // POPULA OS DROPDOWNS DO NOVO MENU DE JANELA DE HORÁRIOS
 const startSelect = document.getElementById('config-hour-start');
@@ -172,13 +173,13 @@ window.selectTag = function(id) {
 function renderTagSelector() {
     const container = document.getElementById('tag-selector-container');
     if(!container) return;
-    let html = `<button onclick="selectTag(null)" class="px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${selectedTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem Tag</button>`;
+    container.className = 'flex gap-2 overflow-x-auto no-scrollbar pb-2 w-full';
+    let html = `<button onclick="selectTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${selectedTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem Tag</button>`;
     tagsDb.forEach(t => {
         const isActive = selectedTagId === t.id;
         const activeClass = isActive ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100';
-        // Usamos hex color e adicionamos opacidade (15 no final do hex) pro fundo
         html += `
-            <button onclick="selectTag('${t.id}')" class="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeClass}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}">
+            <button onclick="selectTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeClass}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}">
                 <div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>
                 ${t.name}
             </button>
@@ -208,34 +209,35 @@ window.debugAdvanceDay = function() {
 
 window.toggleFilterDelayed = function() {
     showOnlyDelayed = !showOnlyDelayed;
+    showOnlyCompleted = false; 
+    
     const btn = document.getElementById('filter-delayed-btn');
+    const btnCompleted = document.getElementById('filter-completed-btn');
+    
     if (showOnlyDelayed) {
         btn.classList.replace('bg-indigo-50', 'bg-indigo-100');
-        // V2.0 - BLOCO 3: Desliga o outro filtro se estiver ativo
-        if (showOnlyCompleted) {
-            showOnlyCompleted = false;
-            document.getElementById('filter-completed-btn').classList.replace('bg-emerald-100', 'bg-emerald-50');
-        }
+        btnCompleted.classList.replace('bg-emerald-100', 'bg-emerald-50');
     } else {
         btn.classList.replace('bg-indigo-100', 'bg-indigo-50');
     }
+    
     renderTimeline();
 }
 
-// V2.0 - BLOCO 3
 window.toggleFilterCompleted = function() {
     showOnlyCompleted = !showOnlyCompleted;
-    const btn = document.getElementById('filter-completed-btn');
+    showOnlyDelayed = false; 
+    
+    const btnCompleted = document.getElementById('filter-completed-btn');
+    const btnDelayed = document.getElementById('filter-delayed-btn');
+    
     if (showOnlyCompleted) {
-        btn.classList.replace('bg-emerald-50', 'bg-emerald-100');
-        // V2.0 - BLOCO 3: Desliga o outro filtro se estiver ativo
-        if (showOnlyDelayed) {
-            showOnlyDelayed = false;
-            document.getElementById('filter-delayed-btn').classList.replace('bg-indigo-100', 'bg-indigo-50');
-        }
+        btnCompleted.classList.replace('bg-emerald-50', 'bg-emerald-100');
+        btnDelayed.classList.replace('bg-indigo-100', 'bg-indigo-50');
     } else {
-        btn.classList.replace('bg-emerald-100', 'bg-emerald-50');
+        btnCompleted.classList.replace('bg-emerald-100', 'bg-emerald-50');
     }
+    
     renderTimeline();
 }
 
@@ -246,7 +248,6 @@ function runRealTimeEngine() {
     const isToday = getActiveDateStr() === getTodayStr();
     const diffDays = Math.round((activeDateObj - now) / (1000 * 60 * 60 * 24));
     
-    // Atualiza Textos do Cabeçalho
     const headerTitle = document.getElementById('header-title');
     if (headerTitle) {
         headerTitle.innerText = diffDays === 0 ? "Hoje" : (diffDays === 1 ? "Amanhã" : "Agenda");
@@ -254,7 +255,6 @@ function runRealTimeEngine() {
     
     const options = { weekday: 'long', day: 'numeric', month: 'long' };
     
-    // V2.0 - BLOCO 2
     let dateStr = activeDateObj.toLocaleDateString('pt-BR', options);
     dateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
     
@@ -263,7 +263,7 @@ function runRealTimeEngine() {
         `<span class="font-bold text-zinc-800">${dateStr}</span>`;
 
     const nowLine = document.getElementById('now-line');
-    if (isToday && currentRealMins >= START_HOUR * 60 && currentRealMins <= END_HOUR * 60) {
+    if ((isToday && currentRealMins >= START_HOUR * 60 && currentRealMins <= END_HOUR * 60) && !showOnlyDelayed && !showOnlyCompleted) {
         const topPx = (currentRealMins - (START_HOUR * 60)) * PX_PER_MIN;
         nowLine.style.top = `${topPx}px`;
         nowLine.style.display = 'flex';
@@ -272,7 +272,6 @@ function runRealTimeEngine() {
         nowLine.style.display = 'none';
     }
 
-    // Automagicamente marca como concluído quem ficou pra trás
     let modified = false;
     db.forEach(b => {
         if (b.type === 'focus') {
@@ -287,7 +286,7 @@ function runRealTimeEngine() {
     if (modified) { saveDb(); renderTimeline(); }
 }
 
-setInterval(runRealTimeEngine, 60000); // 1 tick por minuto
+setInterval(runRealTimeEngine, 60000);
 
 // --- MICROBLOCOS FUNCTIONS ---
 window.toggleBlockCompletion = function(id, e) {
@@ -307,7 +306,6 @@ window.addMicroblock = function(blockId, input, e) {
         b.microblocks.push({ id: 'mb_' + Date.now(), title: input.value.trim(), done: false });
         saveDb();
         renderTimeline();
-        // Foco contínuo para digitação rápida tipo "metralhadora"
         setTimeout(() => {
             const newInput = document.getElementById(`micro-input-${blockId}`);
             if (newInput) newInput.focus();
@@ -337,7 +335,6 @@ window.deleteMicroblock = function(blockId, mbId, e) {
 // --- 4. O MOTOR MATEMÁTICO ---
 const container = document.getElementById('blocks-container');
 
-// Pinta e repinta a grade baseado nas configurações do usuário
 function renderGrid() {
     document.getElementById('timeline-container').style.height = `${TOTAL_MINS * PX_PER_MIN}px`;
     const yAxis = document.getElementById('y-axis');
@@ -359,21 +356,52 @@ function showToast(msg) { const t = document.getElementById('toast'); document.g
 function renderTimeline() {
     container.innerHTML = ''; 
     
-    // Filtra os blocos referentes ao dia que estamos visualizando
+    const timelineContainer = document.getElementById('timeline-container');
+    if (showOnlyDelayed || showOnlyCompleted) {
+        timelineContainer.classList.add('filter-list-mode');
+    } else {
+        timelineContainer.classList.remove('filter-list-mode');
+    }
+
+    let storedStart = localStorage.getItem('tb_start_hour');
+    let storedEnd = localStorage.getItem('tb_end_hour');
+    START_HOUR = storedStart !== null ? parseInt(storedStart) : 0;
+    END_HOUR = storedEnd !== null ? parseInt(storedEnd) : 24;
+    TOTAL_MINS = (END_HOUR - START_HOUR) * 60;
+
+    if (showOnlyDelayed || showOnlyCompleted) {
+        let filteredForWindow = db.filter(b => b.date === getActiveDateStr());
+        
+        if (showOnlyDelayed) {
+            filteredForWindow = filteredForWindow.filter(b => b.type === 'past' || b.wasDelayed);
+        }
+        if (showOnlyCompleted) {
+            filteredForWindow = filteredForWindow.filter(b => b.completed === true);
+        }
+        
+        if (filteredForWindow.length > 0) {
+            const minStart = Math.min(...filteredForWindow.map(b => b.startMin));
+            const maxEnd = Math.max(...filteredForWindow.map(b => b.startMin + b.duration));
+            
+            START_HOUR = Math.max(0, Math.floor(minStart / 60) - 1);
+            END_HOUR = Math.min(24, Math.ceil(maxEnd / 60) + 1);
+            TOTAL_MINS = (END_HOUR - START_HOUR) * 60;
+        }
+    }
+
+    renderGrid(); 
+
     let dailyDb = db.filter(b => b.date === getActiveDateStr());
     
     if (showOnlyDelayed) {
         dailyDb = dailyDb.filter(b => b.type === 'past' || b.wasDelayed);
     }
-    
-    // V2.0 - BLOCO 2
+
     if (showOnlyCompleted) {
         dailyDb = dailyDb.filter(b => b.completed === true);
     }
 
-    // Remove tarefas que estejam totalmente fora da janela de visualização do usuário
     dailyDb = dailyDb.filter(b => b.startMin < END_HOUR * 60 && (b.startMin + b.duration) > START_HOUR * 60);
-    
     dailyDb.sort((a, b) => a.startMin - b.startMin);
     
     let cursorMin = START_HOUR * 60;
@@ -381,7 +409,7 @@ function renderTimeline() {
     let renderQueue = [];
     
     dailyDb.forEach(fb => {
-        if (fb.startMin > cursorMin) {
+        if (fb.startMin > cursorMin && !showOnlyDelayed && !showOnlyCompleted) {
             renderQueue.push({ id: `e_${cursorMin}`, type: 'empty', startMin: cursorMin, duration: fb.startMin - cursorMin });
         }
         renderQueue.push(fb);
@@ -390,7 +418,7 @@ function renderTimeline() {
     });
     
     const endOfDay = END_HOUR * 60;
-    if (cursorMin < endOfDay) {
+    if (cursorMin < endOfDay && !showOnlyDelayed && !showOnlyCompleted) {
         renderQueue.push({ id: `e_${cursorMin}`, type: 'empty', startMin: cursorMin, duration: endOfDay - cursorMin });
     }
     
@@ -407,8 +435,12 @@ function drawBlock(block) {
 
     const el = document.createElement('div');
     el.className = 'absolute left-1 right-1 rounded-2xl overflow-hidden transition-all duration-300 z-10 flex flex-col';
-    el.style.top = `${topPx + 1}px`;
-    el.style.height = `${heightPx}px`;
+    el.classList.add('block-item'); 
+
+    if (!showOnlyDelayed && !showOnlyCompleted) {
+        el.style.top = `${topPx + 1}px`;
+        el.style.height = `${heightPx}px`;
+    }
 
     const isSmall = block.duration <= 30;
 
@@ -432,8 +464,7 @@ function drawBlock(block) {
         const isPast = block.type === 'past';
         const isRest = block.theme === 'rest';
 
-        // 1. Definição do Fundo e Cores da Tag
-        let bgClass = block.completed ? 'bg-emerald-100 border-emerald-200' : (isRest ? 'bg-emerald-50 border-emerald-300' : 'bg-app-focus border-indigo-400 shadow-md');
+        let bgClass = block.completed ? 'bg-emerald-100 border-emerald-200' : (isRest ? 'bg-emerald-50 border-emerald-300' : 'bg-app-focus border-transparent shadow-md');
         if (isPast && !block.completed) {
             bgClass = isRest ? 'bg-zinc-50 border-zinc-200 opacity-80 saturate-50' : 'bg-indigo-50 border-indigo-200 opacity-80 saturate-50';
         } else if (isPast && block.completed) {
@@ -442,7 +473,6 @@ function drawBlock(block) {
         const tagColor = getTagColor(block.tagId);
         let borderStyle = tagColor && !block.completed ? `border-left-width: 4px; border-left-color: ${tagColor};` : '';
 
-        // 2. Mágica da Sanfona e Microblocos
         const isMicro = !block.expanded && block.duration <= 25;
         if (block.expanded) {
             el.className += ` ${bgClass} shadow-2xl border px-3 pt-2 pb-6 group select-none transition-all duration-300`;
@@ -452,17 +482,15 @@ function drawBlock(block) {
         }
         if (borderStyle) el.style.cssText += borderStyle;
 
-        // 3. Tema de Cores (Escuro para Foco, Claro para o resto)
         const isDarkTheme = !isPast && !block.completed && !isRest;
 
-        const timeColor = isDarkTheme ? 'text-indigo-200' : 'text-zinc-500';
+        const timeColor = isDarkTheme ? 'text-white/60' : 'text-zinc-500';
         const titleClass = `${block.completed ? 'line-through opacity-60 text-emerald-900' : (isDarkTheme ? 'text-white' : (isRest ? 'text-emerald-900' : 'text-zinc-800'))}`;
-        const iconColor = isDarkTheme ? 'text-indigo-200 hover:text-white' : 'text-zinc-400 hover:text-zinc-700';
-        const checkColor = isDarkTheme ? 'text-indigo-200 hover:text-white' : (block.completed ? 'text-emerald-600 hover:text-emerald-700' : 'text-zinc-400 hover:text-emerald-600');
+        const iconColor = isDarkTheme ? 'text-white/60 hover:text-white' : 'text-zinc-400 hover:text-zinc-700';
+        const checkColor = isDarkTheme ? 'text-white/60 hover:text-white' : (block.completed ? 'text-emerald-600 hover:text-emerald-700' : 'text-zinc-400 hover:text-emerald-600');
         const btnBg = isDarkTheme ? 'bg-black/20 hover:bg-black/30' : 'bg-black/5 hover:bg-black/10';
         const glowCircle = isDarkTheme ? 'bg-white/10' : 'bg-white/60';
 
-        // 4. MICROBLOCOS RENDER
         let microblocksSection = '';
         let microHtml = (block.microblocks || []).map(mb => `
             <div class="flex items-start gap-1.5 mb-1.5 z-20 relative group/mb pointer-events-auto">
@@ -490,39 +518,39 @@ function drawBlock(block) {
         `;
 
         const showInfoIcon = isPast || block.wasDelayed;
-        const pastIconHtml = showInfoIcon ? `<div class="pointer-events-auto w-3.5 h-3.5 rounded-full ${isDarkTheme ? 'bg-indigo-500/20 border-indigo-400/30 text-indigo-300' : 'bg-black/10 border-black/10 text-zinc-500'} flex items-center justify-center shrink-0 border mr-1.5" title="Tempo Esgotado / Realocado"><i class="ph-bold ph-info text-[8px]"></i></div>` : '';
+        const pastIconHtml = showInfoIcon ? `<div class="pointer-events-auto w-3.5 h-3.5 rounded-full ${isDarkTheme ? 'bg-black/20 border-black/30 text-white/80' : 'bg-black/10 border-black/10 text-zinc-500'} flex items-center justify-center shrink-0 border mr-1.5" title="Tempo Esgotado / Realocado"><i class="ph-bold ph-info text-[8px]"></i></div>` : '';
 
         el.innerHTML = `
             <div class="absolute top-0 right-0 w-32 h-32 ${glowCircle} rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
-            <div class="flex justify-between items-start z-30 relative pointer-events-none">
+            <div class="flex justify-between items-start z-30 relative">
                 <div class="flex flex-1 min-w-0 pr-2 gap-2">
                     <div class="drag-handle w-6 h-6 flex items-center justify-center ${btnBg} ${iconColor} rounded transition pointer-events-auto shrink-0 mt-0.5" title="Arrastar (Mover)">
                         <i class="ph ph-dots-six-vertical"></i>
                     </div>
-                    <div class="flex flex-col flex-1 min-w-0">
-                        <span class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
+                    <div class="flex flex-col flex-1 min-w-0 pointer-events-auto">
+                        <span onclick="openTimePicker('${block.id}', ${block.startMin}, event)" class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate cursor-pointer hover:opacity-70 hover:underline transition w-fit" title="Alterar Horário">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
                         <div class="title-wrapper flex items-center ${isMicro ? 'mt-0' : 'mt-0.5'} min-w-0 pointer-events-none">
                             ${pastIconHtml}
                             <h3 class="block-title ${isMicro ? 'text-[13px] mt-0' : 'text-[14px]'} font-bold leading-tight truncate ${titleClass}">${block.title}</h3>
-                            <span class="micro-time ${isMicro ? 'block' : 'hidden'} text-[11px] font-bold ${timeColor} ml-1 shrink-0">&bull; <span class="micro-time-val">${formatDur(block.duration)}</span></span>
+                            <span class="micro-time ${isMicro ? 'block' : 'hidden'} text-[11px] font-bold ${timeColor} ml-1 shrink-0 cursor-pointer hover:opacity-70 hover:underline transition pointer-events-auto" onclick="openTimePicker('${block.id}', ${block.startMin}, event)" title="Alterar Horário">&bull; <span class="micro-time-val">${formatDur(block.duration)}</span></span>
                         </div>
                     </div>
                 </div>
                 
                 <div class="flex gap-1.5 shrink-0 relative z-30 pointer-events-auto">
-                    <!-- BOTÃO DE EXPANDIR -->
                     <button onclick="toggleExpandBlock('${block.id}', event)" class="w-6 h-6 flex items-center justify-center ${btnBg} ${iconColor} rounded transition" title="Expandir/Recolher">
                         <i class="ph ${block.expanded ? 'ph-caret-up' : 'ph-caret-down'}"></i>
                     </button>
                     <button onclick="toggleBlockCompletion('${block.id}', event)" class="w-6 h-6 flex items-center justify-center ${btnBg} ${checkColor} rounded transition" title="Concluir">
                         <i class="${block.completed ? 'ph-fill ph-check-circle' : 'ph ph-check'}"></i>
                     </button>
-                    <!-- BOTÃO DE DUPLICAR (SOME NO MICRO) -->
+                    <button onclick="openEditModal('${block.id}', event)" class="${isMicro ? 'hidden' : 'flex'} w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Editar">
+                        <i class="ph ph-pencil-simple"></i>
+                    </button>
                     <button onclick="duplicateTask('${block.id}', event)" class="${isMicro ? 'hidden' : 'flex'} w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Duplicar">
                         <i class="ph ph-copy"></i>
                     </button>
-                    <!-- BOTÃO DE APAGAR (SOME NO MICRO) -->
-                    <button onclick="killTask('${block.id}', event)" class="${isMicro ? 'hidden' : 'flex'} w-6 h-6 items-center justify-center ${btnBg} hover:bg-red-500/80 ${iconColor} hover:text-white rounded transition" title="Apagar">
+                    <button onclick="openDeleteModal('${block.id}', event)" class="${isMicro ? 'hidden' : 'flex'} w-6 h-6 items-center justify-center ${btnBg} hover:bg-red-500/80 ${iconColor} hover:text-white rounded transition" title="Apagar">
                         <i class="ph ph-trash"></i>
                     </button>
                 </div>
@@ -542,15 +570,12 @@ function drawBlock(block) {
 // --- 5. ENCAIXE MATEMÁTICO ---
 function performEncaixeMatematico(gapStart, gapDuration) {
     let start = gapStart;
-    // Snap to Now no dia atual
     if (getActiveDateStr() === getTodayStr() && currentRealMins >= gapStart && currentRealMins <= gapStart + gapDuration) {
         if (currentRealMins + pendingIntent.duration <= gapStart + gapDuration) {
             start = Math.round(currentRealMins / 5) * 5; 
             start = Math.max(gapStart, Math.min(start, gapStart + gapDuration - pendingIntent.duration));
         }
     }
-    
-    // Garante que o início sempre seja múltiplo de 5 (hora cheia ou +5)
     start = Math.round(start / 5) * 5;
     
     db.push({ 
@@ -569,7 +594,6 @@ function performEncaixeMatematico(gapStart, gapDuration) {
     cancelPendingTask(); 
 }
 
-// --- FUNÇÕES AUXILIARES DE DATA ---
 function addDaysToDateStr(dateStr, days) {
     let d = new Date(dateStr + 'T00:00:00'); 
     d.setDate(d.getDate() + days);
@@ -581,7 +605,6 @@ function addMonthToDateStr(dateStr, monthsToAdd) {
     return d.toLocaleDateString('en-CA');
 }
 
-// --- NOVA LÓGICA DE CLONAGEM ---
 window.duplicateTask = function(id, e) {
     e.stopPropagation();
     let b = db.find(x => x.id === id);
@@ -617,7 +640,7 @@ window.promptCloneQtd = function(type) {
     else if(type === 'weekly') { title.innerText = 'Por quantas semanas?'; input.value = '4'; }
     else if(type === 'monthly') { title.innerText = 'Por quantos meses?'; input.value = '2'; }
 
-    document.getElementById('clone-sheet').classList.add('translate-y-full'); // Esconde a aba de baixo
+    document.getElementById('clone-sheet').classList.add('translate-y-full'); 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
@@ -685,7 +708,7 @@ function enablePhysics(el, block) {
         const deltaMins = Math.round(((y - startY) / PX_PER_MIN) / 5) * 5; 
         
         let newStart = initialVal + deltaMins;
-        newStart = Math.round(newStart / 5) * 5; // Força múltiplo de 5
+        newStart = Math.round(newStart / 5) * 5; 
         newStart = Math.max(START_HOUR * 60, Math.min(newStart, (END_HOUR * 60) - block.duration));
         
         el.style.top = `${(newStart - (START_HOUR * 60)) * PX_PER_MIN}px`;
@@ -702,7 +725,6 @@ function enablePhysics(el, block) {
             el.classList.remove('dragging');
             const newStart = parseInt(el.dataset.tempStart || block.startMin);
             
-            // Checa colisão apenas no dia ativo
             const dailyDb = db.filter(b => b.date === getActiveDateStr());
             const hasCollision = dailyDb.some(fb => {
                 if (fb.id === block.id) return false;
@@ -714,7 +736,6 @@ function enablePhysics(el, block) {
             } else {
                 block.startMin = newStart;
                 
-                // Se moveu para o futuro, tira o status de past mas marca como delayed
                 const isPastDay = block.date < getTodayStr();
                 const isPastTimeToday = block.date === getTodayStr() && (block.startMin + block.duration) <= currentRealMins;
                 if (!isPastDay && !isPastTimeToday) {
@@ -735,7 +756,7 @@ function enablePhysics(el, block) {
         const dailyDb = db.filter(b => b.date === getActiveDateStr()).sort((a, b) => a.startMin - b.startMin);
         const nextBlock = dailyDb.find(b => b.startMin >= block.startMin + block.duration && b.id !== block.id);
         maxVal = nextBlock ? (nextBlock.startMin - block.startMin) : ((END_HOUR * 60) - block.startMin);
-        maxVal = Math.floor(maxVal / 5) * 5; // Garante que o limite máximo também obedeça os 5 minutos
+        maxVal = Math.floor(maxVal / 5) * 5; 
         
         document.addEventListener('touchmove', onResizeMove, {passive: false});
         document.addEventListener('mousemove', onResizeMove);
@@ -749,7 +770,7 @@ function enablePhysics(el, block) {
         const deltaMins = Math.round(((y - startY) / PX_PER_MIN) / 5) * 5; 
         
         let newDur = initialVal + deltaMins;
-        newDur = Math.round(newDur / 5) * 5; // Força múltiplo de 5
+        newDur = Math.round(newDur / 5) * 5; 
         newDur = Math.max(15, Math.min(newDur, maxVal));
         
         if (newDur !== block.duration) {
@@ -770,7 +791,7 @@ function enablePhysics(el, block) {
         document.removeEventListener('mousemove', onResizeMove);
         document.removeEventListener('touchend', onResizeEnd);
         document.removeEventListener('mouseup', onResizeEnd);
-        block.expanded = false; // Garante recolhimento ao soltar
+        block.expanded = false; 
         saveDb();
         renderTimeline(); 
     }
@@ -793,11 +814,11 @@ const fab = document.getElementById('fab-btn'),
 function syncDurButtons(mins) {
     document.querySelectorAll('.sheet-dur-btn').forEach(b => {
         b.className = 'sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm whitespace-nowrap hover:bg-zinc-50 transition';
-        if(parseInt(b.dataset.time) === mins) b.className = 'sheet-dur-btn px-4 py-2 rounded-full bg-app-focus border border-app-focus text-white text-sm font-medium whitespace-nowrap shadow-[0_0_15px_rgba(79,70,229,0.3)] transition';
+        if(parseInt(b.dataset.time) === mins) b.className = 'sheet-dur-btn px-4 py-2 rounded-full bg-app-focus border border-transparent text-white text-sm font-medium whitespace-nowrap shadow-[0_0_15px_rgba(0,0,0,0.15)] transition';
     });
     document.querySelectorAll('.float-dur-btn').forEach(b => {
         b.className = 'float-dur-btn flex-1 py-1.5 rounded bg-zinc-100 text-zinc-500 hover:bg-zinc-200 text-xs font-bold transition';
-        if(parseInt(b.dataset.time) === mins) b.className = 'float-dur-btn flex-1 py-1.5 rounded bg-app-focus text-white text-xs font-bold shadow-[0_0_10px_rgba(79,70,229,0.4)] transition';
+        if(parseInt(b.dataset.time) === mins) b.className = 'float-dur-btn flex-1 py-1.5 rounded bg-app-focus text-white text-xs font-bold shadow-[0_0_10px_rgba(0,0,0,0.2)] transition';
     });
 }
 
@@ -828,7 +849,6 @@ window.changeFloatDuration = function(mins) {
 }
 
 window.openSheet = () => {
-    // Fecha as outras abas, caso estejam abertas
     document.getElementById('config-sheet').classList.add('translate-y-full');
     document.getElementById('period-select-sheet').classList.add('translate-y-full');
     
@@ -859,6 +879,11 @@ window.closeAllSheets = () => {
     document.getElementById('clone-qtd-modal').classList.add('hidden');
     document.getElementById('clone-qtd-modal').classList.remove('flex');
     document.getElementById('tags-sheet').classList.add('translate-y-full');
+    
+    cancelEdit();
+    cancelDelete();
+    cancelTimePicker();
+
     input.blur();
     backlogInput.blur();
     if(!pendingIntent) {
@@ -867,7 +892,6 @@ window.closeAllSheets = () => {
     }
 }
 
-// Mantido para compatibilidade com partes antigas caso existam
 window.closeSheet = window.closeAllSheets;
 
 window.commitIntent = () => {
@@ -909,9 +933,9 @@ window.openPeriodSelectSheet = () => {
 window.openConfigSheet = () => {
     sheet.classList.add('translate-y-full'); 
     
-    // Reseta para o menu principal de configurações
     document.getElementById('config-periods-view').classList.add('hidden');
     document.getElementById('config-hours-view').classList.add('hidden');
+    document.getElementById('config-appearance-view').classList.add('hidden');
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
     document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
@@ -919,7 +943,6 @@ window.openConfigSheet = () => {
     document.getElementById('config-sheet').classList.remove('translate-y-full');
 }
 
-// JANELA DE HORÁRIO GERAL
 window.openConfigHours = () => {
     document.getElementById('config-main-menu').classList.add('hidden');
     document.getElementById('config-hours-view').classList.remove('hidden');
@@ -959,7 +982,6 @@ window.saveConfigHours = () => {
     showToast("Horários Atualizados!");
 }
 
-// GERENCIAR PERÍODOS DE TEMPO (Manhã, Tarde, etc.)
 window.openConfigPeriods = () => {
     document.getElementById('config-main-menu').classList.add('hidden');
     document.getElementById('config-periods-view').classList.remove('hidden');
@@ -987,11 +1009,10 @@ window.commitPeriodBlock = (periodId) => {
     
     const startMins = timeToMins(period.start);
     let endMins = timeToMins(period.end);
-    if (endMins <= startMins) endMins += 24 * 60; // Vira o dia
+    if (endMins <= startMins) endMins += 24 * 60; 
     
     const title = input.value.trim() || period.name;
     
-    // Verifica colisão antes de empurrar pro banco
     const hasCollision = db.some(fb => fb.date === getActiveDateStr() && (startMins < fb.startMin + fb.duration && endMins > fb.startMin));
     if (hasCollision) {
         showToast("Conflito! O período se sobrepõe a outra tarefa.");
@@ -1093,11 +1114,10 @@ window.scheduleBacklogItem = (id) => {
     const item = backlogDb.find(i => i.id === id);
     if(!item) return;
 
-    // Remove da lista para ir pro calendário
     backlogDb = backlogDb.filter(i => i.id !== id);
     saveBacklog();
 
-    pendingIntent = { title: item.title, duration: item.duration, theme: 'focus' };
+    pendingIntent = { title: item.title, duration: item.duration, theme: 'focus', tagId: item.tagId || null };
     selectedDur = item.duration;
     syncDurButtons(selectedDur);
     
@@ -1113,26 +1133,25 @@ function renderBacklog() {
     const container = document.getElementById('backlog-container');
     document.getElementById('backlog-count').innerText = backlogDb.length;
     
-    // Atualiza o Botão Flutuante e Cabeçalho da Lista
     const totalMins = backlogDb.reduce((acc, item) => acc + item.duration, 0);
     const listStats = document.getElementById('list-btn-stats');
     const listCount = document.getElementById('list-btn-count');
     const listTime = document.getElementById('list-btn-time');
-    const backlogTotalTime = document.getElementById('backlog-total-time');
+    const backlogTotalTime = document.getElementById('backlog-total-time'); // Keep this if exists
     
     if (backlogDb.length > 0) {
         listStats.classList.remove('hidden');
         listStats.classList.add('flex');
         listCount.innerText = backlogDb.length + (backlogDb.length === 1 ? ' item' : ' itens');
         listTime.innerText = formatDur(totalMins);
-        
-        backlogTotalTime.innerText = formatDur(totalMins);
-        backlogTotalTime.classList.remove('hidden');
+        if (backlogTotalTime) {
+            backlogTotalTime.innerText = formatDur(totalMins);
+            backlogTotalTime.classList.remove('hidden');
+        }
     } else {
         listStats.classList.add('hidden');
         listStats.classList.remove('flex');
-        
-        backlogTotalTime.classList.add('hidden');
+        if (backlogTotalTime) backlogTotalTime.classList.add('hidden');
     }
     
     if (backlogDb.length === 0) {
@@ -1140,16 +1159,21 @@ function renderBacklog() {
             <div class="flex flex-col items-center justify-center h-full text-center opacity-50 py-8">
                 <i class="ph ph-inbox text-4xl mb-2"></i>
                 <p class="text-sm font-medium">Lista vazia!</p>
-                <p class="text-xs">Programe suas tarefas aqui.</p>
             </div>`;
         return;
     }
 
-    container.innerHTML = backlogDb.map(item => `
+    container.innerHTML = backlogDb.map(item => {
+        const tagColor = item.tagId ? getTagColor(item.tagId) : null;
+        const tagHtml = tagColor ? `<div class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${tagColor};"></div>` : '';
+        return `
         <div class="flex justify-between items-center bg-white border border-zinc-200 p-3.5 rounded-xl mb-3 shadow-sm hover:shadow transition-shadow group">
-            <div class="flex flex-col min-w-0 pr-3 flex-1">
-                <span class="text-sm font-bold text-zinc-800 truncate mb-0.5">${item.title}</span>
-                <span class="text-[11px] font-bold text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i> ${formatDur(item.duration)}</span>
+            <div class="flex items-start gap-2 min-w-0 pr-3 flex-1">
+                ${tagHtml ? `<div class="mt-1">${tagHtml}</div>` : ''}
+                <div class="flex flex-col min-w-0">
+                    <span class="text-sm font-bold text-zinc-800 truncate mb-0.5">${item.title}</span>
+                    <span class="text-[11px] font-bold text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i> ${formatDur(item.duration)}</span>
+                </div>
             </div>
             <div class="flex gap-2 shrink-0">
                 <button onclick="scheduleBacklogItem('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-500 hover:text-white transition-colors" title="Segurar e Agendar">
@@ -1160,7 +1184,7 @@ function renderBacklog() {
                 </button>
             </div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 window.cancelPendingTask = () => {
@@ -1176,26 +1200,31 @@ input.addEventListener('keypress', e => { if (e.key === 'Enter') commitIntent();
 backlogInput.addEventListener('keypress', e => { if (e.key === 'Enter') addBacklogItem(); });
 
 // --- INICIALIZAÇÃO ---
-renderGrid(); // Renderiza o visual da linha do tempo baseado nas configurações
+renderGrid(); 
 runRealTimeEngine();
 renderTimeline();
 renderBacklog();
 renderTagSelector();
+applyThemeColor(); // V2.0 - Tema inicial
 
-// Pula pro momento atual
 setTimeout(() => {
     const scrollEl = document.getElementById('timeline-scroll');
-    const targetY = (currentRealMins - (START_HOUR * 60)) * PX_PER_MIN - (scrollEl.clientHeight / 2);
+    let targetY;
+    
+    if (showOnlyDelayed || showOnlyCompleted) {
+        targetY = 0; 
+    } else {
+        targetY = (currentRealMins - (START_HOUR * 60)) * PX_PER_MIN - (scrollEl.clientHeight / 2);
+    }
+    
     scrollEl.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
 }, 300);
 
-// Detecta instalação e mostra prompt
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
   
-  // Cria banner de instalação (opcional)
   const installBanner = document.createElement('div');
   installBanner.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-3 animate-float-bubble';
   installBanner.innerHTML = `
@@ -1214,11 +1243,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
     deferredPrompt = null;
   });
   
-  // Remove banner após 10 segundos se não clicar
   setTimeout(() => installBanner.remove(), 10000);
 });
 
-// --- REGISTRO DO SERVICE WORKER (PWA) ---
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
@@ -1229,4 +1256,241 @@ if ('serviceWorker' in navigator) {
         console.log('Falha ao registrar o Service Worker:', error);
       });
   });
+}
+
+// V2.0 - BLOCO 7: Toggle Header
+window.toggleHeader = function() {
+    headerHidden = !headerHidden;
+    const header = document.querySelector('header');
+    const timeline = document.getElementById('timeline-scroll');
+    const btn = document.querySelector('[onclick="toggleHeader()"]');
+    
+    if (headerHidden) {
+        header.style.height = '56px';
+        header.style.overflow = 'hidden';
+        timeline.style.paddingTop = '64px';
+        if(btn) btn.innerHTML = '<i class="ph ph-caret-down text-lg sm:text-xl text-zinc-600"></i>';
+    } else {
+        header.style.height = 'auto';
+        header.style.overflow = 'visible';
+        timeline.style.paddingTop = '180px';
+        if(btn) btn.innerHTML = '<i class="ph ph-caret-up text-lg sm:text-xl text-zinc-600"></i>';
+    }
+}
+
+// --- V2.0 - COMBO A: Edição ---
+let editingTaskId = null;
+let editingTagId = null;
+
+window.openEditModal = function(id, e) {
+    if(e) e.stopPropagation();
+    const b = db.find(x => x.id === id);
+    if(!b) return;
+    
+    closeAllSheets(); 
+    
+    editingTaskId = id;
+    editingTagId = b.tagId;
+    
+    document.getElementById('edit-task-title').value = b.title;
+    renderEditTagSelector();
+    
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('edit-task-modal').classList.remove('hidden');
+    document.getElementById('edit-task-modal').classList.add('flex');
+}
+
+window.selectEditTag = function(id) {
+    editingTagId = editingTagId === id ? null : id;
+    renderEditTagSelector();
+}
+
+window.renderEditTagSelector = function() {
+    const container = document.getElementById('edit-tag-selector-container');
+    if(!container) return;
+    container.className = 'flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2 w-full';
+    let html = `<button onclick="selectEditTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${editingTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
+    tagsDb.forEach(t => {
+        const isActive = editingTagId === t.id;
+        const activeClass = isActive ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100';
+        html += `<button onclick="selectEditTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeClass}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>${t.name}</button>`;
+    });
+    container.innerHTML = html;
+}
+
+window.saveEditTask = function() {
+    if(!editingTaskId) return;
+    const b = db.find(x => x.id === editingTaskId);
+    const newTitle = document.getElementById('edit-task-title').value.trim();
+    if(b && newTitle) {
+        b.title = newTitle;
+        b.tagId = editingTagId;
+        saveDb();
+        renderTimeline();
+    }
+    cancelEdit();
+}
+
+window.cancelEdit = function() {
+    editingTaskId = null;
+    document.getElementById('edit-task-modal').classList.add('hidden');
+    document.getElementById('edit-task-modal').classList.remove('flex');
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+}
+
+// --- V2.0 - COMBO A: Exclusão ---
+let deletingTaskId = null;
+
+window.openDeleteModal = function(id, e) {
+    if(e) e.stopPropagation();
+    
+    closeAllSheets(); 
+    deletingTaskId = id;
+    
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('delete-task-modal').classList.remove('hidden');
+    document.getElementById('delete-task-modal').classList.add('flex');
+}
+
+window.moveToBacklog = function() {
+    if(!deletingTaskId) return;
+    const b = db.find(x => x.id === deletingTaskId);
+    if(b) {
+        backlogDb.push({ id: 'bl_' + Date.now(), title: b.title, duration: b.duration, tagId: b.tagId || null });
+        saveBacklog();
+        db = db.filter(x => x.id !== deletingTaskId);
+        saveDb();
+        renderTimeline();
+        renderBacklog();
+        showToast("Movido para a lista!");
+    }
+    closeAllSheets();
+    cancelDelete();
+}
+
+window.confirmKillTask = function() {
+    if(!deletingTaskId) return;
+    db = db.filter(b => b.id !== deletingTaskId);
+    saveDb();
+    renderTimeline();
+    closeAllSheets();
+    cancelDelete();
+    showToast("Tarefa excluída.");
+}
+
+window.cancelDelete = function() {
+    deletingTaskId = null;
+    document.getElementById('delete-task-modal').classList.add('hidden');
+    document.getElementById('delete-task-modal').classList.remove('flex');
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+}
+
+// --- V2.0 - COMBO B: Time Picker ---
+let timePickerBlockId = null;
+
+window.openTimePicker = function(blockId, currentMin, e) {
+    if(e) e.stopPropagation();
+    
+    closeAllSheets();
+    timePickerBlockId = blockId;
+    
+    const h = Math.floor(currentMin / 60).toString().padStart(2, '0');
+    const m = (currentMin % 60).toString().padStart(2, '0');
+    
+    document.getElementById('edit-time-input').value = `${h}:${m}`;
+    
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('time-picker-modal').classList.remove('hidden');
+    document.getElementById('time-picker-modal').classList.add('flex');
+}
+
+window.confirmTimePicker = function() {
+    if(!timePickerBlockId) return;
+    const timeVal = document.getElementById('edit-time-input').value;
+    if(!timeVal) return;
+    
+    const [h, m] = timeVal.split(':').map(Number);
+    let newStart = (h * 60) + m;
+    newStart = Math.round(newStart / 5) * 5; 
+    
+    const block = db.find(b => b.id === timePickerBlockId);
+    if(!block) return;
+    
+    newStart = Math.max(START_HOUR * 60, Math.min(newStart, (END_HOUR * 60) - block.duration));
+    
+    const dailyDb = db.filter(b => b.date === block.date && b.id !== timePickerBlockId);
+    const hasCollision = dailyDb.some(fb => {
+        return (newStart < fb.startMin + fb.duration && newStart + block.duration > fb.startMin);
+    });
+
+    if (hasCollision) {
+        showToast("Conflito! Horário ocupado.");
+        return;
+    }
+    
+    block.startMin = newStart;
+    
+    const isPastDay = block.date < getTodayStr();
+    const isPastTimeToday = block.date === getTodayStr() && (block.startMin + block.duration) <= currentRealMins;
+    if (!isPastDay && !isPastTimeToday) {
+        if (block.type === 'past') block.wasDelayed = true;
+        block.type = 'focus';
+    }
+    
+    saveDb();
+    renderTimeline();
+    cancelTimePicker();
+    showToast("Horário atualizado!");
+}
+
+window.cancelTimePicker = function() {
+    timePickerBlockId = null;
+    document.getElementById('time-picker-modal').classList.add('hidden');
+    document.getElementById('time-picker-modal').classList.remove('flex');
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+}
+
+// --- V2.0 - COMBO C: Aparência ---
+let themeColor = localStorage.getItem('tb_theme_color') || '#4f46e5';
+
+window.openConfigAppearance = function() {
+    document.getElementById('config-main-menu').classList.add('hidden');
+    document.getElementById('config-appearance-view').classList.remove('hidden');
+    document.getElementById('config-title').innerText = 'Aparência';
+    document.getElementById('config-back-btn').setAttribute('onclick', 'closeConfigAppearance()');
+    
+    document.querySelectorAll('.theme-color-btn').forEach(btn => {
+        btn.classList.remove('scale-110', 'shadow-sm', 'border-zinc-900');
+        btn.classList.add('border-transparent');
+        if(btn.dataset.color === themeColor) {
+            btn.classList.remove('border-transparent');
+            btn.classList.add('scale-110', 'shadow-sm', 'border-zinc-900');
+        }
+    });
+}
+
+window.closeConfigAppearance = function() {
+    document.getElementById('config-appearance-view').classList.add('hidden');
+    document.getElementById('config-main-menu').classList.remove('hidden');
+    document.getElementById('config-title').innerText = 'Configurações';
+    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+}
+
+window.selectThemeColor = function(btn) {
+    themeColor = btn.dataset.color;
+    localStorage.setItem('tb_theme_color', themeColor);
+    
+    document.querySelectorAll('.theme-color-btn').forEach(b => {
+        b.classList.remove('scale-110', 'shadow-sm', 'border-zinc-900');
+        b.classList.add('border-transparent');
+    });
+    btn.classList.remove('border-transparent');
+    btn.classList.add('scale-110', 'shadow-sm', 'border-zinc-900');
+    
+    applyThemeColor();
+    showToast("Cor atualizada!");
+}
+
+window.applyThemeColor = function() {
+    document.documentElement.style.setProperty('--theme-color', themeColor);
 }

@@ -179,7 +179,7 @@ function renderTagSelector() {
     const container = document.getElementById('tag-selector-container');
     if(!container) return;
     container.className = 'flex gap-2 overflow-x-auto no-scrollbar pb-2 w-full';
-    let html = `<button onclick="selectTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${selectedTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem Tag</button>`;
+    let html = `<button onclick="selectTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${selectedTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem Tag</button>`;
     tagsDb.forEach(t => {
         const isActive = selectedTagId === t.id;
         const activeClass = isActive ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100';
@@ -1634,14 +1634,14 @@ window.renderReports = function(period) {
     let globalPct = totalMins > 0 ? Math.round((globalCompleted / totalMins) * 100) : 0;
 
     let html = `
-        <div class="bg-zinc-900 text-white p-4 rounded-xl flex items-center justify-between shadow-md mb-2">
+        <div class="bg-app-focus text-white p-4 rounded-xl flex items-center justify-between shadow-md mb-2">
             <div>
-                <p class="text-[10px] uppercase tracking-widest text-zinc-400 font-bold mb-1">Global</p>
+                <p class="text-[10px] uppercase tracking-widest text-white/60 font-bold mb-1">Global</p>
                 <p class="text-3xl font-black">${globalPct}%</p>
             </div>
             <div class="text-right flex flex-col gap-1">
-                <p class="text-xs text-zinc-300 font-bold bg-white/10 px-2 py-0.5 rounded"><span class="text-emerald-400 mr-1">●</span> ${formatDur(globalCompleted)} concluídos</p>
-                <p class="text-xs text-zinc-400 font-bold bg-white/5 px-2 py-0.5 rounded"><span class="text-zinc-500 mr-1">●</span> ${formatDur(totalMins)} totais</p>
+                <p class="text-xs text-white/90 font-bold bg-white/10 px-2 py-0.5 rounded"><span class="text-emerald-300 mr-1">●</span> ${formatDur(globalCompleted)} concluídos</p>
+                <p class="text-xs text-white/70 font-bold bg-white/5 px-2 py-0.5 rounded"><span class="text-white/50 mr-1">●</span> ${formatDur(totalMins)} totais</p>
             </div>
         </div>
     `;
@@ -1809,7 +1809,7 @@ window.renderEditTagSelector = function() {
     const container = document.getElementById('edit-tag-selector-container');
     if(!container) return;
     container.className = 'flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2 w-full';
-    let html = `<button onclick="selectEditTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${editingTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
+    let html = `<button onclick="selectEditTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${editingTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
     tagsDb.forEach(t => {
         const isActive = editingTagId === t.id;
         const activeClass = isActive ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100';

@@ -1,5 +1,5 @@
-// V3.0 - v40.1.8 (Harmonia visual TOTAL: classes soft + extermínio do indigo + TAGs/Relatórios com border tema)
-const CACHE_NAME = 'timeblock-v40-1-8';
+// V3.0 - v40.1.9 (Card Global em Relatórios + 4 botões CTA com cor do tema; extermínio TOTAL do bg-zinc-900)
+const CACHE_NAME = 'timeblock-v40-1-9';
 const ASSETS = [
   './',
   './index.html',

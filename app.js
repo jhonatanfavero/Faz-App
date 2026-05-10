@@ -565,12 +565,16 @@ function drawBlock(block) {
                     <button onclick="toggleBlockCompletion('${block.id}', event)" class="w-6 h-6 flex items-center justify-center ${btnBg} ${checkColor} rounded transition" title="Concluir">
                         <i class="${block.completed ? 'ph-fill ph-check-circle' : 'ph ph-check'}"></i>
                     </button>
+                    <!-- BOTÃO DE EDITAR (SOME NO MICRO) -->
+                    <button onclick="openEditModal('${block.id}', event)" class="${isMicro ? 'hidden' : 'flex'} w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Editar">
+                        <i class="ph ph-pencil-simple"></i>
+                    </button>
                     <!-- BOTÃO DE DUPLICAR (SOME NO MICRO) -->
                     <button onclick="duplicateTask('${block.id}', event)" class="${isMicro ? 'hidden' : 'flex'} w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Duplicar">
                         <i class="ph ph-copy"></i>
                     </button>
                     <!-- BOTÃO DE APAGAR (SOME NO MICRO) -->
-                    <button onclick="killTask('${block.id}', event)" class="${isMicro ? 'hidden' : 'flex'} w-6 h-6 items-center justify-center ${btnBg} hover:bg-red-500/80 ${iconColor} hover:text-white rounded transition" title="Apagar">
+                    <button onclick="openDeleteModal('${block.id}', event)" class="${isMicro ? 'hidden' : 'flex'} w-6 h-6 items-center justify-center ${btnBg} hover:bg-red-500/80 ${iconColor} hover:text-white rounded transition" title="Apagar">
                         <i class="ph ph-trash"></i>
                     </button>
                 </div>
@@ -1308,4 +1312,104 @@ window.toggleHeader = function() {
 window.showHeader = function() {
     headerHidden = false;
     toggleHeader();
+}
+
+// --- V2.0 - COMBO A: Edição ---
+let editingTaskId = null;
+let editingTagId = null;
+
+window.openEditModal = function(id, e) {
+    if(e) e.stopPropagation();
+    const b = db.find(x => x.id === id);
+    if(!b) return;
+    editingTaskId = id;
+    editingTagId = b.tagId;
+    
+    document.getElementById('edit-task-title').value = b.title;
+    renderEditTagSelector();
+    
+    closeAllSheets(); 
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('edit-task-modal').classList.remove('hidden');
+    document.getElementById('edit-task-modal').classList.add('flex');
+}
+
+window.selectEditTag = function(id) {
+    editingTagId = editingTagId === id ? null : id;
+    renderEditTagSelector();
+}
+
+window.renderEditTagSelector = function() {
+    const container = document.getElementById('edit-tag-selector-container');
+    if(!container) return;
+    let html = `<button onclick="selectEditTag(null)" class="px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${editingTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
+    tagsDb.forEach(t => {
+        const isActive = editingTagId === t.id;
+        const activeClass = isActive ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100';
+        html += `<button onclick="selectEditTag('${t.id}')" class="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeClass}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>${t.name}</button>`;
+    });
+    container.innerHTML = html;
+}
+
+window.saveEditTask = function() {
+    if(!editingTaskId) return;
+    const b = db.find(x => x.id === editingTaskId);
+    const newTitle = document.getElementById('edit-task-title').value.trim();
+    if(b && newTitle) {
+        b.title = newTitle;
+        b.tagId = editingTagId;
+        saveDb();
+        renderTimeline();
+    }
+    cancelEdit();
+}
+
+window.cancelEdit = function() {
+    editingTaskId = null;
+    document.getElementById('edit-task-modal').classList.add('hidden');
+    document.getElementById('edit-task-modal').classList.remove('flex');
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+}
+
+// --- V2.0 - COMBO A: Exclusão ---
+let deletingTaskId = null;
+
+window.openDeleteModal = function(id, e) {
+    if(e) e.stopPropagation();
+    deletingTaskId = id;
+    closeAllSheets();
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('delete-task-modal').classList.remove('hidden');
+    document.getElementById('delete-task-modal').classList.add('flex');
+}
+
+window.moveToBacklog = function() {
+    if(!deletingTaskId) return;
+    const b = db.find(x => x.id === deletingTaskId);
+    if(b) {
+        backlogDb.push({ id: 'bl_' + Date.now(), title: b.title, duration: b.duration });
+        saveBacklog();
+        db = db.filter(x => x.id !== deletingTaskId);
+        saveDb();
+        renderTimeline();
+        renderBacklog();
+        showToast("Movido para a lista!");
+    }
+    cancelDelete();
+}
+
+window.confirmKillTask = function() {
+    if(!deletingTaskId) return;
+    db = db.filter(b => b.id !== deletingTaskId);
+    saveDb();
+    renderTimeline();
+    cancelDelete();
+    showToast("Tarefa excluída.");
+}
+
+window.cancelDelete = function() {
+    deletingTaskId = null;
+    document.getElementById('delete-task-modal').classList.add('hidden');
+    document.getElementById('delete-task-modal').classList.remove('flex');
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
 }

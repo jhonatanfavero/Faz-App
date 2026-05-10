@@ -1,5 +1,5 @@
-// V2.0 - CORREÇÃO B1 (Time Picker Conflito)
-const CACHE_NAME = 'timeblock-v29';
+// V2.0 - CORREÇÃO B3 (Fechar Template Literal)
+const CACHE_NAME = 'timeblock-v31';
 const ASSETS = [
   './',
   './index.html',

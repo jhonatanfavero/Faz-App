@@ -1,10 +1,12 @@
-// V2.0 - CORREÇ
+// V2.0 - v32 Corrigida
+const CACHE_NAME = 'timeblock-v32';
+const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js'
   // CDNs e fontes externas ficam de fora para evitar falhas de CORS na instalação do SW
-;
+];
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

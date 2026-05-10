@@ -1149,7 +1149,7 @@ window.scheduleBacklogItem = (id) => {
     backlogDb = backlogDb.filter(i => i.id !== id);
     saveBacklog();
 
-    pendingIntent = { title: item.title, duration: item.duration, theme: 'focus' };
+    pendingIntent = { title: item.title, duration: item.duration, theme: 'focus', tagId: item.tagId || null };
     selectedDur = item.duration;
     syncDurButtons(selectedDur);
     
@@ -1387,7 +1387,7 @@ window.moveToBacklog = function() {
     if(!deletingTaskId) return;
     const b = db.find(x => x.id === deletingTaskId);
     if(b) {
-        backlogDb.push({ id: 'bl_' + Date.now(), title: b.title, duration: b.duration });
+        backlogDb.push({ id: 'bl_' + Date.now(), title: b.title, duration: b.duration, tagId: b.tagId || null });
         saveBacklog();
         db = db.filter(x => x.id !== deletingTaskId);
         saveDb();

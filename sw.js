@@ -1,5 +1,5 @@
-// V3.0 - v40.1.5 (Polimento visual: FAB+ branco com borda do tema, "Inserir na Agenda" mais proporcional)
-const CACHE_NAME = 'timeblock-v40-1-5';
+// V3.0 - v40.1.6 (Cor do tema: header + TAGs + Relatórios + ícones; "+ Adicionar Check"; botão Metas placeholder)
+const CACHE_NAME = 'timeblock-v40-1-6';
 const ASSETS = [
   './',
   './index.html',

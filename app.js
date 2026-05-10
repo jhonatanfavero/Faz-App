@@ -529,7 +529,7 @@ function drawBlock(block) {
             <div class="flex-1 overflow-y-auto no-scrollbar mt-2 mb-2 z-20 relative pointer-events-auto ${!block.expanded && block.duration <= 25 ? 'hidden' : ''}">
                 ${microHtml}
                 <div class="mt-1">
-                    <input type="text" id="micro-input-${block.id}" placeholder="+ Adicionar" class="microblock-input w-full rounded-md px-2 py-1.5 text-[10px] font-medium outline-none transition-colors border ${mbInputClasses}" onkeypress="if(event.key==='Enter') addMicroblock('${block.id}', this, event)">
+                    <input type="text" id="micro-input-${block.id}" placeholder="+ Adicionar Check" class="microblock-input w-full rounded-md px-2 py-1.5 text-[10px] font-medium outline-none transition-colors border ${mbInputClasses}" onkeypress="if(event.key==='Enter') addMicroblock('${block.id}', this, event)">
                 </div>
             </div>
         `;
@@ -1022,6 +1022,11 @@ window.openPeriodSelectSheet = () => {
     sheet.classList.add('translate-y-full'); 
     renderPeriodSelect();
     document.getElementById('period-select-sheet').classList.remove('translate-y-full');
+}
+
+window.comingSoonMetas = () => {
+    // V40.1.6: Placeholder para futuro recurso de Metas
+    showToast("Metas chegando em breve! 🎯");
 }
 
 window.openConfigSheet = () => {

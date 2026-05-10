@@ -1,11 +1,10 @@
-// V2.0 - CORREÇÃO D1 (Ordem Modais)
-const CACHE_NAME = 'timeblock-v33';
+// V2.0 - v34 (Correções Gemini: FAB + botões + scrollbar)
+const CACHE_NAME = 'timeblock-v34';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js'
-  // CDNs e fontes externas ficam de fora para evitar falhas de CORS na instalação do SW
 ];
 
 self.addEventListener('install', (e) => {

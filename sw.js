@@ -1,5 +1,5 @@
-// V3.0 - v40.1.4 (Clone com microblocks + UX do FAB: placeholder, foco auto, "Inserir na Agenda" no tema)
-const CACHE_NAME = 'timeblock-v40-1-4';
+// V3.0 - v40.1.5 (Polimento visual: FAB+ branco com borda do tema, "Inserir na Agenda" mais proporcional)
+const CACHE_NAME = 'timeblock-v40-1-5';
 const ASSETS = [
   './',
   './index.html',

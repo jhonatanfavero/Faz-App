@@ -41,26 +41,26 @@
         
         <header class="absolute top-0 w-full z-30 pt-12 pb-4 px-6 bg-app-bg/90 backdrop-blur-xl border-b border-black/5 pointer-events-none">
             <div class="flex flex-col gap-4 mb-4 pointer-events-auto">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <p class="text-zinc-500 text-[13px] font-medium flex items-center gap-1.5 mt-0.5" id="header-date">
+                <div class="flex justify-between items-center gap-2">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-zinc-500 text-[13px] font-medium flex items-center gap-1.5 mt-0.5 truncate" id="header-date">
                             Carregando...
                         </p>
                     </div>
-                    <div class="flex gap-1.5">
-                        <button onclick="debugPreviousDay()" class="bg-zinc-100 px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl hover:bg-zinc-200 transition border border-zinc-200" title="Dia Anterior">
-                            <i class="ph ph-rewind text-lg sm:text-xl text-zinc-600"></i>
+                    <div class="flex gap-1 shrink-0">
+                        <button onclick="debugPreviousDay()" class="w-9 h-9 flex items-center justify-center bg-zinc-100 rounded-xl hover:bg-zinc-200 transition border border-zinc-200" title="Dia Anterior">
+                            <i class="ph ph-rewind text-base text-zinc-600"></i>
                         </button>
-                        <button onclick="goToToday()" class="bg-zinc-100 px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl hover:bg-zinc-200 transition border border-zinc-200" title="Voltar para Hoje">
-                            <i class="ph ph-calendar-star text-lg sm:text-xl text-zinc-600"></i>
+                        <button onclick="goToToday()" class="w-9 h-9 flex items-center justify-center bg-zinc-100 rounded-xl hover:bg-zinc-200 transition border border-zinc-200" title="Voltar para Hoje">
+                            <i class="ph ph-calendar-star text-base text-zinc-600"></i>
                         </button>
-                        <button onclick="debugAdvanceDay()" class="bg-zinc-100 px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl hover:bg-zinc-200 transition border border-zinc-200" title="Avançar Dia">
-                            <i class="ph ph-fast-forward text-lg sm:text-xl text-zinc-600"></i>
+                        <button onclick="debugAdvanceDay()" class="w-9 h-9 flex items-center justify-center bg-zinc-100 rounded-xl hover:bg-zinc-200 transition border border-zinc-200" title="Avançar Dia">
+                            <i class="ph ph-fast-forward text-base text-zinc-600"></i>
+                        </button>
+                        <button onclick="toggleHeader()" class="w-9 h-9 flex items-center justify-center bg-zinc-100 rounded-xl hover:bg-zinc-200 transition border border-zinc-200" title="Ocultar Menu">
+                            <i class="ph ph-caret-up text-base text-zinc-600"></i>
                         </button>
                     </div>
-                    <button onclick="toggleHeader()" class="bg-zinc-100 p-2 sm:p-2.5 rounded-full hover:bg-zinc-200 transition border border-zinc-200" title="Ocultar Menu">
-                        <i class="ph ph-caret-up text-lg sm:text-xl text-zinc-600"></i>
-                    </button>
                 </div>
                 
                 <div class="flex gap-2">
@@ -132,8 +132,8 @@
             </div>
         </main>
 
-        <button id="fab-btn" onclick="openSheet()" class="absolute bottom-8 right-6 w-14 h-14 bg-zinc-900 text-white rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(0,0,0,0.25)] hover:scale-105 active:scale-95 transition-all duration-300 z-30">
-            <i class="ph ph-plus text-2xl font-bold"></i>
+        <button id="fab-btn" onclick="openSheet()" class="absolute bottom-8 right-6 w-14 h-14 bg-white border-2 border-app-focus text-app-focus rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(0,0,0,0.15)] hover:scale-105 active:scale-95 transition-all duration-300 z-30">
+            <i class="ph-bold ph-plus text-2xl"></i>
         </button>
 
         <button id="list-btn" onclick="openListSheet()" class="absolute bottom-8 left-6 h-14 min-w-[56px] bg-white border border-zinc-200 text-zinc-800 rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(0,0,0,0.15)] hover:scale-105 active:scale-95 transition-all duration-300 z-30 px-3 overflow-hidden">
@@ -177,8 +177,8 @@
                 </div>
             </div>
 
-            <button onclick="commitIntent()" class="w-full bg-app-focus text-white font-bold py-3.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition flex items-center justify-center gap-2">
-                <i class="ph ph-calendar-plus text-lg"></i> Inserir na Agenda
+            <button onclick="commitIntent()" class="w-full bg-app-focus text-white font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition flex items-center justify-center gap-1.5 text-sm">
+                <i class="ph ph-calendar-plus text-base"></i> Inserir na Agenda
             </button>
         </div>
 

@@ -258,9 +258,14 @@ function runRealTimeEngine() {
         headerTitle.innerText = diffDays === 0 ? "Hoje" : (diffDays === 1 ? "Amanhã" : "Agenda");
     }
     
-    const options = { weekday: 'long', day: 'numeric', month: 'long' };
-    
-    let dateStr = activeDateObj.toLocaleDateString('pt-BR', options);
+    // V40.1.5: data abreviada (Sex, 15 mai) — mostra ano se for diferente do ano atual
+    const currentYear = new Date().getFullYear();
+    const activeYear = activeDateObj.getFullYear();
+    const opts = { weekday: 'short', day: 'numeric', month: 'short' };
+    if (activeYear !== currentYear) opts.year = '2-digit';
+    let dateStr = activeDateObj.toLocaleDateString('pt-BR', opts);
+    // Limpa pontos e ajusta capitalização ("seg., 15 de mai." → "Seg, 15 mai")
+    dateStr = dateStr.replace(/\./g, '').replace(/ de /g, ' ');
     dateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
     
     document.getElementById('header-date').innerHTML = 

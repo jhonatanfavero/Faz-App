@@ -548,11 +548,11 @@ function drawBlock(block) {
                         <i class="ph ph-dots-six-vertical"></i>
                     </div>
                     <div class="flex flex-col flex-1 min-w-0">
-                        <span class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
+                        <span onclick="openTimePicker('${block.id}', ${block.startMin}, event)" class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate cursor-pointer hover:opacity-70 transition pointer-events-auto" title="Alterar Horário">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
                         <div class="title-wrapper flex items-center ${isMicro ? 'mt-0' : 'mt-0.5'} min-w-0 pointer-events-none">
                             ${pastIconHtml}
                             <h3 class="block-title ${isMicro ? 'text-[13px] mt-0' : 'text-[14px]'} font-bold leading-tight truncate ${titleClass}">${block.title}</h3>
-                            <span class="micro-time ${isMicro ? 'block' : 'hidden'} text-[11px] font-bold ${timeColor} ml-1 shrink-0">&bull; <span class="micro-time-val">${formatDur(block.duration)}</span></span>
+                            <span class="micro-time ${isMicro ? 'block' : 'hidden'} text-[11px] font-bold ${timeColor} ml-1 shrink-0 pointer-events-auto">&bull; <span onclick="openTimePicker('${block.id}', ${block.startMin}, event)" class="micro-time-val cursor-pointer hover:opacity-70 transition" title="Alterar Horário">${formatDur(block.duration)}</span></span>
                         </div>
                     </div>
                 </div>
@@ -964,6 +964,7 @@ window.openConfigSheet = () => {
     // Reseta para o menu principal de configurações
     document.getElementById('config-periods-view').classList.add('hidden');
     document.getElementById('config-hours-view').classList.add('hidden');
+    document.getElementById('config-appearance-view').classList.add('hidden');
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
     document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
@@ -1422,3 +1423,111 @@ window.cancelDelete = function() {
     document.getElementById('delete-task-modal').classList.remove('flex');
     document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
 }
+
+// --- V2.0 - COMBO B: Time Picker ---
+let timePickerBlockId = null;
+
+window.openTimePicker = function(blockId, currentMin, e) {
+    if(e) e.stopPropagation();
+    timePickerBlockId = blockId;
+    const hours = Math.floor(currentMin / 60).toString().padStart(2, '0');
+    const mins = (currentMin % 60).toString().padStart(2, '0');
+    document.getElementById('edit-time-input').value = `${hours}:${mins}`;
+    
+    closeAllSheets();
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('time-picker-modal').classList.remove('hidden');
+    document.getElementById('time-picker-modal').classList.add('flex');
+}
+
+window.confirmTimePicker = function() {
+    if(!timePickerBlockId) return;
+    const timeStr = document.getElementById('edit-time-input').value;
+    if(!timeStr) return showToast("Selecione um horário válido.");
+    
+    const parts = timeStr.split(':');
+    const newStartMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+    
+    const b = db.find(x => x.id === timePickerBlockId);
+    if(!b) return;
+
+    // V2.0 - Validar conflito
+    const dailyDb = db.filter(blockItem => blockItem.date === getActiveDateStr() && blockItem.id !== timePickerBlockId);
+    const hasCollision = dailyDb.some(fb => {
+        return (newStartMin < fb.startMin + fb.duration && newStartMin + b.duration > fb.startMin);
+    });
+
+    if (hasCollision) {
+        showToast("Conflito! Horário já ocupado.");
+        return; // Não salva
+    }
+
+    b.startMin = newStartMin;
+    saveDb();
+    renderTimeline();
+    showToast("Horário atualizado!");
+    cancelTimePicker();
+}
+
+window.cancelTimePicker = function() {
+    timePickerBlockId = null;
+    document.getElementById('time-picker-modal').classList.add('hidden');
+    document.getElementById('time-picker-modal').classList.remove('flex');
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+}
+
+// --- V2.0 - COMBO C: Aparência ---
+let themeColor = localStorage.getItem('tb_theme_color') || '#4f46e5';
+
+window.openConfigAppearance = function() {
+    document.getElementById('config-main-menu').classList.add('hidden');
+    document.getElementById('config-appearance-view').classList.remove('hidden');
+    document.getElementById('config-title').innerText = 'Aparência';
+    document.getElementById('config-back-btn').setAttribute('onclick', 'closeConfigAppearance()');
+}
+
+window.closeConfigAppearance = function() {
+    document.getElementById('config-appearance-view').classList.add('hidden');
+    document.getElementById('config-main-menu').classList.remove('hidden');
+    document.getElementById('config-title').innerText = 'Configurações';
+    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+}
+
+window.selectThemeColor = function(btn) {
+    themeColor = btn.dataset.color;
+    localStorage.setItem('tb_theme_color', themeColor);
+    
+    document.querySelectorAll('.theme-color-btn').forEach(b => {
+        b.classList.remove('scale-110', 'shadow-sm', 'border-zinc-900');
+        b.classList.add('border-transparent');
+    });
+    btn.classList.remove('border-transparent');
+    btn.classList.add('scale-110', 'shadow-sm', 'border-zinc-900');
+    
+    applyThemeColor();
+    showToast("Cor atualizada!");
+}
+
+window.applyThemeColor = function() {
+    let styleEl = document.getElementById('dynamic-theme-style');
+    if(!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'dynamic-theme-style';
+        document.head.appendChild(styleEl);
+    }
+    styleEl.innerHTML = `
+        .bg-app-focus { background-color: ${themeColor} !important; }
+        .text-app-focus { color: ${themeColor} !important; }
+        .border-app-focus { border-color: ${themeColor} !important; }
+        .focus\\:border-app-focus:focus { border-color: ${themeColor} !important; }
+        .bg-app-neon { background-color: ${themeColor} !important; }
+        .text-app-neon { color: ${themeColor} !important; }
+        .shadow-\\[0_0_15px_rgba\\(79\\,70\\,229\\,0\\.3\\)\\] { box-shadow: 0 0 15px ${themeColor}4D !important; }
+        .shadow-\\[0_0_10px_rgba\\(0\\,210\\,255\\,0\\.8\\)\\] { box-shadow: 0 0 10px ${themeColor}CC !important; }
+    `;
+}
+
+// Injeta as cores ao carregar
+document.addEventListener('DOMContentLoaded', () => {
+    applyThemeColor();
+});

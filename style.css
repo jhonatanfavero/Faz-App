@@ -11,3 +11,32 @@ body { touch-action: pan-y; background-color: #e2e8f0; }
 .micro-block .block-title { margin-top: 0 !important; font-size: 13px !important; }
 .micro-block .micro-time { display: block !important; }
 body { overflow-x: hidden; max-width: 100vw; }
+
+/* V2.0 - Modo lista para filtros */
+.filter-list-mode #grid-lines,
+.filter-list-mode #y-axis,
+.filter-list-mode #now-line {
+    display: none !important;
+}
+
+.filter-list-mode #blocks-container {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    padding: 12px 0 !important;
+}
+
+.filter-list-mode .block-item {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    height: auto !important;
+    min-height: 80px !important;
+}
+
+.filter-list-mode .drag-handle,
+.filter-list-mode .resize-handle {
+    display: none !important;
+}

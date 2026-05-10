@@ -19,6 +19,7 @@ let taskToClone = null;
 let pendingCloneType = '';
 let selectedTagId = null;
 let headerHidden = false; // V2.0 - Estado do header
+let themeColor = localStorage.getItem('tb_theme_color') || '#4f46e5';
 
 // POPULA OS DROPDOWNS DO NOVO MENU DE JANELA DE HORÁRIOS
 const startSelect = document.getElementById('config-hour-start');
@@ -1453,7 +1454,6 @@ window.cancelTimePicker = function() {
 }
 
 // --- V2.0 - COMBO C: Aparência ---
-let themeColor = localStorage.getItem('tb_theme_color') || '#4f46e5';
 
 window.openConfigAppearance = function() {
     document.getElementById('config-main-menu').classList.add('hidden');

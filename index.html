@@ -74,8 +74,8 @@
                     <button onclick="openTagsSheet()" class="bg-white border border-zinc-200 px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center truncate">
                         TAGs
                     </button>
-                    <button class="bg-white border border-zinc-200 px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center truncate">
-                        Nova Função
+                    <button onclick="openReportsSheet()" class="bg-white border border-zinc-200 px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
+                        <i class="ph ph-chart-bar text-sm"></i> Relatórios
                     </button>
                 </div>
             </div>
@@ -440,6 +440,26 @@
             <div class="flex gap-2">
                 <button onclick="cancelTimePicker()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
                 <button onclick="confirmTimePicker()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:bg-indigo-700 shadow-[0_0_15px_rgba(79,70,229,0.3)] transition">Confirmar</button>
+            </div>
+        </div>
+
+        <!-- V3.0 - COMBO E: Relatórios -->
+        <div id="reports-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
+            <div class="flex items-center justify-between mb-6 shrink-0">
+                <div class="flex items-center gap-3">
+                    <button onclick="closeAllSheets()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-x text-lg"></i></button>
+                    <h2 class="text-lg font-bold text-zinc-900">Produtividade</h2>
+                </div>
+            </div>
+            
+            <div class="flex gap-2 overflow-x-auto no-scrollbar mb-5 shrink-0 bg-zinc-50 p-1.5 rounded-xl border border-zinc-200">
+                <button onclick="renderReports('today')" id="btn-rep-today" class="flex-1 py-1.5 rounded-lg bg-white shadow-sm text-zinc-800 text-xs font-bold transition border border-black/5">Hoje</button>
+                <button onclick="renderReports('week')" id="btn-rep-week" class="flex-1 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 text-xs font-bold transition border border-transparent">7 Dias</button>
+                <button onclick="renderReports('month')" id="btn-rep-month" class="flex-1 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 text-xs font-bold transition border border-transparent">30 Dias</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-3" id="reports-container">
             </div>
         </div>
 

@@ -1,5 +1,5 @@
-// V3.0 - v40.2.6 (Busca multi-dia + clique fora fecha busca)
-const CACHE_NAME = 'timeblock-v40-2-6';
+// V3.0 - v40.2.7 (Cards na busca multi-dia com todas as ações da agenda + selos por data)
+const CACHE_NAME = 'timeblock-v40-2-7';
 const ASSETS = [
   './',
   './index.html',

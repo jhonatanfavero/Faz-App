@@ -52,3 +52,14 @@ body { overflow-x: hidden; max-width: 100vw; }
     padding-left: 16px !important;
     padding-right: 16px !important;
 }
+
+/* V40.2.7: Selo de data agrupando resultados de busca por dia */
+.search-date-seal {
+    text-align: left;
+    margin-top: 8px;
+    margin-bottom: 4px;
+    width: 100%;
+}
+.search-date-seal:first-child {
+    margin-top: 0;
+}

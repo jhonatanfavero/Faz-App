@@ -623,35 +623,28 @@ function renderSearchResultsAllDays() {
                 <p class="text-xs text-zinc-400 mt-1">Tente outro termo de busca</p>
             </div>
         `;
-        // Limpar progress
         document.getElementById('progress-bar').style.width = '0%';
         document.getElementById('progress-text').innerText = 'Busca';
         return;
     }
     
-    // Renderiza cada resultado como item de lista clicável
-    container.innerHTML = results.map(b => {
-        const dateLabel = formatSearchDate(b.date, today);
-        const tag = (typeof tagsDb !== 'undefined' && b.tagId) ? tagsDb.find(t => t.id === b.tagId) : null;
-        const tagBadge = tag 
-            ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background-color:${tag.color}20; color:${tag.color}">${escapeHtml(tag.name)}</span>` 
-            : '';
-        const completedDot = b.completed ? '<span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>' : '';
+    // V40.2.7: agrupa por data e renderiza selo + drawBlock pra cada
+    // (drawBlock dá ao card TODAS as funcionalidades: expandir, marcar concluído, microblocks, notas, etc.)
+    let lastDate = null;
+    results.forEach(b => {
+        // Selo de data antes do primeiro card de cada dia
+        if (b.date !== lastDate) {
+            const dateLabel = formatSearchDate(b.date, today);
+            const seal = document.createElement('div');
+            seal.className = 'search-date-seal';
+            seal.innerHTML = `<span class="text-[11px] font-bold text-app-focus uppercase tracking-wider px-3 py-1 rounded-full bg-app-focus-soft border border-app-focus-soft inline-block">${dateLabel}</span>`;
+            container.appendChild(seal);
+            lastDate = b.date;
+        }
         
-        return `
-            <div onclick="goToBlockFromSearch('${b.id}')" class="bg-white border border-zinc-200 rounded-xl p-3 mb-2 hover:bg-zinc-50 active:scale-[0.99] transition cursor-pointer">
-                <div class="flex items-start justify-between gap-2 mb-1">
-                    <p class="text-[11px] font-bold text-app-focus uppercase tracking-wider">${dateLabel}</p>
-                    ${tagBadge}
-                </div>
-                <div class="flex items-center gap-2">
-                    ${completedDot}
-                    <p class="text-sm font-semibold text-zinc-800 truncate flex-1">${escapeHtml(b.title)}</p>
-                </div>
-                <p class="text-[11px] text-zinc-500 mt-1">${formatClock(b.startMin)} · ${formatDur(b.duration)}</p>
-            </div>
-        `;
-    }).join('');
+        // V40.2.7: drawBlock dá card completo com todas as ações
+        drawBlock(b);
+    });
     
     // Limpar progress
     document.getElementById('progress-bar').style.width = '0%';

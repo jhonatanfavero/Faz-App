@@ -537,20 +537,20 @@ function drawBlock(block) {
                     </div>
                 </div>
                 
-                <div class="flex gap-1.5 shrink-0 relative z-50 pointer-events-auto">
+                <div class="flex gap-1.5 shrink-0 relative z-50 pointer-events-auto select-auto">
                     <button onclick="toggleExpandBlock('${block.id}', event)" class="w-6 h-6 flex items-center justify-center ${btnBg} ${iconColor} rounded transition" title="Expandir/Recolher">
                         <i class="ph ${block.expanded ? 'ph-caret-up' : 'ph-caret-down'}"></i>
                     </button>
                     <button onclick="toggleBlockCompletion('${block.id}', event)" class="w-6 h-6 flex items-center justify-center ${btnBg} ${checkColor} rounded transition" title="Concluir">
                         <i class="${block.completed ? 'ph-fill ph-check-circle' : 'ph ph-check'}"></i>
                     </button>
-                    <button onclick="openEditModal('${block.id}', event)" class="${isMicro ? 'hidden' : 'flex'} w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Editar">
+                    <button onclick="openEditModal('${block.id}', event)" class="flex w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Editar">
                         <i class="ph ph-pencil-simple"></i>
                     </button>
-                    <button onclick="duplicateTask('${block.id}', event)" class="${isMicro ? 'hidden' : 'flex'} w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Duplicar">
+                    <button onclick="duplicateTask('${block.id}', event)" class="flex w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Duplicar">
                         <i class="ph ph-copy"></i>
                     </button>
-                    <button onclick="openDeleteModal('${block.id}', event)" class="${isMicro ? 'hidden' : 'flex'} w-6 h-6 items-center justify-center ${btnBg} hover:bg-red-500/80 ${iconColor} hover:text-white rounded transition" title="Apagar">
+                    <button onclick="openDeleteModal('${block.id}', event)" class="flex w-6 h-6 items-center justify-center ${btnBg} hover:bg-red-500/80 ${iconColor} hover:text-white rounded transition" title="Apagar">
                         <i class="ph ph-trash"></i>
                     </button>
                 </div>
@@ -857,16 +857,12 @@ window.openSheet = () => {
 
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     sheet.classList.remove('translate-y-full');
-    fab.style.transform = 'scale(0)';
-    if(listBtn) listBtn.style.transform = 'scale(0)';
 }
 
 window.openListSheet = () => {
     renderBacklog();
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     listSheet.classList.remove('translate-y-full');
-    fab.style.transform = 'scale(0)';
-    if(listBtn) listBtn.style.transform = 'scale(0)';
 }
 
 window.closeAllSheets = () => {
@@ -1199,18 +1195,13 @@ window.cancelPendingTask = () => {
 input.addEventListener('keypress', e => { if (e.key === 'Enter') commitIntent(); });
 backlogInput.addEventListener('keypress', e => { if (e.key === 'Enter') addBacklogItem(); });
 
-// V2.0 - Aplicar tema
-window.applyThemeColor = function() {
-    document.documentElement.style.setProperty('--theme-color', themeColor);
-}
-applyThemeColor();
-
 // --- INICIALIZAÇÃO ---
 renderGrid(); 
 runRealTimeEngine();
 renderTimeline();
 renderBacklog();
 renderTagSelector();
+applyThemeColor(); // V2.0 - Tema inicial
 
 setTimeout(() => {
     const scrollEl = document.getElementById('timeline-scroll');
@@ -1494,4 +1485,8 @@ window.selectThemeColor = function(btn) {
     
     applyThemeColor();
     showToast("Cor atualizada!");
+}
+
+window.applyThemeColor = function() {
+    document.documentElement.style.setProperty('--theme-color', themeColor);
 }

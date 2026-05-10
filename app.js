@@ -1198,9 +1198,14 @@ function renderBacklog() {
     }
 
     container.innerHTML = backlogDb.map(item => `
+    container.innerHTML = backlogDb.map(item => {
+        const tagColor = getTagColor(item.tagId);
+        const tagHtml = tagColor ? `<div class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${tagColor};"></div>` : '';
+        return `
         <div class="flex justify-between items-center bg-white border border-zinc-200 p-3.5 rounded-xl mb-3 shadow-sm hover:shadow transition-shadow group">
             <div class="flex flex-col min-w-0 pr-3 flex-1">
                 <span class="text-sm font-bold text-zinc-800 truncate mb-0.5">${item.title}</span>
+                <div class="flex items-center gap-1.5 mb-0.5 min-w-0">${tagHtml}<span class="text-sm font-bold text-zinc-800 truncate">${item.title}</span></div>
                 <span class="text-[11px] font-bold text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i> ${formatDur(item.duration)}</span>
             </div>
             <div class="flex gap-2 shrink-0">
@@ -1213,6 +1218,7 @@ function renderBacklog() {
             </div>
         </div>
     `).join('');
+    `}).join('');
 }
 
 window.cancelPendingTask = () => {
@@ -1343,10 +1349,13 @@ window.renderEditTagSelector = function() {
     const container = document.getElementById('edit-tag-selector-container');
     if(!container) return;
     let html = `<button onclick="selectEditTag(null)" class="px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${editingTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
+    container.className = 'flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2 w-full justify-start items-center';
+    let html = `<button onclick="selectEditTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${editingTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
     tagsDb.forEach(t => {
         const isActive = editingTagId === t.id;
         const activeClass = isActive ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100';
         html += `<button onclick="selectEditTag('${t.id}')" class="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeClass}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>${t.name}</button>`;
+        html += `<button onclick="selectEditTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeClass}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>${t.name}</button>`;
     });
     container.innerHTML = html;
 }

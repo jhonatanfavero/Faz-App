@@ -1,5 +1,5 @@
-// V2.0 - v34 (Correções Gemini: FAB + botões + scrollbar)
-const CACHE_NAME = 'timeblock-v34';
+// V3.0 - v35 (COMBO E: Relatórios)
+const CACHE_NAME = 'timeblock-v35';
 const ASSETS = [
   './',
   './index.html',

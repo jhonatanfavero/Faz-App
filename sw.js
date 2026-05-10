@@ -1,5 +1,5 @@
-// V3.0 - v40.2.4 (Data com weekday completo "Domingo, 10 mai" + botão pensamento proporcional 32px rounded-xl)
-const CACHE_NAME = 'timeblock-v40-2-4';
+// V3.0 - v40.2.5 (Nuvem Passageira + botão lupa de busca + reorganização do header)
+const CACHE_NAME = 'timeblock-v40-2-5';
 const ASSETS = [
   './',
   './index.html',

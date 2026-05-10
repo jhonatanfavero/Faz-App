@@ -42,19 +42,19 @@
         <header class="absolute top-0 w-full z-30 pt-12 pb-4 px-6 bg-app-bg/90 backdrop-blur-xl border-b border-black/5 pointer-events-none">
             <div class="flex flex-col gap-4 mb-4 pointer-events-auto">
                 <div class="flex justify-between items-center gap-2">
-                    <div class="min-w-0 flex-1 flex items-center gap-2">
+                    <div class="min-w-0 flex-1">
                         <p class="text-zinc-700 text-[15px] font-semibold flex items-center gap-1.5 mt-0.5 truncate" id="header-date">
                             Carregando...
                         </p>
-                        <button onclick="showThoughtOfDay()" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft border border-app-focus-soft text-app-focus rounded-xl hover:bg-app-focus-soft-strong active:scale-95 transition shrink-0" title="Pensamento do dia">
+                    </div>
+                    <div class="flex gap-1 shrink-0" id="header-btns-cluster">
+                        <button id="thought-btn-wrap" onclick="showThoughtOfDay()" class="w-9 h-9 flex items-center justify-center bg-white border-2 border-app-focus text-app-focus rounded-xl hover:bg-zinc-50 active:scale-95 transition shrink-0" title="Pensamento do dia">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-[18px] h-[18px]">
                                 <path d="M16.5 13C18.4 13 20 11.4 20 9.5C20 7.8 18.7 6.4 17.1 6.1C17.1 4.4 15.6 3 13.8 3C12.7 3 11.7 3.5 11.1 4.3C10.4 3.5 9.3 3 8.2 3C6.3 3 4.7 4.5 4.7 6.4C4.7 6.6 4.7 6.8 4.8 7C3.5 7.5 2.5 8.7 2.5 10.2C2.5 11.7 3.5 13 5 13H16.5Z"/>
                                 <circle cx="6" cy="16" r="1.3" fill="currentColor"/>
                                 <circle cx="3.5" cy="19" r="0.9" fill="currentColor"/>
                             </svg>
                         </button>
-                    </div>
-                    <div class="flex gap-1 shrink-0">
                         <button onclick="debugPreviousDay()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Dia Anterior">
                             <i class="ph ph-rewind text-base text-app-focus"></i>
                         </button>
@@ -64,11 +64,26 @@
                         <button onclick="debugAdvanceDay()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Avançar Dia">
                             <i class="ph ph-fast-forward text-base text-app-focus"></i>
                         </button>
+                        <button onclick="openSearchBar()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Buscar cartão">
+                            <i class="ph ph-magnifying-glass text-base text-app-focus"></i>
+                        </button>
                         <button onclick="toggleHeader()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Ocultar Menu">
                             <i class="ph ph-caret-up text-base text-app-focus"></i>
                         </button>
                     </div>
                 </div>
+                
+                <!-- V40.2.5: Barra de busca colapsável -->
+                <div id="search-bar-row" class="hidden flex items-center gap-2">
+                    <div class="flex-1 relative">
+                        <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-app-focus text-base pointer-events-none"></i>
+                        <input type="text" id="search-input" placeholder="Buscar cartão..." autocomplete="off" oninput="onSearchInput(this.value)" class="w-full bg-white border-2 border-app-focus rounded-xl pl-9 pr-3 py-2 text-sm font-medium text-zinc-800 placeholder-zinc-400 focus:outline-none transition">
+                    </div>
+                    <button onclick="closeSearchBar()" class="w-9 h-9 flex items-center justify-center bg-zinc-100 text-zinc-500 rounded-xl hover:bg-zinc-200 transition shrink-0" title="Fechar busca">
+                        <i class="ph ph-x text-base"></i>
+                    </button>
+                </div>
+                <p id="search-counter" class="hidden text-[12px] font-semibold text-app-focus -mt-2"></p>
                 
                 <div class="flex gap-2">
                     <button id="filter-delayed-btn" onclick="toggleFilterDelayed()" class="bg-app-focus-soft border border-app-focus-soft p-2 rounded-xl hover:bg-app-focus-soft-strong transition flex items-center justify-center shrink-0" title="Filtrar Atrasados">

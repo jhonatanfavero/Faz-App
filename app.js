@@ -20,6 +20,7 @@ let pendingCloneType = '';
 let selectedTagId = null;
 let headerHidden = false; // V2.0 - Estado do header
 let themeColor = localStorage.getItem('tb_theme_color') || '#4f46e5';
+let searchQuery = ''; // V40.2.5: termo de busca por título do cartão
 
 // POPULA OS DROPDOWNS DO NOVO MENU DE JANELA DE HORÁRIOS
 const startSelect = document.getElementById('config-hour-start');
@@ -197,18 +198,21 @@ function renderTagSelector() {
 
 // --- 3. AUTOMAÇÃO: O TEMPO E DIAS ---
 window.debugPreviousDay = function() {
+    if (searchQuery) closeSearchBar(); // V40.2.5: limpa busca ao trocar dia
     activeDateObj.setDate(activeDateObj.getDate() - 1);
     runRealTimeEngine();
     renderTimeline();
 }
 
 window.goToToday = function() {
+    if (searchQuery) closeSearchBar(); // V40.2.5: limpa busca ao trocar dia
     activeDateObj = new Date();
     runRealTimeEngine();
     renderTimeline();
 }
 
 window.debugAdvanceDay = function() {
+    if (searchQuery) closeSearchBar(); // V40.2.5: limpa busca ao trocar dia
     activeDateObj.setDate(activeDateObj.getDate() + 1);
     runRealTimeEngine();
     renderTimeline();
@@ -250,8 +254,11 @@ window.toggleFilterCompleted = function() {
 }
 
 // V40.2.1: Limpa ambos os filtros e atualiza visual dos botões
+// V40.2.5: também limpa busca por nome
 window.clearFilters = function() {
-    if (!showOnlyDelayed && !showOnlyCompleted) return false; // nada a fazer
+    const hadFilters = showOnlyDelayed || showOnlyCompleted;
+    const hadSearch = !!searchQuery;
+    if (!hadFilters && !hadSearch) return false; // nada a fazer
     
     showOnlyDelayed = false;
     showOnlyCompleted = false;
@@ -262,8 +269,79 @@ window.clearFilters = function() {
     if (btnDelayed) btnDelayed.classList.replace('bg-app-focus-soft-strong', 'bg-app-focus-soft');
     if (btnCompleted) btnCompleted.classList.replace('bg-emerald-100', 'bg-emerald-50');
     
+    // V40.2.5: limpa busca também
+    if (hadSearch) closeSearchBar();
+    
     renderTimeline();
-    return true; // filtros foram limpos
+    return true;
+}
+
+// V40.2.5: Normaliza texto pra busca (remove acentos + lowercase)
+function normalizeText(str) {
+    if (!str) return '';
+    return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+// V40.2.5: Abre a barra de busca
+window.openSearchBar = function() {
+    // Limpa outros filtros pra evitar combinações confusas
+    if (showOnlyDelayed || showOnlyCompleted) {
+        showOnlyDelayed = false;
+        showOnlyCompleted = false;
+        const btnD = document.getElementById('filter-delayed-btn');
+        const btnC = document.getElementById('filter-completed-btn');
+        if (btnD) btnD.classList.replace('bg-app-focus-soft-strong', 'bg-app-focus-soft');
+        if (btnC) btnC.classList.replace('bg-emerald-100', 'bg-emerald-50');
+    }
+    
+    const row = document.getElementById('search-bar-row');
+    const cluster = document.getElementById('header-btns-cluster');
+    if (row) { row.classList.remove('hidden'); row.classList.add('flex'); }
+    if (cluster) cluster.classList.add('hidden');
+    
+    setTimeout(() => {
+        const input = document.getElementById('search-input');
+        if (input) input.focus();
+    }, 50);
+}
+
+window.closeSearchBar = function() {
+    searchQuery = '';
+    const input = document.getElementById('search-input');
+    if (input) input.value = '';
+    
+    const row = document.getElementById('search-bar-row');
+    const cluster = document.getElementById('header-btns-cluster');
+    if (row) { row.classList.add('hidden'); row.classList.remove('flex'); }
+    if (cluster) cluster.classList.remove('hidden');
+    
+    const counter = document.getElementById('search-counter');
+    if (counter) { counter.classList.add('hidden'); counter.innerText = ''; }
+    
+    renderTimeline();
+}
+
+window.onSearchInput = function(value) {
+    searchQuery = value || '';
+    renderTimeline();
+    // Atualizar contador após render
+    setTimeout(updateSearchCounter, 10);
+}
+
+// V40.2.5: Atualiza contador "X resultados de Y"
+function updateSearchCounter() {
+    const counter = document.getElementById('search-counter');
+    if (!counter) return;
+    if (!searchQuery.trim()) {
+        counter.classList.add('hidden');
+        counter.innerText = '';
+        return;
+    }
+    const q = normalizeText(searchQuery);
+    const todayBlocks = db.filter(b => b.date === getActiveDateStr());
+    const matched = todayBlocks.filter(b => normalizeText(b.title).includes(q)).length;
+    counter.innerText = `${matched} ${matched === 1 ? 'resultado' : 'resultados'} de "${searchQuery}"`;
+    counter.classList.remove('hidden');
 }
 
 function runRealTimeEngine() {
@@ -368,7 +446,8 @@ const container = document.getElementById('blocks-container');
 function renderGrid() {
     // V3.0 - Bug 2.5: Modo filtro com altura automática
     const tlContainer = document.getElementById('timeline-container');
-    if (showOnlyDelayed || showOnlyCompleted) {
+    const isSearching = !!(searchQuery && searchQuery.trim());
+    if (showOnlyDelayed || showOnlyCompleted || isSearching) {
         tlContainer.style.height = 'auto';
     } else {
         tlContainer.style.height = `${TOTAL_MINS * PX_PER_MIN}px`;
@@ -393,7 +472,8 @@ function renderTimeline() {
     container.innerHTML = ''; 
     
     const timelineContainer = document.getElementById('timeline-container');
-    if (showOnlyDelayed || showOnlyCompleted) {
+    const isSearching = !!(searchQuery && searchQuery.trim());
+    if (showOnlyDelayed || showOnlyCompleted || isSearching) {
         timelineContainer.classList.add('filter-list-mode');
     } else {
         timelineContainer.classList.remove('filter-list-mode');
@@ -405,7 +485,7 @@ function renderTimeline() {
     END_HOUR = storedEnd !== null ? parseInt(storedEnd) : 24;
     TOTAL_MINS = (END_HOUR - START_HOUR) * 60;
 
-    if (showOnlyDelayed || showOnlyCompleted) {
+    if (showOnlyDelayed || showOnlyCompleted || isSearching) {
         let filteredForWindow = db.filter(b => b.date === getActiveDateStr());
         
         if (showOnlyDelayed) {
@@ -413,6 +493,10 @@ function renderTimeline() {
         }
         if (showOnlyCompleted) {
             filteredForWindow = filteredForWindow.filter(b => b.completed === true);
+        }
+        if (isSearching) {
+            const q = normalizeText(searchQuery);
+            filteredForWindow = filteredForWindow.filter(b => normalizeText(b.title).includes(q));
         }
         
         if (filteredForWindow.length > 0) {
@@ -435,6 +519,12 @@ function renderTimeline() {
 
     if (showOnlyCompleted) {
         dailyDb = dailyDb.filter(b => b.completed === true);
+    }
+
+    // V40.2.5: filtro de busca por nome (normaliza acentos, case-insensitive)
+    if (searchQuery && searchQuery.trim()) {
+        const q = normalizeText(searchQuery);
+        dailyDb = dailyDb.filter(b => normalizeText(b.title).includes(q));
     }
 
     dailyDb = dailyDb.filter(b => b.startMin < END_HOUR * 60 && (b.startMin + b.duration) > START_HOUR * 60);
@@ -1382,6 +1472,19 @@ const THOUGHTS_OF_DAY = [
     "Você não precisa fazer tudo. Só o que importa."
 ];
 
+// V40.2.5: Verifica se o pensamento de hoje já foi lido e esconde o botão
+function updateThoughtBtnVisibility() {
+    const btn = document.getElementById('thought-btn-wrap');
+    if (!btn) return;
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const lastRead = localStorage.getItem('tb_thought_read_date');
+    if (lastRead === today) {
+        btn.style.display = 'none';
+    } else {
+        btn.style.display = '';
+    }
+}
+
 // Mostra o modal com a "frase do dia" (mesma frase por 24h, baseada na data)
 window.showThoughtOfDay = function() {
     // Índice baseado na data atual (mesma frase o dia todo)
@@ -1403,6 +1506,11 @@ window.closeThoughtModal = function() {
     const modal = document.getElementById('thought-modal');
     modal.classList.add('hidden');
     modal.classList.remove('flex');
+    
+    // V40.2.5: Nuvem Passageira - marca como lida e esconde o botão até amanhã
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    localStorage.setItem('tb_thought_read_date', todayStr);
+    updateThoughtBtnVisibility();
 }
 
 // =====================================================
@@ -2064,6 +2172,7 @@ renderTimeline();
 renderBacklog();
 renderTagSelector();
 applyThemeColor(); // V2.0 - Aplicar tema salvo
+updateThoughtBtnVisibility(); // V40.2.5 - Nuvem Passageira (esconde se já leu hoje)
 
 setTimeout(() => {
     const scrollEl = document.getElementById('timeline-scroll');

@@ -1,5 +1,5 @@
-// V3.0 - v40.1.2 (Editar nota com lápis: reusa Estado B com pré-preenchimento)
-const CACHE_NAME = 'timeblock-v40-1-2';
+// V3.0 - v40.1.3 (Auto-retrair card: 1 por vez + click-out + scroll com threshold; placeholder microbloco simplificado)
+const CACHE_NAME = 'timeblock-v40-1-3';
 const ASSETS = [
   './',
   './index.html',

@@ -447,6 +447,7 @@ function drawBlock(block) {
     const el = document.createElement('div');
     el.className = 'absolute left-1 right-1 rounded-2xl overflow-hidden transition-all duration-300 z-10 flex flex-col';
     el.classList.add('block-item'); 
+    el.dataset.blockId = block.id; // V40.1.3: identificação para click-out auto-retrair
 
     if (!showOnlyDelayed && !showOnlyCompleted) {
         el.style.top = `${topPx + 1}px`;
@@ -523,7 +524,7 @@ function drawBlock(block) {
             <div class="flex-1 overflow-y-auto no-scrollbar mt-2 mb-2 z-20 relative pointer-events-auto ${!block.expanded && block.duration <= 25 ? 'hidden' : ''}">
                 ${microHtml}
                 <div class="mt-1">
-                    <input type="text" id="micro-input-${block.id}" placeholder="+ adicionar microbloco" class="microblock-input w-full rounded-md px-2 py-1.5 text-[10px] font-medium outline-none transition-colors border ${mbInputClasses}" onkeypress="if(event.key==='Enter') addMicroblock('${block.id}', this, event)">
+                    <input type="text" id="micro-input-${block.id}" placeholder="+ Adicionar" class="microblock-input w-full rounded-md px-2 py-1.5 text-[10px] font-medium outline-none transition-colors border ${mbInputClasses}" onkeypress="if(event.key==='Enter') addMicroblock('${block.id}', this, event)">
                 </div>
             </div>
         `;
@@ -688,11 +689,69 @@ window.killTask = function(id, e) {
 window.toggleExpandBlock = function(id, e) {
     e.stopPropagation();
     let b = db.find(x => x.id === id);
-    if(b) {
-        b.expanded = !b.expanded;
-        renderTimeline();
+    if(!b) return;
+    
+    const willExpand = !b.expanded;
+    
+    if (willExpand) {
+        // V40.1.3: regra "1 por vez" — retrai todos os outros antes
+        db.forEach(x => { if (x.id !== id) x.expanded = false; });
     }
+    
+    b.expanded = willExpand;
+    renderTimeline();
 }
+
+// V40.1.3: Auto-retrair cards expandidos
+// Helper: retrai todos os cards e re-renderiza apenas se algo mudou
+function collapseAllBlocks() {
+    let changed = false;
+    db.forEach(b => { if (b.expanded) { b.expanded = false; changed = true; } });
+    if (changed) renderTimeline();
+}
+
+// Flag para evitar retração durante drag/resize (a física já gerencia o expanded)
+let isPhysicsBusy = false;
+
+// 3a) Click-out: clicar na timeline fora de um card expandido retrai todos
+// Usamos delegação no #timeline-scroll, capturando na fase de bubbling
+(function setupClickOutCollapse() {
+    const timeline = document.getElementById('timeline-scroll');
+    if (!timeline) return;
+    timeline.addEventListener('click', (e) => {
+        if (isPhysicsBusy) return;
+        // Se o click foi dentro de um card que ESTÁ expandido, ignora
+        // (operações dentro do card como microbloco, lápis, lixeira, etc continuam funcionando)
+        const blockEl = e.target.closest('.block-item');
+        if (blockEl) {
+            const id = blockEl.dataset.blockId;
+            const b = id ? db.find(x => x.id === id) : null;
+            if (b && b.expanded) return; // click dentro do expandido — não fazer nada
+        }
+        // Click fora de qualquer card expandido (área vazia, ou em card retraído sem afetá-lo)
+        collapseAllBlocks();
+    });
+})();
+
+// 3b) Scroll com threshold: precisa rolar > 30px para retrair (evita acidente)
+//     Debounce: só reage 120ms após o usuário parar de rolar (suaviza)
+(function setupScrollCollapse() {
+    const timeline = document.getElementById('timeline-scroll');
+    if (!timeline) return;
+    let scrollStartY = null;
+    let scrollDebounce = null;
+    const THRESHOLD = 30; // px
+    timeline.addEventListener('scroll', () => {
+        if (isPhysicsBusy) return;
+        if (scrollStartY === null) scrollStartY = timeline.scrollTop;
+        clearTimeout(scrollDebounce);
+        scrollDebounce = setTimeout(() => {
+            const delta = Math.abs(timeline.scrollTop - scrollStartY);
+            if (delta > THRESHOLD) collapseAllBlocks();
+            scrollStartY = null;
+        }, 120);
+    }, { passive: true });
+})();
 
 // --- 6. A FÍSICA MALEÁVEL ---
 function enablePhysics(el, block) {
@@ -703,6 +762,7 @@ function enablePhysics(el, block) {
 
     function onDragStart(e) {
         e.preventDefault(); e.stopPropagation();
+        isPhysicsBusy = true; // V40.1.3: bloquear auto-retrair durante drag
         startY = e.touches ? e.touches[0].clientY : e.clientY;
         initialVal = block.startMin;
         el.classList.add('dragging');
@@ -757,10 +817,13 @@ function enablePhysics(el, block) {
             saveDb();
             renderTimeline();
         }
+        // V40.1.3: liberar auto-retrair após pequeno delay (ignora scroll/click residuais do dragend)
+        setTimeout(() => { isPhysicsBusy = false; }, 200);
     }
 
     function onResizeStart(e) {
         e.preventDefault(); e.stopPropagation();
+        isPhysicsBusy = true; // V40.1.3: bloquear auto-retrair durante resize
         startY = e.touches ? e.touches[0].clientY : e.clientY;
         initialVal = block.duration;
         
@@ -805,6 +868,8 @@ function enablePhysics(el, block) {
         block.expanded = false; 
         saveDb();
         renderTimeline(); 
+        // V40.1.3: liberar auto-retrair após pequeno delay
+        setTimeout(() => { isPhysicsBusy = false; }, 200);
     }
 
     dragger.addEventListener('touchstart', onDragStart, {passive: false});

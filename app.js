@@ -125,6 +125,7 @@ window.getTagColor = function(tagId) {
 let selectedNewTagColor = '#ef4444'; // Vermelho padrão
 
 window.openTagsSheet = () => {
+    clearFilters(); // V40.2.1: limpa filtros pra não confundir
     closeAllSheets();
     renderTagsList();
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
@@ -246,6 +247,23 @@ window.toggleFilterCompleted = function() {
     }
     
     renderTimeline();
+}
+
+// V40.2.1: Limpa ambos os filtros e atualiza visual dos botões
+window.clearFilters = function() {
+    if (!showOnlyDelayed && !showOnlyCompleted) return false; // nada a fazer
+    
+    showOnlyDelayed = false;
+    showOnlyCompleted = false;
+    
+    const btnDelayed = document.getElementById('filter-delayed-btn');
+    const btnCompleted = document.getElementById('filter-completed-btn');
+    
+    if (btnDelayed) btnDelayed.classList.replace('bg-app-focus-soft-strong', 'bg-app-focus-soft');
+    if (btnCompleted) btnCompleted.classList.replace('bg-emerald-100', 'bg-emerald-50');
+    
+    renderTimeline();
+    return true; // filtros foram limpos
 }
 
 function runRealTimeEngine() {
@@ -944,6 +962,7 @@ window.changeFloatDuration = function(mins) {
 }
 
 window.openSheet = () => {
+    clearFilters(); // V40.2.1: limpa filtros pra não confundir
     document.getElementById('config-sheet').classList.add('translate-y-full');
     document.getElementById('period-select-sheet').classList.add('translate-y-full');
     
@@ -961,6 +980,7 @@ window.openSheet = () => {
 }
 
 window.openListSheet = () => {
+    clearFilters(); // V40.2.1: limpa filtros pra não confundir
     switchListTab('backlog'); // V40.1: sempre abrir na aba Banco
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     listSheet.classList.remove('translate-y-full');
@@ -985,6 +1005,7 @@ window.closeAllSheets = () => {
     activeLinkBlockId = null;
     viewingLinkedNoteId = null;
     viewingLinkedFromBlockId = null;
+    pendingLinkBlockId = null; // V40.2.1
     
     cancelEdit();
     cancelDelete();
@@ -1042,6 +1063,7 @@ window.comingSoonMetas = () => {
 }
 
 window.openConfigSheet = () => {
+    clearFilters(); // V40.2.1: limpa filtros pra não confundir
     sheet.classList.add('translate-y-full'); 
     
     document.getElementById('config-periods-view').classList.add('hidden');
@@ -1359,39 +1381,24 @@ window.closeLinkNoteSheet = function() {
     document.getElementById('link-note-sheet').classList.add('translate-y-full');
 }
 
-// Opção "Criar nova": cria nota vazia, vincula, e abre form de edição
+// V40.2.1: ID do bloco aguardando vincular nota recém-criada (após save no form)
+let pendingLinkBlockId = null;
+
+// Opção "Criar nova": abre form em modo "criação ligada ao bloco"
 window.chooseCreateNewNote = function() {
     if (!activeLinkBlockId) return;
-    const blockId = activeLinkBlockId;
-    
-    // Cria nota com placeholder editável depois
-    const newNote = {
-        id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
-        title: '',
-        content: '',
-        createdAt: Date.now()
-    };
-    notesDb.unshift(newNote);
-    saveNotes();
-    
-    // Vincula ao bloco
-    const block = db.find(b => b.id === blockId);
-    if (block) {
-        if (!block.linkedNoteIds) block.linkedNoteIds = [];
-        block.linkedNoteIds.push(newNote.id);
-        saveDb();
-    }
+    pendingLinkBlockId = activeLinkBlockId; // marca pra addNote vincular depois
     
     // Fecha sheet de escolha
     closeLinkNoteSheet();
     
-    // Abre direto o modal de edição da nota nova
+    // Abre form de criar nota direto na aba Notas
     setTimeout(() => {
-        viewingLinkedFromBlockId = blockId;
-        editLinkedNoteInline(newNote.id);
+        document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+        document.getElementById('list-sheet').classList.remove('translate-y-full');
+        switchListTab('notes');
+        openNoteForm(); // abre form em modo criação
     }, 320);
-    
-    renderTimeline();
 }
 
 // Opção "Vincular existente": mostra lista de notas (com busca se > 10)
@@ -1624,6 +1631,7 @@ window.openEditNote = function(id) {
 window.cancelNoteForm = function() {
     notesFormOpen = false;
     editingNoteId = null; // V40.1.2: limpar modo edição
+    pendingLinkBlockId = null; // V40.2.1: limpa flag de vincular
     // limpa inputs caso o usuário tenha digitado algo
     const titleInput = document.getElementById('note-title-input');
     const contentInput = document.getElementById('note-content-input');
@@ -1654,19 +1662,43 @@ window.addNote = function() {
         showToast('Nota atualizada!');
     } else {
         // Modo criação (comportamento original)
-        notesDb.unshift({
+        const newNote = {
             id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
             title: title,
             content: content,
             createdAt: Date.now()
-        });
-        showToast('Nota salva!');
+        };
+        notesDb.unshift(newNote);
+        
+        // V40.2.1: se veio do fluxo "Criar nova" no card, vincula ao bloco
+        if (pendingLinkBlockId) {
+            const block = db.find(b => b.id === pendingLinkBlockId);
+            if (block) {
+                if (!block.linkedNoteIds) block.linkedNoteIds = [];
+                block.linkedNoteIds.push(newNote.id);
+                saveDb();
+            }
+            pendingLinkBlockId = null; // limpa flag
+            showToast('Nota vinculada ao card!');
+        } else {
+            showToast('Nota salva!');
+        }
     }
     
     saveNotes();
     titleInput.value = '';
     contentInput.value = '';
     notesFormOpen = false; // V40.1.1: fecha o form após salvar
+    
+    // V40.2.1: se nota está vinculada a algum card, re-renderiza timeline pra atualizar texto na hora
+    const editedId = editingNoteId;
+    const newId = !editingNoteId && notesDb[0] ? notesDb[0].id : null;
+    const idToCheck = editedId || newId;
+    if (idToCheck) {
+        const isLinked = db.some(b => b.linkedNoteIds && b.linkedNoteIds.includes(idToCheck));
+        if (isLinked) renderTimeline();
+    }
+    
     editingNoteId = null;  // V40.1.2: limpar modo edição
     renderNotes();
 }
@@ -1822,6 +1854,7 @@ window.applyThemeColor = function() {
 // ==========================================
 
 window.openReportsSheet = function() {
+    clearFilters(); // V40.2.1: limpa filtros pra não confundir
     closeAllSheets();
     renderReports('today');
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');

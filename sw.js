@@ -1,5 +1,5 @@
-// V3.0 - v40.2 (Vincular Notas a Cards: criar/vincular/desvincular + busca híbrida)
-const CACHE_NAME = 'timeblock-v40-2';
+// V3.0 - v40.2.1 (Filtros zeram ao abrir sheets + render imediato de nota vinculada + fluxo limpo de Criar nova)
+const CACHE_NAME = 'timeblock-v40-2-1';
 const ASSETS = [
   './',
   './index.html',

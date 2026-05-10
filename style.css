@@ -1,3 +1,7 @@
+html {
+    scrollbar-gutter: stable;
+}
+
 body { touch-action: pan-y; background-color: #e2e8f0; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

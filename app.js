@@ -18,6 +18,7 @@ let showOnlyCompleted = false;
 let taskToClone = null;
 let pendingCloneType = '';
 let selectedTagId = null;
+let headerHidden = false; // V2.0 - Estado do header
 
 // POPULA OS DROPDOWNS DO NOVO MENU DE JANELA DE HORÁRIOS
 const startSelect = document.getElementById('config-hour-start');
@@ -1284,4 +1285,27 @@ if ('serviceWorker' in navigator) {
         console.log('Falha ao registrar o Service Worker:', error);
       });
   });
+}
+
+// V2.0 - BLOCO 7: Toggle Header
+window.toggleHeader = function() {
+    headerHidden = !headerHidden;
+    const header = document.querySelector('header');
+    const timeline = document.getElementById('timeline-scroll');
+    const showBtn = document.getElementById('show-header-btn');
+    
+    if (headerHidden) {
+        header.classList.add('header-hidden');
+        timeline.classList.add('timeline-expanded');
+        if (showBtn) showBtn.classList.remove('hidden');
+    } else {
+        header.classList.remove('header-hidden');
+        timeline.classList.remove('timeline-expanded');
+        if (showBtn) showBtn.classList.add('hidden');
+    }
+}
+
+window.showHeader = function() {
+    headerHidden = false;
+    toggleHeader();
 }

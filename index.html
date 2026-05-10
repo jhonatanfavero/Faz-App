@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="antialiased">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Time-Blocking: O Santo Graal</title>
+    
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TimeBlock">
+    <link rel="icon" href="data:,">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { app: { bg: '#f8fafc', card: '#ffffff', neon: '#00d2ff', focus: '#4f46e5' } },
+                    backgroundImage: { 'hatched': 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(0,0,0,0.03) 8px, rgba(0,0,0,0.03) 10px)' },
+                    keyframes: {
+                        pulseDrop: { '0%, 100%': { borderColor: 'rgba(0,0,0,0.15)' }, '50%': { borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.10)' } },
+                        floatBubble: { '0%': { transform: 'translateY(20px) translateX(-50%)', opacity: 0 }, '100%': { transform: 'translateY(0) translateX(-50%)', opacity: 1 } }
+                    },
+                    animation: { 'pulse-drop': 'pulseDrop 1.5s infinite', 'float-bubble': 'floatBubble 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards' }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="text-zinc-900 selection:bg-app-focus selection:text-white font-sans flex items-center justify-center min-h-[100dvh] overflow-hidden">
+
+    <div class="relative w-full max-w-[420px] h-[100dvh] sm:h-full sm:max-h-[850px] bg-app-bg sm:rounded-[40px] shadow-2xl sm:border-[6px] border-zinc-300 overflow-hidden flex flex-col mx-auto sm:my-8">
+        
+        <header class="absolute top-0 w-full z-30 pt-12 pb-4 px-6 bg-app-bg/90 backdrop-blur-xl border-b border-black/5 pointer-events-none">
+            <div class="flex flex-col gap-4 mb-4 pointer-events-auto">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-zinc-500 text-[13px] font-medium flex items-center gap-1.5 mt-0.5" id="header-date">
+                            Carregando...
+                        </p>
+                    </div>
+                    <div class="flex gap-1.5">
+                        <button onclick="debugPreviousDay()" class="bg-zinc-100 px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl hover:bg-zinc-200 transition border border-zinc-200" title="Dia Anterior">
+                            <i class="ph ph-rewind text-lg sm:text-xl text-zinc-600"></i>
+                        </button>
+                        <button onclick="goToToday()" class="bg-zinc-100 px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl hover:bg-zinc-200 transition border border-zinc-200" title="Voltar para Hoje">
+                            <i class="ph ph-calendar-star text-lg sm:text-xl text-zinc-600"></i>
+                        </button>
+                        <button onclick="debugAdvanceDay()" class="bg-zinc-100 px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl hover:bg-zinc-200 transition border border-zinc-200" title="Avançar Dia">
+                            <i class="ph ph-fast-forward text-lg sm:text-xl text-zinc-600"></i>
+                        </button>
+                    </div>
+                    <button onclick="toggleHeader()" class="bg-zinc-100 p-2 sm:p-2.5 rounded-full hover:bg-zinc-200 transition border border-zinc-200" title="Ocultar Menu">
+                        <i class="ph ph-caret-up text-lg sm:text-xl text-zinc-600"></i>
+                    </button>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button id="filter-delayed-btn" onclick="toggleFilterDelayed()" class="bg-indigo-50 border border-indigo-200 p-2 rounded-xl hover:bg-indigo-100 transition flex items-center justify-center shrink-0" title="Filtrar Atrasados">
+                        <i class="ph-bold ph-info text-lg text-indigo-500"></i>
+                    </button>
+                    <!-- V2.0 - BLOCO 2 -->
+                    <button id="filter-completed-btn" onclick="toggleFilterCompleted()" class="bg-emerald-50 border border-emerald-200 p-2 rounded-xl hover:bg-emerald-100 transition flex items-center justify-center shrink-0" title="Filtrar Concluídos">
+                        <i class="ph-bold ph-check-circle text-lg text-emerald-500"></i>
+                    </button>
+                    <button onclick="openTagsSheet()" class="bg-white border border-zinc-200 px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center truncate">
+                        TAGs
+                    </button>
+                    <button onclick="openReportsSheet()" class="bg-white border border-zinc-200 px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
+                        <i class="ph ph-chart-bar text-sm"></i> Relatórios
+                    </button>
+                </div>
+            </div>
+            <div class="w-full pointer-events-auto">
+                <div class="flex justify-between text-[10px] text-zinc-500 mb-1.5 font-bold uppercase tracking-wider">
+                    <span id="progress-text">Planejado (0%)</span>
+                    <span>Livre</span>
+                </div>
+                <div class="w-full h-1.5 bg-zinc-200 rounded-full overflow-hidden flex">
+                    <div class="h-full bg-blue-500 rounded-full transition-all duration-700 ease-out" style="width: 0%" id="progress-bar"></div>
+                </div>
+            </div>
+        </header>
+
+        <div id="floating-task" class="absolute bottom-6 left-1/2 w-[92%] bg-white border border-zinc-200 shadow-[0_20px_40px_rgba(0,0,0,0.1)] rounded-2xl p-4 z-50 hidden flex-col animate-float-bubble pointer-events-auto -translate-x-1/2">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3 overflow-hidden">
+                    <div class="bg-app-focus/10 p-2 rounded-lg shrink-0">
+                        <i class="ph ph-hand-grabbing text-app-focus text-lg animate-pulse"></i>
+                    </div>
+                    <div class="flex-1 min-w-0 pr-2">
+                        <p id="floating-title" class="text-sm font-bold text-zinc-900 leading-tight truncate">Tarefa</p>
+                        <p class="text-[10px] text-app-neon font-bold mt-0.5 uppercase tracking-widest">Toque num espaço livre</p>
+                    </div>
+                </div>
+                <button onclick="cancelPendingTask()" class="w-8 h-8 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-500 rounded-full transition shrink-0">
+                    <i class="ph ph-x"></i>
+                </button>
+            </div>
+            <div class="flex gap-2">
+                <button class="float-dur-btn flex-1 py-1.5 rounded bg-zinc-100 text-zinc-500 hover:bg-zinc-200 text-xs font-bold transition" data-time="15" onclick="changeFloatDuration(15)">15m</button>
+                <button class="float-dur-btn flex-1 py-1.5 rounded bg-app-focus text-white text-xs font-bold transition shadow-[0_0_10px_rgba(79,70,229,0.3)]" data-time="30" onclick="changeFloatDuration(30)">30m</button>
+                <button class="float-dur-btn flex-1 py-1.5 rounded bg-zinc-100 text-zinc-500 hover:bg-zinc-200 text-xs font-bold transition" data-time="45" onclick="changeFloatDuration(45)">45m</button>
+                <button class="float-dur-btn flex-1 py-1.5 rounded bg-zinc-100 text-zinc-500 hover:bg-zinc-200 text-xs font-bold transition" data-time="60" onclick="changeFloatDuration(60)">1h</button>
+            </div>
+        </div>
+
+        <div id="toast" class="absolute top-32 left-1/2 -translate-x-1/2 px-4 py-2 bg-red-100 border border-red-300 rounded-full shadow-lg z-50 text-xs font-bold text-red-800 opacity-0 pointer-events-none transition-opacity duration-300 flex items-center gap-2">
+            <i class="ph ph-warning-circle text-lg"></i>
+            <span id="toast-msg">Mensagem</span>
+        </div>
+
+        <main class="flex-1 overflow-y-auto no-scrollbar relative pt-36 pb-40" id="timeline-scroll">
+            <div class="relative pl-14 pr-4 w-full" id="timeline-container">
+                <div id="y-axis" class="absolute left-0 top-0 bottom-0 w-14 border-r border-black/5 pointer-events-none"></div>
+                <div id="grid-lines" class="absolute w-full h-full pointer-events-none"></div>
+                
+                <div id="blocks-container" class="relative w-full"></div>
+                
+                <div id="now-line" class="absolute left-0 w-full h-[2px] bg-app-neon glow-line flex items-center transition-all duration-1000 pointer-events-none z-50" style="display: none;">
+                    <div class="w-3 h-3 rounded-full bg-app-neon absolute -left-1.5 animate-pulse shadow-[0_0_10px_rgba(0,210,255,0.8)]"></div>
+                    <div id="now-badge" class="absolute left-4 -top-6 bg-app-neon text-white text-[11px] px-2 py-1 rounded font-bold shadow-[0_0_15px_rgba(0,210,255,0.6)] tracking-wider">Agora</div>
+                </div>
+            </div>
+        </main>
+
+        <button id="fab-btn" onclick="openSheet()" class="absolute bottom-8 right-6 w-14 h-14 bg-zinc-900 text-white rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(0,0,0,0.25)] hover:scale-105 active:scale-95 transition-all duration-300 z-30">
+            <i class="ph ph-plus text-2xl font-bold"></i>
+        </button>
+
+        <button id="list-btn" onclick="openListSheet()" class="absolute bottom-8 left-6 h-14 min-w-[56px] bg-white border border-zinc-200 text-zinc-800 rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(0,0,0,0.15)] hover:scale-105 active:scale-95 transition-all duration-300 z-30 px-3 overflow-hidden">
+            <i class="ph ph-list-bullets text-2xl font-bold shrink-0 mx-1"></i>
+            <div id="list-btn-stats" class="hidden flex-col items-start pr-1 shrink-0">
+                <span class="text-[11px] font-extrabold leading-none text-zinc-900" id="list-btn-count">0 itens</span>
+                <span class="text-[10px] font-bold text-indigo-600 leading-none mt-1" id="list-btn-time">0h</span>
+            </div>
+        </button>
+
+        <div id="overlay" onclick="closeAllSheets()" class="absolute inset-0 bg-black/40 backdrop-blur-sm z-40 opacity-0 pointer-events-none transition-opacity duration-300"></div>
+
+        <div id="bottom-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
+            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-6"></div>
+            
+            <div class="flex gap-2 overflow-x-auto no-scrollbar mb-5">
+                <button onclick="commitSpecialIntent('Descanso', 'rest')" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 text-sm font-medium hover:bg-emerald-100 transition whitespace-nowrap">
+                    <i class="ph ph-tree text-lg"></i> Descanso
+                </button>
+                <button class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition whitespace-nowrap">
+                    <i class="ph ph-arrows-clockwise text-lg"></i> Rotina
+                </button>
+                <button onclick="openConfigSheet()" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition whitespace-nowrap">
+                    <i class="ph ph-gear text-lg"></i> Config
+                </button>
+            </div>
+            
+            <input type="text" id="task-input" placeholder="Sem tarefas soltas. O que focar?" autocomplete="off" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-app-focus focus:bg-white transition-colors mb-6 text-sm">
+            
+            <div class="mb-8">
+                <p class="text-xs text-zinc-500 font-medium mb-3 uppercase tracking-wider">Volume de Tempo</p>
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                    <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="15">15m</button>
+                    <button class="sheet-dur-btn px-4 py-2 rounded-full bg-app-focus border border-app-focus text-white text-sm font-medium shadow-[0_0_15px_rgba(79,70,229,0.3)] transition active-chip" data-time="30">30m</button>
+                    <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="45">45m</button>
+                    <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="60">1h</button>
+                    <button onclick="openPeriodSelectSheet()" class="px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition whitespace-nowrap flex items-center gap-1"><i class="ph ph-calendar-blank"></i> Período</button>
+                </div>
+            </div>
+
+            <div class="mb-8">
+                <p class="text-xs text-zinc-500 font-medium mb-3 uppercase tracking-wider">Etiqueta (Opcional)</p>
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2" id="tag-selector-container">
+                </div>
+            </div>
+
+            <button onclick="commitIntent()" class="w-full bg-zinc-900 text-white font-bold py-3.5 rounded-xl hover:bg-zinc-800 active:scale-[0.98] transition flex items-center justify-center gap-2">
+                <i class="ph ph-hand-grabbing text-lg"></i> Segurar Intenção
+            </button>
+        </div>
+
+        <div id="list-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
+            
+            <!-- V40.1: Super Gabinete - Pills de navegação entre abas -->
+            <div class="flex gap-1 bg-zinc-100 p-1 rounded-xl mb-4 shrink-0">
+                <button id="btn-list-backlog" onclick="switchListTab('backlog')" class="flex-1 py-1.5 rounded-lg bg-white shadow-sm text-zinc-800 text-xs font-bold transition border border-black/5 flex items-center justify-center gap-1">
+                    <i class="ph ph-tray text-sm"></i> Banco
+                </button>
+                <button id="btn-list-routines" onclick="switchListTab('routines')" class="flex-1 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50 text-xs font-bold transition border border-transparent flex items-center justify-center gap-1">
+                    <i class="ph ph-arrows-clockwise text-sm"></i> Rotinas
+                </button>
+                <button id="btn-list-notes" onclick="switchListTab('notes')" class="flex-1 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50 text-xs font-bold transition border border-transparent flex items-center justify-center gap-1">
+                    <i class="ph ph-note text-sm"></i> Notas
+                </button>
+            </div>
+
+            <!-- V40.1: View 1 - Banco (conteúdo original do backlog) -->
+            <div id="view-backlog" class="flex-1 flex flex-col min-h-0">
+                <div class="flex items-center justify-between mb-4 shrink-0">
+                    <h2 class="text-lg font-bold text-zinc-900">Banco de Tarefas</h2>
+                    <div class="flex gap-1.5 items-center">
+                        <span class="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider hidden" id="backlog-total-time">0h</span>
+                        <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider" id="backlog-count">0</span>
+                    </div>
+                </div>
+                
+                <div class="shrink-0 mb-4 bg-zinc-50 border border-zinc-200 p-3 rounded-2xl">
+                    <input type="text" id="backlog-input" placeholder="Nova tarefa..." autocomplete="off" class="w-full bg-white border border-zinc-200 rounded-xl px-4 py-3 text-sm focus:border-app-focus outline-none mb-3 transition-colors">
+                    
+                    <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-1">
+                        <button class="backlog-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-100 transition whitespace-nowrap" data-time="15">15m</button>
+                        <button class="backlog-dur-btn px-4 py-2 rounded-full bg-zinc-900 border border-zinc-900 text-white text-sm font-medium transition whitespace-nowrap shadow-md" data-time="30">30m</button>
+                        <button class="backlog-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-100 transition whitespace-nowrap" data-time="45">45m</button>
+                        <button class="backlog-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-100 transition whitespace-nowrap" data-time="60">1h</button>
+                    </div>
+                    
+                    <button onclick="addBacklogItem()" class="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold py-2.5 rounded-xl hover:bg-indigo-100 active:scale-[0.98] transition text-sm">
+                        Salvar na Lista
+                    </button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto min-h-[150px] no-scrollbar border-t border-zinc-100 pt-4" id="backlog-container">
+                </div>
+            </div>
+
+            <!-- V40.1: View 2 - Rotinas (placeholder, será implementado em V40.2) -->
+            <div id="view-routines" class="flex-1 flex flex-col min-h-0 hidden">
+                <div class="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
+                    <div class="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mb-4">
+                        <i class="ph ph-arrows-clockwise text-3xl"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-zinc-800 mb-1">Rotinas Visuais</h3>
+                    <p class="text-xs text-zinc-500 leading-relaxed max-w-[280px]">
+                        Em breve: crie kits de blocos (ex: "Manhã Produtiva") e carimbe na timeline com 1 toque.
+                    </p>
+                </div>
+            </div>
+
+            <!-- V40.1: View 3 - Notas livres do dia -->
+            <div id="view-notes" class="flex-1 flex flex-col min-h-0 hidden">
+                <div class="flex items-center justify-between mb-4 shrink-0">
+                    <h2 class="text-lg font-bold text-zinc-900">Notas Soltas</h2>
+                    <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider" id="notes-count">0</span>
+                </div>
+                
+                <div class="shrink-0 mb-4 bg-zinc-50 border border-zinc-200 p-3 rounded-2xl">
+                    <input type="text" id="note-title-input" placeholder="Título (opcional)" autocomplete="off" class="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-app-focus outline-none mb-2 transition-colors">
+                    <textarea id="note-content-input" placeholder="Anote uma ideia, lembrete, observação..." rows="2" class="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:border-app-focus outline-none mb-3 transition-colors resize-none"></textarea>
+                    <button onclick="addNote()" class="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold py-2.5 rounded-xl hover:bg-indigo-100 active:scale-[0.98] transition text-sm">
+                        Salvar Nota
+                    </button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto min-h-[150px] no-scrollbar border-t border-zinc-100 pt-4 flex flex-col gap-2" id="notes-container">
+                </div>
+            </div>
+        </div>
+
+        <div id="period-select-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
+            <div class="flex items-center gap-3 mb-4 shrink-0">
+                <button onclick="openSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
+                <h2 class="text-lg font-bold text-zinc-900">Selecionar Período</h2>
+            </div>
+            <div class="flex-1 overflow-y-auto no-scrollbar" id="period-select-container">
+            </div>
+        </div>
+
+        <div id="config-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
+            <div class="flex items-center gap-3 mb-4 shrink-0">
+                <button id="config-back-btn" onclick="openSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
+                <h2 class="text-lg font-bold text-zinc-900" id="config-title">Configurações</h2>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto no-scrollbar" id="config-main-menu">
+                
+                <button onclick="openConfigHours()" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+                            <i class="ph ph-sun-horizon text-xl"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="font-bold text-zinc-800 text-sm">Janela de Horário</span>
+                            <span class="text-[11px] text-zinc-500 font-medium">Definir início e fim do dia</span>
+                        </div>
+                    </div>
+                    <i class="ph ph-caret-right text-zinc-400"></i>
+                </button>
+
+                <button onclick="openConfigPeriods()" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                            <i class="ph ph-clock text-xl"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="font-bold text-zinc-800 text-sm">Períodos de Tempo</span>
+                            <span class="text-[11px] text-zinc-500 font-medium">Gerenciar Manhã, Tarde...</span>
+                        </div>
+                    </div>
+                    <i class="ph ph-caret-right text-zinc-400"></i>
+                </button>
+                
+                <button onclick="openConfigAppearance()" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <i class="ph ph-palette text-xl"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="font-bold text-zinc-800 text-sm">Aparência</span>
+                            <span class="text-[11px] text-zinc-500 font-medium">Cores e temas do app</span>
+                        </div>
+                    </div>
+                    <i class="ph ph-caret-right text-zinc-400"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto no-scrollbar hidden" id="config-hours-view">
+                <p class="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-3">Horário de Funcionamento</p>
+                <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-4 mb-4">
+                    <div class="flex gap-4 mb-4">
+                        <div class="flex-1">
+                            <label class="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-1">Início (Hora)</label>
+                            <select id="config-hour-start" class="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2.5 text-sm outline-none font-bold text-zinc-800 focus:border-app-focus">
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-1">Fim (Hora)</label>
+                            <select id="config-hour-end" class="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2.5 text-sm outline-none font-bold text-zinc-800 focus:border-app-focus">
+                            </select>
+                        </div>
+                    </div>
+                    <button onclick="saveConfigHours()" class="w-full bg-zinc-900 text-white rounded-lg px-3 py-3 text-sm font-bold shadow-md hover:bg-zinc-800 transition flex items-center justify-center gap-2">
+                        <i class="ph ph-check-circle text-lg"></i> Salvar Janela
+                    </button>
+                </div>
+                <p class="text-[11px] text-zinc-500 text-center leading-relaxed px-4">
+                    As tarefas já salvas fora desta janela permanecerão no banco de dados, mas não estarão visíveis.
+                </p>
+            </div>
+
+            <div class="flex-1 overflow-y-auto no-scrollbar hidden" id="config-periods-view">
+                <p class="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-3">Meus Períodos</p>
+                
+                <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-3 mb-4">
+                    <input type="text" id="config-period-name" placeholder="Ex: Madrugada" autocomplete="off" class="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:border-app-focus outline-none mb-2">
+                    <div class="flex gap-2 mb-2">
+                        <div class="flex-1">
+                            <label class="text-[10px] font-bold text-zinc-500 uppercase ml-1">Início</label>
+                            <input type="time" id="config-period-start" class="w-full bg-white border border-zinc-200 rounded-lg px-2 py-2 text-sm outline-none">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-[10px] font-bold text-zinc-500 uppercase ml-1">Fim</label>
+                            <input type="time" id="config-period-end" class="w-full bg-white border border-zinc-200 rounded-lg px-2 py-2 text-sm outline-none">
+                        </div>
+                    </div>
+                    <button onclick="addConfigPeriod()" class="w-full bg-zinc-900 text-white rounded-lg px-3 py-2.5 text-sm font-bold shadow-md hover:bg-zinc-800 transition"><i class="ph ph-plus mr-1"></i> Adicionar</button>
+                </div>
+
+                <div class="flex flex-col gap-2" id="config-periods-list">
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto no-scrollbar hidden" id="config-appearance-view">
+                <p class="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-3">Cor Principal do App</p>
+                <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-4 mb-4">
+                    <div class="flex flex-wrap justify-center gap-3" id="theme-color-picker">
+                        <button type="button" class="theme-color-btn w-10 h-10 rounded-full border-2 border-transparent scale-110 shadow-sm border-zinc-900" style="background-color: #4f46e5;" data-color="#4f46e5" onclick="selectThemeColor(this)"></button>
+                        <button type="button" class="theme-color-btn w-10 h-10 rounded-full border-2 border-transparent" style="background-color: #ef4444;" data-color="#ef4444" onclick="selectThemeColor(this)"></button>
+                        <button type="button" class="theme-color-btn w-10 h-10 rounded-full border-2 border-transparent" style="background-color: #3b82f6;" data-color="#3b82f6" onclick="selectThemeColor(this)"></button>
+                        <button type="button" class="theme-color-btn w-10 h-10 rounded-full border-2 border-transparent" style="background-color: #10b981;" data-color="#10b981" onclick="selectThemeColor(this)"></button>
+                        <button type="button" class="theme-color-btn w-10 h-10 rounded-full border-2 border-transparent" style="background-color: #f59e0b;" data-color="#f59e0b" onclick="selectThemeColor(this)"></button>
+                        <button type="button" class="theme-color-btn w-10 h-10 rounded-full border-2 border-transparent" style="background-color: #8b5cf6;" data-color="#8b5cf6" onclick="selectThemeColor(this)"></button>
+                        <button type="button" class="theme-color-btn w-10 h-10 rounded-full border-2 border-transparent" style="background-color: #ec4899;" data-color="#ec4899" onclick="selectThemeColor(this)"></button>
+                        <button type="button" class="theme-color-btn w-10 h-10 rounded-full border-2 border-transparent" style="background-color: #14b8a6;" data-color="#14b8a6" onclick="selectThemeColor(this)"></button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div id="tags-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
+            <div class="flex items-center gap-3 mb-4 shrink-0">
+                <button onclick="closeAllSheets()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-x text-lg"></i></button>
+                <h2 class="text-lg font-bold text-zinc-900">Gerenciar Tags</h2>
+            </div>
+            
+            <div class="shrink-0 mb-4 bg-zinc-50 border border-zinc-200 p-3 rounded-2xl">
+                <input type="text" id="new-tag-name" placeholder="Nome da tag..." autocomplete="off" class="w-full bg-white border border-zinc-200 rounded-xl px-4 py-3 text-sm focus:border-app-focus outline-none mb-3 transition-colors font-medium">
+                
+                <div class="flex flex-wrap gap-2 mb-3" id="tag-color-picker">
+                    <button type="button" class="tag-color-btn w-8 h-8 rounded-full border-2 border-transparent scale-110 shadow-sm" style="background-color: #ef4444;" data-color="#ef4444" onclick="selectTagColor(this)"></button>
+                    <button type="button" class="tag-color-btn w-8 h-8 rounded-full border-2 border-transparent" style="background-color: #3b82f6;" data-color="#3b82f6" onclick="selectTagColor(this)"></button>
+                    <button type="button" class="tag-color-btn w-8 h-8 rounded-full border-2 border-transparent" style="background-color: #10b981;" data-color="#10b981" onclick="selectTagColor(this)"></button>
+                    <button type="button" class="tag-color-btn w-8 h-8 rounded-full border-2 border-transparent" style="background-color: #f59e0b;" data-color="#f59e0b" onclick="selectTagColor(this)"></button>
+                    <button type="button" class="tag-color-btn w-8 h-8 rounded-full border-2 border-transparent" style="background-color: #8b5cf6;" data-color="#8b5cf6" onclick="selectTagColor(this)"></button>
+                    <button type="button" class="tag-color-btn w-8 h-8 rounded-full border-2 border-transparent" style="background-color: #ec4899;" data-color="#ec4899" onclick="selectTagColor(this)"></button>
+                    <button type="button" class="tag-color-btn w-8 h-8 rounded-full border-2 border-transparent" style="background-color: #f97316;" data-color="#f97316" onclick="selectTagColor(this)"></button>
+                    <button type="button" class="tag-color-btn w-8 h-8 rounded-full border-2 border-transparent" style="background-color: #14b8a6;" data-color="#14b8a6" onclick="selectTagColor(this)"></button>
+                </div>
+                
+                <button onclick="commitNewTag()" class="w-full bg-zinc-900 text-white font-bold py-2.5 rounded-xl hover:bg-zinc-800 active:scale-[0.98] transition text-sm">
+                    Adicionar Tag
+                </button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2" id="tags-list-container">
+            </div>
+        </div>
+
+        <!-- ABA: CLONAR TAREFA -->
+        <div id="clone-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
+            <div class="flex items-center gap-3 mb-6 shrink-0">
+                <h2 class="text-lg font-bold text-zinc-900">Repetir Tarefa</h2>
+            </div>
+            <div class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2">
+                <button onclick="cloneManual()" class="w-full flex items-center gap-3 p-4 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left text-zinc-800 font-bold text-sm">
+                    <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><i class="ph ph-hand-grabbing text-xl"></i></div>
+                    Copiar
+                </button>
+                <button onclick="promptCloneQtd('daily')" class="w-full flex items-center gap-3 p-4 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left text-zinc-800 font-bold text-sm">
+                    <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><i class="ph ph-calendar-plus text-xl"></i></div>
+                    Diariamente (5 dias)
+                </button>
+                <button onclick="promptCloneQtd('weekly')" class="w-full flex items-center gap-3 p-4 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left text-zinc-800 font-bold text-sm">
+                    <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><i class="ph ph-calendar-blank text-xl"></i></div>
+                    Semanalmente
+                </button>
+                <button onclick="promptCloneQtd('monthly')" class="w-full flex items-center gap-3 p-4 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left text-zinc-800 font-bold text-sm">
+                    <div class="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0"><i class="ph ph-calendar-check text-xl"></i></div>
+                    Mensalmente
+                </button>
+            </div>
+        </div>
+
+        <!-- MODAL DE QUANTIDADE (SUBSTITUI O PROMPT) -->
+        <div id="clone-qtd-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+            <h3 id="clone-qtd-title" class="text-lg font-bold text-zinc-900 mb-2 text-center">Quantas repetições?</h3>
+            <input type="number" id="clone-qtd-input" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-6 text-center text-xl" min="1">
+            <div class="flex gap-2">
+                <button onclick="cancelCloneQtd()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
+                <button onclick="confirmCloneQtd()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:bg-indigo-700 shadow-[0_0_15px_rgba(79,70,229,0.3)] transition">Confirmar</button>
+            </div>
+        </div>
+
+        <!-- MODAL 1: EDIÇÃO (COMBO A) -->
+        <div id="edit-task-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+            <h3 class="text-lg font-bold text-zinc-900 mb-4 text-center">Editar Tarefa</h3>
+            <input type="text" id="edit-task-title" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-4 text-sm text-center">
+            <p class="text-xs text-zinc-500 font-medium mb-2 uppercase tracking-wider text-center">Etiqueta</p>
+            <div class="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2" id="edit-tag-selector-container"></div>
+            <div class="flex gap-2">
+                <button onclick="cancelEdit()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
+                <button onclick="saveEditTask()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:bg-indigo-700 shadow-[0_0_15px_rgba(79,70,229,0.3)] transition">Salvar</button>
+            </div>
+        </div>
+
+        <!-- MODAL 2: EXCLUSÃO (COMBO A) -->
+        <div id="delete-task-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+            <div class="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-3"><i class="ph ph-warning text-2xl"></i></div>
+            <h3 class="text-lg font-bold text-zinc-900 mb-6 text-center leading-tight">O que fazer com esta tarefa?</h3>
+            <div class="flex flex-col gap-2">
+                <button onclick="moveToBacklog()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm hover:bg-emerald-100 border border-emerald-200 transition">
+                    <i class="ph ph-list-bullets text-lg"></i> Mover pra Lista
+                </button>
+                <button onclick="confirmKillTask()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] transition">
+                    <i class="ph ph-trash text-lg"></i> Excluir Definitivo
+                </button>
+                <button onclick="cancelDelete()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+
+        <!-- MODAL 3: TIME PICKER (COMBO B) -->
+        <div id="time-picker-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+            <h3 class="text-lg font-bold text-zinc-900 mb-4 text-center">Selecionar Horário</h3>
+            <input type="time" id="edit-time-input" class="w-full text-center text-3xl font-bold p-4 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:border-app-focus transition-colors mb-6">
+            <div class="flex gap-2">
+                <button onclick="cancelTimePicker()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
+                <button onclick="confirmTimePicker()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:bg-indigo-700 shadow-[0_0_15px_rgba(79,70,229,0.3)] transition">Confirmar</button>
+            </div>
+        </div>
+
+        <!-- V3.0 - COMBO E: Relatórios -->
+        <div id="reports-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
+            <div class="flex items-center justify-between mb-6 shrink-0">
+                <div class="flex items-center gap-3">
+                    <button onclick="closeAllSheets()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-x text-lg"></i></button>
+                    <h2 class="text-lg font-bold text-zinc-900">Produtividade</h2>
+                </div>
+            </div>
+            
+            <div class="flex gap-2 overflow-x-auto no-scrollbar mb-5 shrink-0 bg-zinc-50 p-1.5 rounded-xl border border-zinc-200">
+                <button onclick="renderReports('today')" id="btn-rep-today" class="flex-1 py-1.5 rounded-lg bg-white shadow-sm text-zinc-800 text-xs font-bold transition border border-black/5">Hoje</button>
+                <button onclick="renderReports('week')" id="btn-rep-week" class="flex-1 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 text-xs font-bold transition border border-transparent">7 Dias</button>
+                <button onclick="renderReports('month')" id="btn-rep-month" class="flex-1 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 text-xs font-bold transition border border-transparent">30 Dias</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-3" id="reports-container">
+            </div>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

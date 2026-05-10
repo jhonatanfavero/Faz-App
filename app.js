@@ -87,6 +87,7 @@ if (!db || db.length === 0) {
         if(!b.date) { b.date = getTodayStr(); modified = true; }
         if(!b.microblocks) { b.microblocks = []; modified = true; }
         if(b.tagId === undefined) { b.tagId = null; modified = true; } // NOVA MIGRAÇÃO DE TAG
+        if(!b.linkedNoteIds) { b.linkedNoteIds = []; modified = true; } // V40.2: notas vinculadas
     });
     if(modified) saveDb();
 }
@@ -532,6 +533,7 @@ function drawBlock(block) {
                 <div class="mt-1">
                     <input type="text" id="micro-input-${block.id}" placeholder="+ Adicionar Check" class="microblock-input w-full rounded-md px-2 py-1.5 text-[10px] font-medium outline-none transition-colors border ${mbInputClasses}" onkeypress="if(event.key==='Enter') addMicroblock('${block.id}', this, event)">
                 </div>
+                ${renderLinkedNotesSection(block, isDarkTheme)}
             </div>
         `;
 
@@ -610,7 +612,8 @@ function performEncaixeMatematico(gapStart, gapDuration) {
         })),
         completed: false,
         theme: pendingIntent.theme || 'focus',
-        tagId: pendingIntent.tagId || null
+        tagId: pendingIntent.tagId || null,
+        linkedNoteIds: [] // V40.2: notas vinculadas começam vazias (clone não copia notas)
     });
     saveDb();
     cancelPendingTask(); 
@@ -684,7 +687,7 @@ window.confirmCloneQtd = function() {
         else if(pendingCloneType === 'weekly') nextDate = addDaysToDateStr(taskToClone.date, i * 7);
         else if(pendingCloneType === 'monthly') nextDate = addMonthToDateStr(taskToClone.date, i);
 
-        db.push({...taskToClone, id: 'f_' + Date.now() + '_' + Math.random(), date: nextDate, microblocks: (taskToClone.microblocks || []).map(mb => ({...mb, id: 'mb_' + Date.now() + Math.random(), done: false})), completed: false, expanded: false});
+        db.push({...taskToClone, id: 'f_' + Date.now() + '_' + Math.random(), date: nextDate, microblocks: (taskToClone.microblocks || []).map(mb => ({...mb, id: 'mb_' + Date.now() + Math.random(), done: false})), completed: false, expanded: false, linkedNoteIds: []});
     }
     saveDb();
     closeAllSheets();
@@ -974,6 +977,14 @@ window.closeAllSheets = () => {
     document.getElementById('clone-qtd-modal').classList.remove('flex');
     document.getElementById('tags-sheet').classList.add('translate-y-full');
     document.getElementById('reports-sheet').classList.add('translate-y-full');
+    // V40.2: fechar sheets de vincular notas
+    const linkSheet = document.getElementById('link-note-sheet');
+    if (linkSheet) linkSheet.classList.add('translate-y-full');
+    const linkedView = document.getElementById('linked-note-view-modal');
+    if (linkedView) { linkedView.classList.add('hidden'); linkedView.classList.remove('flex'); }
+    activeLinkBlockId = null;
+    viewingLinkedNoteId = null;
+    viewingLinkedFromBlockId = null;
     
     cancelEdit();
     cancelDelete();
@@ -1128,7 +1139,8 @@ window.commitPeriodBlock = (periodId) => {
         date: getActiveDateStr(),
         microblocks: [],
         completed: false,
-        theme: 'focus'
+        theme: 'focus',
+        linkedNoteIds: [] // V40.2
     });
     saveDb();
     input.value = '';
@@ -1288,6 +1300,237 @@ function renderBacklog() {
 }
 
 // =====================================================
+// V40.2 - VINCULAR NOTAS A CARDS
+// =====================================================
+
+// Estado: qual card está abrindo a sheet de "Adicionar nota" / qual nota está aberta no modal
+let activeLinkBlockId = null;
+let viewingLinkedNoteId = null;
+let viewingLinkedFromBlockId = null;
+
+// Renderiza a seção de notas vinculadas dentro de um card expandido
+function renderLinkedNotesSection(block, isDarkTheme) {
+    const linkedIds = block.linkedNoteIds || [];
+    const validNotes = linkedIds
+        .map(id => notesDb.find(n => n.id === id))
+        .filter(n => n); // remove ids órfãos (nota apagada)
+    
+    const linkedHtml = validNotes.map(n => {
+        const label = n.title || n.content.slice(0, 30) + (n.content.length > 30 ? '…' : '');
+        const labelClass = isDarkTheme ? 'text-white/85' : 'text-black/75';
+        const iconClass = isDarkTheme ? 'text-white/60' : 'text-black/50';
+        const bgClass = isDarkTheme ? 'bg-black/15 hover:bg-black/25' : 'bg-black/[0.04] hover:bg-black/[0.08]';
+        return `
+            <div onclick="viewLinkedNote('${block.id}', '${n.id}', event)" class="flex items-center gap-1.5 ${bgClass} rounded-md px-2 py-1.5 cursor-pointer transition-colors mt-1">
+                <i class="ph ph-note-pencil text-[12px] ${iconClass} shrink-0"></i>
+                <span class="text-[11px] font-medium leading-tight flex-1 ${labelClass} truncate">${escapeHtml(label)}</span>
+            </div>
+        `;
+    }).join('');
+    
+    const btnClass = isDarkTheme
+        ? 'bg-black/15 hover:bg-black/25 text-white/80 border-white/10'
+        : 'bg-black/[0.04] hover:bg-black/[0.08] text-black/60 border-black/[0.08]';
+    
+    return `
+        <div class="mt-3 pt-2 border-t ${isDarkTheme ? 'border-white/10' : 'border-black/[0.06]'}">
+            ${linkedHtml}
+            <button onclick="openLinkNoteSheet('${block.id}', event)" class="mt-1 w-full flex items-center justify-center gap-1.5 ${btnClass} rounded-md px-2 py-1.5 text-[10px] font-medium border transition-colors">
+                <i class="ph ph-plus text-[11px]"></i> Adicionar nota
+            </button>
+        </div>
+    `;
+}
+
+// Abre a sheet de escolha (Criar nova / Vincular existente)
+window.openLinkNoteSheet = function(blockId, e) {
+    if (e) e.stopPropagation();
+    activeLinkBlockId = blockId;
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('link-note-sheet').classList.remove('translate-y-full');
+    // Reset visual: mostrar opções, esconder lista
+    document.getElementById('link-note-options').classList.remove('hidden');
+    document.getElementById('link-note-existing-view').classList.add('hidden');
+}
+
+window.closeLinkNoteSheet = function() {
+    activeLinkBlockId = null;
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    document.getElementById('link-note-sheet').classList.add('translate-y-full');
+}
+
+// Opção "Criar nova": cria nota vazia, vincula, e abre form de edição
+window.chooseCreateNewNote = function() {
+    if (!activeLinkBlockId) return;
+    const blockId = activeLinkBlockId;
+    
+    // Cria nota com placeholder editável depois
+    const newNote = {
+        id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+        title: '',
+        content: '',
+        createdAt: Date.now()
+    };
+    notesDb.unshift(newNote);
+    saveNotes();
+    
+    // Vincula ao bloco
+    const block = db.find(b => b.id === blockId);
+    if (block) {
+        if (!block.linkedNoteIds) block.linkedNoteIds = [];
+        block.linkedNoteIds.push(newNote.id);
+        saveDb();
+    }
+    
+    // Fecha sheet de escolha
+    closeLinkNoteSheet();
+    
+    // Abre direto o modal de edição da nota nova
+    setTimeout(() => {
+        viewingLinkedFromBlockId = blockId;
+        editLinkedNoteInline(newNote.id);
+    }, 320);
+    
+    renderTimeline();
+}
+
+// Opção "Vincular existente": mostra lista de notas (com busca se > 10)
+window.chooseLinkExistingNote = function() {
+    document.getElementById('link-note-options').classList.add('hidden');
+    document.getElementById('link-note-existing-view').classList.remove('hidden');
+    renderExistingNotesList('');
+    // Foco na busca após reflow
+    setTimeout(() => {
+        const searchInput = document.getElementById('link-note-search');
+        if (searchInput && notesDb.length > 10) searchInput.focus();
+    }, 50);
+}
+
+// Volta da lista de existentes pra opções iniciais
+window.backToLinkOptions = function() {
+    document.getElementById('link-note-existing-view').classList.add('hidden');
+    document.getElementById('link-note-options').classList.remove('hidden');
+    const searchInput = document.getElementById('link-note-search');
+    if (searchInput) searchInput.value = '';
+}
+
+// Renderiza lista de notas existentes (com filtro opcional)
+window.renderExistingNotesList = function(filter) {
+    const container = document.getElementById('link-note-existing-list');
+    const searchWrapper = document.getElementById('link-note-search-wrapper');
+    if (!container) return;
+    
+    // Esconder busca se ≤ 10 notas (Opção Híbrida Jules)
+    if (notesDb.length <= 10) {
+        searchWrapper.classList.add('hidden');
+    } else {
+        searchWrapper.classList.remove('hidden');
+    }
+    
+    // Excluir notas já vinculadas ao bloco atual
+    const block = db.find(b => b.id === activeLinkBlockId);
+    const alreadyLinked = (block && block.linkedNoteIds) ? block.linkedNoteIds : [];
+    
+    // Filtro por título OU conteúdo (case insensitive)
+    const f = (filter || '').toLowerCase().trim();
+    const filtered = notesDb.filter(n => {
+        if (alreadyLinked.includes(n.id)) return false;
+        if (!f) return true;
+        return (n.title || '').toLowerCase().includes(f) || (n.content || '').toLowerCase().includes(f);
+    });
+    
+    if (filtered.length === 0) {
+        const msg = notesDb.length === 0
+            ? 'Você ainda não tem notas. Use "Criar nova" para começar.'
+            : (alreadyLinked.length === notesDb.length
+                ? 'Todas as suas notas já estão vinculadas a este card.'
+                : 'Nenhuma nota encontrada com esse termo.');
+        container.innerHTML = `<p class="text-xs text-zinc-400 text-center py-6 px-4">${msg}</p>`;
+        return;
+    }
+    
+    container.innerHTML = filtered.map(n => {
+        const title = n.title || '<span class="text-zinc-400 italic">Sem título</span>';
+        const preview = (n.content || '').slice(0, 60) + ((n.content || '').length > 60 ? '…' : '');
+        return `
+            <button onclick="linkExistingNoteToBlock('${n.id}')" class="w-full text-left p-3 rounded-xl bg-zinc-50 border border-zinc-200 hover:bg-zinc-100 active:scale-[0.99] transition mb-1.5">
+                <p class="text-sm font-bold text-zinc-800 truncate">${title}</p>
+                ${preview ? `<p class="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">${escapeHtml(preview)}</p>` : ''}
+            </button>
+        `;
+    }).join('');
+}
+
+// Vincula nota existente ao bloco
+window.linkExistingNoteToBlock = function(noteId) {
+    if (!activeLinkBlockId) return;
+    const block = db.find(b => b.id === activeLinkBlockId);
+    if (!block) return;
+    if (!block.linkedNoteIds) block.linkedNoteIds = [];
+    if (!block.linkedNoteIds.includes(noteId)) {
+        block.linkedNoteIds.push(noteId);
+        saveDb();
+    }
+    closeLinkNoteSheet();
+    showToast('Nota vinculada!');
+    renderTimeline();
+}
+
+// Abre modal de leitura ao tocar uma nota vinculada no card
+window.viewLinkedNote = function(blockId, noteId, e) {
+    if (e) e.stopPropagation();
+    const note = notesDb.find(n => n.id === noteId);
+    if (!note) return;
+    
+    viewingLinkedNoteId = noteId;
+    viewingLinkedFromBlockId = blockId;
+    
+    document.getElementById('linked-note-view-title').innerText = note.title || 'Sem título';
+    
+    const contentEl = document.getElementById('linked-note-view-content');
+    if (note.content) {
+        contentEl.innerHTML = `<p class="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap break-words">${escapeHtml(note.content)}</p>`;
+    } else {
+        contentEl.innerHTML = `<p class="text-xs text-zinc-400 italic">Esta nota está vazia.</p>`;
+    }
+    
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('linked-note-view-modal').classList.remove('hidden');
+    document.getElementById('linked-note-view-modal').classList.add('flex');
+}
+
+window.closeLinkedNoteView = function() {
+    viewingLinkedNoteId = null;
+    viewingLinkedFromBlockId = null;
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    document.getElementById('linked-note-view-modal').classList.add('hidden');
+    document.getElementById('linked-note-view-modal').classList.remove('flex');
+}
+
+// Editar a nota vinculada inline (abre sheet de Notas com a nota em modo edição)
+window.editLinkedNoteInline = function(noteId) {
+    closeLinkedNoteView();
+    closeLinkNoteSheet();
+    // Abre Lista → aba Notas → modo edição
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('list-sheet').classList.remove('translate-y-full');
+    switchListTab('notes');
+    setTimeout(() => openEditNote(noteId || viewingLinkedNoteId), 100);
+}
+
+// Desvincula nota do card (não apaga a nota, só remove o link)
+window.unlinkNoteFromBlock = function() {
+    if (!viewingLinkedNoteId || !viewingLinkedFromBlockId) return;
+    const block = db.find(b => b.id === viewingLinkedFromBlockId);
+    if (!block || !block.linkedNoteIds) return;
+    block.linkedNoteIds = block.linkedNoteIds.filter(id => id !== viewingLinkedNoteId);
+    saveDb();
+    closeLinkedNoteView();
+    showToast('Nota desvinculada (continua na aba Notas).');
+    renderTimeline();
+}
+
+// =====================================================
 // =====================================================
 // V40.1.1 - SUPER GABINETE (abas Lista / Rotinas / Notas)
 // Notas com 3 estados: empty / form / list
@@ -1431,6 +1674,20 @@ window.addNote = function() {
 window.deleteNote = function(id) {
     notesDb = notesDb.filter(n => n.id !== id);
     saveNotes();
+    
+    // V40.2: limpar IDs órfãos em todos os blocos que vinculavam essa nota
+    let blocksAffected = 0;
+    db.forEach(b => {
+        if (b.linkedNoteIds && b.linkedNoteIds.includes(id)) {
+            b.linkedNoteIds = b.linkedNoteIds.filter(nid => nid !== id);
+            blocksAffected++;
+        }
+    });
+    if (blocksAffected > 0) {
+        saveDb();
+        renderTimeline();
+    }
+    
     renderNotes();
     showToast('Nota apagada.');
 }

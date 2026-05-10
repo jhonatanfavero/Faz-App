@@ -291,6 +291,68 @@
             </div>
         </div>
 
+        <!-- V40.2: Sheet "Adicionar nota" (escolha entre criar nova ou vincular existente) -->
+        <div id="link-note-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
+            
+            <!-- View 1: opções iniciais -->
+            <div id="link-note-options">
+                <div class="flex items-center justify-between mb-5 shrink-0">
+                    <h2 class="text-lg font-bold text-zinc-900">Adicionar nota</h2>
+                    <button onclick="closeLinkNoteSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-500 rounded-full hover:bg-zinc-200 transition"><i class="ph ph-x text-base"></i></button>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="chooseCreateNewNote()" class="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl bg-app-focus-soft border border-app-focus-soft hover:bg-app-focus-soft-strong active:scale-[0.98] transition">
+                        <div class="w-12 h-12 rounded-xl bg-app-focus-soft text-app-focus flex items-center justify-center">
+                            <i class="ph-bold ph-note-pencil text-2xl"></i>
+                        </div>
+                        <span class="text-sm font-bold text-app-focus">Criar nova</span>
+                        <span class="text-[10px] text-zinc-500 text-center leading-tight">Nova nota vazia</span>
+                    </button>
+                    <button onclick="chooseLinkExistingNote()" class="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl bg-zinc-50 border border-zinc-200 hover:bg-zinc-100 active:scale-[0.98] transition">
+                        <div class="w-12 h-12 rounded-xl bg-zinc-100 text-zinc-700 flex items-center justify-center">
+                            <i class="ph-bold ph-link-simple text-2xl"></i>
+                        </div>
+                        <span class="text-sm font-bold text-zinc-700">Vincular existente</span>
+                        <span class="text-[10px] text-zinc-500 text-center leading-tight">Da sua aba Notas</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- View 2: lista de notas existentes -->
+            <div id="link-note-existing-view" class="hidden flex flex-col flex-1 min-h-0">
+                <div class="flex items-center gap-2 mb-4 shrink-0">
+                    <button onclick="backToLinkOptions()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
+                    <h2 class="text-lg font-bold text-zinc-900 flex-1">Vincular nota</h2>
+                    <button onclick="closeLinkNoteSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-500 rounded-full hover:bg-zinc-200 transition"><i class="ph ph-x text-base"></i></button>
+                </div>
+                <div id="link-note-search-wrapper" class="shrink-0 mb-3 hidden">
+                    <input type="text" id="link-note-search" placeholder="Buscar nota..." autocomplete="off" oninput="renderExistingNotesList(this.value)" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:border-app-focus outline-none transition-colors">
+                </div>
+                <div id="link-note-existing-list" class="flex-1 overflow-y-auto no-scrollbar pb-2">
+                </div>
+            </div>
+        </div>
+
+        <!-- V40.2: Modal de leitura de nota vinculada -->
+        <div id="linked-note-view-modal" class="absolute inset-x-4 top-1/2 -translate-y-1/2 bg-white rounded-3xl p-5 z-[60] hidden flex-col shadow-2xl max-h-[80%]">
+            <div class="flex items-start justify-between gap-3 mb-3 shrink-0">
+                <h2 id="linked-note-view-title" class="text-base font-bold text-zinc-900 flex-1 break-words">Título</h2>
+                <button onclick="closeLinkedNoteView()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-500 rounded-full hover:bg-zinc-200 transition shrink-0"><i class="ph ph-x text-base"></i></button>
+            </div>
+            <div id="linked-note-view-content" class="flex-1 overflow-y-auto no-scrollbar mb-4 min-h-[60px]">
+                <p class="text-sm text-zinc-700">conteúdo</p>
+            </div>
+            <div class="flex gap-2 shrink-0">
+                <button onclick="editLinkedNoteInline()" class="flex-1 py-2.5 rounded-xl bg-app-focus-soft border border-app-focus-soft text-app-focus font-bold text-sm hover:bg-app-focus-soft-strong transition flex items-center justify-center gap-1.5">
+                    <i class="ph ph-pencil-simple text-base"></i> Editar
+                </button>
+                <button onclick="unlinkNoteFromBlock()" class="flex-1 py-2.5 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 font-bold text-sm hover:bg-zinc-200 transition flex items-center justify-center gap-1.5">
+                    <i class="ph ph-link-break text-base"></i> Desvincular
+                </button>
+            </div>
+        </div>
+
         <div id="period-select-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
             <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
             <div class="flex items-center gap-3 mb-4 shrink-0">

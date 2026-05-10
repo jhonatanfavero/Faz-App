@@ -1,5 +1,5 @@
-// V3.0 - v40.1.9 (Card Global em Relatórios + 4 botões CTA com cor do tema; extermínio TOTAL do bg-zinc-900)
-const CACHE_NAME = 'timeblock-v40-1-9';
+// V3.0 - v40.2 (Vincular Notas a Cards: criar/vincular/desvincular + busca híbrida)
+const CACHE_NAME = 'timeblock-v40-2';
 const ASSETS = [
   './',
   './index.html',

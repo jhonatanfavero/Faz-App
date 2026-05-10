@@ -1,5 +1,5 @@
-// V2.0 - IMPLEMENTAÇÃO 2J (Modo Lista para Filtros)
-const CACHE_NAME = 'timeblock-v22';
+// V2.0 - COMBO 2K + BLOCO 7
+const CACHE_NAME = 'timeblock-v24';
 const ASSETS = [
   './',
   './index.html',

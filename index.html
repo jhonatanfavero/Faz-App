@@ -48,16 +48,16 @@
                         </p>
                     </div>
                     <div class="flex gap-1 shrink-0">
-                        <button onclick="debugPreviousDay()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-zinc-200 shadow-sm" title="Dia Anterior">
+                        <button onclick="debugPreviousDay()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Dia Anterior">
                             <i class="ph ph-rewind text-base text-app-focus"></i>
                         </button>
-                        <button onclick="goToToday()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-zinc-200 shadow-sm" title="Voltar para Hoje">
+                        <button onclick="goToToday()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Voltar para Hoje">
                             <i class="ph ph-calendar-star text-base text-app-focus"></i>
                         </button>
-                        <button onclick="debugAdvanceDay()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-zinc-200 shadow-sm" title="Avançar Dia">
+                        <button onclick="debugAdvanceDay()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Avançar Dia">
                             <i class="ph ph-fast-forward text-base text-app-focus"></i>
                         </button>
-                        <button onclick="toggleHeader()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-zinc-200 shadow-sm" title="Ocultar Menu">
+                        <button onclick="toggleHeader()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Ocultar Menu">
                             <i class="ph ph-caret-up text-base text-app-focus"></i>
                         </button>
                     </div>
@@ -136,11 +136,11 @@
             <i class="ph-bold ph-plus text-2xl"></i>
         </button>
 
-        <button id="list-btn" onclick="openListSheet()" class="absolute bottom-8 left-6 h-14 min-w-[56px] bg-white border border-zinc-200 text-zinc-800 rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(0,0,0,0.15)] hover:scale-105 active:scale-95 transition-all duration-300 z-30 px-3 overflow-hidden">
-            <i class="ph ph-list-bullets text-2xl font-bold shrink-0 mx-1"></i>
+        <button id="list-btn" onclick="openListSheet()" class="absolute bottom-8 left-6 h-14 min-w-[56px] bg-white border-2 border-app-focus text-app-focus rounded-full flex items-center justify-center shadow-[0_8px_25px_rgba(0,0,0,0.15)] hover:scale-105 active:scale-95 transition-all duration-300 z-30 px-3 overflow-hidden">
+            <i class="ph-bold ph-list-bullets text-2xl shrink-0 mx-1"></i>
             <div id="list-btn-stats" class="hidden flex-col items-start pr-1 shrink-0">
                 <span class="text-[11px] font-extrabold leading-none text-zinc-900" id="list-btn-count">0 itens</span>
-                <span class="text-[10px] font-bold text-indigo-600 leading-none mt-1" id="list-btn-time">0h</span>
+                <span class="text-[10px] font-bold text-app-focus leading-none mt-1" id="list-btn-time">0h</span>
             </div>
         </button>
 
@@ -153,9 +153,8 @@
                 <button onclick="commitSpecialIntent('Descanso', 'rest')" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 text-sm font-medium hover:bg-emerald-100 transition whitespace-nowrap">
                     <i class="ph ph-tree text-lg"></i> Descanso
                 </button>
-                <button onclick="comingSoonMetas()" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-zinc-200 text-zinc-400 bg-zinc-50 text-sm font-medium hover:bg-zinc-100 transition whitespace-nowrap relative" title="Em breve">
+                <button onclick="comingSoonMetas()" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-zinc-200 text-zinc-400 bg-zinc-50 text-sm font-medium hover:bg-zinc-100 transition whitespace-nowrap" title="Em breve">
                     <i class="ph ph-target text-lg"></i> Metas
-                    <span class="text-[8px] font-bold uppercase tracking-wider bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded-full">em breve</span>
                 </button>
                 <button onclick="openConfigSheet()" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition whitespace-nowrap">
                     <i class="ph ph-gear text-lg"></i> Config

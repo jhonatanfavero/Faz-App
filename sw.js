@@ -1,5 +1,5 @@
-// V3.0 - v40.1.6 (Cor do tema: header + TAGs + Relatórios + ícones; "+ Adicionar Check"; botão Metas placeholder)
-const CACHE_NAME = 'timeblock-v40-1-6';
+// V3.0 - v40.1.7 (Tema universal: botão Lista igual FAB+, contornos do header coloridos, Metas mais discreto)
+const CACHE_NAME = 'timeblock-v40-1-7';
 const ASSETS = [
   './',
   './index.html',

@@ -1,10 +1,10 @@
-const CACHE_NAME = 'timeblock-v11';
+// V2.0 - v34 (Correções Gemini: FAB + botões + scrollbar)
+const CACHE_NAME = 'timeblock-v34';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js'
-  // CDNs e fontes externas ficam de fora para evitar falhas de CORS na instalação do SW
 ];
 
 self.addEventListener('install', (e) => {

@@ -1,5 +1,5 @@
-// V2.0 - COMBO 2K + BLOCO 7
-const CACHE_NAME = 'timeblock-v24';
+// V2.0 - COMBO A (Modais)
+const CACHE_NAME = 'timeblock-v25';
 const ASSETS = [
   './',
   './index.html',

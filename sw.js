@@ -1,5 +1,5 @@
-// V2.0 - v32 Corrigida
-const CACHE_NAME = 'timeblock-v32';
+// V2.0 - CORREÇÃO D1 (Ordem Modais)
+const CACHE_NAME = 'timeblock-v33';
 const ASSETS = [
   './',
   './index.html',

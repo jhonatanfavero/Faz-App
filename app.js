@@ -220,10 +220,11 @@ window.toggleFilterDelayed = function() {
     const btnCompleted = document.getElementById('filter-completed-btn');
     
     if (showOnlyDelayed) {
-        btn.classList.replace('bg-indigo-50', 'bg-indigo-100');
+        // V40.1.8: ativo = soft-strong (15% bg)
+        btn.classList.replace('bg-app-focus-soft', 'bg-app-focus-soft-strong');
         btnCompleted.classList.replace('bg-emerald-100', 'bg-emerald-50');
     } else {
-        btn.classList.replace('bg-indigo-100', 'bg-indigo-50');
+        btn.classList.replace('bg-app-focus-soft-strong', 'bg-app-focus-soft');
     }
     
     renderTimeline();
@@ -238,7 +239,7 @@ window.toggleFilterCompleted = function() {
     
     if (showOnlyCompleted) {
         btnCompleted.classList.replace('bg-emerald-50', 'bg-emerald-100');
-        btnDelayed.classList.replace('bg-indigo-100', 'bg-indigo-50');
+        btnDelayed.classList.replace('bg-app-focus-soft-strong', 'bg-app-focus-soft');
     } else {
         btnCompleted.classList.replace('bg-emerald-100', 'bg-emerald-50');
     }
@@ -483,7 +484,7 @@ function drawBlock(block) {
 
         let bgClass = block.completed ? 'bg-emerald-100 border-emerald-200' : (isRest ? 'bg-emerald-50 border-emerald-300' : 'bg-app-focus border-transparent shadow-md');
         if (isPast && !block.completed) {
-            bgClass = isRest ? 'bg-zinc-50 border-zinc-200 opacity-80 saturate-50' : 'bg-indigo-50 border-indigo-200 opacity-80 saturate-50';
+            bgClass = isRest ? 'bg-zinc-50 border-zinc-200 opacity-80 saturate-50' : 'bg-app-focus-soft border-app-focus-soft opacity-80 saturate-50';
         } else if (isPast && block.completed) {
             bgClass = 'bg-emerald-50 border-emerald-200 opacity-80 saturate-50';
         }
@@ -916,7 +917,7 @@ function syncDurButtons(mins) {
 function syncBacklogDurButtons(mins) {
     document.querySelectorAll('.backlog-dur-btn').forEach(b => {
         b.className = 'backlog-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm whitespace-nowrap hover:bg-zinc-100 transition';
-        if(parseInt(b.dataset.time) === mins) b.className = 'backlog-dur-btn px-4 py-2 rounded-full bg-zinc-900 border border-zinc-900 text-white text-sm font-medium whitespace-nowrap shadow-md transition';
+        if(parseInt(b.dataset.time) === mins) b.className = 'backlog-dur-btn px-4 py-2 rounded-full bg-app-focus border border-app-focus text-white text-sm font-medium whitespace-nowrap shadow-md transition';
     });
 }
 
@@ -1275,7 +1276,7 @@ function renderBacklog() {
                 </div>
             </div>
             <div class="flex gap-2 shrink-0">
-                <button onclick="scheduleBacklogItem('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-500 hover:text-white transition-colors" title="Segurar e Agendar">
+                <button onclick="scheduleBacklogItem('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-app-focus-soft border border-app-focus-soft text-app-focus rounded-xl hover:bg-app-focus-soft-strong transition-colors" title="Segurar e Agendar">
                     <i class="ph ph-hand-grabbing text-lg"></i>
                 </button>
                 <button onclick="deleteBacklogItem('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-red-50 border border-red-100 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors" title="Apagar">
@@ -1527,6 +1528,17 @@ backlogInput.addEventListener('keypress', e => { if (e.key === 'Enter') addBackl
 window.applyThemeColor = function() {
     document.documentElement.style.setProperty('--theme-color', themeColor);
     
+    // V40.1.8: converter hex pra rgb pra usar com opacidade (botões "tinted")
+    function hexToRgb(hex) {
+        const h = hex.replace('#', '');
+        const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+        const r = parseInt(full.substring(0, 2), 16);
+        const g = parseInt(full.substring(2, 4), 16);
+        const b = parseInt(full.substring(4, 6), 16);
+        return `${r}, ${g}, ${b}`;
+    }
+    const rgb = hexToRgb(themeColor);
+    
     // V3.0 - Bug 2.7: Injetar CSS dinâmico pra sobrescrever app-focus
     let styleEl = document.getElementById('dynamic-theme-style');
     if (!styleEl) {
@@ -1540,6 +1552,11 @@ window.applyThemeColor = function() {
         .border-app-focus { border-color: ${themeColor} !important; }
         .focus\\:border-app-focus:focus { border-color: ${themeColor} !important; }
         .selection\\:bg-app-focus::selection { background-color: ${themeColor} !important; }
+        /* V40.1.8: variações suaves para CTAs internos (Notas/Lista/Rotinas) */
+        .bg-app-focus-soft { background-color: rgba(${rgb}, 0.08) !important; }
+        .border-app-focus-soft { border-color: rgba(${rgb}, 0.25) !important; }
+        .bg-app-focus-soft-strong { background-color: rgba(${rgb}, 0.15) !important; }
+        .hover\\:bg-app-focus-soft-strong:hover { background-color: rgba(${rgb}, 0.15) !important; }
     `;
 }
 

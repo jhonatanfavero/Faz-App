@@ -1,5 +1,5 @@
-// V3.0 - v40.1.7 (Tema universal: botão Lista igual FAB+, contornos do header coloridos, Metas mais discreto)
-const CACHE_NAME = 'timeblock-v40-1-7';
+// V3.0 - v40.1.8 (Harmonia visual TOTAL: classes soft + extermínio do indigo + TAGs/Relatórios com border tema)
+const CACHE_NAME = 'timeblock-v40-1-8';
 const ASSETS = [
   './',
   './index.html',

@@ -64,17 +64,17 @@
                 </div>
                 
                 <div class="flex gap-2">
-                    <button id="filter-delayed-btn" onclick="toggleFilterDelayed()" class="bg-indigo-50 border border-indigo-200 p-2 rounded-xl hover:bg-indigo-100 transition flex items-center justify-center shrink-0" title="Filtrar Atrasados">
-                        <i class="ph-bold ph-info text-lg text-indigo-500"></i>
+                    <button id="filter-delayed-btn" onclick="toggleFilterDelayed()" class="bg-app-focus-soft border border-app-focus-soft p-2 rounded-xl hover:bg-app-focus-soft-strong transition flex items-center justify-center shrink-0" title="Filtrar Atrasados">
+                        <i class="ph-bold ph-info text-lg text-app-focus"></i>
                     </button>
                     <!-- V2.0 - BLOCO 2 -->
                     <button id="filter-completed-btn" onclick="toggleFilterCompleted()" class="bg-emerald-50 border border-emerald-200 p-2 rounded-xl hover:bg-emerald-100 transition flex items-center justify-center shrink-0" title="Filtrar Concluídos">
                         <i class="ph-bold ph-check-circle text-lg text-emerald-500"></i>
                     </button>
-                    <button onclick="openTagsSheet()" class="bg-white border border-zinc-200 px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
+                    <button onclick="openTagsSheet()" class="bg-white border border-app-focus px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
                         <i class="ph ph-tag text-sm text-app-focus"></i> TAGs
                     </button>
-                    <button onclick="openReportsSheet()" class="bg-white border border-zinc-200 px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
+                    <button onclick="openReportsSheet()" class="bg-white border border-app-focus px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
                         <i class="ph ph-chart-bar text-sm text-app-focus"></i> Relatórios
                     </button>
                 </div>
@@ -107,7 +107,7 @@
             </div>
             <div class="flex gap-2">
                 <button class="float-dur-btn flex-1 py-1.5 rounded bg-zinc-100 text-zinc-500 hover:bg-zinc-200 text-xs font-bold transition" data-time="15" onclick="changeFloatDuration(15)">15m</button>
-                <button class="float-dur-btn flex-1 py-1.5 rounded bg-app-focus text-white text-xs font-bold transition shadow-[0_0_10px_rgba(79,70,229,0.3)]" data-time="30" onclick="changeFloatDuration(30)">30m</button>
+                <button class="float-dur-btn flex-1 py-1.5 rounded bg-app-focus text-white text-xs font-bold transition shadow-md" data-time="30" onclick="changeFloatDuration(30)">30m</button>
                 <button class="float-dur-btn flex-1 py-1.5 rounded bg-zinc-100 text-zinc-500 hover:bg-zinc-200 text-xs font-bold transition" data-time="45" onclick="changeFloatDuration(45)">45m</button>
                 <button class="float-dur-btn flex-1 py-1.5 rounded bg-zinc-100 text-zinc-500 hover:bg-zinc-200 text-xs font-bold transition" data-time="60" onclick="changeFloatDuration(60)">1h</button>
             </div>
@@ -167,7 +167,7 @@
                 <p class="text-xs text-zinc-500 font-medium mb-3 uppercase tracking-wider">Volume de Tempo</p>
                 <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                     <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="15">15m</button>
-                    <button class="sheet-dur-btn px-4 py-2 rounded-full bg-app-focus border border-app-focus text-white text-sm font-medium shadow-[0_0_15px_rgba(79,70,229,0.3)] transition active-chip" data-time="30">30m</button>
+                    <button class="sheet-dur-btn px-4 py-2 rounded-full bg-app-focus border border-app-focus text-white text-sm font-medium shadow-md transition active-chip" data-time="30">30m</button>
                     <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="45">45m</button>
                     <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="60">1h</button>
                     <button onclick="openPeriodSelectSheet()" class="px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition whitespace-nowrap flex items-center gap-1"><i class="ph ph-calendar-blank"></i> Período</button>
@@ -206,7 +206,7 @@
                 <div class="flex items-center justify-between mb-4 shrink-0">
                     <h2 class="text-lg font-bold text-zinc-900">Lista de Tarefas</h2>
                     <div class="flex gap-1.5 items-center">
-                        <span class="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider hidden" id="backlog-total-time">0h</span>
+                        <span class="bg-app-focus-soft text-app-focus text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider hidden" id="backlog-total-time">0h</span>
                         <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider" id="backlog-count">0</span>
                     </div>
                 </div>
@@ -216,12 +216,12 @@
                     
                     <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-1">
                         <button class="backlog-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-100 transition whitespace-nowrap" data-time="15">15m</button>
-                        <button class="backlog-dur-btn px-4 py-2 rounded-full bg-zinc-900 border border-zinc-900 text-white text-sm font-medium transition whitespace-nowrap shadow-md" data-time="30">30m</button>
+                        <button class="backlog-dur-btn px-4 py-2 rounded-full bg-app-focus border border-app-focus text-white text-sm font-medium transition whitespace-nowrap shadow-md" data-time="30">30m</button>
                         <button class="backlog-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-100 transition whitespace-nowrap" data-time="45">45m</button>
                         <button class="backlog-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-100 transition whitespace-nowrap" data-time="60">1h</button>
                     </div>
                     
-                    <button onclick="addBacklogItem()" class="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold py-2.5 rounded-xl hover:bg-indigo-100 active:scale-[0.98] transition text-sm">
+                    <button onclick="addBacklogItem()" class="w-full bg-app-focus-soft border border-app-focus-soft text-app-focus font-bold py-2.5 rounded-xl hover:bg-app-focus-soft-strong active:scale-[0.98] transition text-sm">
                         Salvar na Lista
                     </button>
                 </div>
@@ -233,7 +233,7 @@
             <!-- V40.1: View 2 - Rotinas (placeholder, será implementado em V40.2) -->
             <div id="view-routines" class="flex-1 flex flex-col min-h-0 hidden">
                 <div class="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
-                    <div class="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mb-4">
+                    <div class="w-16 h-16 rounded-2xl bg-app-focus-soft text-app-focus flex items-center justify-center mb-4">
                         <i class="ph ph-arrows-clockwise text-3xl"></i>
                     </div>
                     <h3 class="text-base font-bold text-zinc-800 mb-1">Rotinas Visuais</h3>
@@ -251,21 +251,21 @@
                         <h2 class="text-lg font-bold text-zinc-900">Notas Soltas</h2>
                         <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider" id="notes-count">0</span>
                     </div>
-                    <button onclick="openNoteForm()" class="w-9 h-9 flex items-center justify-center bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-xl hover:bg-indigo-100 active:scale-[0.95] transition shadow-sm" title="Nova nota">
+                    <button onclick="openNoteForm()" class="w-9 h-9 flex items-center justify-center bg-app-focus-soft border border-app-focus-soft text-app-focus rounded-xl hover:bg-app-focus-soft-strong active:scale-[0.95] transition shadow-sm" title="Nova nota">
                         <i class="ph-bold ph-plus text-base"></i>
                     </button>
                 </div>
 
                 <!-- Estado A: Empty (nenhuma nota) -->
                 <div id="notes-empty" class="flex-1 flex flex-col items-center justify-center text-center px-6 py-8">
-                    <div class="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mb-4">
+                    <div class="w-16 h-16 rounded-2xl bg-app-focus-soft text-app-focus flex items-center justify-center mb-4">
                         <i class="ph ph-note-pencil text-3xl"></i>
                     </div>
                     <h3 class="text-base font-bold text-zinc-800 mb-1">Notas Soltas</h3>
                     <p class="text-xs text-zinc-500 leading-relaxed max-w-[280px] mb-6">
                         Anote ideias, lembretes ou observações que não precisam de horário.
                     </p>
-                    <button onclick="openNoteForm()" class="bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold py-3 px-6 rounded-xl hover:bg-indigo-100 active:scale-[0.98] transition text-sm flex items-center gap-2 shadow-sm">
+                    <button onclick="openNoteForm()" class="bg-app-focus-soft border border-app-focus-soft text-app-focus font-bold py-3 px-6 rounded-xl hover:bg-app-focus-soft-strong active:scale-[0.98] transition text-sm flex items-center gap-2 shadow-sm">
                         <i class="ph-bold ph-plus text-base"></i> Criar Nota
                     </button>
                 </div>
@@ -280,7 +280,7 @@
                     </div>
                     <input type="text" id="note-title-input" placeholder="Título (opcional)" autocomplete="off" class="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-app-focus outline-none mb-2 transition-colors">
                     <textarea id="note-content-input" placeholder="Anote uma ideia, lembrete, observação..." rows="3" class="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:border-app-focus outline-none mb-3 transition-colors resize-none"></textarea>
-                    <button id="notes-form-save-btn" onclick="addNote()" class="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold py-2.5 rounded-xl hover:bg-indigo-100 active:scale-[0.98] transition text-sm">
+                    <button id="notes-form-save-btn" onclick="addNote()" class="w-full bg-app-focus-soft border border-app-focus-soft text-app-focus font-bold py-2.5 rounded-xl hover:bg-app-focus-soft-strong active:scale-[0.98] transition text-sm">
                         Salvar Nota
                     </button>
                 </div>
@@ -325,7 +325,7 @@
 
                 <button onclick="openConfigPeriods()" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <div class="w-10 h-10 rounded-lg bg-app-focus-soft text-app-focus flex items-center justify-center">
                             <i class="ph ph-clock text-xl"></i>
                         </div>
                         <div class="flex flex-col">
@@ -452,7 +452,7 @@
             </div>
             <div class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2">
                 <button onclick="cloneManual()" class="w-full flex items-center gap-3 p-4 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left text-zinc-800 font-bold text-sm">
-                    <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><i class="ph ph-hand-grabbing text-xl"></i></div>
+                    <div class="w-10 h-10 rounded-lg bg-app-focus-soft text-app-focus flex items-center justify-center shrink-0"><i class="ph ph-hand-grabbing text-xl"></i></div>
                     Copiar
                 </button>
                 <button onclick="promptCloneQtd('daily')" class="w-full flex items-center gap-3 p-4 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left text-zinc-800 font-bold text-sm">
@@ -476,7 +476,7 @@
             <input type="number" id="clone-qtd-input" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-6 text-center text-xl" min="1">
             <div class="flex gap-2">
                 <button onclick="cancelCloneQtd()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
-                <button onclick="confirmCloneQtd()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:bg-indigo-700 shadow-[0_0_15px_rgba(79,70,229,0.3)] transition">Confirmar</button>
+                <button onclick="confirmCloneQtd()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:opacity-90 shadow-md transition">Confirmar</button>
             </div>
         </div>
 
@@ -488,7 +488,7 @@
             <div class="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2" id="edit-tag-selector-container"></div>
             <div class="flex gap-2">
                 <button onclick="cancelEdit()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
-                <button onclick="saveEditTask()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:bg-indigo-700 shadow-[0_0_15px_rgba(79,70,229,0.3)] transition">Salvar</button>
+                <button onclick="saveEditTask()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:opacity-90 shadow-md transition">Salvar</button>
             </div>
         </div>
 
@@ -515,7 +515,7 @@
             <input type="time" id="edit-time-input" class="w-full text-center text-3xl font-bold p-4 bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:border-app-focus transition-colors mb-6">
             <div class="flex gap-2">
                 <button onclick="cancelTimePicker()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
-                <button onclick="confirmTimePicker()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:bg-indigo-700 shadow-[0_0_15px_rgba(79,70,229,0.3)] transition">Confirmar</button>
+                <button onclick="confirmTimePicker()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:opacity-90 shadow-md transition">Confirmar</button>
             </div>
         </div>
 

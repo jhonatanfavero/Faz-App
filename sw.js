@@ -1,12 +1,10 @@
-// V2.0 - CORREÇÃO B3 (Fechar Template Literal)
-const CACHE_NAME = 'timeblock-v31';
-const ASSETS = [
+// V2.0 - CORREÇ
   './',
   './index.html',
   './style.css',
   './app.js'
   // CDNs e fontes externas ficam de fora para evitar falhas de CORS na instalação do SW
-];
+;
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

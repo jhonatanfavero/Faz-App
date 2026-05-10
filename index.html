@@ -58,6 +58,9 @@
                             <i class="ph ph-fast-forward text-lg sm:text-xl text-zinc-600"></i>
                         </button>
                     </div>
+                    <button onclick="toggleHeader()" class="bg-zinc-100 p-2 sm:p-2.5 rounded-full hover:bg-zinc-200 transition border border-zinc-200" title="Ocultar Menu">
+                        <i class="ph ph-eye-slash text-lg sm:text-xl text-zinc-600"></i>
+                    </button>
                 </div>
                 
                 <div class="flex gap-2">
@@ -86,6 +89,10 @@
                 </div>
             </div>
         </header>
+
+        <button id="show-header-btn" onclick="showHeader()" class="show-header-btn hidden">
+            <i class="ph ph-eye text-zinc-600"></i>
+        </button>
 
         <div id="floating-task" class="absolute bottom-6 left-1/2 w-[92%] bg-white border border-zinc-200 shadow-[0_20px_40px_rgba(0,0,0,0.1)] rounded-2xl p-4 z-50 hidden flex-col animate-float-bubble pointer-events-auto -translate-x-1/2">
             <div class="flex items-center justify-between mb-3">

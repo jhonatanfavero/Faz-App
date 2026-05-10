@@ -597,7 +597,11 @@ function performEncaixeMatematico(gapStart, gapDuration) {
         startMin: start, 
         duration: pendingIntent.duration,
         date: getActiveDateStr(),
-        microblocks: [],
+        microblocks: (pendingIntent.microblocks || []).map(mb => ({
+            ...mb,
+            id: 'mb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+            done: false // V40.1.4: clone reseta status (recomeça do zero)
+        })),
         completed: false,
         theme: pendingIntent.theme || 'focus',
         tagId: pendingIntent.tagId || null
@@ -630,7 +634,13 @@ window.duplicateTask = function(id, e) {
 
 window.cloneManual = function() {
     if(!taskToClone) return;
-    pendingIntent = { title: taskToClone.title, duration: taskToClone.duration, theme: taskToClone.theme || 'focus' };
+    pendingIntent = { 
+        title: taskToClone.title, 
+        duration: taskToClone.duration, 
+        theme: taskToClone.theme || 'focus',
+        tagId: taskToClone.tagId || null, // V40.1.4: preserva tag
+        microblocks: taskToClone.microblocks || [] // V40.1.4: copia microblocks
+    };
     selectedDur = taskToClone.duration;
     document.getElementById('floating-title').innerText = taskToClone.title;
     syncDurButtons(selectedDur);
@@ -933,6 +943,12 @@ window.openSheet = () => {
 
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     sheet.classList.remove('translate-y-full');
+    
+    // V40.1.4: foco automático no input após animação do sheet (350ms)
+    setTimeout(() => {
+        const taskInput = document.getElementById('task-input');
+        if (taskInput) taskInput.focus();
+    }, 350);
 }
 
 window.openListSheet = () => {

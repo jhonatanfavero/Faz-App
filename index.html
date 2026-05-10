@@ -158,7 +158,7 @@
                 </button>
             </div>
             
-            <input type="text" id="task-input" placeholder="Sem tarefas soltas. O que focar?" autocomplete="off" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-app-focus focus:bg-white transition-colors mb-6 text-sm">
+            <input type="text" id="task-input" placeholder="Nome da tarefa" autocomplete="off" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-app-focus focus:bg-white transition-colors mb-6 text-sm">
             
             <div class="mb-8">
                 <p class="text-xs text-zinc-500 font-medium mb-3 uppercase tracking-wider">Volume de Tempo</p>
@@ -177,8 +177,8 @@
                 </div>
             </div>
 
-            <button onclick="commitIntent()" class="w-full bg-zinc-900 text-white font-bold py-3.5 rounded-xl hover:bg-zinc-800 active:scale-[0.98] transition flex items-center justify-center gap-2">
-                <i class="ph ph-hand-grabbing text-lg"></i> Segurar Intenção
+            <button onclick="commitIntent()" class="w-full bg-app-focus text-white font-bold py-3.5 rounded-xl hover:opacity-90 active:scale-[0.98] transition flex items-center justify-center gap-2">
+                <i class="ph ph-calendar-plus text-lg"></i> Inserir na Agenda
             </button>
         </div>
 

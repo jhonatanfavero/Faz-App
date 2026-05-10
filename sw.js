@@ -1,5 +1,5 @@
-// V3.0 - v40.1.3 (Auto-retrair card: 1 por vez + click-out + scroll com threshold; placeholder microbloco simplificado)
-const CACHE_NAME = 'timeblock-v40-1-3';
+// V3.0 - v40.1.4 (Clone com microblocks + UX do FAB: placeholder, foco auto, "Inserir na Agenda" no tema)
+const CACHE_NAME = 'timeblock-v40-1-4';
 const ASSETS = [
   './',
   './index.html',

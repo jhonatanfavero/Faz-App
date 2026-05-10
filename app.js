@@ -1166,26 +1166,19 @@ function renderBacklog() {
     const container = document.getElementById('backlog-container');
     document.getElementById('backlog-count').innerText = backlogDb.length;
     
-    // Atualiza o Botão Flutuante e Cabeçalho da Lista
     const totalMins = backlogDb.reduce((acc, item) => acc + item.duration, 0);
     const listStats = document.getElementById('list-btn-stats');
     const listCount = document.getElementById('list-btn-count');
     const listTime = document.getElementById('list-btn-time');
-    const backlogTotalTime = document.getElementById('backlog-total-time');
     
     if (backlogDb.length > 0) {
         listStats.classList.remove('hidden');
         listStats.classList.add('flex');
-        listCount.innerText = backlogDb.length + (backlogDb.length === 1 ? ' item' : ' itens');
+        listCount.innerText = backlogDb.length + ' itens';
         listTime.innerText = formatDur(totalMins);
-        
-        backlogTotalTime.innerText = formatDur(totalMins);
-        backlogTotalTime.classList.remove('hidden');
     } else {
         listStats.classList.add('hidden');
         listStats.classList.remove('flex');
-        
-        backlogTotalTime.classList.add('hidden');
     }
     
     if (backlogDb.length === 0) {
@@ -1193,20 +1186,19 @@ function renderBacklog() {
             <div class="flex flex-col items-center justify-center h-full text-center opacity-50 py-8">
                 <i class="ph ph-inbox text-4xl mb-2"></i>
                 <p class="text-sm font-medium">Lista vazia!</p>
-                <p class="text-xs">Programe suas tarefas aqui.</p>
             </div>`;
         return;
     }
 
-    container.innerHTML = backlogDb.map(item => `
     container.innerHTML = backlogDb.map(item => {
-        const tagColor = getTagColor(item.tagId);
-        const tagHtml = tagColor ? `<div class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${tagColor};"></div>` : '';
+        const tagHtml = item.tagId ? `<div class="w-2.5 h-2.5 rounded-full" style="background-color: ${getTagColor(item.tagId)};"></div>` : '';
         return `
         <div class="flex justify-between items-center bg-white border border-zinc-200 p-3.5 rounded-xl mb-3 shadow-sm hover:shadow transition-shadow group">
             <div class="flex flex-col min-w-0 pr-3 flex-1">
-                <span class="text-sm font-bold text-zinc-800 truncate mb-0.5">${item.title}</span>
-                <div class="flex items-center gap-1.5 mb-0.5 min-w-0">${tagHtml}<span class="text-sm font-bold text-zinc-800 truncate">${item.title}</span></div>
+                <div class="flex items-center gap-1.5 mb-0.5">
+                    ${tagHtml}
+                    <span class="text-sm font-bold text-zinc-800 truncate">${item.title}</span>
+                </div>
                 <span class="text-[11px] font-bold text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i> ${formatDur(item.duration)}</span>
             </div>
             <div class="flex gap-2 shrink-0">
@@ -1218,7 +1210,6 @@ function renderBacklog() {
                 </button>
             </div>
         </div>
-    `).join('');
     `}).join('');
 }
 
@@ -1240,6 +1231,7 @@ runRealTimeEngine();
 renderTimeline();
 renderBacklog();
 renderTagSelector();
+applyThemeColor(); // V2.0 - Aplica tema
 
 // Pula pro momento atual
 setTimeout(() => {
@@ -1528,6 +1520,3 @@ window.applyThemeColor = function() {
 }
 
 // Injeta as cores ao carregar
-document.addEventListener('DOMContentLoaded', () => {
-    applyThemeColor();
-});

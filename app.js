@@ -537,7 +537,7 @@ function drawBlock(block) {
                     </div>
                 </div>
                 
-                <div class="flex gap-1.5 shrink-0 relative z-30 pointer-events-auto">
+                <div class="flex gap-1.5 shrink-0 relative z-50 pointer-events-auto">
                     <button onclick="toggleExpandBlock('${block.id}', event)" class="w-6 h-6 flex items-center justify-center ${btnBg} ${iconColor} rounded transition" title="Expandir/Recolher">
                         <i class="ph ${block.expanded ? 'ph-caret-up' : 'ph-caret-down'}"></i>
                     </button>

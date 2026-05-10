@@ -1195,13 +1195,19 @@ window.cancelPendingTask = () => {
 input.addEventListener('keypress', e => { if (e.key === 'Enter') commitIntent(); });
 backlogInput.addEventListener('keypress', e => { if (e.key === 'Enter') addBacklogItem(); });
 
+
+// V2.0 - Aplicar tema
+window.applyThemeColor = function() {
+    document.documentElement.style.setProperty('--theme-color', themeColor);
+}
+applyThemeColor();
+
 // --- INICIALIZAÇÃO ---
 renderGrid(); 
 runRealTimeEngine();
 renderTimeline();
 renderBacklog();
 renderTagSelector();
-applyThemeColor(); // V2.0 - Tema inicial
 
 setTimeout(() => {
     const scrollEl = document.getElementById('timeline-scroll');

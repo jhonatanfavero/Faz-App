@@ -302,7 +302,37 @@ window.openSearchBar = function() {
     setTimeout(() => {
         const input = document.getElementById('search-input');
         if (input) input.focus();
-    }, 50);
+        // V40.2.6: ativa listener de clique fora APÓS pequeno delay
+        // (evita que o próprio clique de abertura feche)
+        document.addEventListener('mousedown', handleClickOutsideSearch, true);
+        document.addEventListener('touchstart', handleClickOutsideSearch, { capture: true, passive: true });
+    }, 100);
+}
+
+// V40.2.6: Detecta clique fora da busca pra fechar
+function handleClickOutsideSearch(e) {
+    const row = document.getElementById('search-bar-row');
+    // Se a busca não está aberta, remove listener (cleanup defensivo)
+    if (!row || row.classList.contains('hidden')) {
+        document.removeEventListener('mousedown', handleClickOutsideSearch, true);
+        document.removeEventListener('touchstart', handleClickOutsideSearch, { capture: true, passive: true });
+        return;
+    }
+    
+    // Se o clique foi DENTRO da search-bar-row (input, X, ou qualquer filho), ignora
+    if (row.contains(e.target)) return;
+    
+    // Se o clique foi num resultado de busca (card clicável), ignora — goToBlockFromSearch já fecha
+    let el = e.target;
+    while (el && el !== document.body) {
+        if (el.getAttribute && el.getAttribute('onclick') && el.getAttribute('onclick').indexOf('goToBlockFromSearch') !== -1) {
+            return; // deixa o onclick funcionar
+        }
+        el = el.parentNode;
+    }
+    
+    // Clique fora → fecha busca
+    closeSearchBar();
 }
 
 window.closeSearchBar = function() {
@@ -318,6 +348,10 @@ window.closeSearchBar = function() {
     const counter = document.getElementById('search-counter');
     if (counter) { counter.classList.add('hidden'); counter.innerText = ''; }
     
+    // V40.2.6: cleanup do listener de clique fora
+    document.removeEventListener('mousedown', handleClickOutsideSearch, true);
+    document.removeEventListener('touchstart', handleClickOutsideSearch, { capture: true, passive: true });
+    
     renderTimeline();
 }
 
@@ -329,6 +363,7 @@ window.onSearchInput = function(value) {
 }
 
 // V40.2.5: Atualiza contador "X resultados de Y"
+// V40.2.6: agora conta em todos os dias do db
 function updateSearchCounter() {
     const counter = document.getElementById('search-counter');
     if (!counter) return;
@@ -338,8 +373,7 @@ function updateSearchCounter() {
         return;
     }
     const q = normalizeText(searchQuery);
-    const todayBlocks = db.filter(b => b.date === getActiveDateStr());
-    const matched = todayBlocks.filter(b => normalizeText(b.title).includes(q)).length;
+    const matched = db.filter(b => normalizeText(b.title).includes(q)).length;
     counter.innerText = `${matched} ${matched === 1 ? 'resultado' : 'resultados'} de "${searchQuery}"`;
     counter.classList.remove('hidden');
 }
@@ -473,7 +507,17 @@ function renderTimeline() {
     
     const timelineContainer = document.getElementById('timeline-container');
     const isSearching = !!(searchQuery && searchQuery.trim());
-    if (showOnlyDelayed || showOnlyCompleted || isSearching) {
+    
+    // V40.2.6: busca pesquisa em TODOS os dias e renderiza lista especial
+    if (isSearching) {
+        timelineContainer.classList.add('filter-list-mode');
+        renderSearchResultsAllDays();
+        renderGrid();
+        updateSearchCounter();
+        return;
+    }
+    
+    if (showOnlyDelayed || showOnlyCompleted) {
         timelineContainer.classList.add('filter-list-mode');
     } else {
         timelineContainer.classList.remove('filter-list-mode');
@@ -553,6 +597,101 @@ function renderTimeline() {
     document.getElementById('progress-text').innerText = `Planejado (${pct}%)`;
 
     renderQueue.forEach(block => drawBlock(block));
+}
+
+// V40.2.6: Renderiza resultados de busca de TODOS os dias como lista
+function renderSearchResultsAllDays() {
+    const q = normalizeText(searchQuery);
+    const today = getTodayStr();
+    
+    // Pega TODOS os blocos do db (qualquer data) que batem com a busca
+    let results = db.filter(b => normalizeText(b.title).includes(q));
+    
+    // Ordena por data (crescente) e depois por hora
+    results.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.startMin - b.startMin;
+    });
+    
+    if (results.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12 px-4">
+                <div class="w-16 h-16 rounded-2xl bg-app-focus-soft text-app-focus flex items-center justify-center mx-auto mb-4">
+                    <i class="ph ph-magnifying-glass text-3xl"></i>
+                </div>
+                <p class="text-sm font-medium text-zinc-600">Nenhum cartão encontrado</p>
+                <p class="text-xs text-zinc-400 mt-1">Tente outro termo de busca</p>
+            </div>
+        `;
+        // Limpar progress
+        document.getElementById('progress-bar').style.width = '0%';
+        document.getElementById('progress-text').innerText = 'Busca';
+        return;
+    }
+    
+    // Renderiza cada resultado como item de lista clicável
+    container.innerHTML = results.map(b => {
+        const dateLabel = formatSearchDate(b.date, today);
+        const tag = (typeof tagsDb !== 'undefined' && b.tagId) ? tagsDb.find(t => t.id === b.tagId) : null;
+        const tagBadge = tag 
+            ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background-color:${tag.color}20; color:${tag.color}">${escapeHtml(tag.name)}</span>` 
+            : '';
+        const completedDot = b.completed ? '<span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>' : '';
+        
+        return `
+            <div onclick="goToBlockFromSearch('${b.id}')" class="bg-white border border-zinc-200 rounded-xl p-3 mb-2 hover:bg-zinc-50 active:scale-[0.99] transition cursor-pointer">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                    <p class="text-[11px] font-bold text-app-focus uppercase tracking-wider">${dateLabel}</p>
+                    ${tagBadge}
+                </div>
+                <div class="flex items-center gap-2">
+                    ${completedDot}
+                    <p class="text-sm font-semibold text-zinc-800 truncate flex-1">${escapeHtml(b.title)}</p>
+                </div>
+                <p class="text-[11px] text-zinc-500 mt-1">${formatClock(b.startMin)} · ${formatDur(b.duration)}</p>
+            </div>
+        `;
+    }).join('');
+    
+    // Limpar progress
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('progress-text').innerText = `${results.length} ${results.length === 1 ? 'resultado' : 'resultados'}`;
+}
+
+// V40.2.6: Formata data pra exibição na lista de busca (Hoje / Ontem / data completa)
+function formatSearchDate(dateStr, todayStr) {
+    if (dateStr === todayStr) return 'Hoje';
+    
+    // Calcular diferença em dias usando UTC midday pra evitar problemas de fuso
+    const d = new Date(dateStr + 'T12:00:00');
+    const t = new Date(todayStr + 'T12:00:00');
+    const diffDays = Math.round((d - t) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === -1) return 'Ontem';
+    if (diffDays === 1) return 'Amanhã';
+    
+    // Outro dia: formato "Seg, 12 mai"
+    const opts = { weekday: 'short', day: 'numeric', month: 'short' };
+    let s = d.toLocaleDateString('pt-BR', opts);
+    s = s.replace(/\./g, '').replace(/ de /g, ' ');
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// V40.2.6: Clica num resultado de busca → vai pro dia daquele card
+window.goToBlockFromSearch = function(blockId) {
+    const block = db.find(b => b.id === blockId);
+    if (!block) return;
+    
+    // Fecha busca e zera query
+    closeSearchBar();
+    
+    // Pula pro dia do bloco
+    activeDateObj = new Date(block.date + 'T12:00:00');
+    runRealTimeEngine();
+    renderTimeline();
+    
+    // Pequeno toast pra feedback
+    setTimeout(() => showToast(`Indo pra ${formatSearchDate(block.date, getTodayStr())}`), 100);
 }
 
 function drawBlock(block) {

@@ -1,5 +1,5 @@
-// V3.0 - v40.2.5 (Nuvem Passageira + botão lupa de busca + reorganização do header)
-const CACHE_NAME = 'timeblock-v40-2-5';
+// V3.0 - v40.2.6 (Busca multi-dia + clique fora fecha busca)
+const CACHE_NAME = 'timeblock-v40-2-6';
 const ASSETS = [
   './',
   './index.html',

@@ -1,5 +1,5 @@
-// V3.0 - v40.2.1 (Filtros zeram ao abrir sheets + render imediato de nota vinculada + fluxo limpo de Criar nova)
-const CACHE_NAME = 'timeblock-v40-2-1';
+// V3.0 - v40.2.2 (Pensamento do Dia: 50 frases motivacionais + data com fonte maior)
+const CACHE_NAME = 'timeblock-v40-2-2';
 const ASSETS = [
   './',
   './index.html',

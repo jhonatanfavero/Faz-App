@@ -1007,6 +1007,10 @@ window.closeAllSheets = () => {
     viewingLinkedFromBlockId = null;
     pendingLinkBlockId = null; // V40.2.1
     
+    // V40.2.2: fechar modal de pensamento do dia
+    const thoughtModal = document.getElementById('thought-modal');
+    if (thoughtModal) { thoughtModal.classList.add('hidden'); thoughtModal.classList.remove('flex'); }
+    
     cancelEdit();
     cancelDelete();
     cancelTimePicker();
@@ -1319,6 +1323,86 @@ function renderBacklog() {
             </div>
         </div>
     `}).join('');
+}
+
+// =====================================================
+// V40.2.2 - PENSAMENTO DO DIA (50 frases motivacionais curtas)
+// =====================================================
+
+const THOUGHTS_OF_DAY = [
+    "Comece pelo passo mais fácil. O resto vem.",
+    "Você não precisa estar pronto. Só precisa começar.",
+    "Pequeno avanço hoje > inércia perfeita.",
+    "Respira. Está tudo no seu tempo.",
+    "O que você faz agora vira o você de amanhã.",
+    "Disciplina é amor próprio em movimento.",
+    "Não desista no dia ruim. Ele é só um dia.",
+    "Foco é dizer não pra coisas boas em nome do essencial.",
+    "Sua atenção é o presente mais raro que você tem.",
+    "Acabar é melhor que perfeito.",
+    "Confia no processo, mesmo quando não vê o resultado.",
+    "Hoje é o melhor dia pra recomeçar.",
+    "Você tá fazendo o suficiente. De verdade.",
+    "O cansaço passa. O orgulho de ter feito fica.",
+    "Faça uma coisa por vez. Faça bem feito.",
+    "Não compare seu capítulo 3 com o capítulo 20 dos outros.",
+    "Persistência vence talento sem disciplina.",
+    "Tudo que importa exige presença, não pressa.",
+    "Você é maior do que o pior dia da sua semana.",
+    "Aja. A motivação chega depois.",
+    "A versão de você que termina é diferente da que começa.",
+    "Você não está atrasado. Está no seu próprio tempo.",
+    "O importante não é o tamanho do passo, é a direção.",
+    "Cuide do agora. O futuro se cuida sozinho.",
+    "Coragem é fazer com medo.",
+    "Quem se compara, se afasta de si mesmo.",
+    "Resultado é consequência. Cuide do hábito.",
+    "Você não precisa ser perfeito hoje. Só precisa aparecer.",
+    "Diga não às distrações. Diga sim aos seus sonhos.",
+    "Cada bloco concluído é um voto pra quem você quer ser.",
+    "A vida acontece nos pequenos momentos de foco.",
+    "Sua rotina constrói seu futuro mais que sua ambição.",
+    "Não negocie com a procrastinação. Comece.",
+    "Você merece o esforço que dedica aos outros.",
+    "O dia não precisa ser perfeito pra ser produtivo.",
+    "Faça hoje o que seu eu de amanhã vai agradecer.",
+    "Calma. Foco. Coragem. Repete.",
+    "Nem todo dia rende. E tudo bem.",
+    "A pressa é inimiga da intenção.",
+    "Pequenos passos diários movem montanhas.",
+    "Você é o que repete. Repita o que importa.",
+    "Aceitar o ritmo é mais sábio que lutar contra ele.",
+    "Não é sobre tempo. É sobre prioridade.",
+    "Faça por amor, não por culpa.",
+    "Você está mais perto do que pensa.",
+    "Cada minuto bem gasto é uma vitória silenciosa.",
+    "O foco é o novo luxo.",
+    "Não trabalhe duro. Trabalhe com intenção.",
+    "Hoje é um bom dia pra ser gentil consigo.",
+    "Você não precisa fazer tudo. Só o que importa."
+];
+
+// Mostra o modal com a "frase do dia" (mesma frase por 24h, baseada na data)
+window.showThoughtOfDay = function() {
+    // Índice baseado na data atual (mesma frase o dia todo)
+    const today = new Date();
+    const daysSinceEpoch = Math.floor(today.getTime() / (1000 * 60 * 60 * 24));
+    const idx = daysSinceEpoch % THOUGHTS_OF_DAY.length;
+    
+    const textEl = document.getElementById('thought-text');
+    if (textEl) textEl.innerText = THOUGHTS_OF_DAY[idx];
+    
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    const modal = document.getElementById('thought-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+window.closeThoughtModal = function() {
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    const modal = document.getElementById('thought-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
 }
 
 // =====================================================

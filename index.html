@@ -42,10 +42,13 @@
         <header class="absolute top-0 w-full z-30 pt-12 pb-4 px-6 bg-app-bg/90 backdrop-blur-xl border-b border-black/5 pointer-events-none">
             <div class="flex flex-col gap-4 mb-4 pointer-events-auto">
                 <div class="flex justify-between items-center gap-2">
-                    <div class="min-w-0 flex-1">
-                        <p class="text-zinc-500 text-[13px] font-medium flex items-center gap-1.5 mt-0.5 truncate" id="header-date">
+                    <div class="min-w-0 flex-1 flex items-center gap-2">
+                        <p class="text-zinc-600 text-[15px] font-semibold flex items-center gap-1.5 mt-0.5 truncate" id="header-date">
                             Carregando...
                         </p>
+                        <button onclick="showThoughtOfDay()" class="w-7 h-7 flex items-center justify-center bg-app-focus-soft border border-app-focus-soft text-app-focus rounded-full hover:bg-app-focus-soft-strong active:scale-95 transition shrink-0" title="Pensamento do dia">
+                            <i class="ph-bold ph-quotes text-[12px]"></i>
+                        </button>
                     </div>
                     <div class="flex gap-1 shrink-0">
                         <button onclick="debugPreviousDay()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Dia Anterior">
@@ -351,6 +354,20 @@
                     <i class="ph ph-link-break text-base"></i> Desvincular
                 </button>
             </div>
+        </div>
+
+        <!-- V40.2.2: Modal "Pensamento do Dia" -->
+        <div id="thought-modal" class="absolute inset-x-6 top-1/2 -translate-y-1/2 bg-white rounded-3xl p-6 z-[60] hidden flex-col shadow-2xl">
+            <div class="flex items-start justify-between gap-3 mb-4 shrink-0">
+                <div class="flex items-center gap-2">
+                    <div class="w-9 h-9 rounded-full bg-app-focus-soft text-app-focus flex items-center justify-center">
+                        <i class="ph-bold ph-quotes text-base"></i>
+                    </div>
+                    <h2 class="text-sm font-bold text-zinc-700">Pensamento do dia</h2>
+                </div>
+                <button onclick="closeThoughtModal()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-500 rounded-full hover:bg-zinc-200 transition shrink-0"><i class="ph ph-x text-base"></i></button>
+            </div>
+            <p id="thought-text" class="text-base font-medium text-zinc-800 leading-relaxed text-center px-2 py-4 break-words">…</p>
         </div>
 
         <div id="period-select-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">

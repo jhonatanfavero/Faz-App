@@ -522,7 +522,7 @@ function drawBlock(block) {
 
         el.innerHTML = `
             <div class="absolute top-0 right-0 w-32 h-32 ${glowCircle} rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
-            <div class="flex justify-between items-start z-30 relative pointer-events-none">
+            <div class="flex justify-between items-start z-30 relative">
                 <div class="flex flex-1 min-w-0 pr-2 gap-2">
                     <div class="drag-handle w-6 h-6 flex items-center justify-center ${btnBg} ${iconColor} rounded transition pointer-events-auto shrink-0 mt-0.5" title="Arrastar (Mover)">
                         <i class="ph ph-dots-six-vertical"></i>
@@ -1286,13 +1286,15 @@ window.openEditModal = function(id, e) {
     if(e) e.stopPropagation();
     const b = db.find(x => x.id === id);
     if(!b) return;
+    
+    closeAllSheets(); 
+    
     editingTaskId = id;
     editingTagId = b.tagId;
     
     document.getElementById('edit-task-title').value = b.title;
     renderEditTagSelector();
     
-    closeAllSheets(); 
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('edit-task-modal').classList.remove('hidden');
     document.getElementById('edit-task-modal').classList.add('flex');
@@ -1341,8 +1343,10 @@ let deletingTaskId = null;
 
 window.openDeleteModal = function(id, e) {
     if(e) e.stopPropagation();
+    
+    closeAllSheets(); 
     deletingTaskId = id;
-    closeAllSheets();
+    
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('delete-task-modal').classList.remove('hidden');
     document.getElementById('delete-task-modal').classList.add('flex');
@@ -1386,6 +1390,8 @@ let timePickerBlockId = null;
 
 window.openTimePicker = function(blockId, currentMin, e) {
     if(e) e.stopPropagation();
+    
+    closeAllSheets();
     timePickerBlockId = blockId;
     
     const h = Math.floor(currentMin / 60).toString().padStart(2, '0');
@@ -1393,7 +1399,6 @@ window.openTimePicker = function(blockId, currentMin, e) {
     
     document.getElementById('edit-time-input').value = `${h}:${m}`;
     
-    closeAllSheets();
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('time-picker-modal').classList.remove('hidden');
     document.getElementById('time-picker-modal').classList.add('flex');

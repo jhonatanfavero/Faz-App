@@ -13,6 +13,7 @@ let currentRealMins = 0;
 let pendingIntent = null; 
 let selectedDur = 30;
 let showOnlyDelayed = false;
+// V2.0 - BLOCO 2
 let showOnlyCompleted = false;
 let taskToClone = null;
 let pendingCloneType = '';
@@ -80,7 +81,7 @@ if (!db || db.length === 0) {
     db.forEach(b => { 
         if(!b.date) { b.date = getTodayStr(); modified = true; }
         if(!b.microblocks) { b.microblocks = []; modified = true; }
-        if(b.tagId === undefined) { b.tagId = null; modified = true; }
+        if(b.tagId === undefined) { b.tagId = null; modified = true; } // NOVA MIGRAÇÃO DE TAG
     });
     if(modified) saveDb();
 }
@@ -101,6 +102,7 @@ window.deleteTag = function(id) {
     tagsDb = tagsDb.filter(t => t.id !== id);
     saveTags();
     
+    // Remove a tag deletada das tarefas que a usavam para não quebrar a UI
     let modified = false;
     db.forEach(b => {
         if(b.tagId === id) { b.tagId = null; modified = true; }
@@ -114,7 +116,7 @@ window.getTagColor = function(tagId) {
     return tag ? tag.color : null;
 }
 
-let selectedNewTagColor = '#ef4444'; 
+let selectedNewTagColor = '#ef4444'; // Vermelho padrão
 
 window.openTagsSheet = () => {
     closeAllSheets();
@@ -171,6 +173,7 @@ window.selectTag = function(id) {
 function renderTagSelector() {
     const container = document.getElementById('tag-selector-container');
     if(!container) return;
+    container.className = 'flex gap-2 overflow-x-auto no-scrollbar pb-2 w-full';
     let html = `<button onclick="selectTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${selectedTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem Tag</button>`;
     tagsDb.forEach(t => {
         const isActive = selectedTagId === t.id;
@@ -1202,6 +1205,7 @@ runRealTimeEngine();
 renderTimeline();
 renderBacklog();
 renderTagSelector();
+applyThemeColor(); // V2.0 - Tema inicial
 
 setTimeout(() => {
     const scrollEl = document.getElementById('timeline-scroll');
@@ -1274,7 +1278,13 @@ window.toggleHeader = function() {
 
 window.showHeader = function() {
     headerHidden = false;
-    toggleHeader();
+    const header = document.querySelector('header');
+    const timeline = document.getElementById('timeline-scroll');
+    const showBtn = document.getElementById('show-header-btn');
+    
+    header.classList.remove('header-hidden');
+    timeline.classList.remove('timeline-expanded');
+    if (showBtn) showBtn.classList.add('hidden');
 }
 
 // --- V2.0 - COMBO A: Edição ---
@@ -1305,7 +1315,7 @@ window.selectEditTag = function(id) {
 window.renderEditTagSelector = function() {
     const container = document.getElementById('edit-tag-selector-container');
     if(!container) return;
-    container.className = 'flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2 w-full justify-start items-center';
+    container.className = 'flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2 w-full';
     let html = `<button onclick="selectEditTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${editingTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
     tagsDb.forEach(t => {
         const isActive = editingTagId === t.id;
@@ -1359,6 +1369,7 @@ window.moveToBacklog = function() {
         renderBacklog();
         showToast("Movido para a lista!");
     }
+    closeAllSheets();
     cancelDelete();
 }
 
@@ -1367,6 +1378,7 @@ window.confirmKillTask = function() {
     db = db.filter(b => b.id !== deletingTaskId);
     saveDb();
     renderTimeline();
+    closeAllSheets();
     cancelDelete();
     showToast("Tarefa excluída.");
 }
@@ -1486,7 +1498,3 @@ window.selectThemeColor = function(btn) {
 window.applyThemeColor = function() {
     document.documentElement.style.setProperty('--theme-color', themeColor);
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    applyThemeColor();
-});

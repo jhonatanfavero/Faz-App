@@ -362,6 +362,14 @@ function showToast(msg) { const t = document.getElementById('toast'); document.g
 function renderTimeline() {
     container.innerHTML = ''; 
     
+    // V2.0 - Ativar modo lista para filtros
+    const timelineContainer = document.getElementById('timeline-container');
+    if (showOnlyDelayed || showOnlyCompleted) {
+        timelineContainer.classList.add('filter-list-mode');
+    } else {
+        timelineContainer.classList.remove('filter-list-mode');
+    }
+
     let storedStart = localStorage.getItem('tb_start_hour');
     let storedEnd = localStorage.getItem('tb_end_hour');
     START_HOUR = storedStart !== null ? parseInt(storedStart) : 0;
@@ -441,8 +449,13 @@ function drawBlock(block) {
 
     const el = document.createElement('div');
     el.className = 'absolute left-1 right-1 rounded-2xl overflow-hidden transition-all duration-300 z-10 flex flex-col';
-    el.style.top = `${topPx + 1}px`;
-    el.style.height = `${heightPx}px`;
+    el.classList.add('block-item'); // V2.0 - Classe para modo lista
+
+    // V2.0 - Posicionamento condicional
+    if (!showOnlyDelayed && !showOnlyCompleted) {
+        el.style.top = `${topPx + 1}px`;
+        el.style.height = `${heightPx}px`;
+    }
 
     const isSmall = block.duration <= 30;
 

@@ -278,14 +278,14 @@ function runRealTimeEngine() {
         headerTitle.innerText = diffDays === 0 ? "Hoje" : (diffDays === 1 ? "Amanhã" : "Agenda");
     }
     
-    // V40.1.5: data abreviada (Sex, 15 mai) — mostra ano se for diferente do ano atual
+    // V40.2.4: data com weekday completo sem "-feira" (Domingo, 10 mai)
     const currentYear = new Date().getFullYear();
     const activeYear = activeDateObj.getFullYear();
-    const opts = { weekday: 'short', day: 'numeric', month: 'short' };
+    const opts = { weekday: 'long', day: 'numeric', month: 'short' };
     if (activeYear !== currentYear) opts.year = '2-digit';
     let dateStr = activeDateObj.toLocaleDateString('pt-BR', opts);
-    // Limpa pontos e ajusta capitalização ("seg., 15 de mai." → "Seg, 15 mai")
-    dateStr = dateStr.replace(/\./g, '').replace(/ de /g, ' ');
+    // Limpa "-feira" e pontos: "segunda-feira, 15 de mai." → "Segunda, 15 mai"
+    dateStr = dateStr.replace(/-feira/g, '').replace(/\./g, '').replace(/ de /g, ' ');
     dateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
     
     document.getElementById('header-date').innerHTML = 

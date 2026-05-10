@@ -1,5 +1,5 @@
-// V3.0 - v40.2.2 (Pensamento do Dia: 50 frases motivacionais + data com fonte maior)
-const CACHE_NAME = 'timeblock-v40-2-2';
+// V3.0 - v40.2.4 (Data com weekday completo "Domingo, 10 mai" + botão pensamento proporcional 32px rounded-xl)
+const CACHE_NAME = 'timeblock-v40-2-4';
 const ASSETS = [
   './',
   './index.html',

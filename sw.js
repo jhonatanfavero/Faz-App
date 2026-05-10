@@ -1,5 +1,5 @@
-// V3.0 - v40.1.1 (Lista renomeada + Rotina removida do FAB + Notas com 3 estados)
-const CACHE_NAME = 'timeblock-v40-1-1';
+// V3.0 - v40.1.2 (Editar nota com lápis: reusa Estado B com pré-preenchimento)
+const CACHE_NAME = 'timeblock-v40-1-2';
 const ASSETS = [
   './',
   './index.html',

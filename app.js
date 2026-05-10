@@ -1216,6 +1216,8 @@ function escapeHtml(str) {
 
 // V40.1.1: estado interno do form de nota (true = aberto)
 let notesFormOpen = false;
+// V40.1.2: ID da nota sendo editada (null = criando nova)
+let editingNoteId = null;
 
 window.switchListTab = function(tabName) {
     activeListTab = tabName;
@@ -1242,27 +1244,51 @@ window.switchListTab = function(tabName) {
     // Render dinâmico ao trocar
     if (tabName === 'notes') {
         notesFormOpen = false; // ao entrar na aba, sempre começa fechado
+        editingNoteId = null;  // V40.1.2: garantir que não está em modo edição
         renderNotes();
     } else {
         notesFormOpen = false; // ao sair da aba, garante que form fica fechado da próxima vez
+        editingNoteId = null;  // V40.1.2: limpar modo edição ao sair
     }
     if (tabName === 'backlog') renderBacklog();
 }
 
-// V40.1.1: abre o form (Estado B)
+// V40.1.1: abre o form (Estado B) — modo criar
 window.openNoteForm = function() {
     notesFormOpen = true;
+    editingNoteId = null; // V40.1.2: garantir que NÃO está em modo edição
     renderNotes();
-    // foco automático no título depois do reflow
+    // limpa inputs e foca depois do reflow
     setTimeout(() => {
         const titleInput = document.getElementById('note-title-input');
-        if (titleInput) titleInput.focus();
+        const contentInput = document.getElementById('note-content-input');
+        if (titleInput) { titleInput.value = ''; titleInput.focus(); }
+        if (contentInput) contentInput.value = '';
+    }, 50);
+}
+
+// V40.1.2: abre o form em modo edição (Estado B com pré-preenchimento)
+window.openEditNote = function(id) {
+    const note = notesDb.find(n => n.id === id);
+    if (!note) return;
+    
+    notesFormOpen = true;
+    editingNoteId = id;
+    renderNotes();
+    
+    // pré-preencher campos depois do reflow
+    setTimeout(() => {
+        const titleInput = document.getElementById('note-title-input');
+        const contentInput = document.getElementById('note-content-input');
+        if (titleInput) { titleInput.value = note.title || ''; titleInput.focus(); }
+        if (contentInput) contentInput.value = note.content || '';
     }, 50);
 }
 
 // V40.1.1: cancela o form (volta pra Estado A ou C)
 window.cancelNoteForm = function() {
     notesFormOpen = false;
+    editingNoteId = null; // V40.1.2: limpar modo edição
     // limpa inputs caso o usuário tenha digitado algo
     const titleInput = document.getElementById('note-title-input');
     const contentInput = document.getElementById('note-content-input');
@@ -1282,19 +1308,32 @@ window.addNote = function() {
         return;
     }
     
-    notesDb.unshift({
-        id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
-        title: title,
-        content: content,
-        createdAt: Date.now()
-    });
+    if (editingNoteId) {
+        // V40.1.2: modo edição — atualiza nota existente preservando id e createdAt
+        const note = notesDb.find(n => n.id === editingNoteId);
+        if (note) {
+            note.title = title;
+            note.content = content;
+            note.updatedAt = Date.now(); // útil pra futuro (não exibido)
+        }
+        showToast('Nota atualizada!');
+    } else {
+        // Modo criação (comportamento original)
+        notesDb.unshift({
+            id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+            title: title,
+            content: content,
+            createdAt: Date.now()
+        });
+        showToast('Nota salva!');
+    }
     
     saveNotes();
     titleInput.value = '';
     contentInput.value = '';
     notesFormOpen = false; // V40.1.1: fecha o form após salvar
+    editingNoteId = null;  // V40.1.2: limpar modo edição
     renderNotes();
-    showToast('Nota salva!');
 }
 
 window.deleteNote = function(id) {
@@ -1340,6 +1379,19 @@ window.renderNotes = function() {
         header.classList.remove('hidden');
     }
     
+    // V40.1.2: atualizar labels do form conforme modo (criar vs editar)
+    const formLabel = document.getElementById('notes-form-label');
+    const formSaveBtn = document.getElementById('notes-form-save-btn');
+    if (formLabel && formSaveBtn) {
+        if (editingNoteId) {
+            formLabel.innerText = 'Editar nota';
+            formSaveBtn.innerText = 'Atualizar Nota';
+        } else {
+            formLabel.innerText = 'Nova nota';
+            formSaveBtn.innerText = 'Salvar Nota';
+        }
+    }
+    
     // Sempre re-renderizar a lista (idempotente)
     container.innerHTML = notesDb.map(n => {
         const dateStr = new Date(n.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
@@ -1352,9 +1404,14 @@ window.renderNotes = function() {
                     <div class="flex-1 min-w-0">
                         ${titleHtml}
                     </div>
-                    <button onclick="deleteNote('${n.id}')" class="w-7 h-7 flex items-center justify-center bg-red-50 border border-red-100 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition shrink-0" title="Apagar">
-                        <i class="ph ph-trash text-sm"></i>
-                    </button>
+                    <div class="flex gap-1.5 shrink-0">
+                        <button onclick="openEditNote('${n.id}')" class="w-7 h-7 flex items-center justify-center bg-zinc-50 border border-zinc-200 text-zinc-500 rounded-lg hover:bg-zinc-100 hover:text-zinc-700 transition" title="Editar">
+                            <i class="ph ph-pencil-simple text-sm"></i>
+                        </button>
+                        <button onclick="deleteNote('${n.id}')" class="w-7 h-7 flex items-center justify-center bg-red-50 border border-red-100 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition" title="Apagar">
+                            <i class="ph ph-trash text-sm"></i>
+                        </button>
+                    </div>
                 </div>
                 ${contentHtml}
                 <p class="text-[10px] text-zinc-400 font-medium uppercase tracking-wider mt-2">${dateStr} · ${timeStr}</p>

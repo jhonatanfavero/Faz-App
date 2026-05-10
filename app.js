@@ -876,6 +876,7 @@ window.closeAllSheets = () => {
     document.getElementById('clone-qtd-modal').classList.add('hidden');
     document.getElementById('clone-qtd-modal').classList.remove('flex');
     document.getElementById('tags-sheet').classList.add('translate-y-full');
+    document.getElementById('reports-sheet').classList.add('translate-y-full');
     
     cancelEdit();
     cancelDelete();
@@ -1196,12 +1197,130 @@ window.cancelPendingTask = () => {
 input.addEventListener('keypress', e => { if (e.key === 'Enter') commitIntent(); });
 backlogInput.addEventListener('keypress', e => { if (e.key === 'Enter') addBacklogItem(); });
 
-
-// V2.0 - Aplicar tema
+// V2.0 - Função de tema (declarada antes da inicialização)
 window.applyThemeColor = function() {
     document.documentElement.style.setProperty('--theme-color', themeColor);
 }
-applyThemeColor();
+
+// ==========================================
+// --- V3.0 - COMBO E: Relatórios ---
+// ==========================================
+
+window.openReportsSheet = function() {
+    closeAllSheets();
+    renderReports('today');
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('reports-sheet').classList.remove('translate-y-full');
+}
+
+window.renderReports = function(period) {
+    // 1. Atualizar UI das Abas
+    ['today', 'week', 'month'].forEach(p => {
+        const btn = document.getElementById(`btn-rep-${p}`);
+        if (p === period) {
+            btn.className = 'flex-1 py-1.5 rounded-lg bg-white shadow-sm text-zinc-800 text-xs font-bold transition border border-black/5';
+        } else {
+            btn.className = 'flex-1 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 text-xs font-bold transition border border-transparent';
+        }
+    });
+
+    // 2. Calcular Janela de Data
+    const now = new Date();
+    let startDate = new Date();
+    if (period === 'week') startDate.setDate(now.getDate() - 6);
+    else if (period === 'month') startDate.setDate(now.getDate() - 29);
+    
+    const startStr = startDate.toLocaleDateString('en-CA');
+    const endStr = now.toLocaleDateString('en-CA');
+
+    // 3. Filtrar Banco
+    let filteredDb = db.filter(b => b.date >= startStr && b.date <= endStr && b.type !== 'empty');
+
+    const container = document.getElementById('reports-container');
+    if (filteredDb.length === 0) {
+        container.innerHTML = `<div class="text-center text-zinc-400 mt-10"><i class="ph ph-chart-line-down text-4xl mb-2"></i><p class="text-sm font-medium">Sem registros no período.</p></div>`;
+        return;
+    }
+
+    // 4. Agregar Dados
+    let totalMins = 0;
+    let tagStats = {};
+
+    tagsDb.forEach(t => {
+        tagStats[t.id] = { name: t.name, color: t.color, planned: 0, completed: 0, delayed: 0 };
+    });
+    tagStats['null'] = { name: 'Sem Etiqueta', color: '#9ca3af', planned: 0, completed: 0, delayed: 0 };
+
+    filteredDb.forEach(b => {
+        const dur = b.duration;
+        totalMins += dur;
+        const tId = b.tagId || 'null';
+        
+        if (!tagStats[tId]) {
+           tagStats[tId] = { name: 'Excluída', color: '#9ca3af', planned: 0, completed: 0, delayed: 0 };
+        }
+
+        tagStats[tId].planned += dur;
+        if (b.completed) {
+            tagStats[tId].completed += dur;
+        } else if (b.type === 'past' || b.wasDelayed) {
+            tagStats[tId].delayed += dur;
+        }
+    });
+
+    // 5. Renderizar
+    let globalCompleted = Object.values(tagStats).reduce((acc, curr) => acc + curr.completed, 0);
+    let globalPct = totalMins > 0 ? Math.round((globalCompleted / totalMins) * 100) : 0;
+
+    let html = `
+        <div class="bg-zinc-900 text-white p-4 rounded-xl flex items-center justify-between shadow-md mb-2">
+            <div>
+                <p class="text-[10px] uppercase tracking-widest text-zinc-400 font-bold mb-1">Global</p>
+                <p class="text-3xl font-black">${globalPct}%</p>
+            </div>
+            <div class="text-right flex flex-col gap-1">
+                <p class="text-xs text-zinc-300 font-bold bg-white/10 px-2 py-0.5 rounded"><span class="text-emerald-400 mr-1">●</span> ${formatDur(globalCompleted)} concluídos</p>
+                <p class="text-xs text-zinc-400 font-bold bg-white/5 px-2 py-0.5 rounded"><span class="text-zinc-500 mr-1">●</span> ${formatDur(totalMins)} totais</p>
+            </div>
+        </div>
+    `;
+
+    const sortedTags = Object.values(tagStats)
+        .filter(t => t.planned > 0)
+        .sort((a, b) => b.planned - a.planned);
+
+    sortedTags.forEach(t => {
+        const compPct = Math.round((t.completed / t.planned) * 100) || 0;
+        const delPct = Math.round((t.delayed / t.planned) * 100) || 0;
+        const pendPct = 100 - compPct - delPct;
+
+        html += `
+            <div class="bg-white border border-zinc-200 p-4 rounded-xl shadow-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full" style="background-color: ${t.color}"></div>
+                        <span class="font-bold text-sm text-zinc-800">${t.name}</span>
+                    </div>
+                    <span class="text-[11px] bg-zinc-100 px-2 py-1 rounded font-bold text-zinc-500">${formatDur(t.planned)}</span>
+                </div>
+                
+                <div class="w-full h-3 bg-zinc-100 rounded-full flex overflow-hidden mb-2">
+                    <div class="h-full transition-all duration-700" style="width: ${compPct}%; background-color: ${t.color}"></div>
+                    <div class="h-full bg-red-400 transition-all duration-700" style="width: ${delPct}%"></div>
+                    <div class="h-full bg-zinc-200 transition-all duration-700" style="width: ${pendPct}%"></div>
+                </div>
+
+                <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                    <span style="color: ${t.color}">${compPct}% Feito</span>
+                    ${t.delayed > 0 ? `<span class="text-red-500">${delPct}% Atr.</span>` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
 
 // --- INICIALIZAÇÃO ---
 renderGrid(); 
@@ -1209,6 +1328,7 @@ runRealTimeEngine();
 renderTimeline();
 renderBacklog();
 renderTagSelector();
+applyThemeColor(); // V2.0 - Aplicar tema salvo
 
 setTimeout(() => {
     const scrollEl = document.getElementById('timeline-scroll');
@@ -1491,8 +1611,4 @@ window.selectThemeColor = function(btn) {
     
     applyThemeColor();
     showToast("Cor atualizada!");
-}
-
-window.applyThemeColor = function() {
-    document.documentElement.style.setProperty('--theme-color', themeColor);
 }

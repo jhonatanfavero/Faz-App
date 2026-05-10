@@ -1263,28 +1263,19 @@ window.toggleHeader = function() {
     headerHidden = !headerHidden;
     const header = document.querySelector('header');
     const timeline = document.getElementById('timeline-scroll');
-    const showBtn = document.getElementById('show-header-btn');
+    const btn = document.querySelector('[onclick="toggleHeader()"]');
     
     if (headerHidden) {
-        header.classList.add('header-hidden');
-        timeline.classList.add('timeline-expanded');
-        if (showBtn) showBtn.classList.remove('hidden');
+        header.style.height = '56px';
+        header.style.overflow = 'hidden';
+        timeline.style.paddingTop = '64px';
+        if(btn) btn.innerHTML = '<i class="ph ph-caret-down text-lg sm:text-xl text-zinc-600"></i>';
     } else {
-        header.classList.remove('header-hidden');
-        timeline.classList.remove('timeline-expanded');
-        if (showBtn) showBtn.classList.add('hidden');
+        header.style.height = 'auto';
+        header.style.overflow = 'visible';
+        timeline.style.paddingTop = '180px';
+        if(btn) btn.innerHTML = '<i class="ph ph-caret-up text-lg sm:text-xl text-zinc-600"></i>';
     }
-}
-
-window.showHeader = function() {
-    headerHidden = false;
-    const header = document.querySelector('header');
-    const timeline = document.getElementById('timeline-scroll');
-    const showBtn = document.getElementById('show-header-btn');
-    
-    header.classList.remove('header-hidden');
-    timeline.classList.remove('timeline-expanded');
-    if (showBtn) showBtn.classList.add('hidden');
 }
 
 // --- V2.0 - COMBO A: Edição ---

@@ -1,5 +1,5 @@
-// V3.6 - v40.2.14 (Fix: editar nota não duplica mais sheets / tag visível mesmo na mesma cor do card)
-const CACHE_NAME = 'timeblock-v40-2-14';
+// V3.7 - v40.2.15-segura (Trava Mestra cirúrgica: html/body 100vw + cluster header espremido. SEM tocar containers internos.)
+const CACHE_NAME = 'timeblock-v40-2-15-segura';
 const ASSETS = [
   './',
   './index.html',

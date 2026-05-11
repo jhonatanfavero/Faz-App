@@ -1,5 +1,5 @@
-// V3.7 - v40.2.15-segura (Trava Mestra cirúrgica: html/body 100vw + cluster header espremido. SEM tocar containers internos.)
-const CACHE_NAME = 'timeblock-v40-2-15-segura';
+// V3.9 - v40.2.17 (Bala de Prata Gemini: visibility:hidden em sheets fechadas mata o glitch do compositor do Chrome Android)
+const CACHE_NAME = 'timeblock-v40-2-17';
 const ASSETS = [
   './',
   './index.html',

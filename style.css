@@ -3,25 +3,9 @@ html {
     overflow-x: hidden;
     overscroll-behavior-x: none;
     touch-action: pan-y;
-    /* V40.2.15: força box-sizing universal pra padding/border não somar à width */
-    box-sizing: border-box;
 }
 
-*, *::before, *::after {
-    /* V40.2.15: herda box-sizing pra todos os elementos */
-    box-sizing: inherit;
-}
-
-body { 
-    touch-action: pan-y; 
-    background-color: #e2e8f0; 
-    overscroll-behavior-x: none; 
-    overflow-x: hidden; 
-    max-width: 100vw;
-    /* V40.2.15: trava body em 100vw real */
-    width: 100%;
-}
-
+body { touch-action: pan-y; background-color: #e2e8f0; overscroll-behavior-x: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .glow-line { box-shadow: 0 0 8px rgba(0,210,255,0.8); }
@@ -33,48 +17,7 @@ body {
 .micro-block .title-wrapper { margin-top: 2px !important; }
 .micro-block .block-title { margin-top: 0 !important; font-size: 13px !important; }
 .micro-block .micro-time { display: block !important; }
-
-/* V40.2.15 — DIRETRIZ JULES #1: Trava Universal do wrapper principal.
-   Garante que o "frame" do app NUNCA ultrapasse 100vw, independente do browser.
-   Chrome desktop calcula 100vw considerando scrollbar; Safari mobile não. Trava ambos. */
-.app-frame-locked {
-    max-width: min(420px, 100vw) !important;
-    width: 100% !important;
-    overflow: hidden !important;
-}
-
-/* V40.2.15 — DIRETRIZ JULES #2: Proteção do Header.
-   O flex do cluster de botões podia estourar a largura quando tinha muitos itens.
-   min-width:0 permite que o texto da data seja truncado se ficar apertado, sem empurrar nada. */
-header { 
-    max-width: 100% !important; 
-    overflow: hidden !important; 
-}
-#header-btns-cluster {
-    flex-shrink: 1 !important;
-    min-width: 0 !important;
-    overflow: hidden !important;
-}
-
-/* V40.2.15 — DIRETRIZ JULES #3: Ancoragem do Eixo Y.
-   Mesmo se algum elemento tentar empurrar a tela, o y-axis fica fixo na coluna esquerda. */
-#y-axis {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    bottom: 0 !important;
-    width: 56px !important;
-    flex-shrink: 0 !important;
-    z-index: 5;
-}
-
-/* V40.2.15: trava timeline-container e blocks-container em width: 100% (não 100vw) */
-#timeline-container,
-#blocks-container,
-#timeline-scroll {
-    max-width: 100% !important;
-    overflow-x: hidden !important;
-}
+body { overflow-x: hidden; max-width: 100vw; }
 
 /* V2.0 - Modo lista para filtros */
 .filter-list-mode #grid-lines,

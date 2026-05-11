@@ -115,6 +115,10 @@ window.deleteTag = function(id) {
         if(b.tagId === id) { b.tagId = null; modified = true; }
     });
     if(modified) { saveDb(); renderTimeline(); }
+    
+    // V40.2.9: atualiza a lista visual de tags na sheet (bug: antes ficava com tag fantasma)
+    renderTagsList();
+    showToast("Tag excluída!");
 }
 
 window.getTagColor = function(tagId) {
@@ -302,53 +306,17 @@ window.openSearchBar = function() {
     setTimeout(() => {
         const input = document.getElementById('search-input');
         if (input) input.focus();
-        // V40.2.6: ativa listener de clique fora APÓS pequeno delay
-        // (evita que o próprio clique de abertura feche)
-        document.addEventListener('mousedown', handleClickOutsideSearch, true);
-        document.addEventListener('touchstart', handleClickOutsideSearch, { capture: true, passive: true });
     }, 100);
 }
 
-// V40.2.6: Detecta clique fora da busca pra fechar
-// V40.2.8: refinado - não fecha quando clica em cards da lista, modais, sheets ou overlays
+// V40.2.11: handler de clique fora REMOVIDO.
+// Motivo: causava bugs (fechava ao tocar em áreas vazias do header que tinham pointer-events-none
+// e vazavam pra trás). A busca tem botão X bem visível e fecha automaticamente quando o usuário
+// muda de contexto (trocar dia, abrir FAB+, abrir menus). Não precisa do listener global.
+// Mantemos a função vazia pra retrocompatibilidade caso algo ainda a chame.
 function handleClickOutsideSearch(e) {
-    const row = document.getElementById('search-bar-row');
-    // Se a busca não está aberta, remove listener (cleanup defensivo)
-    if (!row || row.classList.contains('hidden')) {
-        document.removeEventListener('mousedown', handleClickOutsideSearch, true);
-        document.removeEventListener('touchstart', handleClickOutsideSearch, { capture: true, passive: true });
-        return;
-    }
-    
-    // Se o clique foi DENTRO da search-bar-row (input, X, ou qualquer filho), ignora
-    if (row.contains(e.target)) return;
-    
-    // V40.2.8: Se o clique foi dentro de um CARD (.block-item), 
-    // SHEET (.translate-y-full pode abrir), MODAL (#edit-task-modal, #delete-task-modal, etc),
-    // ou OVERLAY → NÃO fecha (deixa a ação acontecer)
-    let el = e.target;
-    while (el && el !== document.body) {
-        if (!el.classList) { el = el.parentNode; continue; }
-        // Cards da lista de busca
-        if (el.classList.contains('block-item')) return;
-        // Modais e sheets que cobrem a tela
-        if (el.id === 'edit-task-modal' || el.id === 'delete-task-modal' || 
-            el.id === 'clone-sheet' || el.id === 'clone-qtd-modal' ||
-            el.id === 'time-picker-modal' || el.id === 'overlay' ||
-            el.id === 'list-sheet' || el.id === 'sheet' || el.id === 'config-sheet' ||
-            el.id === 'tags-sheet' || el.id === 'reports-sheet' ||
-            el.id === 'link-note-sheet' || el.id === 'linked-note-view-modal' ||
-            el.id === 'thought-modal' || el.id === 'period-select-sheet') return;
-        // Resultado de busca clicado
-        if (el.getAttribute && el.getAttribute('onclick') && 
-            el.getAttribute('onclick').indexOf('goToBlockFromSearch') !== -1) {
-            return;
-        }
-        el = el.parentNode;
-    }
-    
-    // Clique fora → fecha busca
-    closeSearchBar();
+    // Removido em V40.2.11 — busca só fecha via X explícito ou ações de troca de contexto
+    return;
 }
 
 window.closeSearchBar = function() {
@@ -364,9 +332,7 @@ window.closeSearchBar = function() {
     const counter = document.getElementById('search-counter');
     if (counter) { counter.classList.add('hidden'); counter.innerText = ''; }
     
-    // V40.2.6: cleanup do listener de clique fora
-    document.removeEventListener('mousedown', handleClickOutsideSearch, true);
-    document.removeEventListener('touchstart', handleClickOutsideSearch, { capture: true, passive: true });
+    // V40.2.11: listener de clique fora foi removido — não há mais nada pra limpar aqui
     
     renderTimeline();
 }
@@ -527,11 +493,15 @@ function renderTimeline() {
     // V40.2.6: busca pesquisa em TODOS os dias e renderiza lista especial
     if (isSearching) {
         timelineContainer.classList.add('filter-list-mode');
+        timelineContainer.classList.add('search-mode'); // V40.2.10: padding menor pra busca
         renderSearchResultsAllDays();
         renderGrid();
         updateSearchCounter();
         return;
     }
+    
+    // V40.2.10: garante que search-mode é removido fora de busca
+    timelineContainer.classList.remove('search-mode');
     
     if (showOnlyDelayed || showOnlyCompleted) {
         timelineContainer.classList.add('filter-list-mode');
@@ -707,6 +677,9 @@ function drawBlock(block) {
     const topPx = (block.startMin - (START_HOUR * 60)) * PX_PER_MIN;
     const heightPx = (block.duration * PX_PER_MIN) - 2; 
 
+    // V40.2.9: detecta modo busca pra neutralizar o atalho de horário (que estava capturando toques na área do card)
+    const isSearching = !!(searchQuery && searchQuery.trim());
+
     const el = document.createElement('div');
     el.className = 'absolute left-1 right-1 rounded-2xl overflow-hidden transition-all duration-300 z-10 flex flex-col';
     el.classList.add('block-item'); 
@@ -804,11 +777,11 @@ function drawBlock(block) {
                         <i class="ph ph-dots-six-vertical"></i>
                     </div>
                     <div class="flex flex-col flex-1 min-w-0 pointer-events-auto">
-                        <span onclick="openTimePicker('${block.id}', ${block.startMin}, event)" class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate cursor-pointer hover:opacity-70 hover:underline transition max-w-full" title="Alterar Horário">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
+                        <span ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition max-w-full" title="${isSearching ? '' : 'Alterar Horário'}">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
                         <div class="title-wrapper flex items-center ${isMicro ? 'mt-0' : 'mt-0.5'} min-w-0 pointer-events-none">
                             ${pastIconHtml}
                             <h3 class="block-title ${isMicro ? 'text-[13px] mt-0' : 'text-[14px]'} font-bold leading-tight truncate ${titleClass}">${block.title}</h3>
-                            <span class="micro-time ${isMicro ? 'block' : 'hidden'} text-[11px] font-bold ${timeColor} ml-1 shrink-0 cursor-pointer hover:opacity-70 hover:underline transition pointer-events-auto" onclick="openTimePicker('${block.id}', ${block.startMin}, event)" title="Alterar Horário">&bull; <span class="micro-time-val">${formatDur(block.duration)}</span></span>
+                            <span class="micro-time ${isMicro ? 'block' : 'hidden'} text-[11px] font-bold ${timeColor} ml-1 shrink-0 ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition pointer-events-auto" ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} title="${isSearching ? '' : 'Alterar Horário'}">&bull; <span class="micro-time-val">${formatDur(block.duration)}</span></span>
                         </div>
                     </div>
                 </div>
@@ -1859,13 +1832,23 @@ window.closeLinkedNoteView = function() {
 
 // Editar a nota vinculada inline (abre sheet de Notas com a nota em modo edição)
 window.editLinkedNoteInline = function(noteId) {
+    // V40.2.10: salva o noteId ANTES de fechar a view (closeLinkedNoteView zera viewingLinkedNoteId)
+    // V40.2.11: alinhado ao pattern de chooseCreateNewNote — switchListTab + openEditNote ambos
+    //          DENTRO do setTimeout (senão switchListTab zerava notesFormOpen e renderizava lista
+    //          antes do openEditNote rodar). Tempo aumentado pra 320ms (igual chooseCreateNewNote)
+    //          pra dar tempo da animação do modal fechar de verdade.
+    const targetNoteId = noteId || viewingLinkedNoteId;
+    
     closeLinkedNoteView();
     closeLinkNoteSheet();
-    // Abre Lista → aba Notas → modo edição
-    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
-    document.getElementById('list-sheet').classList.remove('translate-y-full');
-    switchListTab('notes');
-    setTimeout(() => openEditNote(noteId || viewingLinkedNoteId), 100);
+    
+    // Abre Lista → aba Notas → modo edição (tudo após animação)
+    setTimeout(() => {
+        document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+        document.getElementById('list-sheet').classList.remove('translate-y-full');
+        switchListTab('notes');     // zera notesFormOpen e renderiza lista...
+        openEditNote(targetNoteId); // ...mas openEditNote seta notesFormOpen=true e re-renderiza form
+    }, 320);
 }
 
 // Desvincula nota do card (não apaga a nota, só remove o link)

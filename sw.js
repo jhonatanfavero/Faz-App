@@ -1,5 +1,5 @@
-// V3.0 - v40.2.8 (Fix: ações nos cards da busca mantêm a busca aberta - lápis, lixeira, microblocks)
-const CACHE_NAME = 'timeblock-v40-2-8';
+// V3.3 - v40.2.11 (Fix: busca não fecha mais ao tocar áreas vazias / editar nota abre form direto / sem folga horizontal)
+const CACHE_NAME = 'timeblock-v40-2-11';
 const ASSETS = [
   './',
   './index.html',

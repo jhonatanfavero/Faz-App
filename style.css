@@ -1,8 +1,11 @@
 html {
     scrollbar-gutter: stable;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
 }
 
-body { touch-action: pan-y; background-color: #e2e8f0; }
+body { touch-action: pan-y; background-color: #e2e8f0; overscroll-behavior-x: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .glow-line { box-shadow: 0 0 8px rgba(0,210,255,0.8); }
@@ -51,6 +54,12 @@ body { overflow-x: hidden; max-width: 100vw; }
     padding-top: 200px !important;
     padding-left: 16px !important;
     padding-right: 16px !important;
+}
+
+/* V40.2.10: Modo busca usa padding-top reduzido (header da busca é menor,
+   200px deixava um buraco de ~344px que fechava a pesquisa ao tocar) */
+.filter-list-mode.search-mode {
+    padding-top: 16px !important;
 }
 
 /* V40.2.7: Selo de data agrupando resultados de busca por dia */

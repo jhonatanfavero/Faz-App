@@ -1966,11 +1966,13 @@ window.openNoteForm = function() {
     notesFormOpen = true;
     editingNoteId = null; // V40.1.2: garantir que NÃO está em modo edição
     renderNotes();
-    // limpa inputs e foca depois do reflow
+    // V40.2.17 (Regra de Ouro PWA - Jules): REMOVIDO .focus() programático.
+    // Forçar teclado via JS em PWA com 100dvh fazia Chrome Android empurrar body inteiro pra cima,
+    // descolando a sheet do fundo e criando "buraco branco" embaixo. Usuário toca no campo manualmente.
     setTimeout(() => {
         const titleInput = document.getElementById('note-title-input');
         const contentInput = document.getElementById('note-content-input');
-        if (titleInput) { titleInput.value = ''; titleInput.focus(); }
+        if (titleInput) titleInput.value = '';
         if (contentInput) contentInput.value = '';
     }, 50);
 }
@@ -1984,11 +1986,12 @@ window.openEditNote = function(id) {
     editingNoteId = id;
     renderNotes();
     
-    // pré-preencher campos depois do reflow
+    // V40.2.17 (Regra de Ouro PWA - Jules): REMOVIDO .focus() programático.
+    // Mesmo motivo do openNoteForm. setTimeout preservado só pra preencher os campos após reflow.
     setTimeout(() => {
         const titleInput = document.getElementById('note-title-input');
         const contentInput = document.getElementById('note-content-input');
-        if (titleInput) { titleInput.value = note.title || ''; titleInput.focus(); }
+        if (titleInput) titleInput.value = note.title || '';
         if (contentInput) contentInput.value = note.content || '';
     }, 50);
 }

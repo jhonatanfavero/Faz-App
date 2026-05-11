@@ -627,6 +627,7 @@ function renderSearchResultsAllDays() {
     
     // V40.2.7: agrupa por data e renderiza selo + drawBlock pra cada
     // (drawBlock dá ao card TODAS as funcionalidades: expandir, marcar concluído, microblocks, notas, etc.)
+    // V40.2.13: selo agora é CLICÁVEL — toca pra ir direto pro dia (e sem cursor de texto piscando)
     let lastDate = null;
     results.forEach(b => {
         // Selo de data antes do primeiro card de cada dia
@@ -634,7 +635,8 @@ function renderSearchResultsAllDays() {
             const dateLabel = formatSearchDate(b.date, today);
             const seal = document.createElement('div');
             seal.className = 'search-date-seal';
-            seal.innerHTML = `<span class="text-[11px] font-bold text-app-focus uppercase tracking-wider px-3 py-1 rounded-full bg-app-focus-soft border border-app-focus-soft inline-block">${dateLabel}</span>`;
+            // V40.2.13: span clicável + select-none pra não mostrar cursor de texto
+            seal.innerHTML = `<span onclick="goToDateFromSearch('${b.date}')" class="text-[11px] font-bold text-app-focus uppercase tracking-wider px-3 py-1 rounded-full bg-app-focus-soft border border-app-focus-soft inline-flex items-center gap-1.5 cursor-pointer hover:bg-app-focus-soft-strong active:scale-95 transition select-none" style="-webkit-touch-callout: none; -webkit-user-select: none; user-select: none;" title="Ir para ${dateLabel}"><i class="ph ph-arrow-right text-[10px]"></i>${dateLabel}</span>`;
             container.appendChild(seal);
             lastDate = b.date;
         }
@@ -682,6 +684,21 @@ window.goToBlockFromSearch = function(blockId) {
     
     // Pequeno toast pra feedback
     setTimeout(() => showToast(`Indo pra ${formatSearchDate(block.date, getTodayStr())}`), 100);
+}
+
+// V40.2.13: Clica no selo de data → vai pro dia daquele grupo
+window.goToDateFromSearch = function(dateStr) {
+    if (!dateStr) return;
+    const today = getTodayStr();
+    const label = formatSearchDate(dateStr, today);
+    
+    closeSearchBar();
+    
+    activeDateObj = new Date(dateStr + 'T12:00:00');
+    runRealTimeEngine();
+    renderTimeline();
+    
+    setTimeout(() => showToast(`Indo pra ${label}`), 100);
 }
 
 function drawBlock(block) {

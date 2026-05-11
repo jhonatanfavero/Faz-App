@@ -1,5 +1,5 @@
-// V3.4 - v40.2.12 (Fix: filtros sem espaço fantasma / feedback visual claro nos filtros / setas teclado trocam dia)
-const CACHE_NAME = 'timeblock-v40-2-12';
+// V3.5 - v40.2.13 (Fix: selos de data clicáveis na busca / sem cursor de texto piscando)
+const CACHE_NAME = 'timeblock-v40-2-13';
 const ASSETS = [
   './',
   './index.html',

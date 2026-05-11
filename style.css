@@ -73,3 +73,22 @@ body { overflow-x: hidden; max-width: 100vw; }
 .search-date-seal:first-child {
     margin-top: 0;
 }
+
+/* V40.2.13: bloqueia seleção de texto na timeline (cursor de I-beam piscando ao tocar títulos).
+   Inputs e textareas explicitamente recuperam a habilidade de seleção pra digitação. */
+#timeline-scroll {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+#timeline-scroll input,
+#timeline-scroll textarea,
+#timeline-scroll [contenteditable="true"] {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+}

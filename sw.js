@@ -1,5 +1,5 @@
-// V3.3 - v40.2.11 (Fix: busca não fecha mais ao tocar áreas vazias / editar nota abre form direto / sem folga horizontal)
-const CACHE_NAME = 'timeblock-v40-2-11';
+// V3.4 - v40.2.12 (Fix: filtros sem espaço fantasma / feedback visual claro nos filtros / setas teclado trocam dia)
+const CACHE_NAME = 'timeblock-v40-2-12';
 const ASSETS = [
   './',
   './index.html',

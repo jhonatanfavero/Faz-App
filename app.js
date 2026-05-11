@@ -226,17 +226,9 @@ window.toggleFilterDelayed = function() {
     showOnlyDelayed = !showOnlyDelayed;
     showOnlyCompleted = false; 
     
-    const btn = document.getElementById('filter-delayed-btn');
-    const btnCompleted = document.getElementById('filter-completed-btn');
-    
-    if (showOnlyDelayed) {
-        // V40.1.8: ativo = soft-strong (15% bg)
-        btn.classList.replace('bg-app-focus-soft', 'bg-app-focus-soft-strong');
-        btnCompleted.classList.replace('bg-emerald-100', 'bg-emerald-50');
-    } else {
-        btn.classList.replace('bg-app-focus-soft-strong', 'bg-app-focus-soft');
-    }
-    
+    // V40.2.12: visual MUITO mais óbvio — quando ativo, vira CTA cheio (bg-app-focus + texto branco)
+    // antes só mudava 8% → 15% de opacidade, era imperceptível
+    updateFilterButtonsVisual();
     renderTimeline();
 }
 
@@ -244,21 +236,47 @@ window.toggleFilterCompleted = function() {
     showOnlyCompleted = !showOnlyCompleted;
     showOnlyDelayed = false; 
     
-    const btnCompleted = document.getElementById('filter-completed-btn');
+    updateFilterButtonsVisual();
+    renderTimeline();
+}
+
+// V40.2.12: atualiza visual dos botões de filtro de forma centralizada
+function updateFilterButtonsVisual() {
     const btnDelayed = document.getElementById('filter-delayed-btn');
+    const btnCompleted = document.getElementById('filter-completed-btn');
     
-    if (showOnlyCompleted) {
-        btnCompleted.classList.replace('bg-emerald-50', 'bg-emerald-100');
-        btnDelayed.classList.replace('bg-app-focus-soft-strong', 'bg-app-focus-soft');
-    } else {
-        btnCompleted.classList.replace('bg-emerald-100', 'bg-emerald-50');
+    if (btnDelayed) {
+        if (showOnlyDelayed) {
+            // ATIVO: fundo sólido da cor do tema + ícone branco + ring pra reforçar
+            btnDelayed.className = 'bg-app-focus border-2 border-app-focus p-2 rounded-xl shadow-md ring-2 ring-app-focus-soft transition flex items-center justify-center shrink-0';
+            const icon = btnDelayed.querySelector('i');
+            if (icon) icon.className = 'ph-fill ph-info text-lg text-white';
+        } else {
+            // INATIVO: soft + ícone colorido
+            btnDelayed.className = 'bg-app-focus-soft border border-app-focus-soft p-2 rounded-xl hover:bg-app-focus-soft-strong transition flex items-center justify-center shrink-0';
+            const icon = btnDelayed.querySelector('i');
+            if (icon) icon.className = 'ph-bold ph-info text-lg text-app-focus';
+        }
     }
     
-    renderTimeline();
+    if (btnCompleted) {
+        if (showOnlyCompleted) {
+            // ATIVO: fundo verde sólido + ícone branco + ring
+            btnCompleted.className = 'bg-emerald-500 border-2 border-emerald-500 p-2 rounded-xl shadow-md ring-2 ring-emerald-100 transition flex items-center justify-center shrink-0';
+            const icon = btnCompleted.querySelector('i');
+            if (icon) icon.className = 'ph-fill ph-check-circle text-lg text-white';
+        } else {
+            // INATIVO: verde claro + ícone verde
+            btnCompleted.className = 'bg-emerald-50 border border-emerald-200 p-2 rounded-xl hover:bg-emerald-100 transition flex items-center justify-center shrink-0';
+            const icon = btnCompleted.querySelector('i');
+            if (icon) icon.className = 'ph-bold ph-check-circle text-lg text-emerald-500';
+        }
+    }
 }
 
 // V40.2.1: Limpa ambos os filtros e atualiza visual dos botões
 // V40.2.5: também limpa busca por nome
+// V40.2.12: usa updateFilterButtonsVisual em vez de replace manual
 window.clearFilters = function() {
     const hadFilters = showOnlyDelayed || showOnlyCompleted;
     const hadSearch = !!searchQuery;
@@ -267,11 +285,7 @@ window.clearFilters = function() {
     showOnlyDelayed = false;
     showOnlyCompleted = false;
     
-    const btnDelayed = document.getElementById('filter-delayed-btn');
-    const btnCompleted = document.getElementById('filter-completed-btn');
-    
-    if (btnDelayed) btnDelayed.classList.replace('bg-app-focus-soft-strong', 'bg-app-focus-soft');
-    if (btnCompleted) btnCompleted.classList.replace('bg-emerald-100', 'bg-emerald-50');
+    updateFilterButtonsVisual();
     
     // V40.2.5: limpa busca também
     if (hadSearch) closeSearchBar();
@@ -292,10 +306,7 @@ window.openSearchBar = function() {
     if (showOnlyDelayed || showOnlyCompleted) {
         showOnlyDelayed = false;
         showOnlyCompleted = false;
-        const btnD = document.getElementById('filter-delayed-btn');
-        const btnC = document.getElementById('filter-completed-btn');
-        if (btnD) btnD.classList.replace('bg-app-focus-soft-strong', 'bg-app-focus-soft');
-        if (btnC) btnC.classList.replace('bg-emerald-100', 'bg-emerald-50');
+        updateFilterButtonsVisual(); // V40.2.12: usa função centralizada
     }
     
     const row = document.getElementById('search-bar-row');
@@ -2370,6 +2381,31 @@ window.adjustTimelinePadding = function() {
 }
 setTimeout(adjustTimelinePadding, 100);
 window.addEventListener('resize', adjustTimelinePadding);
+
+// V40.2.12: Atalhos de teclado pra navegação por dia no desktop
+// ← seta esquerda = dia anterior, → seta direita = dia seguinte, espaço = HOJE
+// Ignora se o foco está num input/textarea/contenteditable pra não atrapalhar digitação
+document.addEventListener('keydown', (e) => {
+    // Ignora se o usuário está digitando em algum input
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+    
+    // Ignora também se algum modal/sheet está aberto (overlay visível)
+    const overlay = document.getElementById('overlay');
+    const overlayOpen = overlay && !overlay.classList.contains('pointer-events-none');
+    if (overlayOpen) return;
+    
+    if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        debugPreviousDay();
+    } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        debugAdvanceDay();
+    } else if (e.key === 'Home') {
+        e.preventDefault();
+        goToToday();
+    }
+});
 
 // V2.0 - BLOCO 7: Toggle Header
 window.toggleHeader = function() {

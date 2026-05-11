@@ -747,7 +747,15 @@ function drawBlock(block) {
             bgClass = 'bg-emerald-50 border-emerald-200 opacity-80 saturate-50';
         }
         const tagColor = getTagColor(block.tagId);
-        let borderStyle = tagColor ? `border-left-width: 4px; border-left-color: ${tagColor};` : '';
+        // V40.2.14: tag agora tem destaque claro mesmo quando bate com cor do card.
+        //   - borda lateral colorida com 5px (era 4px)
+        //   - inset shadow projeta linha branca de 1px logo após a borda colorida,
+        //     separando visualmente a faixa da tag do conteúdo. Funciona em qualquer combinação:
+        //     se card é roxo + tag roxa → linha branca cria contraste; se card é branco + tag clara
+        //     → linha branca quase invisível, mas a borda colorida já se vê no fundo claro.
+        let borderStyle = tagColor 
+            ? `border-left-width: 5px; border-left-color: ${tagColor}; box-shadow: inset 6px 0 0 -5px rgba(255,255,255,0.7);`
+            : '';
 
         const isMicro = !block.expanded && block.duration <= 25;
         if (block.expanded) {
@@ -1731,10 +1739,12 @@ let pendingLinkBlockId = null;
 // Opção "Criar nova": abre form em modo "criação ligada ao bloco"
 window.chooseCreateNewNote = function() {
     if (!activeLinkBlockId) return;
-    pendingLinkBlockId = activeLinkBlockId; // marca pra addNote vincular depois
+    const blockIdToLink = activeLinkBlockId; // V40.2.14: salva ANTES de closeAllSheets zerar tudo
     
-    // Fecha sheet de escolha
-    closeLinkNoteSheet();
+    // V40.2.14: closeAllSheets em vez de só closeLinkNoteSheet — evita sheets sobrepostas
+    closeAllSheets();
+    
+    pendingLinkBlockId = blockIdToLink; // V40.2.14: re-seta DEPOIS do closeAllSheets pra addNote vincular
     
     // Abre form de criar nota direto na aba Notas
     setTimeout(() => {
@@ -1865,10 +1875,12 @@ window.editLinkedNoteInline = function(noteId) {
     //          DENTRO do setTimeout (senão switchListTab zerava notesFormOpen e renderizava lista
     //          antes do openEditNote rodar). Tempo aumentado pra 320ms (igual chooseCreateNewNote)
     //          pra dar tempo da animação do modal fechar de verdade.
+    // V40.2.14: chama closeAllSheets() pra garantir que NENHUMA outra sheet (reports/tags/config)
+    //          fique aberta junto. Antes podia ficar reports-sheet + list-sheet sobrepostas.
     const targetNoteId = noteId || viewingLinkedNoteId;
     
     closeLinkedNoteView();
-    closeLinkNoteSheet();
+    closeAllSheets(); // V40.2.14: fecha TUDO antes de reabrir lista (evita 2 sheets visíveis)
     
     // Abre Lista → aba Notas → modo edição (tudo após animação)
     setTimeout(() => {

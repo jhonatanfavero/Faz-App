@@ -1,5 +1,5 @@
-// V3.5 - v40.2.13 (Fix: selos de data clicáveis na busca / sem cursor de texto piscando)
-const CACHE_NAME = 'timeblock-v40-2-13';
+// V3.6 - v40.2.14 (Fix: editar nota não duplica mais sheets / tag visível mesmo na mesma cor do card)
+const CACHE_NAME = 'timeblock-v40-2-14';
 const ASSETS = [
   './',
   './index.html',

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { background: #f8fafc; padding: 20px; font-family: sans-serif; }
+.card-base {
+    border-radius: 16px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    color: white;
+    width: 320px;
+}
+
+.test1 { /* Original (V40.2.13) - borda 4px sem inset shadow */
+    background: #4f46e5;
+    border-left: 4px solid #4f46e5;  /* tag mesma cor que card */
+}
+.test2 { /* V40.2.14 - borda 5px + inset shadow branco 1px */
+    background: #4f46e5;
+    border-left: 5px solid #4f46e5;
+    box-shadow: inset 6px 0 0 -5px rgba(255,255,255,0.7);
+}
+.test3 {
+    background: #4f46e5;
+    border-left: 5px solid #10b981; /* tag diferente do card */
+    box-shadow: inset 6px 0 0 -5px rgba(255,255,255,0.7);
+}
+.test4 {
+    background: #fef3c7; /* card claro */
+    color: #92400e;
+    border-left: 5px solid #f59e0b;
+    box-shadow: inset 6px 0 0 -5px rgba(255,255,255,0.7);
+}
+.test5 { /* tag preta no card branco */
+    background: white;
+    color: black;
+    border: 1px solid #eee;
+    border-left: 5px solid #1f2937;
+    box-shadow: inset 6px 0 0 -5px rgba(255,255,255,0.7);
+}
+</style>
+</head>
+<body>
+<h2>Teste visual de tag</h2>
+
+<div class="card-base test1">TEST 1 - Original (4px, sem halo): tag roxa = card roxo → tag invisível 🔴</div>
+<div class="card-base test2">TEST 2 - V40.2.14 (5px + halo 1px branco): tag roxa = card roxo → linha branca destaca ✅</div>
+<div class="card-base test3">TEST 3 - V40.2.14: tag verde no card roxo → continua bem visível ✅</div>
+<div class="card-base test4">TEST 4 - V40.2.14: tag laranja no card amarelo claro → funciona ✅</div>
+<div class="card-base test5">TEST 5 - V40.2.14: tag escura no card branco → funciona ✅</div>
+</body>
+</html>

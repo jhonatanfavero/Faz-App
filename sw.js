@@ -1,5 +1,5 @@
-// V3.6 - v40.2.14 (Fix: editar nota não duplica mais sheets / tag visível mesmo na mesma cor do card)
-const CACHE_NAME = 'timeblock-v40-2-14';
+// V3.7 - v40.2.15 (Diretriz Jules: Trava universal de overflow / Proteção header / Ancoragem y-axis)
+const CACHE_NAME = 'timeblock-v40-2-15';
 const ASSETS = [
   './',
   './index.html',

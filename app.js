@@ -740,11 +740,26 @@ function drawBlock(block) {
         const isPast = block.type === 'past';
         const isRest = block.theme === 'rest';
 
-        let bgClass = block.completed ? 'bg-emerald-100 border-emerald-200' : (isRest ? 'bg-emerald-50 border-emerald-300' : 'bg-app-focus border-transparent shadow-md');
-        if (isPast && !block.completed) {
-            bgClass = isRest ? 'bg-zinc-50 border-zinc-200 opacity-80 saturate-50' : 'bg-app-focus-soft border-app-focus-soft opacity-80 saturate-50';
-        } else if (isPast && block.completed) {
-            bgClass = 'bg-emerald-50 border-emerald-200 opacity-80 saturate-50';
+        // V40.2.20 — Sem mais "fantasma" no final do dia.
+        //   ANTES: atrasado não-concluído ganhava bg-app-focus-soft + opacity-80 saturate-50,
+        //          virando uma cor desbotada/transparente que tirava a vida da agenda.
+        //          Concluídos eram emerald-100/50 (verde claro lavadinho) com saturate-50 quando atrasados.
+        //   AGORA:
+        //   - Atrasado não-concluído mantém cor SÓLIDA do tema (bg-app-focus), idêntica ao futuro.
+        //     O único indicador de atraso é o ícone "i" (pastIconHtml) que JÁ aparece quando isPast.
+        //   - Concluído (no prazo ou atrasado, rest ou normal) vira emerald-500 sólido e vivo —
+        //     injeção de dopamina de missão cumprida (chancela Jules).
+        //   - Rest atrasado mantém zinc claro mas SEM desbotamento (coerência com a lei "sem opacity").
+        let bgClass;
+        if (block.completed) {
+            // Qualquer concluído (futuro ou passado, rest ou normal) = verde vivo sólido
+            bgClass = 'bg-emerald-500 border-emerald-600 shadow-md';
+        } else if (isRest) {
+            // Descanso não-concluído: esquema claro (zinc se atrasado, emerald-50 se futuro), sem desbotamento
+            bgClass = isPast ? 'bg-zinc-50 border-zinc-200' : 'bg-emerald-50 border-emerald-300';
+        } else {
+            // Foco normal (futuro OU atrasado) = cor sólida do tema
+            bgClass = 'bg-app-focus border-transparent shadow-md';
         }
         const tagColor = getTagColor(block.tagId);
         // V40.2.14: tag agora tem destaque claro mesmo quando bate com cor do card.
@@ -766,12 +781,17 @@ function drawBlock(block) {
         }
         if (borderStyle) el.style.cssText += borderStyle;
 
-        const isDarkTheme = !isPast && !block.completed && !isRest;
+        // V40.2.20: isDarkTheme agora cobre TODOS os fundos escuros do app:
+        //   - foco normal (futuro OU atrasado, ambos com bg-app-focus)
+        //   - concluído (sempre emerald-500)
+        // Só rest não-concluído (emerald-50 / zinc-50) usa tema claro.
+        const isDarkTheme = !isRest || block.completed;
 
         const timeColor = isDarkTheme ? 'text-white/60' : 'text-zinc-500';
-        const titleClass = `${block.completed ? 'line-through opacity-60 text-emerald-900' : (isDarkTheme ? 'text-white' : (isRest ? 'text-emerald-900' : 'text-zinc-800'))}`;
+        // V40.2.20: título do concluído agora é branco riscado (sobre fundo emerald-500), não mais emerald-900 desbotado.
+        const titleClass = `${block.completed ? 'line-through opacity-90 text-white' : (isDarkTheme ? 'text-white' : (isRest ? 'text-emerald-900' : 'text-zinc-800'))}`;
         const iconColor = isDarkTheme ? 'text-white/60 hover:text-white' : 'text-zinc-400 hover:text-zinc-700';
-        const checkColor = isDarkTheme ? 'text-white/60 hover:text-white' : (block.completed ? 'text-emerald-600 hover:text-emerald-700' : 'text-zinc-400 hover:text-emerald-600');
+        const checkColor = isDarkTheme ? (block.completed ? 'text-white hover:text-white/80' : 'text-white/60 hover:text-white') : (block.completed ? 'text-emerald-600 hover:text-emerald-700' : 'text-zinc-400 hover:text-emerald-600');
         const btnBg = isDarkTheme ? 'bg-black/20 hover:bg-black/30' : 'bg-black/5 hover:bg-black/10';
         const glowCircle = isDarkTheme ? 'bg-white/10' : 'bg-white/60';
 

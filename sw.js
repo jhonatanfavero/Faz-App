@@ -1,5 +1,5 @@
-// V4.1 - v40.2.19 (Click-out por neutralidade: cards reais não se fecham entre si — só Tempo Livre/área neutra fecha o expandido)
-const CACHE_NAME = 'timeblock-v40-2-19';
+// V4.2 - v40.2.20 (Fim do "fantasma": atrasados mantêm cor sólida do tema, concluídos viram emerald-500 vivo)
+const CACHE_NAME = 'timeblock-v40-2-20';
 const ASSETS = [
   './',
   './index.html',

@@ -87,7 +87,7 @@
                 </div>
                 <p id="search-counter" class="hidden text-[12px] font-semibold text-app-focus -mt-2"></p>
                 
-                <div class="flex gap-2">
+                <div id="header-filters-row" class="flex gap-2">
                     <button id="filter-delayed-btn" onclick="toggleFilterDelayed()" class="bg-app-focus-soft border border-app-focus-soft p-2 rounded-xl hover:bg-app-focus-soft-strong transition flex items-center justify-center shrink-0" title="Filtrar Atrasados">
                         <i class="ph-bold ph-info text-lg text-app-focus"></i>
                     </button>
@@ -103,7 +103,7 @@
                     </button>
                 </div>
             </div>
-            <div class="w-full pointer-events-auto">
+            <div id="header-progress-row" class="w-full pointer-events-auto">
                 <div class="flex justify-between text-[10px] text-zinc-500 mb-1.5 font-bold uppercase tracking-wider">
                     <span id="progress-text">Planejado (0%)</span>
                     <span>Livre</span>

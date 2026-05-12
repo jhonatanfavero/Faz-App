@@ -2594,11 +2594,13 @@ if ('serviceWorker' in navigator) {
 }
 
 // V3.0 - V37: Ajustar paddingTop da timeline conforme altura real do header
+// V40.2.27: removido o "if (headerHidden) return" — agora calcula dinâmicamente em
+//           ambos os estados, porque o header encolhe naturalmente via display:none
+//           nos blocos internos (não mais via altura fixa).
 window.adjustTimelinePadding = function() {
     const header = document.querySelector('header');
     const timeline = document.getElementById('timeline-scroll');
     if (!header || !timeline) return;
-    if (headerHidden) return; // Modo retraído controla próprio padding
     const h = header.offsetHeight;
     timeline.style.paddingTop = (h + 8) + 'px';
 }
@@ -2631,27 +2633,37 @@ document.addEventListener('keydown', (e) => {
 });
 
 // V2.0 - BLOCO 7: Toggle Header
+// V40.2.27 — Refatoração picaprofunda (diagnóstico Jules):
+//   ANTES: usava header.style.height='100px' + overflow:hidden + paddingTop='110px' fixos.
+//          Esse "hack" cortava as pílulas i/✓/TAGs/Relatórios pela metade ao invés de escondê-las.
+//          Frágil em diferentes tamanhos de tela e tamanhos de fonte do usuário.
+//   AGORA: esconde com .classList.toggle('hidden') os 2 blocos (filtros + barra Planejado).
+//          O header naturalmente encolhe via flexbox. adjustTimelinePadding cuida do espaço.
+//          Comportamento ELÁSTICO — adapta-se ao tamanho real do conteúdo.
 window.toggleHeader = function() {
     headerHidden = !headerHidden;
     const header = document.querySelector('header');
-    const timeline = document.getElementById('timeline-scroll');
+    const filtersRow = document.getElementById('header-filters-row');
+    const progressRow = document.getElementById('header-progress-row');
     const btn = document.querySelector('[onclick="toggleHeader()"]');
-    
+
     if (headerHidden) {
-        header.style.height = '100px'; // V38: 48px de pt-12 + 52px para botões respirarem (box-sizing: border-box)
-        header.style.overflow = 'hidden';
-        timeline.style.paddingTop = '110px';
-        if(btn) btn.innerHTML = '<i class="ph ph-caret-down text-lg sm:text-xl text-zinc-600"></i>';
+        filtersRow.classList.add('hidden');
+        progressRow.classList.add('hidden');
+        if(btn) btn.innerHTML = '<i class="ph ph-caret-down text-base text-app-focus"></i>';
     } else {
-        header.style.height = 'auto';
-        header.style.overflow = 'visible';
-        if(btn) btn.innerHTML = '<i class="ph ph-caret-up text-lg sm:text-xl text-zinc-600"></i>';
-        // V3.0 V37: padding dinâmico baseado na altura real do header
-        setTimeout(() => {
-            const h = header.offsetHeight;
-            timeline.style.paddingTop = (h + 8) + 'px';
-        }, 50);
+        filtersRow.classList.remove('hidden');
+        progressRow.classList.remove('hidden');
+        if(btn) btn.innerHTML = '<i class="ph ph-caret-up text-base text-app-focus"></i>';
     }
+
+    // Recalcula paddingTop da timeline AGORA que a altura real do header mudou.
+    // setTimeout 50ms dá tempo do browser aplicar o display:none e recalcular offsetHeight.
+    setTimeout(() => {
+        const h = header.offsetHeight;
+        const timeline = document.getElementById('timeline-scroll');
+        if (timeline) timeline.style.paddingTop = (h + 8) + 'px';
+    }, 50);
 }
 
 // --- V2.0 - COMBO A: Edição ---

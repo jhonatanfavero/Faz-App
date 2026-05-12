@@ -1,5 +1,5 @@
-// V4.8 - v40.2.26 (FIX BLOQUEIO FANTASMA: drag-handle sobe pra z-50 + flex container e microblocksSection ml-10 — drag volta a funcionar mantendo TODAS as melhorias UX da V40.2.23-25)
-const CACHE_NAME = 'timeblock-v40-2-26';
+// V4.9 - v40.2.27 (Header recolhível REFATORADO: removido hack do height:100px fixo + overflow:hidden — agora esconde blocos com display:none, header encolhe naturalmente, paddingTop dinâmico)
+const CACHE_NAME = 'timeblock-v40-2-27';
 const ASSETS = [
   './',
   './index.html',

@@ -1,8 +1,11 @@
 html {
     scrollbar-gutter: stable;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
 }
 
-body { touch-action: pan-y; background-color: #e2e8f0; }
+body { touch-action: pan-y; background-color: #e2e8f0; overscroll-behavior-x: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .glow-line { box-shadow: 0 0 8px rgba(0,210,255,0.8); }
@@ -46,6 +49,82 @@ body { overflow-x: hidden; max-width: 100vw; }
 }
 
 /* V2.0 - Padding modo filtro */
+/* V38: padding-left/right removem o buraco de 56px do pl-14 quando y-axis está oculto */
+/* V40.2.12: padding-top reduzido pra 16px (era 200px e criava buraco visual feio nos filtros,
+   o <main> já tem pt-36 que cuida do espaço pro header) */
 .filter-list-mode {
-    padding-top: 200px !important;
+    padding-top: 16px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+}
+
+/* V40.2.10: Modo busca herda o mesmo padding (já era 16px) */
+.filter-list-mode.search-mode {
+    padding-top: 16px !important;
+}
+
+/* V40.2.7: Selo de data agrupando resultados de busca por dia */
+.search-date-seal {
+    text-align: left;
+    margin-top: 8px;
+    margin-bottom: 4px;
+    width: 100%;
+}
+.search-date-seal:first-child {
+    margin-top: 0;
+}
+
+/* V40.2.13: bloqueia seleção de texto na timeline (cursor de I-beam piscando ao tocar títulos).
+   Inputs e textareas explicitamente recuperam a habilidade de seleção pra digitação. */
+#timeline-scroll {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+#timeline-scroll input,
+#timeline-scroll textarea,
+#timeline-scroll [contenteditable="true"] {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+}
+
+/* ========================================================================
+   V40.2.17 — BALA DE PRATA PRO TECLADO FANTASMA (Diretriz Gemini)
+   
+   CAUSA-RAIZ (que o Claude tinha errado):
+   Sheets recolhidas com .translate-y-full continuam EXISTINDO na placa de 
+   vídeo do celular como camadas invisíveis (só off-screen). Quando o teclado 
+   virtual sobe e o Chrome Android achata o viewport, o compositor gráfico 
+   perde a referência das camadas e "rasga" tudo, fazendo sheets escondidas 
+   (Reports, Clone, etc) vazarem por cima do conteúdo.
+   
+   SOLUÇÃO: aplicar `visibility: hidden` na sheet APÓS a animação de fechar 
+   terminar (delay de 300ms = duração da transition). Isso arranca a sheet 
+   da árvore de renderização → o compositor não pode rasgar o que não existe.
+   
+   COMO FUNCIONA:
+   - Ao ABRIR (remover .translate-y-full): visibility → visible INSTANTÂNEO 
+     (delay 0s), transform anima 300ms
+   - Ao FECHAR (adicionar .translate-y-full): transform anima 300ms primeiro, 
+     visibility: hidden aplica APÓS animação (delay 300ms)
+   
+   Selector [id$="-sheet"] pega todas as 8 sheets do app sem afetar mais nada:
+   bottom-sheet, list-sheet, link-note-sheet, period-select-sheet,
+   config-sheet, tags-sheet, clone-sheet, reports-sheet.
+   ======================================================================== */
+
+[id$="-sheet"] {
+    transition-property: transform, visibility !important;
+    transition-duration: 300ms, 0s !important;
+    transition-delay: 0s, 0s !important;
+    transition-timing-function: cubic-bezier(0.16,1,0.3,1), linear !important;
+}
+[id$="-sheet"].translate-y-full {
+    visibility: hidden !important;
+    transition-delay: 0s, 300ms !important;
 }

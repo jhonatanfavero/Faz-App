@@ -1,5 +1,5 @@
-// V4.2 - v40.2.20 (Fim do "fantasma": atrasados mantêm cor sólida do tema, concluídos viram emerald-500 vivo)
-const CACHE_NAME = 'timeblock-v40-2-20';
+// V4.3 - v40.2.21 (Divulgação Progressiva: topo do card só com 2 botões; Editar/Duplicar/Apagar viram action bar no rodapé do expandido)
+const CACHE_NAME = 'timeblock-v40-2-21';
 const ASSETS = [
   './',
   './index.html',

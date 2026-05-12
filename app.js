@@ -774,7 +774,9 @@ function drawBlock(block) {
 
         const isMicro = !block.expanded && block.duration <= 25;
         if (block.expanded) {
-            el.className += ` ${bgClass} shadow-2xl border px-3 pt-2 pb-6 group select-none transition-all duration-300`;
+            // V40.2.21: pb-12 (era pb-6) pra dar espaço pra action bar (Editar/Duplicar/Apagar)
+            // que agora ocupa o rodapé via absolute. A barra usa bottom-1, height ~32px.
+            el.className += ` ${bgClass} shadow-2xl border px-3 pt-2 pb-12 group select-none transition-all duration-300`;
             el.style.height = 'auto'; el.style.minHeight = `${heightPx}px`; el.style.zIndex = '35'; 
         } else {
             el.className += ` ${bgClass} border px-3 ${isMicro ? 'pt-1.5 pb-1.5' : 'pt-2 pb-4'} group select-none transition-all duration-300`;
@@ -825,6 +827,39 @@ function drawBlock(block) {
         const showInfoIcon = isPast || block.wasDelayed;
         const pastIconHtml = showInfoIcon ? `<div class="pointer-events-auto w-3.5 h-3.5 rounded-full ${isDarkTheme ? 'bg-black/20 border-black/30 text-white/80' : 'bg-black/10 border-black/10 text-zinc-500'} flex items-center justify-center shrink-0 border mr-1.5" title="Tempo Esgotado / Realocado"><i class="ph-bold ph-info text-[8px]"></i></div>` : '';
 
+        // V40.2.21 — Divulgação Progressiva (Progressive Disclosure):
+        //   ANTES: 5 botões amontoados no topo direito do card (expandir, concluir, editar,
+        //          duplicar, apagar) → comprimia o título a ~50% da largura, com truncate.
+        //   AGORA:
+        //   - Topo retraído: só 2 botões essenciais (▼ expandir, ✓ concluir), tamanho w-7 h-7
+        //     pra melhor área de toque no mobile (Touch Target accessibility). Título ganha
+        //     ~3 botões de largura extra.
+        //   - Rodapé do expandido: barra horizontal com Editar / Duplicar / Apagar com ícone
+        //     + texto. Aparece SÓ quando o card está expandido (chancela Jules + Jhonatan).
+        //   - Resize handle continua no canto inferior esquerdo absoluto (z-40), a action bar
+        //     usa right-0 com inset (left-3 right-3 bottom-1), não colidem em posição.
+
+        // Botões internos do rodapé do expandido (só renderizados quando block.expanded === true)
+        const actionBarBtnClass = isDarkTheme
+            ? 'bg-black/20 hover:bg-black/30 text-white/85 active:scale-95'
+            : 'bg-black/5 hover:bg-black/10 text-zinc-700 active:scale-95';
+        const actionBarDeleteClass = isDarkTheme
+            ? 'bg-black/20 hover:bg-red-500/70 text-white/85 hover:text-white active:scale-95'
+            : 'bg-black/5 hover:bg-red-500/80 text-zinc-700 hover:text-white active:scale-95';
+        const actionBarHtml = block.expanded ? `
+            <div class="absolute left-3 right-3 bottom-1 flex gap-1.5 z-30 pointer-events-auto">
+                <button onclick="openEditModal('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarBtnClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Editar">
+                    <i class="ph ph-pencil-simple text-[12px]"></i>Editar
+                </button>
+                <button onclick="duplicateTask('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarBtnClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Duplicar">
+                    <i class="ph ph-copy text-[12px]"></i>Duplicar
+                </button>
+                <button onclick="openDeleteModal('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarDeleteClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Apagar">
+                    <i class="ph ph-trash text-[12px]"></i>Apagar
+                </button>
+            </div>
+        ` : '';
+
         el.innerHTML = `
             <div class="absolute top-0 right-0 w-32 h-32 ${glowCircle} rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
             <div class="flex justify-between items-start z-30 relative">
@@ -843,27 +878,20 @@ function drawBlock(block) {
                 </div>
                 
                 <div class="flex gap-1.5 shrink-0 relative z-50 pointer-events-auto select-auto">
-                    <button onclick="toggleExpandBlock('${block.id}', event)" class="w-6 h-6 flex items-center justify-center ${btnBg} ${iconColor} rounded transition" title="Expandir/Recolher">
+                    <button onclick="toggleExpandBlock('${block.id}', event)" class="w-7 h-7 flex items-center justify-center ${btnBg} ${iconColor} rounded transition" title="Expandir/Recolher">
                         <i class="ph ${block.expanded ? 'ph-caret-up' : 'ph-caret-down'}"></i>
                     </button>
-                    <button onclick="toggleBlockCompletion('${block.id}', event)" class="w-6 h-6 flex items-center justify-center ${btnBg} ${checkColor} rounded transition" title="Concluir">
+                    <button onclick="toggleBlockCompletion('${block.id}', event)" class="w-7 h-7 flex items-center justify-center ${btnBg} ${checkColor} rounded transition" title="Concluir">
                         <i class="${block.completed ? 'ph-fill ph-check-circle' : 'ph ph-check'}"></i>
-                    </button>
-                    <button onclick="openEditModal('${block.id}', event)" class="flex w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Editar">
-                        <i class="ph ph-pencil-simple"></i>
-                    </button>
-                    <button onclick="duplicateTask('${block.id}', event)" class="flex w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Duplicar">
-                        <i class="ph ph-copy"></i>
-                    </button>
-                    <button onclick="openDeleteModal('${block.id}', event)" class="flex w-6 h-6 items-center justify-center ${btnBg} hover:bg-red-500/80 ${iconColor} hover:text-white rounded transition" title="Apagar">
-                        <i class="ph ph-trash"></i>
                     </button>
                 </div>
             </div>
             
             ${microblocksSection}
 
-            <div class="resize-handle absolute bottom-0 left-12 w-12 h-6 flex items-end justify-start pb-1.5 z-40">
+            ${actionBarHtml}
+
+            <div class="resize-handle absolute bottom-0 left-12 w-12 h-6 flex items-end justify-start pb-1.5 z-40 ${block.expanded ? 'hidden' : ''}">
                 <div class="w-8 h-1 ${isDarkTheme ? 'bg-white/40' : 'bg-black/20'} rounded-full pointer-events-none"></div>
             </div>
         `;

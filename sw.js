@@ -1,5 +1,5 @@
-// V4.0 - v40.2.18 (Scroll collapse por visibilidade: card só fecha quando sai 100% do viewport + 20px de tolerância)
-const CACHE_NAME = 'timeblock-v40-2-18';
+// V4.1 - v40.2.19 (Click-out por neutralidade: cards reais não se fecham entre si — só Tempo Livre/área neutra fecha o expandido)
+const CACHE_NAME = 'timeblock-v40-2-19';
 const ASSETS = [
   './',
   './index.html',

@@ -1000,22 +1000,50 @@ function collapseAllBlocks() {
 // Flag para evitar retração durante drag/resize (a física já gerencia o expanded)
 let isPhysicsBusy = false;
 
-// 3a) Click-out: clicar na timeline fora de um card expandido retrai todos
-// Usamos delegação no #timeline-scroll, capturando na fase de bubbling
+// 3a) V40.2.19 — Click-out por NEUTRALIDADE (não mais por "está expandido")
+//
+//   PROBLEMA RESOLVIDO:
+//   No celular, ao expandir um card pra ler, o usuário rola a tela apoiando o dedo
+//   em OUTROS cards retraídos (porque a timeline é densa, raramente há área vazia
+//   acessível). O navegador interpreta esse toque inicial (a "gordura do dedo")
+//   como CLIQUE no card retraído. A regra antiga ("clicou fora do expandido →
+//   fecha") matava o expandido injustamente.
+//
+//   NOVA REGRA (Opção A aprovada por Jhonatan + Jules):
+//   - Tocar em QUALQUER card REAL (type='focus' ou 'past'), expandido ou retraído
+//     → IGNORA (cards não se fecham uns aos outros).
+//   - Tocar em "Tempo Livre" (type='empty', bg-hatched) → FECHA. Área neutra.
+//   - Tocar em qualquer área fora de cards (y-axis, padding, fundo) → FECHA.
+//   - Botões internos dos cards (concluir, editar, lápis, etc) já chamam
+//     stopPropagation no próprio onclick — nunca chegam aqui.
+//
+//   ROTAS PRA FECHAR O EXPANDIDO:
+//   1. Botão ▲ do próprio card (toggleExpandBlock)
+//   2. Rolar até o card sumir do viewport + 20px (handler 3b, V40.2.18)
+//   3. Tocar em "Tempo Livre" ou área neutra (este handler)
 (function setupClickOutCollapse() {
     const timeline = document.getElementById('timeline-scroll');
     if (!timeline) return;
     timeline.addEventListener('click', (e) => {
         if (isPhysicsBusy) return;
-        // Se o click foi dentro de um card que ESTÁ expandido, ignora
-        // (operações dentro do card como microbloco, lápis, lixeira, etc continuam funcionando)
+
         const blockEl = e.target.closest('.block-item');
         if (blockEl) {
+            // Tocou em algum card. Descobre se é real (focus/past) ou vazio (empty).
             const id = blockEl.dataset.blockId;
             const b = id ? db.find(x => x.id === id) : null;
-            if (b && b.expanded) return; // click dentro do expandido — não fazer nada
+
+            // Card real (focus/past) → ignora, deixa o usuário interagir/rolar livre.
+            // Vale tanto pro expandido (preserva leitura) quanto pra retraído (evita
+            // o "clique fantasma" quando o dedo só esbarra pra rolar).
+            if (b && b.type !== 'empty') return;
+
+            // Tempo Livre (type='empty'): cai pro fechamento padrão (área neutra).
+            // Se b não foi encontrado no db (caso raro de dataset corrompido),
+            // também cai pro padrão — comportamento seguro.
         }
-        // Click fora de qualquer card expandido (área vazia, ou em card retraído sem afetá-lo)
+
+        // Toque em área neutra (fora de cards) ou em Tempo Livre → fecha expandido.
         collapseAllBlocks();
     });
 })();

@@ -1,5 +1,5 @@
-// V4.6 - v40.2.24 (Busca expandida: título + microblocos + nome da tag — helper cardMatchesSearch centraliza a lógica)
-const CACHE_NAME = 'timeblock-v40-2-24';
+// V4.7 - v40.2.25 (Ícone ⋮⋮ ancorado no TOPO da drag-zone — não flutua mais no meio em cards expandidos; opacity-100 elimina invisibilidade em fundos escuros)
+const CACHE_NAME = 'timeblock-v40-2-25';
 const ASSETS = [
   './',
   './index.html',

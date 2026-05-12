@@ -917,10 +917,19 @@ function drawBlock(block) {
                         nada muda, mas a área de toque cresceu 8x.
                  - position: absolute pra cobrir altura toda
                  - bg transparente pra mostrar border-left da tag por baixo
-                 - ícone ⋮⋮ centralizado vertical via flex items-center justify-center
-                 - touch-action: none herdado da classe .drag-handle (resolve drag horizontal) -->
-            <div class="drag-handle absolute left-0 top-0 bottom-0 w-10 flex items-center justify-center pointer-events-auto z-20" title="Arrastar (Mover)">
-                <i class="ph ph-dots-six-vertical ${iconColor} text-base opacity-70"></i>
+                 - touch-action: none herdado da classe .drag-handle (resolve drag horizontal)
+
+                 V40.2.25 — Ícone ⋮⋮ ANCORADO NO TOPO (correção Jules+Jhonatan):
+                 ANTES: items-center centralizava o ícone no MEIO vertical da faixa toda.
+                        No card retraído ficava ok. No card EXPANDIDO (alto com microblocos,
+                        notas, action bar), o ícone ia parar lá no meio do nada visualmente.
+                 AGORA:
+                 - items-start (ancora no topo)
+                 - padding-top acompanha o do card (pt-2 normal, pt-1.5 se micro)
+                 - mt-0.5 (2px de ajuste fino pra alinhar com centro vertical da 1ª linha)
+                 - opacity-100 (era opacity-70, sumia em fundos escuros como emerald-500) -->
+            <div class="drag-handle absolute left-0 top-0 bottom-0 w-10 flex items-start justify-center ${isMicro ? 'pt-1.5' : 'pt-2'} pointer-events-auto z-20" title="Arrastar (Mover)">
+                <i class="ph ph-dots-six-vertical ${iconColor} text-base mt-0.5"></i>
             </div>
 
             <div class="flex justify-between items-start z-30 relative pl-10">

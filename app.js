@@ -782,10 +782,12 @@ function drawBlock(block) {
         if (block.expanded) {
             // V40.2.21: pb-12 (era pb-6) pra dar espaço pra action bar (Editar/Duplicar/Apagar)
             // que agora ocupa o rodapé via absolute. A barra usa bottom-1, height ~32px.
-            el.className += ` ${bgClass} shadow-2xl border px-3 pt-2 pb-12 group select-none transition-all duration-300`;
+            // V40.2.23: px-3 → pr-3 (drag-handle absolute agora ocupa os 40px da esquerda).
+            el.className += ` ${bgClass} shadow-2xl border pr-3 pt-2 pb-12 group select-none transition-all duration-300`;
             el.style.height = 'auto'; el.style.minHeight = `${heightPx}px`; el.style.zIndex = '35'; 
         } else {
-            el.className += ` ${bgClass} border px-3 ${isMicro ? 'pt-1.5 pb-1.5' : 'pt-2 pb-4'} group select-none transition-all duration-300`;
+            // V40.2.23: px-3 → pr-3 (drag-handle absolute ocupa a esquerda).
+            el.className += ` ${bgClass} border pr-3 ${isMicro ? 'pt-1.5 pb-1.5' : 'pt-2 pb-4'} group select-none transition-all duration-300`;
         }
         if (borderStyle) el.style.cssText += borderStyle;
 
@@ -853,7 +855,7 @@ function drawBlock(block) {
             ? 'bg-black/20 hover:bg-red-500/70 text-white/85 hover:text-white active:scale-95'
             : 'bg-black/5 hover:bg-red-500/80 text-zinc-700 hover:text-white active:scale-95';
         const actionBarHtml = block.expanded ? `
-            <div class="absolute left-3 right-3 bottom-1 flex gap-1.5 z-30 pointer-events-auto">
+            <div class="absolute left-12 right-3 bottom-1 flex gap-1.5 z-30 pointer-events-auto">
                 <button onclick="openEditModal('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarBtnClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Editar">
                     <i class="ph ph-pencil-simple text-[12px]"></i>Editar
                 </button>
@@ -868,11 +870,23 @@ function drawBlock(block) {
 
         el.innerHTML = `
             <div class="absolute top-0 right-0 w-32 h-32 ${glowCircle} rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
-            <div class="flex justify-between items-start z-30 relative">
-                <div class="flex flex-1 min-w-0 pr-2 gap-2">
-                    <div class="drag-handle w-6 h-6 flex items-center justify-center ${btnBg} ${iconColor} rounded transition pointer-events-auto shrink-0 mt-0.5" title="Arrastar (Mover)">
-                        <i class="ph ph-dots-six-vertical"></i>
-                    </div>
+
+            <!-- V40.2.23 — DRAG ZONE EXPANDIDA (faixa esquerda inteira)
+                 ANTES: drag-handle era um quadradinho w-6 h-6 (24px²) no canto superior esquerdo.
+                        Usuário tinha que MIRAR no alvo pequeno pra arrastar — gargalo de UX.
+                 AGORA: a faixa esquerda inteira do card (w-10 = 40px, altura total) vira zona de drag.
+                        Inclui a área da border-left colorida (tag) e o halo branco — visualmente
+                        nada muda, mas a área de toque cresceu 8x.
+                 - position: absolute pra cobrir altura toda
+                 - bg transparente pra mostrar border-left da tag por baixo
+                 - ícone ⋮⋮ centralizado vertical via flex items-center justify-center
+                 - touch-action: none herdado da classe .drag-handle (resolve drag horizontal) -->
+            <div class="drag-handle absolute left-0 top-0 bottom-0 w-10 flex items-center justify-center pointer-events-auto z-20" title="Arrastar (Mover)">
+                <i class="ph ph-dots-six-vertical ${iconColor} text-base opacity-70"></i>
+            </div>
+
+            <div class="flex justify-between items-start z-30 relative pl-10">
+                <div class="flex flex-1 min-w-0 pr-2">
                     <div class="flex flex-col flex-1 min-w-0 pointer-events-auto">
                         <span ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition max-w-full" title="${isSearching ? '' : 'Alterar Horário'}">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
                         <div class="title-wrapper flex items-center ${isMicro ? 'mt-0' : 'mt-0.5'} min-w-0 pointer-events-none">

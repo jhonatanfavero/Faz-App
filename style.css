@@ -9,7 +9,13 @@ body { touch-action: pan-y; background-color: #e2e8f0; overscroll-behavior-x: no
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .glow-line { box-shadow: 0 0 8px rgba(0,210,255,0.8); }
-.drag-handle { cursor: grab; }
+.drag-handle {
+    /* V40.2.23: touch-action: none impede que o browser interprete o gesto inicial como
+       pan horizontal (estava causando deslocamento lateral da timeline durante drag).
+       Comportamento equivalente ao já existente em .resize-handle. */
+    touch-action: none;
+    cursor: grab;
+}
 .resize-handle { touch-action: none; cursor: ns-resize; }
 .dragging { z-index: 50 !important; opacity: 0.95; transform: scale(1.02); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15); pointer-events: none; }
 .micro-block { padding-top: 6px !important; padding-bottom: 6px !important; }
@@ -48,6 +54,14 @@ body { overflow-x: hidden; max-width: 100vw; }
     display: none !important;
 }
 
+/* V40.2.23: drag-handle agora é absolute left-0 w-10 (40px) e o conteúdo do card
+   tem pl-10 pra escapar dele. No modo lista o drag fica display:none mas o pl-10
+   continua aplicado, criando um buraco vazio de 40px à esquerda. Esse seletor
+   neutraliza o pl-10 do flex direto dentro do block-item em modo lista. */
+.filter-list-mode .block-item > .flex.justify-between {
+    padding-left: 0 !important;
+}
+
 /* V2.0 - Padding modo filtro */
 /* V38: padding-left/right removem o buraco de 56px do pl-14 quando y-axis está oculto */
 /* V40.2.12: padding-top reduzido pra 16px (era 200px e criava buraco visual feio nos filtros,
@@ -75,8 +89,12 @@ body { overflow-x: hidden; max-width: 100vw; }
 }
 
 /* V40.2.13: bloqueia seleção de texto na timeline (cursor de I-beam piscando ao tocar títulos).
-   Inputs e textareas explicitamente recuperam a habilidade de seleção pra digitação. */
+   Inputs e textareas explicitamente recuperam a habilidade de seleção pra digitação.
+   V40.2.23: + overflow-x: hidden e touch-action: pan-y como defense-in-depth contra
+   deslocamento horizontal acidental durante drag de cards. */
 #timeline-scroll {
+    overflow-x: hidden;
+    touch-action: pan-y;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     -moz-user-select: none;

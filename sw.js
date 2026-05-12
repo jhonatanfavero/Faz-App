@@ -1,5 +1,5 @@
-// V4.4 - v40.2.22 (Micro-ajuste de conforto Jules: PX_PER_MIN 2.5 → 3.0 — cards de 15min ganham respiro pros botões w-7 h-7, sem destruir a visão panorâmica)
-const CACHE_NAME = 'timeblock-v40-2-22';
+// V4.5 - v40.2.23 FINAL (Drag zone expandida: faixa esquerda inteira vira pega; touch-action:none corrige drag horizontal; overflow-x:hidden defense-in-depth no #timeline-scroll)
+const CACHE_NAME = 'timeblock-v40-2-23';
 const ASSETS = [
   './',
   './index.html',

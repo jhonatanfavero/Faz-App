@@ -1,5 +1,5 @@
-// V4.5 - v40.2.23 FINAL (Drag zone expandida: faixa esquerda inteira vira pega; touch-action:none corrige drag horizontal; overflow-x:hidden defense-in-depth no #timeline-scroll)
-const CACHE_NAME = 'timeblock-v40-2-23';
+// V4.6 - v40.2.24 (Busca expandida: título + microblocos + nome da tag — helper cardMatchesSearch centraliza a lógica)
+const CACHE_NAME = 'timeblock-v40-2-24';
 const ASSETS = [
   './',
   './index.html',

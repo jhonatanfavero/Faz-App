@@ -306,6 +306,40 @@ function normalizeText(str) {
     return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
+// V40.2.24: Helper centralizado de match de busca em cards.
+//   Busca em 3 campos (Opção B aprovada por Jules + Jhonatan):
+//   1. Título do cartão (b.title)
+//   2. Microblocos (b.microblocks[].title)
+//   3. Nome da tag (tagsDb.find(t => t.id === b.tagId).name)
+//
+//   Notas vinculadas (linkedNoteIds) foram propositalmente EXCLUÍDAS do escopo —
+//   adicionariam custo de O(n × m) (cards × notas) por keystroke, e notas têm sua
+//   própria sheet pra navegar.
+//
+//   Argumento `normalizedQuery` recebe a string já passada por normalizeText()
+//   pra não chamar normalizeText 4 vezes por bloco. Performance.
+function cardMatchesSearch(block, normalizedQuery) {
+    if (!normalizedQuery) return false;
+
+    // 1. Título do cartão
+    if (normalizeText(block.title).includes(normalizedQuery)) return true;
+
+    // 2. Microblocos (checklist interna)
+    if (block.microblocks && block.microblocks.length > 0) {
+        if (block.microblocks.some(mb => normalizeText(mb.title).includes(normalizedQuery))) {
+            return true;
+        }
+    }
+
+    // 3. Nome da tag (se tiver tag vinculada)
+    if (block.tagId) {
+        const tag = tagsDb.find(t => t.id === block.tagId);
+        if (tag && normalizeText(tag.name).includes(normalizedQuery)) return true;
+    }
+
+    return false;
+}
+
 // V40.2.5: Abre a barra de busca
 window.openSearchBar = function() {
     // Limpa outros filtros pra evitar combinações confusas
@@ -372,7 +406,8 @@ function updateSearchCounter() {
         return;
     }
     const q = normalizeText(searchQuery);
-    const matched = db.filter(b => normalizeText(b.title).includes(q)).length;
+    // V40.2.24: usa cardMatchesSearch (título + microblocos + tag)
+    const matched = db.filter(b => cardMatchesSearch(b, q)).length;
     counter.innerText = `${matched} ${matched === 1 ? 'resultado' : 'resultados'} de "${searchQuery}"`;
     counter.classList.remove('hidden');
 }
@@ -543,7 +578,8 @@ function renderTimeline() {
         }
         if (isSearching) {
             const q = normalizeText(searchQuery);
-            filteredForWindow = filteredForWindow.filter(b => normalizeText(b.title).includes(q));
+            // V40.2.24: filtro expandido pra título + microblocos + tag
+            filteredForWindow = filteredForWindow.filter(b => cardMatchesSearch(b, q));
         }
         
         if (filteredForWindow.length > 0) {
@@ -569,9 +605,10 @@ function renderTimeline() {
     }
 
     // V40.2.5: filtro de busca por nome (normaliza acentos, case-insensitive)
+    // V40.2.24: expandido pra incluir microblocos e tag via cardMatchesSearch
     if (searchQuery && searchQuery.trim()) {
         const q = normalizeText(searchQuery);
-        dailyDb = dailyDb.filter(b => normalizeText(b.title).includes(q));
+        dailyDb = dailyDb.filter(b => cardMatchesSearch(b, q));
     }
 
     dailyDb = dailyDb.filter(b => b.startMin < END_HOUR * 60 && (b.startMin + b.duration) > START_HOUR * 60);
@@ -608,7 +645,8 @@ function renderSearchResultsAllDays() {
     const today = getTodayStr();
     
     // Pega TODOS os blocos do db (qualquer data) que batem com a busca
-    let results = db.filter(b => normalizeText(b.title).includes(q));
+    // V40.2.24: agora busca em título + microblocos + nome da tag
+    let results = db.filter(b => cardMatchesSearch(b, q));
     
     // Ordena por data (crescente) e depois por hora
     results.sort((a, b) => {

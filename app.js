@@ -1,5 +1,11 @@
 // --- 1. FÍSICA UNIVERSAL ---
-const PX_PER_MIN = 2.5; 
+// V40.2.22 — Micro-ajuste de conforto (decisão Jules):
+//   ANTES: 2.5px/min → 1h ocupava 150px, cards de 15min apertados (37.5px)
+//   AGORA: 3.0px/min → 1h ocupa 180px, cards de 15min com 45px (ideal pros botões w-7 h-7 = 28px)
+//   POR QUE NÃO IR MAIS ALTO: Jules vetou escalas 4.0/5.0 — destruiriam a "Bird's-Eye View"
+//   (visão panorâmica do dia inteiro). Card de 5min só vai ser viável quando tivermos
+//   movimento de pinça/zoom (planejado pra V41).
+const PX_PER_MIN = 3.0; 
 
 // VARIÁVEIS DE HORÁRIO AGORA SÃO DINÂMICAS E SALVAS NO LOCALSTORAGE
 let storedStart = localStorage.getItem('tb_start_hour');

@@ -1,5 +1,5 @@
-// V4.3 - v40.2.21 (Divulgação Progressiva: topo do card só com 2 botões; Editar/Duplicar/Apagar viram action bar no rodapé do expandido)
-const CACHE_NAME = 'timeblock-v40-2-21';
+// V4.4 - v40.2.22 (Micro-ajuste de conforto Jules: PX_PER_MIN 2.5 → 3.0 — cards de 15min ganham respiro pros botões w-7 h-7, sem destruir a visão panorâmica)
+const CACHE_NAME = 'timeblock-v40-2-22';
 const ASSETS = [
   './',
   './index.html',

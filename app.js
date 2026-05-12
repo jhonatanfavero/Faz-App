@@ -1020,22 +1020,63 @@ let isPhysicsBusy = false;
     });
 })();
 
-// 3b) Scroll com threshold: precisa rolar > 30px para retrair (evita acidente)
-//     Debounce: só reage 120ms após o usuário parar de rolar (suaviza)
+// 3b) V40.2.18 — Scroll collapse por VISIBILIDADE (não mais por distância de scroll)
+//
+//   PROBLEMA RESOLVIDO:
+//   Versão antiga (V40.1.3) fechava o card expandido após apenas 30px de scroll.
+//   Isso quebrava o uso real: o usuário expandia o card pra ler microblocos / notas
+//   vinculadas, deslizava o dedo só pra ajustar a posição na tela, e o card já fechava.
+//
+//   NOVA LÓGICA (Opção A aprovada por Jhonatan + Jules):
+//   Em vez de medir "quanto rolou", medimos "o card expandido ainda está visível?".
+//   Usamos getBoundingClientRect() do card e do container #timeline-scroll.
+//   O card só é fechado quando sai COMPLETAMENTE do viewport visível do scroller,
+//   com TOLERÂNCIA de 20px de amortecimento (evita "piscadas" quando o card está
+//   bem na borda — fecharia/abriria/fecharia em micro-scrolls).
+//
+//   CRITÉRIOS DE FECHAMENTO (basta UM ser verdadeiro):
+//   - cardRect.bottom < timelineRect.top - TOLERANCE  → saiu pra cima
+//   - cardRect.top    > timelineRect.bottom + TOLERANCE → saiu pra baixo
+//
+//   GUARDS PRESERVADOS:
+//   - isPhysicsBusy: drag/resize não dispara collapse (mantido da V40.1.3)
+//   - Debounce 120ms: continua suavizando reação ao scroll
+//   - Click-out (handler 3a, linhas 1003–1021): intocado, continua fechando em tap
+//
+//   COMPATIBILIDADE:
+//   - Modo lista (filter-list-mode + search-mode): cards usam position:relative,
+//     mas getBoundingClientRect() funciona igual — retorna posição real na tela.
+//   - Múltiplos cards expandidos: impossível pela regra "1 por vez" da
+//     toggleExpandBlock (linha 985), então o break no primeiro encontrado basta.
 (function setupScrollCollapse() {
     const timeline = document.getElementById('timeline-scroll');
     if (!timeline) return;
-    let scrollStartY = null;
     let scrollDebounce = null;
-    const THRESHOLD = 30; // px
+    const TOLERANCE = 20; // px de margem antes de considerar o card "fora da tela"
+
     timeline.addEventListener('scroll', () => {
         if (isPhysicsBusy) return;
-        if (scrollStartY === null) scrollStartY = timeline.scrollTop;
         clearTimeout(scrollDebounce);
         scrollDebounce = setTimeout(() => {
-            const delta = Math.abs(timeline.scrollTop - scrollStartY);
-            if (delta > THRESHOLD) collapseAllBlocks();
-            scrollStartY = null;
+            // Existe algum card expandido no db? Se não, nada a fazer.
+            const expandedBlock = db.find(b => b.expanded);
+            if (!expandedBlock) return;
+
+            // Localiza o elemento DOM do card expandido
+            const cardEl = timeline.querySelector(
+                `.block-item[data-block-id="${expandedBlock.id}"]`
+            );
+            if (!cardEl) return; // card não está renderizado (ex: mudou de dia) — nada a fazer
+
+            const cardRect = cardEl.getBoundingClientRect();
+            const timelineRect = timeline.getBoundingClientRect();
+
+            const saiuPraCima  = cardRect.bottom < timelineRect.top    - TOLERANCE;
+            const saiuPraBaixo = cardRect.top    > timelineRect.bottom + TOLERANCE;
+
+            if (saiuPraCima || saiuPraBaixo) {
+                collapseAllBlocks();
+            }
         }, 120);
     }, { passive: true });
 })();

@@ -1,5 +1,5 @@
-// V3.9 - v40.2.17 (Bala de Prata Gemini: visibility:hidden em sheets fechadas mata o glitch do compositor do Chrome Android)
-const CACHE_NAME = 'timeblock-v40-2-17';
+// V4.0 - v40.2.18 (Scroll collapse por visibilidade: card só fecha quando sai 100% do viewport + 20px de tolerância)
+const CACHE_NAME = 'timeblock-v40-2-18';
 const ASSETS = [
   './',
   './index.html',

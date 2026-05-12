@@ -1,5 +1,5 @@
-// V3.0 - v36 (Correções: Header, Filtro, Tema, Período Data)
-const CACHE_NAME = 'timeblock-v36';
+// V3.9 - v40.2.17 (Bala de Prata Gemini: visibility:hidden em sheets fechadas mata o glitch do compositor do Chrome Android)
+const CACHE_NAME = 'timeblock-v40-2-17';
 const ASSETS = [
   './',
   './index.html',

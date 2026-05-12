@@ -1,5 +1,5 @@
-// V4.7 - v40.2.25 (Ícone ⋮⋮ ancorado no TOPO da drag-zone — não flutua mais no meio em cards expandidos; opacity-100 elimina invisibilidade em fundos escuros)
-const CACHE_NAME = 'timeblock-v40-2-25';
+// V4.8 - v40.2.26 (FIX BLOQUEIO FANTASMA: drag-handle sobe pra z-50 + flex container e microblocksSection ml-10 — drag volta a funcionar mantendo TODAS as melhorias UX da V40.2.23-25)
+const CACHE_NAME = 'timeblock-v40-2-26';
 const ASSETS = [
   './',
   './index.html',

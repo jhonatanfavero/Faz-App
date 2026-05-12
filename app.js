@@ -861,7 +861,7 @@ function drawBlock(block) {
             : 'bg-black/5 hover:bg-black/10 focus:bg-white focus:border-zinc-300 text-zinc-900 placeholder-zinc-500 border-transparent shadow-sm';
 
         microblocksSection = `
-            <div class="flex-1 overflow-y-auto no-scrollbar mt-2 mb-2 z-20 relative pointer-events-auto ${!block.expanded && block.duration <= 25 ? 'hidden' : ''}">
+            <div class="flex-1 overflow-y-auto no-scrollbar mt-2 mb-2 ml-10 z-20 relative pointer-events-auto ${!block.expanded && block.duration <= 25 ? 'hidden' : ''}">
                 ${microHtml}
                 <div class="mt-1">
                     <input type="text" id="micro-input-${block.id}" placeholder="+ Adicionar Check" class="microblock-input w-full rounded-md px-2 py-1.5 text-[10px] font-medium outline-none transition-colors border ${mbInputClasses}" onkeypress="if(event.key==='Enter') addMicroblock('${block.id}', this, event)">
@@ -915,24 +915,31 @@ function drawBlock(block) {
                  AGORA: a faixa esquerda inteira do card (w-10 = 40px, altura total) vira zona de drag.
                         Inclui a área da border-left colorida (tag) e o halo branco — visualmente
                         nada muda, mas a área de toque cresceu 8x.
-                 - position: absolute pra cobrir altura toda
-                 - bg transparente pra mostrar border-left da tag por baixo
-                 - touch-action: none herdado da classe .drag-handle (resolve drag horizontal)
 
-                 V40.2.25 — Ícone ⋮⋮ ANCORADO NO TOPO (correção Jules+Jhonatan):
-                 ANTES: items-center centralizava o ícone no MEIO vertical da faixa toda.
-                        No card retraído ficava ok. No card EXPANDIDO (alto com microblocos,
-                        notas, action bar), o ícone ia parar lá no meio do nada visualmente.
-                 AGORA:
-                 - items-start (ancora no topo)
-                 - padding-top acompanha o do card (pt-2 normal, pt-1.5 se micro)
-                 - mt-0.5 (2px de ajuste fino pra alinhar com centro vertical da 1ª linha)
-                 - opacity-100 (era opacity-70, sumia em fundos escuros como emerald-500) -->
-            <div class="drag-handle absolute left-0 top-0 bottom-0 w-10 flex items-start justify-center ${isMicro ? 'pt-1.5' : 'pt-2'} pointer-events-auto z-20" title="Arrastar (Mover)">
+                 V40.2.25 — Ícone ⋮⋮ ANCORADO NO TOPO:
+                 - items-start + pt condicional + mt-0.5 = ícone alinhado com 1ª linha de texto
+                 - opacity-100 = ícone visível em fundos escuros (emerald-500)
+
+                 V40.2.26 — FIX DO BLOQUEIO FANTASMA (diagnóstico Jules):
+                 ANTES: drag-handle tinha z-20. flex container conteúdo tinha z-30. Mesmo com
+                        ml-10 deslocando o flex pra x=40, podia haver bloqueio sutil em alguns
+                        navegadores ou em estados específicos do card. Drag parava de funcionar.
+                 AGORA: drag-handle ganhou Z-50 (era z-20). Agora é o ELEMENTO MAIS ALTO da
+                        cadeia de hit-testing dentro do card. Nenhuma outra camada (z-10, 20, 30,
+                        40) pode interceptar toques na faixa esquerda. Belt-and-suspenders. -->
+            <div class="drag-handle absolute left-0 top-0 bottom-0 w-10 flex items-start justify-center ${isMicro ? 'pt-1.5' : 'pt-2'} pointer-events-auto z-50" title="Arrastar (Mover)">
                 <i class="ph ph-dots-six-vertical ${iconColor} text-base mt-0.5"></i>
             </div>
 
-            <div class="flex justify-between items-start z-30 relative pl-10">
+            <!-- V40.2.26 FIX CRÍTICO: pl-10 → ml-10
+                 ANTES (V40.2.23-25): pl-10 (padding-left 40px) criava uma área de 40px à esquerda
+                                       do flex container. Como o flex tem z-30 e o drag-handle tem
+                                       z-20, esses 40px de padding INTERCEPTAVAM os toques que
+                                       deveriam ir pro drag-handle. Resultado: drag NÃO funcionava.
+                 AGORA: ml-10 (margin-left 40px) desloca o flex container pra x=40, deixando os
+                        primeiros 40px do card LIVRES pra receber toques do drag-handle (z-20).
+                 Foi um bug invisível: visualmente idêntico, mas a área de toque era diferente. -->
+            <div class="flex justify-between items-start z-30 relative ml-10">
                 <div class="flex flex-1 min-w-0 pr-2">
                     <div class="flex flex-col flex-1 min-w-0 pointer-events-auto">
                         <span ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition max-w-full" title="${isSearching ? '' : 'Alterar Horário'}">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
@@ -944,7 +951,7 @@ function drawBlock(block) {
                     </div>
                 </div>
                 
-                <div class="flex gap-1.5 shrink-0 relative z-50 pointer-events-auto select-auto">
+                <div class="flex gap-1.5 shrink-0 relative z-[60] pointer-events-auto select-auto">
                     <button onclick="toggleExpandBlock('${block.id}', event)" class="w-7 h-7 flex items-center justify-center ${btnBg} ${iconColor} rounded transition" title="Expandir/Recolher">
                         <i class="ph ${block.expanded ? 'ph-caret-up' : 'ph-caret-down'}"></i>
                     </button>

@@ -20,6 +20,7 @@ let pendingCloneType = '';
 let selectedTagId = null;
 let headerHidden = false; // V2.0 - Estado do header
 let themeColor = localStorage.getItem('tb_theme_color') || '#4f46e5';
+let searchQuery = ''; // V40.2.5: termo de busca por título do cartão
 
 // POPULA OS DROPDOWNS DO NOVO MENU DE JANELA DE HORÁRIOS
 const startSelect = document.getElementById('config-hour-start');
@@ -40,6 +41,10 @@ function getTodayStr() { return new Date().toLocaleDateString('en-CA'); }
 let db = JSON.parse(localStorage.getItem('tb_master_db'));
 let backlogDb = JSON.parse(localStorage.getItem('tb_backlog_db')) || [];
 let backlogSelectedDur = 30;
+
+// V40.1: Super Gabinete - Notas livres do dia
+let notesDb = JSON.parse(localStorage.getItem('tb_notes_db')) || [];
+let activeListTab = 'backlog'; // 'backlog' | 'routines' | 'notes'
 
 let periodsDb = JSON.parse(localStorage.getItem('tb_periods_db'));
 if (!periodsDb || periodsDb.length === 0) {
@@ -83,6 +88,7 @@ if (!db || db.length === 0) {
         if(!b.date) { b.date = getTodayStr(); modified = true; }
         if(!b.microblocks) { b.microblocks = []; modified = true; }
         if(b.tagId === undefined) { b.tagId = null; modified = true; } // NOVA MIGRAÇÃO DE TAG
+        if(!b.linkedNoteIds) { b.linkedNoteIds = []; modified = true; } // V40.2: notas vinculadas
     });
     if(modified) saveDb();
 }
@@ -109,6 +115,10 @@ window.deleteTag = function(id) {
         if(b.tagId === id) { b.tagId = null; modified = true; }
     });
     if(modified) { saveDb(); renderTimeline(); }
+    
+    // V40.2.9: atualiza a lista visual de tags na sheet (bug: antes ficava com tag fantasma)
+    renderTagsList();
+    showToast("Tag excluída!");
 }
 
 window.getTagColor = function(tagId) {
@@ -120,6 +130,7 @@ window.getTagColor = function(tagId) {
 let selectedNewTagColor = '#ef4444'; // Vermelho padrão
 
 window.openTagsSheet = () => {
+    clearFilters(); // V40.2.1: limpa filtros pra não confundir
     closeAllSheets();
     renderTagsList();
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
@@ -175,7 +186,7 @@ function renderTagSelector() {
     const container = document.getElementById('tag-selector-container');
     if(!container) return;
     container.className = 'flex gap-2 overflow-x-auto no-scrollbar pb-2 w-full';
-    let html = `<button onclick="selectTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${selectedTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem Tag</button>`;
+    let html = `<button onclick="selectTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${selectedTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem Tag</button>`;
     tagsDb.forEach(t => {
         const isActive = selectedTagId === t.id;
         const activeClass = isActive ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100';
@@ -191,18 +202,21 @@ function renderTagSelector() {
 
 // --- 3. AUTOMAÇÃO: O TEMPO E DIAS ---
 window.debugPreviousDay = function() {
+    if (searchQuery) closeSearchBar(); // V40.2.5: limpa busca ao trocar dia
     activeDateObj.setDate(activeDateObj.getDate() - 1);
     runRealTimeEngine();
     renderTimeline();
 }
 
 window.goToToday = function() {
+    if (searchQuery) closeSearchBar(); // V40.2.5: limpa busca ao trocar dia
     activeDateObj = new Date();
     runRealTimeEngine();
     renderTimeline();
 }
 
 window.debugAdvanceDay = function() {
+    if (searchQuery) closeSearchBar(); // V40.2.5: limpa busca ao trocar dia
     activeDateObj.setDate(activeDateObj.getDate() + 1);
     runRealTimeEngine();
     renderTimeline();
@@ -212,16 +226,9 @@ window.toggleFilterDelayed = function() {
     showOnlyDelayed = !showOnlyDelayed;
     showOnlyCompleted = false; 
     
-    const btn = document.getElementById('filter-delayed-btn');
-    const btnCompleted = document.getElementById('filter-completed-btn');
-    
-    if (showOnlyDelayed) {
-        btn.classList.replace('bg-indigo-50', 'bg-indigo-100');
-        btnCompleted.classList.replace('bg-emerald-100', 'bg-emerald-50');
-    } else {
-        btn.classList.replace('bg-indigo-100', 'bg-indigo-50');
-    }
-    
+    // V40.2.12: visual MUITO mais óbvio — quando ativo, vira CTA cheio (bg-app-focus + texto branco)
+    // antes só mudava 8% → 15% de opacidade, era imperceptível
+    updateFilterButtonsVisual();
     renderTimeline();
 }
 
@@ -229,17 +236,139 @@ window.toggleFilterCompleted = function() {
     showOnlyCompleted = !showOnlyCompleted;
     showOnlyDelayed = false; 
     
-    const btnCompleted = document.getElementById('filter-completed-btn');
+    updateFilterButtonsVisual();
+    renderTimeline();
+}
+
+// V40.2.12: atualiza visual dos botões de filtro de forma centralizada
+function updateFilterButtonsVisual() {
     const btnDelayed = document.getElementById('filter-delayed-btn');
+    const btnCompleted = document.getElementById('filter-completed-btn');
     
-    if (showOnlyCompleted) {
-        btnCompleted.classList.replace('bg-emerald-50', 'bg-emerald-100');
-        btnDelayed.classList.replace('bg-indigo-100', 'bg-indigo-50');
-    } else {
-        btnCompleted.classList.replace('bg-emerald-100', 'bg-emerald-50');
+    if (btnDelayed) {
+        if (showOnlyDelayed) {
+            // ATIVO: fundo sólido da cor do tema + ícone branco + ring pra reforçar
+            btnDelayed.className = 'bg-app-focus border-2 border-app-focus p-2 rounded-xl shadow-md ring-2 ring-app-focus-soft transition flex items-center justify-center shrink-0';
+            const icon = btnDelayed.querySelector('i');
+            if (icon) icon.className = 'ph-fill ph-info text-lg text-white';
+        } else {
+            // INATIVO: soft + ícone colorido
+            btnDelayed.className = 'bg-app-focus-soft border border-app-focus-soft p-2 rounded-xl hover:bg-app-focus-soft-strong transition flex items-center justify-center shrink-0';
+            const icon = btnDelayed.querySelector('i');
+            if (icon) icon.className = 'ph-bold ph-info text-lg text-app-focus';
+        }
     }
     
+    if (btnCompleted) {
+        if (showOnlyCompleted) {
+            // ATIVO: fundo verde sólido + ícone branco + ring
+            btnCompleted.className = 'bg-emerald-500 border-2 border-emerald-500 p-2 rounded-xl shadow-md ring-2 ring-emerald-100 transition flex items-center justify-center shrink-0';
+            const icon = btnCompleted.querySelector('i');
+            if (icon) icon.className = 'ph-fill ph-check-circle text-lg text-white';
+        } else {
+            // INATIVO: verde claro + ícone verde
+            btnCompleted.className = 'bg-emerald-50 border border-emerald-200 p-2 rounded-xl hover:bg-emerald-100 transition flex items-center justify-center shrink-0';
+            const icon = btnCompleted.querySelector('i');
+            if (icon) icon.className = 'ph-bold ph-check-circle text-lg text-emerald-500';
+        }
+    }
+}
+
+// V40.2.1: Limpa ambos os filtros e atualiza visual dos botões
+// V40.2.5: também limpa busca por nome
+// V40.2.12: usa updateFilterButtonsVisual em vez de replace manual
+window.clearFilters = function() {
+    const hadFilters = showOnlyDelayed || showOnlyCompleted;
+    const hadSearch = !!searchQuery;
+    if (!hadFilters && !hadSearch) return false; // nada a fazer
+    
+    showOnlyDelayed = false;
+    showOnlyCompleted = false;
+    
+    updateFilterButtonsVisual();
+    
+    // V40.2.5: limpa busca também
+    if (hadSearch) closeSearchBar();
+    
     renderTimeline();
+    return true;
+}
+
+// V40.2.5: Normaliza texto pra busca (remove acentos + lowercase)
+function normalizeText(str) {
+    if (!str) return '';
+    return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+// V40.2.5: Abre a barra de busca
+window.openSearchBar = function() {
+    // Limpa outros filtros pra evitar combinações confusas
+    if (showOnlyDelayed || showOnlyCompleted) {
+        showOnlyDelayed = false;
+        showOnlyCompleted = false;
+        updateFilterButtonsVisual(); // V40.2.12: usa função centralizada
+    }
+    
+    const row = document.getElementById('search-bar-row');
+    const cluster = document.getElementById('header-btns-cluster');
+    if (row) { row.classList.remove('hidden'); row.classList.add('flex'); }
+    if (cluster) cluster.classList.add('hidden');
+    
+    setTimeout(() => {
+        const input = document.getElementById('search-input');
+        if (input) input.focus();
+    }, 100);
+}
+
+// V40.2.11: handler de clique fora REMOVIDO.
+// Motivo: causava bugs (fechava ao tocar em áreas vazias do header que tinham pointer-events-none
+// e vazavam pra trás). A busca tem botão X bem visível e fecha automaticamente quando o usuário
+// muda de contexto (trocar dia, abrir FAB+, abrir menus). Não precisa do listener global.
+// Mantemos a função vazia pra retrocompatibilidade caso algo ainda a chame.
+function handleClickOutsideSearch(e) {
+    // Removido em V40.2.11 — busca só fecha via X explícito ou ações de troca de contexto
+    return;
+}
+
+window.closeSearchBar = function() {
+    searchQuery = '';
+    const input = document.getElementById('search-input');
+    if (input) input.value = '';
+    
+    const row = document.getElementById('search-bar-row');
+    const cluster = document.getElementById('header-btns-cluster');
+    if (row) { row.classList.add('hidden'); row.classList.remove('flex'); }
+    if (cluster) cluster.classList.remove('hidden');
+    
+    const counter = document.getElementById('search-counter');
+    if (counter) { counter.classList.add('hidden'); counter.innerText = ''; }
+    
+    // V40.2.11: listener de clique fora foi removido — não há mais nada pra limpar aqui
+    
+    renderTimeline();
+}
+
+window.onSearchInput = function(value) {
+    searchQuery = value || '';
+    renderTimeline();
+    // Atualizar contador após render
+    setTimeout(updateSearchCounter, 10);
+}
+
+// V40.2.5: Atualiza contador "X resultados de Y"
+// V40.2.6: agora conta em todos os dias do db
+function updateSearchCounter() {
+    const counter = document.getElementById('search-counter');
+    if (!counter) return;
+    if (!searchQuery.trim()) {
+        counter.classList.add('hidden');
+        counter.innerText = '';
+        return;
+    }
+    const q = normalizeText(searchQuery);
+    const matched = db.filter(b => normalizeText(b.title).includes(q)).length;
+    counter.innerText = `${matched} ${matched === 1 ? 'resultado' : 'resultados'} de "${searchQuery}"`;
+    counter.classList.remove('hidden');
 }
 
 function runRealTimeEngine() {
@@ -254,9 +383,14 @@ function runRealTimeEngine() {
         headerTitle.innerText = diffDays === 0 ? "Hoje" : (diffDays === 1 ? "Amanhã" : "Agenda");
     }
     
-    const options = { weekday: 'long', day: 'numeric', month: 'long' };
-    
-    let dateStr = activeDateObj.toLocaleDateString('pt-BR', options);
+    // V40.2.4: data com weekday completo sem "-feira" (Domingo, 10 mai)
+    const currentYear = new Date().getFullYear();
+    const activeYear = activeDateObj.getFullYear();
+    const opts = { weekday: 'long', day: 'numeric', month: 'short' };
+    if (activeYear !== currentYear) opts.year = '2-digit';
+    let dateStr = activeDateObj.toLocaleDateString('pt-BR', opts);
+    // Limpa "-feira" e pontos: "segunda-feira, 15 de mai." → "Segunda, 15 mai"
+    dateStr = dateStr.replace(/-feira/g, '').replace(/\./g, '').replace(/ de /g, ' ');
     dateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
     
     document.getElementById('header-date').innerHTML = 
@@ -339,7 +473,8 @@ const container = document.getElementById('blocks-container');
 function renderGrid() {
     // V3.0 - Bug 2.5: Modo filtro com altura automática
     const tlContainer = document.getElementById('timeline-container');
-    if (showOnlyDelayed || showOnlyCompleted) {
+    const isSearching = !!(searchQuery && searchQuery.trim());
+    if (showOnlyDelayed || showOnlyCompleted || isSearching) {
         tlContainer.style.height = 'auto';
     } else {
         tlContainer.style.height = `${TOTAL_MINS * PX_PER_MIN}px`;
@@ -364,6 +499,21 @@ function renderTimeline() {
     container.innerHTML = ''; 
     
     const timelineContainer = document.getElementById('timeline-container');
+    const isSearching = !!(searchQuery && searchQuery.trim());
+    
+    // V40.2.6: busca pesquisa em TODOS os dias e renderiza lista especial
+    if (isSearching) {
+        timelineContainer.classList.add('filter-list-mode');
+        timelineContainer.classList.add('search-mode'); // V40.2.10: padding menor pra busca
+        renderSearchResultsAllDays();
+        renderGrid();
+        updateSearchCounter();
+        return;
+    }
+    
+    // V40.2.10: garante que search-mode é removido fora de busca
+    timelineContainer.classList.remove('search-mode');
+    
     if (showOnlyDelayed || showOnlyCompleted) {
         timelineContainer.classList.add('filter-list-mode');
     } else {
@@ -376,7 +526,7 @@ function renderTimeline() {
     END_HOUR = storedEnd !== null ? parseInt(storedEnd) : 24;
     TOTAL_MINS = (END_HOUR - START_HOUR) * 60;
 
-    if (showOnlyDelayed || showOnlyCompleted) {
+    if (showOnlyDelayed || showOnlyCompleted || isSearching) {
         let filteredForWindow = db.filter(b => b.date === getActiveDateStr());
         
         if (showOnlyDelayed) {
@@ -384,6 +534,10 @@ function renderTimeline() {
         }
         if (showOnlyCompleted) {
             filteredForWindow = filteredForWindow.filter(b => b.completed === true);
+        }
+        if (isSearching) {
+            const q = normalizeText(searchQuery);
+            filteredForWindow = filteredForWindow.filter(b => normalizeText(b.title).includes(q));
         }
         
         if (filteredForWindow.length > 0) {
@@ -406,6 +560,12 @@ function renderTimeline() {
 
     if (showOnlyCompleted) {
         dailyDb = dailyDb.filter(b => b.completed === true);
+    }
+
+    // V40.2.5: filtro de busca por nome (normaliza acentos, case-insensitive)
+    if (searchQuery && searchQuery.trim()) {
+        const q = normalizeText(searchQuery);
+        dailyDb = dailyDb.filter(b => normalizeText(b.title).includes(q));
     }
 
     dailyDb = dailyDb.filter(b => b.startMin < END_HOUR * 60 && (b.startMin + b.duration) > START_HOUR * 60);
@@ -436,13 +596,122 @@ function renderTimeline() {
     renderQueue.forEach(block => drawBlock(block));
 }
 
+// V40.2.6: Renderiza resultados de busca de TODOS os dias como lista
+function renderSearchResultsAllDays() {
+    const q = normalizeText(searchQuery);
+    const today = getTodayStr();
+    
+    // Pega TODOS os blocos do db (qualquer data) que batem com a busca
+    let results = db.filter(b => normalizeText(b.title).includes(q));
+    
+    // Ordena por data (crescente) e depois por hora
+    results.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.startMin - b.startMin;
+    });
+    
+    if (results.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-12 px-4">
+                <div class="w-16 h-16 rounded-2xl bg-app-focus-soft text-app-focus flex items-center justify-center mx-auto mb-4">
+                    <i class="ph ph-magnifying-glass text-3xl"></i>
+                </div>
+                <p class="text-sm font-medium text-zinc-600">Nenhum cartão encontrado</p>
+                <p class="text-xs text-zinc-400 mt-1">Tente outro termo de busca</p>
+            </div>
+        `;
+        document.getElementById('progress-bar').style.width = '0%';
+        document.getElementById('progress-text').innerText = 'Busca';
+        return;
+    }
+    
+    // V40.2.7: agrupa por data e renderiza selo + drawBlock pra cada
+    // (drawBlock dá ao card TODAS as funcionalidades: expandir, marcar concluído, microblocks, notas, etc.)
+    // V40.2.13: selo agora é CLICÁVEL — toca pra ir direto pro dia (e sem cursor de texto piscando)
+    let lastDate = null;
+    results.forEach(b => {
+        // Selo de data antes do primeiro card de cada dia
+        if (b.date !== lastDate) {
+            const dateLabel = formatSearchDate(b.date, today);
+            const seal = document.createElement('div');
+            seal.className = 'search-date-seal';
+            // V40.2.13: span clicável + select-none pra não mostrar cursor de texto
+            seal.innerHTML = `<span onclick="goToDateFromSearch('${b.date}')" class="text-[11px] font-bold text-app-focus uppercase tracking-wider px-3 py-1 rounded-full bg-app-focus-soft border border-app-focus-soft inline-flex items-center gap-1.5 cursor-pointer hover:bg-app-focus-soft-strong active:scale-95 transition select-none" style="-webkit-touch-callout: none; -webkit-user-select: none; user-select: none;" title="Ir para ${dateLabel}"><i class="ph ph-arrow-right text-[10px]"></i>${dateLabel}</span>`;
+            container.appendChild(seal);
+            lastDate = b.date;
+        }
+        
+        // V40.2.7: drawBlock dá card completo com todas as ações
+        drawBlock(b);
+    });
+    
+    // Limpar progress
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('progress-text').innerText = `${results.length} ${results.length === 1 ? 'resultado' : 'resultados'}`;
+}
+
+// V40.2.6: Formata data pra exibição na lista de busca (Hoje / Ontem / data completa)
+function formatSearchDate(dateStr, todayStr) {
+    if (dateStr === todayStr) return 'Hoje';
+    
+    // Calcular diferença em dias usando UTC midday pra evitar problemas de fuso
+    const d = new Date(dateStr + 'T12:00:00');
+    const t = new Date(todayStr + 'T12:00:00');
+    const diffDays = Math.round((d - t) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === -1) return 'Ontem';
+    if (diffDays === 1) return 'Amanhã';
+    
+    // Outro dia: formato "Seg, 12 mai"
+    const opts = { weekday: 'short', day: 'numeric', month: 'short' };
+    let s = d.toLocaleDateString('pt-BR', opts);
+    s = s.replace(/\./g, '').replace(/ de /g, ' ');
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// V40.2.6: Clica num resultado de busca → vai pro dia daquele card
+window.goToBlockFromSearch = function(blockId) {
+    const block = db.find(b => b.id === blockId);
+    if (!block) return;
+    
+    // Fecha busca e zera query
+    closeSearchBar();
+    
+    // Pula pro dia do bloco
+    activeDateObj = new Date(block.date + 'T12:00:00');
+    runRealTimeEngine();
+    renderTimeline();
+    
+    // Pequeno toast pra feedback
+    setTimeout(() => showToast(`Indo pra ${formatSearchDate(block.date, getTodayStr())}`), 100);
+}
+
+// V40.2.13: Clica no selo de data → vai pro dia daquele grupo
+window.goToDateFromSearch = function(dateStr) {
+    if (!dateStr) return;
+    const today = getTodayStr();
+    const label = formatSearchDate(dateStr, today);
+    
+    closeSearchBar();
+    
+    activeDateObj = new Date(dateStr + 'T12:00:00');
+    runRealTimeEngine();
+    renderTimeline();
+    
+    setTimeout(() => showToast(`Indo pra ${label}`), 100);
+}
+
 function drawBlock(block) {
     const topPx = (block.startMin - (START_HOUR * 60)) * PX_PER_MIN;
     const heightPx = (block.duration * PX_PER_MIN) - 2; 
 
+    // V40.2.9: detecta modo busca pra neutralizar o atalho de horário (que estava capturando toques na área do card)
+    const isSearching = !!(searchQuery && searchQuery.trim());
+
     const el = document.createElement('div');
     el.className = 'absolute left-1 right-1 rounded-2xl overflow-hidden transition-all duration-300 z-10 flex flex-col';
     el.classList.add('block-item'); 
+    el.dataset.blockId = block.id; // V40.1.3: identificação para click-out auto-retrair
 
     if (!showOnlyDelayed && !showOnlyCompleted) {
         el.style.top = `${topPx + 1}px`;
@@ -473,12 +742,20 @@ function drawBlock(block) {
 
         let bgClass = block.completed ? 'bg-emerald-100 border-emerald-200' : (isRest ? 'bg-emerald-50 border-emerald-300' : 'bg-app-focus border-transparent shadow-md');
         if (isPast && !block.completed) {
-            bgClass = isRest ? 'bg-zinc-50 border-zinc-200 opacity-80 saturate-50' : 'bg-indigo-50 border-indigo-200 opacity-80 saturate-50';
+            bgClass = isRest ? 'bg-zinc-50 border-zinc-200 opacity-80 saturate-50' : 'bg-app-focus-soft border-app-focus-soft opacity-80 saturate-50';
         } else if (isPast && block.completed) {
             bgClass = 'bg-emerald-50 border-emerald-200 opacity-80 saturate-50';
         }
         const tagColor = getTagColor(block.tagId);
-        let borderStyle = tagColor && !block.completed ? `border-left-width: 4px; border-left-color: ${tagColor};` : '';
+        // V40.2.14: tag agora tem destaque claro mesmo quando bate com cor do card.
+        //   - borda lateral colorida com 5px (era 4px)
+        //   - inset shadow projeta linha branca de 1px logo após a borda colorida,
+        //     separando visualmente a faixa da tag do conteúdo. Funciona em qualquer combinação:
+        //     se card é roxo + tag roxa → linha branca cria contraste; se card é branco + tag clara
+        //     → linha branca quase invisível, mas a borda colorida já se vê no fundo claro.
+        let borderStyle = tagColor 
+            ? `border-left-width: 5px; border-left-color: ${tagColor}; box-shadow: inset 6px 0 0 -5px rgba(255,255,255,0.7);`
+            : '';
 
         const isMicro = !block.expanded && block.duration <= 25;
         if (block.expanded) {
@@ -519,8 +796,9 @@ function drawBlock(block) {
             <div class="flex-1 overflow-y-auto no-scrollbar mt-2 mb-2 z-20 relative pointer-events-auto ${!block.expanded && block.duration <= 25 ? 'hidden' : ''}">
                 ${microHtml}
                 <div class="mt-1">
-                    <input type="text" id="micro-input-${block.id}" placeholder="+ adicionar microbloco" class="microblock-input w-full rounded-md px-2 py-1.5 text-[10px] font-medium outline-none transition-colors border ${mbInputClasses}" onkeypress="if(event.key==='Enter') addMicroblock('${block.id}', this, event)">
+                    <input type="text" id="micro-input-${block.id}" placeholder="+ Adicionar Check" class="microblock-input w-full rounded-md px-2 py-1.5 text-[10px] font-medium outline-none transition-colors border ${mbInputClasses}" onkeypress="if(event.key==='Enter') addMicroblock('${block.id}', this, event)">
                 </div>
+                ${renderLinkedNotesSection(block, isDarkTheme)}
             </div>
         `;
 
@@ -535,11 +813,11 @@ function drawBlock(block) {
                         <i class="ph ph-dots-six-vertical"></i>
                     </div>
                     <div class="flex flex-col flex-1 min-w-0 pointer-events-auto">
-                        <span onclick="openTimePicker('${block.id}', ${block.startMin}, event)" class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate cursor-pointer hover:opacity-70 hover:underline transition w-fit" title="Alterar Horário">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
+                        <span ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition max-w-full" title="${isSearching ? '' : 'Alterar Horário'}">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
                         <div class="title-wrapper flex items-center ${isMicro ? 'mt-0' : 'mt-0.5'} min-w-0 pointer-events-none">
                             ${pastIconHtml}
                             <h3 class="block-title ${isMicro ? 'text-[13px] mt-0' : 'text-[14px]'} font-bold leading-tight truncate ${titleClass}">${block.title}</h3>
-                            <span class="micro-time ${isMicro ? 'block' : 'hidden'} text-[11px] font-bold ${timeColor} ml-1 shrink-0 cursor-pointer hover:opacity-70 hover:underline transition pointer-events-auto" onclick="openTimePicker('${block.id}', ${block.startMin}, event)" title="Alterar Horário">&bull; <span class="micro-time-val">${formatDur(block.duration)}</span></span>
+                            <span class="micro-time ${isMicro ? 'block' : 'hidden'} text-[11px] font-bold ${timeColor} ml-1 shrink-0 ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition pointer-events-auto" ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} title="${isSearching ? '' : 'Alterar Horário'}">&bull; <span class="micro-time-val">${formatDur(block.duration)}</span></span>
                         </div>
                     </div>
                 </div>
@@ -592,10 +870,15 @@ function performEncaixeMatematico(gapStart, gapDuration) {
         startMin: start, 
         duration: pendingIntent.duration,
         date: getActiveDateStr(),
-        microblocks: [],
+        microblocks: (pendingIntent.microblocks || []).map(mb => ({
+            ...mb,
+            id: 'mb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+            done: false // V40.1.4: clone reseta status (recomeça do zero)
+        })),
         completed: false,
         theme: pendingIntent.theme || 'focus',
-        tagId: pendingIntent.tagId || null
+        tagId: pendingIntent.tagId || null,
+        linkedNoteIds: [] // V40.2: notas vinculadas começam vazias (clone não copia notas)
     });
     saveDb();
     cancelPendingTask(); 
@@ -625,13 +908,21 @@ window.duplicateTask = function(id, e) {
 
 window.cloneManual = function() {
     if(!taskToClone) return;
-    pendingIntent = { title: taskToClone.title, duration: taskToClone.duration, theme: taskToClone.theme || 'focus' };
+    pendingIntent = { 
+        title: taskToClone.title, 
+        duration: taskToClone.duration, 
+        theme: taskToClone.theme || 'focus',
+        tagId: taskToClone.tagId || null, // V40.1.4: preserva tag
+        microblocks: taskToClone.microblocks || [] // V40.1.4: copia microblocks
+    };
     selectedDur = taskToClone.duration;
     document.getElementById('floating-title').innerText = taskToClone.title;
     syncDurButtons(selectedDur);
     document.getElementById('floating-task').classList.remove('hidden');
     document.getElementById('floating-task').classList.add('flex');
     closeAllSheets();
+    // V40.2.8: se estava na busca, fecha pra mostrar a agenda (Cópia única precisa colar em espaço livre)
+    if (searchQuery) closeSearchBar();
     renderTimeline();
     showToast("Pronto para colar! Navegue até o dia e toque num espaço livre.");
 }
@@ -663,10 +954,11 @@ window.confirmCloneQtd = function() {
         else if(pendingCloneType === 'weekly') nextDate = addDaysToDateStr(taskToClone.date, i * 7);
         else if(pendingCloneType === 'monthly') nextDate = addMonthToDateStr(taskToClone.date, i);
 
-        db.push({...taskToClone, id: 'f_' + Date.now() + '_' + Math.random(), date: nextDate, microblocks: (taskToClone.microblocks || []).map(mb => ({...mb, id: 'mb_' + Date.now() + Math.random(), done: false})), completed: false, expanded: false});
+        db.push({...taskToClone, id: 'f_' + Date.now() + '_' + Math.random(), date: nextDate, microblocks: (taskToClone.microblocks || []).map(mb => ({...mb, id: 'mb_' + Date.now() + Math.random(), done: false})), completed: false, expanded: false, linkedNoteIds: []});
     }
     saveDb();
     closeAllSheets();
+    renderTimeline(); // V40.2.8: re-render pra atualizar lista de busca se estiver ativa
     showToast(`Clonado com sucesso!`);
 }
 
@@ -684,11 +976,69 @@ window.killTask = function(id, e) {
 window.toggleExpandBlock = function(id, e) {
     e.stopPropagation();
     let b = db.find(x => x.id === id);
-    if(b) {
-        b.expanded = !b.expanded;
-        renderTimeline();
+    if(!b) return;
+    
+    const willExpand = !b.expanded;
+    
+    if (willExpand) {
+        // V40.1.3: regra "1 por vez" — retrai todos os outros antes
+        db.forEach(x => { if (x.id !== id) x.expanded = false; });
     }
+    
+    b.expanded = willExpand;
+    renderTimeline();
 }
+
+// V40.1.3: Auto-retrair cards expandidos
+// Helper: retrai todos os cards e re-renderiza apenas se algo mudou
+function collapseAllBlocks() {
+    let changed = false;
+    db.forEach(b => { if (b.expanded) { b.expanded = false; changed = true; } });
+    if (changed) renderTimeline();
+}
+
+// Flag para evitar retração durante drag/resize (a física já gerencia o expanded)
+let isPhysicsBusy = false;
+
+// 3a) Click-out: clicar na timeline fora de um card expandido retrai todos
+// Usamos delegação no #timeline-scroll, capturando na fase de bubbling
+(function setupClickOutCollapse() {
+    const timeline = document.getElementById('timeline-scroll');
+    if (!timeline) return;
+    timeline.addEventListener('click', (e) => {
+        if (isPhysicsBusy) return;
+        // Se o click foi dentro de um card que ESTÁ expandido, ignora
+        // (operações dentro do card como microbloco, lápis, lixeira, etc continuam funcionando)
+        const blockEl = e.target.closest('.block-item');
+        if (blockEl) {
+            const id = blockEl.dataset.blockId;
+            const b = id ? db.find(x => x.id === id) : null;
+            if (b && b.expanded) return; // click dentro do expandido — não fazer nada
+        }
+        // Click fora de qualquer card expandido (área vazia, ou em card retraído sem afetá-lo)
+        collapseAllBlocks();
+    });
+})();
+
+// 3b) Scroll com threshold: precisa rolar > 30px para retrair (evita acidente)
+//     Debounce: só reage 120ms após o usuário parar de rolar (suaviza)
+(function setupScrollCollapse() {
+    const timeline = document.getElementById('timeline-scroll');
+    if (!timeline) return;
+    let scrollStartY = null;
+    let scrollDebounce = null;
+    const THRESHOLD = 30; // px
+    timeline.addEventListener('scroll', () => {
+        if (isPhysicsBusy) return;
+        if (scrollStartY === null) scrollStartY = timeline.scrollTop;
+        clearTimeout(scrollDebounce);
+        scrollDebounce = setTimeout(() => {
+            const delta = Math.abs(timeline.scrollTop - scrollStartY);
+            if (delta > THRESHOLD) collapseAllBlocks();
+            scrollStartY = null;
+        }, 120);
+    }, { passive: true });
+})();
 
 // --- 6. A FÍSICA MALEÁVEL ---
 function enablePhysics(el, block) {
@@ -699,6 +1049,7 @@ function enablePhysics(el, block) {
 
     function onDragStart(e) {
         e.preventDefault(); e.stopPropagation();
+        isPhysicsBusy = true; // V40.1.3: bloquear auto-retrair durante drag
         startY = e.touches ? e.touches[0].clientY : e.clientY;
         initialVal = block.startMin;
         el.classList.add('dragging');
@@ -753,10 +1104,13 @@ function enablePhysics(el, block) {
             saveDb();
             renderTimeline();
         }
+        // V40.1.3: liberar auto-retrair após pequeno delay (ignora scroll/click residuais do dragend)
+        setTimeout(() => { isPhysicsBusy = false; }, 200);
     }
 
     function onResizeStart(e) {
         e.preventDefault(); e.stopPropagation();
+        isPhysicsBusy = true; // V40.1.3: bloquear auto-retrair durante resize
         startY = e.touches ? e.touches[0].clientY : e.clientY;
         initialVal = block.duration;
         
@@ -801,6 +1155,8 @@ function enablePhysics(el, block) {
         block.expanded = false; 
         saveDb();
         renderTimeline(); 
+        // V40.1.3: liberar auto-retrair após pequeno delay
+        setTimeout(() => { isPhysicsBusy = false; }, 200);
     }
 
     dragger.addEventListener('touchstart', onDragStart, {passive: false});
@@ -832,7 +1188,7 @@ function syncDurButtons(mins) {
 function syncBacklogDurButtons(mins) {
     document.querySelectorAll('.backlog-dur-btn').forEach(b => {
         b.className = 'backlog-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm whitespace-nowrap hover:bg-zinc-100 transition';
-        if(parseInt(b.dataset.time) === mins) b.className = 'backlog-dur-btn px-4 py-2 rounded-full bg-zinc-900 border border-zinc-900 text-white text-sm font-medium whitespace-nowrap shadow-md transition';
+        if(parseInt(b.dataset.time) === mins) b.className = 'backlog-dur-btn px-4 py-2 rounded-full bg-app-focus border border-app-focus text-white text-sm font-medium whitespace-nowrap shadow-md transition';
     });
 }
 
@@ -856,6 +1212,7 @@ window.changeFloatDuration = function(mins) {
 }
 
 window.openSheet = () => {
+    clearFilters(); // V40.2.1: limpa filtros pra não confundir
     document.getElementById('config-sheet').classList.add('translate-y-full');
     document.getElementById('period-select-sheet').classList.add('translate-y-full');
     
@@ -864,10 +1221,17 @@ window.openSheet = () => {
 
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     sheet.classList.remove('translate-y-full');
+    
+    // V40.1.4: foco automático no input após animação do sheet (350ms)
+    setTimeout(() => {
+        const taskInput = document.getElementById('task-input');
+        if (taskInput) taskInput.focus();
+    }, 350);
 }
 
 window.openListSheet = () => {
-    renderBacklog();
+    clearFilters(); // V40.2.1: limpa filtros pra não confundir
+    switchListTab('backlog'); // V40.1: sempre abrir na aba Banco
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     listSheet.classList.remove('translate-y-full');
 }
@@ -883,6 +1247,19 @@ window.closeAllSheets = () => {
     document.getElementById('clone-qtd-modal').classList.remove('flex');
     document.getElementById('tags-sheet').classList.add('translate-y-full');
     document.getElementById('reports-sheet').classList.add('translate-y-full');
+    // V40.2: fechar sheets de vincular notas
+    const linkSheet = document.getElementById('link-note-sheet');
+    if (linkSheet) linkSheet.classList.add('translate-y-full');
+    const linkedView = document.getElementById('linked-note-view-modal');
+    if (linkedView) { linkedView.classList.add('hidden'); linkedView.classList.remove('flex'); }
+    activeLinkBlockId = null;
+    viewingLinkedNoteId = null;
+    viewingLinkedFromBlockId = null;
+    pendingLinkBlockId = null; // V40.2.1
+    
+    // V40.2.2: fechar modal de pensamento do dia
+    const thoughtModal = document.getElementById('thought-modal');
+    if (thoughtModal) { thoughtModal.classList.add('hidden'); thoughtModal.classList.remove('flex'); }
     
     cancelEdit();
     cancelDelete();
@@ -934,7 +1311,13 @@ window.openPeriodSelectSheet = () => {
     document.getElementById('period-select-sheet').classList.remove('translate-y-full');
 }
 
+window.comingSoonMetas = () => {
+    // V40.1.6: Placeholder para futuro recurso de Metas
+    showToast("Metas chegando em breve! 🎯");
+}
+
 window.openConfigSheet = () => {
+    clearFilters(); // V40.2.1: limpa filtros pra não confundir
     sheet.classList.add('translate-y-full'); 
     
     document.getElementById('config-periods-view').classList.add('hidden');
@@ -1032,7 +1415,8 @@ window.commitPeriodBlock = (periodId) => {
         date: getActiveDateStr(),
         microblocks: [],
         completed: false,
-        theme: 'focus'
+        theme: 'focus',
+        linkedNoteIds: [] // V40.2
     });
     saveDb();
     input.value = '';
@@ -1180,7 +1564,7 @@ function renderBacklog() {
                 </div>
             </div>
             <div class="flex gap-2 shrink-0">
-                <button onclick="scheduleBacklogItem('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl hover:bg-indigo-500 hover:text-white transition-colors" title="Segurar e Agendar">
+                <button onclick="scheduleBacklogItem('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-app-focus-soft border border-app-focus-soft text-app-focus rounded-xl hover:bg-app-focus-soft-strong transition-colors" title="Segurar e Agendar">
                     <i class="ph ph-hand-grabbing text-lg"></i>
                 </button>
                 <button onclick="deleteBacklogItem('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-red-50 border border-red-100 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors" title="Apagar">
@@ -1189,6 +1573,601 @@ function renderBacklog() {
             </div>
         </div>
     `}).join('');
+}
+
+// =====================================================
+// V40.2.2 - PENSAMENTO DO DIA (50 frases motivacionais curtas)
+// =====================================================
+
+const THOUGHTS_OF_DAY = [
+    "Comece pelo passo mais fácil. O resto vem.",
+    "Você não precisa estar pronto. Só precisa começar.",
+    "Pequeno avanço hoje > inércia perfeita.",
+    "Respira. Está tudo no seu tempo.",
+    "O que você faz agora vira o você de amanhã.",
+    "Disciplina é amor próprio em movimento.",
+    "Não desista no dia ruim. Ele é só um dia.",
+    "Foco é dizer não pra coisas boas em nome do essencial.",
+    "Sua atenção é o presente mais raro que você tem.",
+    "Acabar é melhor que perfeito.",
+    "Confia no processo, mesmo quando não vê o resultado.",
+    "Hoje é o melhor dia pra recomeçar.",
+    "Você tá fazendo o suficiente. De verdade.",
+    "O cansaço passa. O orgulho de ter feito fica.",
+    "Faça uma coisa por vez. Faça bem feito.",
+    "Não compare seu capítulo 3 com o capítulo 20 dos outros.",
+    "Persistência vence talento sem disciplina.",
+    "Tudo que importa exige presença, não pressa.",
+    "Você é maior do que o pior dia da sua semana.",
+    "Aja. A motivação chega depois.",
+    "A versão de você que termina é diferente da que começa.",
+    "Você não está atrasado. Está no seu próprio tempo.",
+    "O importante não é o tamanho do passo, é a direção.",
+    "Cuide do agora. O futuro se cuida sozinho.",
+    "Coragem é fazer com medo.",
+    "Quem se compara, se afasta de si mesmo.",
+    "Resultado é consequência. Cuide do hábito.",
+    "Você não precisa ser perfeito hoje. Só precisa aparecer.",
+    "Diga não às distrações. Diga sim aos seus sonhos.",
+    "Cada bloco concluído é um voto pra quem você quer ser.",
+    "A vida acontece nos pequenos momentos de foco.",
+    "Sua rotina constrói seu futuro mais que sua ambição.",
+    "Não negocie com a procrastinação. Comece.",
+    "Você merece o esforço que dedica aos outros.",
+    "O dia não precisa ser perfeito pra ser produtivo.",
+    "Faça hoje o que seu eu de amanhã vai agradecer.",
+    "Calma. Foco. Coragem. Repete.",
+    "Nem todo dia rende. E tudo bem.",
+    "A pressa é inimiga da intenção.",
+    "Pequenos passos diários movem montanhas.",
+    "Você é o que repete. Repita o que importa.",
+    "Aceitar o ritmo é mais sábio que lutar contra ele.",
+    "Não é sobre tempo. É sobre prioridade.",
+    "Faça por amor, não por culpa.",
+    "Você está mais perto do que pensa.",
+    "Cada minuto bem gasto é uma vitória silenciosa.",
+    "O foco é o novo luxo.",
+    "Não trabalhe duro. Trabalhe com intenção.",
+    "Hoje é um bom dia pra ser gentil consigo.",
+    "Você não precisa fazer tudo. Só o que importa."
+];
+
+// V40.2.5: Verifica se o pensamento de hoje já foi lido e esconde o botão
+function updateThoughtBtnVisibility() {
+    const btn = document.getElementById('thought-btn-wrap');
+    if (!btn) return;
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const lastRead = localStorage.getItem('tb_thought_read_date');
+    if (lastRead === today) {
+        btn.style.display = 'none';
+    } else {
+        btn.style.display = '';
+    }
+}
+
+// Mostra o modal com a "frase do dia" (mesma frase por 24h, baseada na data)
+window.showThoughtOfDay = function() {
+    // Índice baseado na data atual (mesma frase o dia todo)
+    const today = new Date();
+    const daysSinceEpoch = Math.floor(today.getTime() / (1000 * 60 * 60 * 24));
+    const idx = daysSinceEpoch % THOUGHTS_OF_DAY.length;
+    
+    const textEl = document.getElementById('thought-text');
+    if (textEl) textEl.innerText = THOUGHTS_OF_DAY[idx];
+    
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    const modal = document.getElementById('thought-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+window.closeThoughtModal = function() {
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    const modal = document.getElementById('thought-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    
+    // V40.2.5: Nuvem Passageira - marca como lida e esconde o botão até amanhã
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    localStorage.setItem('tb_thought_read_date', todayStr);
+    updateThoughtBtnVisibility();
+}
+
+// =====================================================
+// V40.2 - VINCULAR NOTAS A CARDS
+// =====================================================
+
+// Estado: qual card está abrindo a sheet de "Adicionar nota" / qual nota está aberta no modal
+let activeLinkBlockId = null;
+let viewingLinkedNoteId = null;
+let viewingLinkedFromBlockId = null;
+
+// Renderiza a seção de notas vinculadas dentro de um card expandido
+function renderLinkedNotesSection(block, isDarkTheme) {
+    const linkedIds = block.linkedNoteIds || [];
+    const validNotes = linkedIds
+        .map(id => notesDb.find(n => n.id === id))
+        .filter(n => n); // remove ids órfãos (nota apagada)
+    
+    const linkedHtml = validNotes.map(n => {
+        const label = n.title || n.content.slice(0, 30) + (n.content.length > 30 ? '…' : '');
+        const labelClass = isDarkTheme ? 'text-white/85' : 'text-black/75';
+        const iconClass = isDarkTheme ? 'text-white/60' : 'text-black/50';
+        const bgClass = isDarkTheme ? 'bg-black/15 hover:bg-black/25' : 'bg-black/[0.04] hover:bg-black/[0.08]';
+        return `
+            <div onclick="viewLinkedNote('${block.id}', '${n.id}', event)" class="flex items-center gap-1.5 ${bgClass} rounded-md px-2 py-1.5 cursor-pointer transition-colors mt-1">
+                <i class="ph ph-note-pencil text-[12px] ${iconClass} shrink-0"></i>
+                <span class="text-[11px] font-medium leading-tight flex-1 ${labelClass} truncate">${escapeHtml(label)}</span>
+            </div>
+        `;
+    }).join('');
+    
+    const btnClass = isDarkTheme
+        ? 'bg-black/15 hover:bg-black/25 text-white/80 border-white/10'
+        : 'bg-black/[0.04] hover:bg-black/[0.08] text-black/60 border-black/[0.08]';
+    
+    return `
+        <div class="mt-3 pt-2 border-t ${isDarkTheme ? 'border-white/10' : 'border-black/[0.06]'}">
+            ${linkedHtml}
+            <button onclick="openLinkNoteSheet('${block.id}', event)" class="mt-1 w-full flex items-center justify-center gap-1.5 ${btnClass} rounded-md px-2 py-1.5 text-[10px] font-medium border transition-colors">
+                <i class="ph ph-plus text-[11px]"></i> Adicionar nota
+            </button>
+        </div>
+    `;
+}
+
+// Abre a sheet de escolha (Criar nova / Vincular existente)
+window.openLinkNoteSheet = function(blockId, e) {
+    if (e) e.stopPropagation();
+    activeLinkBlockId = blockId;
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('link-note-sheet').classList.remove('translate-y-full');
+    // Reset visual: mostrar opções, esconder lista
+    document.getElementById('link-note-options').classList.remove('hidden');
+    document.getElementById('link-note-existing-view').classList.add('hidden');
+}
+
+window.closeLinkNoteSheet = function() {
+    activeLinkBlockId = null;
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    document.getElementById('link-note-sheet').classList.add('translate-y-full');
+}
+
+// V40.2.1: ID do bloco aguardando vincular nota recém-criada (após save no form)
+let pendingLinkBlockId = null;
+
+// Opção "Criar nova": abre form em modo "criação ligada ao bloco"
+window.chooseCreateNewNote = function() {
+    if (!activeLinkBlockId) return;
+    const blockIdToLink = activeLinkBlockId; // V40.2.14: salva ANTES de closeAllSheets zerar tudo
+    
+    // V40.2.14: closeAllSheets em vez de só closeLinkNoteSheet — evita sheets sobrepostas
+    closeAllSheets();
+    
+    pendingLinkBlockId = blockIdToLink; // V40.2.14: re-seta DEPOIS do closeAllSheets pra addNote vincular
+    
+    // Abre form de criar nota direto na aba Notas
+    setTimeout(() => {
+        document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+        document.getElementById('list-sheet').classList.remove('translate-y-full');
+        switchListTab('notes');
+        openNoteForm(); // abre form em modo criação
+    }, 320);
+}
+
+// Opção "Vincular existente": mostra lista de notas (com busca se > 10)
+window.chooseLinkExistingNote = function() {
+    document.getElementById('link-note-options').classList.add('hidden');
+    document.getElementById('link-note-existing-view').classList.remove('hidden');
+    renderExistingNotesList('');
+    // Foco na busca após reflow
+    setTimeout(() => {
+        const searchInput = document.getElementById('link-note-search');
+        if (searchInput && notesDb.length > 10) searchInput.focus();
+    }, 50);
+}
+
+// Volta da lista de existentes pra opções iniciais
+window.backToLinkOptions = function() {
+    document.getElementById('link-note-existing-view').classList.add('hidden');
+    document.getElementById('link-note-options').classList.remove('hidden');
+    const searchInput = document.getElementById('link-note-search');
+    if (searchInput) searchInput.value = '';
+}
+
+// Renderiza lista de notas existentes (com filtro opcional)
+window.renderExistingNotesList = function(filter) {
+    const container = document.getElementById('link-note-existing-list');
+    const searchWrapper = document.getElementById('link-note-search-wrapper');
+    if (!container) return;
+    
+    // Esconder busca se ≤ 10 notas (Opção Híbrida Jules)
+    if (notesDb.length <= 10) {
+        searchWrapper.classList.add('hidden');
+    } else {
+        searchWrapper.classList.remove('hidden');
+    }
+    
+    // Excluir notas já vinculadas ao bloco atual
+    const block = db.find(b => b.id === activeLinkBlockId);
+    const alreadyLinked = (block && block.linkedNoteIds) ? block.linkedNoteIds : [];
+    
+    // Filtro por título OU conteúdo (case insensitive)
+    const f = (filter || '').toLowerCase().trim();
+    const filtered = notesDb.filter(n => {
+        if (alreadyLinked.includes(n.id)) return false;
+        if (!f) return true;
+        return (n.title || '').toLowerCase().includes(f) || (n.content || '').toLowerCase().includes(f);
+    });
+    
+    if (filtered.length === 0) {
+        const msg = notesDb.length === 0
+            ? 'Você ainda não tem notas. Use "Criar nova" para começar.'
+            : (alreadyLinked.length === notesDb.length
+                ? 'Todas as suas notas já estão vinculadas a este card.'
+                : 'Nenhuma nota encontrada com esse termo.');
+        container.innerHTML = `<p class="text-xs text-zinc-400 text-center py-6 px-4">${msg}</p>`;
+        return;
+    }
+    
+    container.innerHTML = filtered.map(n => {
+        const title = n.title || '<span class="text-zinc-400 italic">Sem título</span>';
+        const preview = (n.content || '').slice(0, 60) + ((n.content || '').length > 60 ? '…' : '');
+        return `
+            <button onclick="linkExistingNoteToBlock('${n.id}')" class="w-full text-left p-3 rounded-xl bg-zinc-50 border border-zinc-200 hover:bg-zinc-100 active:scale-[0.99] transition mb-1.5">
+                <p class="text-sm font-bold text-zinc-800 truncate">${title}</p>
+                ${preview ? `<p class="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">${escapeHtml(preview)}</p>` : ''}
+            </button>
+        `;
+    }).join('');
+}
+
+// Vincula nota existente ao bloco
+window.linkExistingNoteToBlock = function(noteId) {
+    if (!activeLinkBlockId) return;
+    const block = db.find(b => b.id === activeLinkBlockId);
+    if (!block) return;
+    if (!block.linkedNoteIds) block.linkedNoteIds = [];
+    if (!block.linkedNoteIds.includes(noteId)) {
+        block.linkedNoteIds.push(noteId);
+        saveDb();
+    }
+    closeLinkNoteSheet();
+    showToast('Nota vinculada!');
+    renderTimeline();
+}
+
+// Abre modal de leitura ao tocar uma nota vinculada no card
+window.viewLinkedNote = function(blockId, noteId, e) {
+    if (e) e.stopPropagation();
+    const note = notesDb.find(n => n.id === noteId);
+    if (!note) return;
+    
+    viewingLinkedNoteId = noteId;
+    viewingLinkedFromBlockId = blockId;
+    
+    document.getElementById('linked-note-view-title').innerText = note.title || 'Sem título';
+    
+    const contentEl = document.getElementById('linked-note-view-content');
+    if (note.content) {
+        contentEl.innerHTML = `<p class="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap break-words">${escapeHtml(note.content)}</p>`;
+    } else {
+        contentEl.innerHTML = `<p class="text-xs text-zinc-400 italic">Esta nota está vazia.</p>`;
+    }
+    
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('linked-note-view-modal').classList.remove('hidden');
+    document.getElementById('linked-note-view-modal').classList.add('flex');
+}
+
+window.closeLinkedNoteView = function() {
+    viewingLinkedNoteId = null;
+    viewingLinkedFromBlockId = null;
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    document.getElementById('linked-note-view-modal').classList.add('hidden');
+    document.getElementById('linked-note-view-modal').classList.remove('flex');
+}
+
+// Editar a nota vinculada inline (abre sheet de Notas com a nota em modo edição)
+window.editLinkedNoteInline = function(noteId) {
+    // V40.2.10: salva o noteId ANTES de fechar a view (closeLinkedNoteView zera viewingLinkedNoteId)
+    // V40.2.11: alinhado ao pattern de chooseCreateNewNote — switchListTab + openEditNote ambos
+    //          DENTRO do setTimeout (senão switchListTab zerava notesFormOpen e renderizava lista
+    //          antes do openEditNote rodar). Tempo aumentado pra 320ms (igual chooseCreateNewNote)
+    //          pra dar tempo da animação do modal fechar de verdade.
+    // V40.2.14: chama closeAllSheets() pra garantir que NENHUMA outra sheet (reports/tags/config)
+    //          fique aberta junto. Antes podia ficar reports-sheet + list-sheet sobrepostas.
+    const targetNoteId = noteId || viewingLinkedNoteId;
+    
+    closeLinkedNoteView();
+    closeAllSheets(); // V40.2.14: fecha TUDO antes de reabrir lista (evita 2 sheets visíveis)
+    
+    // Abre Lista → aba Notas → modo edição (tudo após animação)
+    setTimeout(() => {
+        document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+        document.getElementById('list-sheet').classList.remove('translate-y-full');
+        switchListTab('notes');     // zera notesFormOpen e renderiza lista...
+        openEditNote(targetNoteId); // ...mas openEditNote seta notesFormOpen=true e re-renderiza form
+    }, 320);
+}
+
+// Desvincula nota do card (não apaga a nota, só remove o link)
+window.unlinkNoteFromBlock = function() {
+    if (!viewingLinkedNoteId || !viewingLinkedFromBlockId) return;
+    const block = db.find(b => b.id === viewingLinkedFromBlockId);
+    if (!block || !block.linkedNoteIds) return;
+    block.linkedNoteIds = block.linkedNoteIds.filter(id => id !== viewingLinkedNoteId);
+    saveDb();
+    closeLinkedNoteView();
+    showToast('Nota desvinculada (continua na aba Notas).');
+    renderTimeline();
+}
+
+// =====================================================
+// =====================================================
+// V40.1.1 - SUPER GABINETE (abas Lista / Rotinas / Notas)
+// Notas com 3 estados: empty / form / list
+// =====================================================
+
+function saveNotes() { localStorage.setItem('tb_notes_db', JSON.stringify(notesDb)); }
+
+// Helper: escapa HTML para evitar quebra de layout / XSS no innerHTML
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// V40.1.1: estado interno do form de nota (true = aberto)
+let notesFormOpen = false;
+// V40.1.2: ID da nota sendo editada (null = criando nova)
+let editingNoteId = null;
+
+window.switchListTab = function(tabName) {
+    activeListTab = tabName;
+    
+    // Atualizar pills
+    ['backlog', 'routines', 'notes'].forEach(t => {
+        const btn = document.getElementById(`btn-list-${t}`);
+        if (!btn) return;
+        if (t === tabName) {
+            btn.className = 'flex-1 py-1.5 rounded-lg bg-white shadow-sm text-zinc-800 text-xs font-bold transition border border-black/5 flex items-center justify-center gap-1';
+        } else {
+            btn.className = 'flex-1 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50 text-xs font-bold transition border border-transparent flex items-center justify-center gap-1';
+        }
+    });
+    
+    // Mostrar view correspondente, esconder outras
+    ['backlog', 'routines', 'notes'].forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        if (!view) return;
+        if (t === tabName) view.classList.remove('hidden');
+        else view.classList.add('hidden');
+    });
+    
+    // Render dinâmico ao trocar
+    if (tabName === 'notes') {
+        notesFormOpen = false; // ao entrar na aba, sempre começa fechado
+        editingNoteId = null;  // V40.1.2: garantir que não está em modo edição
+        renderNotes();
+    } else {
+        notesFormOpen = false; // ao sair da aba, garante que form fica fechado da próxima vez
+        editingNoteId = null;  // V40.1.2: limpar modo edição ao sair
+    }
+    if (tabName === 'backlog') renderBacklog();
+}
+
+// V40.1.1: abre o form (Estado B) — modo criar
+window.openNoteForm = function() {
+    notesFormOpen = true;
+    editingNoteId = null; // V40.1.2: garantir que NÃO está em modo edição
+    renderNotes();
+    // V40.2.17 (Regra de Ouro PWA - Jules): REMOVIDO .focus() programático.
+    // Forçar teclado via JS em PWA com 100dvh fazia Chrome Android empurrar body inteiro pra cima,
+    // descolando a sheet do fundo e criando "buraco branco" embaixo. Usuário toca no campo manualmente.
+    setTimeout(() => {
+        const titleInput = document.getElementById('note-title-input');
+        const contentInput = document.getElementById('note-content-input');
+        if (titleInput) titleInput.value = '';
+        if (contentInput) contentInput.value = '';
+    }, 50);
+}
+
+// V40.1.2: abre o form em modo edição (Estado B com pré-preenchimento)
+window.openEditNote = function(id) {
+    const note = notesDb.find(n => n.id === id);
+    if (!note) return;
+    
+    notesFormOpen = true;
+    editingNoteId = id;
+    renderNotes();
+    
+    // V40.2.17 (Regra de Ouro PWA - Jules): REMOVIDO .focus() programático.
+    // Mesmo motivo do openNoteForm. setTimeout preservado só pra preencher os campos após reflow.
+    setTimeout(() => {
+        const titleInput = document.getElementById('note-title-input');
+        const contentInput = document.getElementById('note-content-input');
+        if (titleInput) titleInput.value = note.title || '';
+        if (contentInput) contentInput.value = note.content || '';
+    }, 50);
+}
+
+// V40.1.1: cancela o form (volta pra Estado A ou C)
+window.cancelNoteForm = function() {
+    notesFormOpen = false;
+    editingNoteId = null; // V40.1.2: limpar modo edição
+    pendingLinkBlockId = null; // V40.2.1: limpa flag de vincular
+    // limpa inputs caso o usuário tenha digitado algo
+    const titleInput = document.getElementById('note-title-input');
+    const contentInput = document.getElementById('note-content-input');
+    if (titleInput) titleInput.value = '';
+    if (contentInput) contentInput.value = '';
+    renderNotes();
+}
+
+window.addNote = function() {
+    const titleInput = document.getElementById('note-title-input');
+    const contentInput = document.getElementById('note-content-input');
+    const title = (titleInput.value || '').trim();
+    const content = (contentInput.value || '').trim();
+    
+    if (!title && !content) {
+        showToast('Escreva algo antes de salvar.');
+        return;
+    }
+    
+    if (editingNoteId) {
+        // V40.1.2: modo edição — atualiza nota existente preservando id e createdAt
+        const note = notesDb.find(n => n.id === editingNoteId);
+        if (note) {
+            note.title = title;
+            note.content = content;
+            note.updatedAt = Date.now(); // útil pra futuro (não exibido)
+        }
+        showToast('Nota atualizada!');
+    } else {
+        // Modo criação (comportamento original)
+        const newNote = {
+            id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+            title: title,
+            content: content,
+            createdAt: Date.now()
+        };
+        notesDb.unshift(newNote);
+        
+        // V40.2.1: se veio do fluxo "Criar nova" no card, vincula ao bloco
+        if (pendingLinkBlockId) {
+            const block = db.find(b => b.id === pendingLinkBlockId);
+            if (block) {
+                if (!block.linkedNoteIds) block.linkedNoteIds = [];
+                block.linkedNoteIds.push(newNote.id);
+                saveDb();
+            }
+            pendingLinkBlockId = null; // limpa flag
+            showToast('Nota vinculada ao card!');
+        } else {
+            showToast('Nota salva!');
+        }
+    }
+    
+    saveNotes();
+    titleInput.value = '';
+    contentInput.value = '';
+    notesFormOpen = false; // V40.1.1: fecha o form após salvar
+    
+    // V40.2.1: se nota está vinculada a algum card, re-renderiza timeline pra atualizar texto na hora
+    const editedId = editingNoteId;
+    const newId = !editingNoteId && notesDb[0] ? notesDb[0].id : null;
+    const idToCheck = editedId || newId;
+    if (idToCheck) {
+        const isLinked = db.some(b => b.linkedNoteIds && b.linkedNoteIds.includes(idToCheck));
+        if (isLinked) renderTimeline();
+    }
+    
+    editingNoteId = null;  // V40.1.2: limpar modo edição
+    renderNotes();
+}
+
+window.deleteNote = function(id) {
+    notesDb = notesDb.filter(n => n.id !== id);
+    saveNotes();
+    
+    // V40.2: limpar IDs órfãos em todos os blocos que vinculavam essa nota
+    let blocksAffected = 0;
+    db.forEach(b => {
+        if (b.linkedNoteIds && b.linkedNoteIds.includes(id)) {
+            b.linkedNoteIds = b.linkedNoteIds.filter(nid => nid !== id);
+            blocksAffected++;
+        }
+    });
+    if (blocksAffected > 0) {
+        saveDb();
+        renderTimeline();
+    }
+    
+    renderNotes();
+    showToast('Nota apagada.');
+}
+
+window.renderNotes = function() {
+    // V40.1.1: 3 estados controlados via classes hidden
+    const header = document.getElementById('notes-header');
+    const empty = document.getElementById('notes-empty');
+    const form = document.getElementById('notes-form');
+    const container = document.getElementById('notes-container');
+    const counter = document.getElementById('notes-count');
+    
+    if (!container || !empty || !form || !header) return;
+    
+    if (counter) counter.innerText = notesDb.length;
+    
+    const hasNotes = notesDb.length > 0;
+    
+    if (notesFormOpen) {
+        // Estado B: Form aberto. Esconde empty, esconde lista, mostra form.
+        // Header só fica visível se já existem notas (pra não poluir tela vazia)
+        empty.classList.add('hidden');
+        container.classList.add('hidden');
+        form.classList.remove('hidden');
+        if (hasNotes) header.classList.remove('hidden');
+        else header.classList.add('hidden');
+    } else if (!hasNotes) {
+        // Estado A: Empty. Mostra só o convite central.
+        empty.classList.remove('hidden');
+        form.classList.add('hidden');
+        container.classList.add('hidden');
+        header.classList.add('hidden');
+    } else {
+        // Estado C: Lista. Header com botão + e cards.
+        empty.classList.add('hidden');
+        form.classList.add('hidden');
+        container.classList.remove('hidden');
+        header.classList.remove('hidden');
+    }
+    
+    // V40.1.2: atualizar labels do form conforme modo (criar vs editar)
+    const formLabel = document.getElementById('notes-form-label');
+    const formSaveBtn = document.getElementById('notes-form-save-btn');
+    if (formLabel && formSaveBtn) {
+        if (editingNoteId) {
+            formLabel.innerText = 'Editar nota';
+            formSaveBtn.innerText = 'Atualizar Nota';
+        } else {
+            formLabel.innerText = 'Nova nota';
+            formSaveBtn.innerText = 'Salvar Nota';
+        }
+    }
+    
+    // Sempre re-renderizar a lista (idempotente)
+    container.innerHTML = notesDb.map(n => {
+        const dateStr = new Date(n.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+        const timeStr = new Date(n.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const titleHtml = n.title ? `<h4 class="font-bold text-sm text-zinc-800 mb-1 break-words">${escapeHtml(n.title)}</h4>` : '';
+        const contentHtml = n.content ? `<p class="text-[13px] text-zinc-600 leading-snug whitespace-pre-wrap break-words">${escapeHtml(n.content)}</p>` : '';
+        return `
+            <div class="bg-white border border-zinc-200 p-3 rounded-xl shadow-sm">
+                <div class="flex items-start justify-between gap-2 mb-1.5">
+                    <div class="flex-1 min-w-0">
+                        ${titleHtml}
+                    </div>
+                    <div class="flex gap-1.5 shrink-0">
+                        <button onclick="openEditNote('${n.id}')" class="w-7 h-7 flex items-center justify-center bg-zinc-50 border border-zinc-200 text-zinc-500 rounded-lg hover:bg-zinc-100 hover:text-zinc-700 transition" title="Editar">
+                            <i class="ph ph-pencil-simple text-sm"></i>
+                        </button>
+                        <button onclick="deleteNote('${n.id}')" class="w-7 h-7 flex items-center justify-center bg-red-50 border border-red-100 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition" title="Apagar">
+                            <i class="ph ph-trash text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+                ${contentHtml}
+                <p class="text-[10px] text-zinc-400 font-medium uppercase tracking-wider mt-2">${dateStr} · ${timeStr}</p>
+            </div>
+        `;
+    }).join('');
 }
 
 window.cancelPendingTask = () => {
@@ -1207,6 +2186,17 @@ backlogInput.addEventListener('keypress', e => { if (e.key === 'Enter') addBackl
 window.applyThemeColor = function() {
     document.documentElement.style.setProperty('--theme-color', themeColor);
     
+    // V40.1.8: converter hex pra rgb pra usar com opacidade (botões "tinted")
+    function hexToRgb(hex) {
+        const h = hex.replace('#', '');
+        const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+        const r = parseInt(full.substring(0, 2), 16);
+        const g = parseInt(full.substring(2, 4), 16);
+        const b = parseInt(full.substring(4, 6), 16);
+        return `${r}, ${g}, ${b}`;
+    }
+    const rgb = hexToRgb(themeColor);
+    
     // V3.0 - Bug 2.7: Injetar CSS dinâmico pra sobrescrever app-focus
     let styleEl = document.getElementById('dynamic-theme-style');
     if (!styleEl) {
@@ -1220,6 +2210,11 @@ window.applyThemeColor = function() {
         .border-app-focus { border-color: ${themeColor} !important; }
         .focus\\:border-app-focus:focus { border-color: ${themeColor} !important; }
         .selection\\:bg-app-focus::selection { background-color: ${themeColor} !important; }
+        /* V40.1.8: variações suaves para CTAs internos (Notas/Lista/Rotinas) */
+        .bg-app-focus-soft { background-color: rgba(${rgb}, 0.08) !important; }
+        .border-app-focus-soft { border-color: rgba(${rgb}, 0.25) !important; }
+        .bg-app-focus-soft-strong { background-color: rgba(${rgb}, 0.15) !important; }
+        .hover\\:bg-app-focus-soft-strong:hover { background-color: rgba(${rgb}, 0.15) !important; }
     `;
 }
 
@@ -1228,6 +2223,7 @@ window.applyThemeColor = function() {
 // ==========================================
 
 window.openReportsSheet = function() {
+    clearFilters(); // V40.2.1: limpa filtros pra não confundir
     closeAllSheets();
     renderReports('today');
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
@@ -1297,14 +2293,14 @@ window.renderReports = function(period) {
     let globalPct = totalMins > 0 ? Math.round((globalCompleted / totalMins) * 100) : 0;
 
     let html = `
-        <div class="bg-zinc-900 text-white p-4 rounded-xl flex items-center justify-between shadow-md mb-2">
+        <div class="bg-app-focus text-white p-4 rounded-xl flex items-center justify-between shadow-md mb-2">
             <div>
-                <p class="text-[10px] uppercase tracking-widest text-zinc-400 font-bold mb-1">Global</p>
+                <p class="text-[10px] uppercase tracking-widest text-white/60 font-bold mb-1">Global</p>
                 <p class="text-3xl font-black">${globalPct}%</p>
             </div>
             <div class="text-right flex flex-col gap-1">
-                <p class="text-xs text-zinc-300 font-bold bg-white/10 px-2 py-0.5 rounded"><span class="text-emerald-400 mr-1">●</span> ${formatDur(globalCompleted)} concluídos</p>
-                <p class="text-xs text-zinc-400 font-bold bg-white/5 px-2 py-0.5 rounded"><span class="text-zinc-500 mr-1">●</span> ${formatDur(totalMins)} totais</p>
+                <p class="text-xs text-white/90 font-bold bg-white/10 px-2 py-0.5 rounded"><span class="text-emerald-300 mr-1">●</span> ${formatDur(globalCompleted)} concluídos</p>
+                <p class="text-xs text-white/70 font-bold bg-white/5 px-2 py-0.5 rounded"><span class="text-white/50 mr-1">●</span> ${formatDur(totalMins)} totais</p>
             </div>
         </div>
     `;
@@ -1353,6 +2349,7 @@ renderTimeline();
 renderBacklog();
 renderTagSelector();
 applyThemeColor(); // V2.0 - Aplicar tema salvo
+updateThoughtBtnVisibility(); // V40.2.5 - Nuvem Passageira (esconde se já leu hoje)
 
 setTimeout(() => {
     const scrollEl = document.getElementById('timeline-scroll');
@@ -1405,6 +2402,43 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// V3.0 - V37: Ajustar paddingTop da timeline conforme altura real do header
+window.adjustTimelinePadding = function() {
+    const header = document.querySelector('header');
+    const timeline = document.getElementById('timeline-scroll');
+    if (!header || !timeline) return;
+    if (headerHidden) return; // Modo retraído controla próprio padding
+    const h = header.offsetHeight;
+    timeline.style.paddingTop = (h + 8) + 'px';
+}
+setTimeout(adjustTimelinePadding, 100);
+window.addEventListener('resize', adjustTimelinePadding);
+
+// V40.2.12: Atalhos de teclado pra navegação por dia no desktop
+// ← seta esquerda = dia anterior, → seta direita = dia seguinte, espaço = HOJE
+// Ignora se o foco está num input/textarea/contenteditable pra não atrapalhar digitação
+document.addEventListener('keydown', (e) => {
+    // Ignora se o usuário está digitando em algum input
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+    
+    // Ignora também se algum modal/sheet está aberto (overlay visível)
+    const overlay = document.getElementById('overlay');
+    const overlayOpen = overlay && !overlay.classList.contains('pointer-events-none');
+    if (overlayOpen) return;
+    
+    if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        debugPreviousDay();
+    } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        debugAdvanceDay();
+    } else if (e.key === 'Home') {
+        e.preventDefault();
+        goToToday();
+    }
+});
+
 // V2.0 - BLOCO 7: Toggle Header
 window.toggleHeader = function() {
     headerHidden = !headerHidden;
@@ -1413,15 +2447,19 @@ window.toggleHeader = function() {
     const btn = document.querySelector('[onclick="toggleHeader()"]');
     
     if (headerHidden) {
-        header.style.height = '60px';
+        header.style.height = '100px'; // V38: 48px de pt-12 + 52px para botões respirarem (box-sizing: border-box)
         header.style.overflow = 'hidden';
-        timeline.style.paddingTop = '70px';
+        timeline.style.paddingTop = '110px';
         if(btn) btn.innerHTML = '<i class="ph ph-caret-down text-lg sm:text-xl text-zinc-600"></i>';
     } else {
         header.style.height = 'auto';
         header.style.overflow = 'visible';
-        timeline.style.paddingTop = '180px';
         if(btn) btn.innerHTML = '<i class="ph ph-caret-up text-lg sm:text-xl text-zinc-600"></i>';
+        // V3.0 V37: padding dinâmico baseado na altura real do header
+        setTimeout(() => {
+            const h = header.offsetHeight;
+            timeline.style.paddingTop = (h + 8) + 'px';
+        }, 50);
     }
 }
 
@@ -1456,7 +2494,7 @@ window.renderEditTagSelector = function() {
     const container = document.getElementById('edit-tag-selector-container');
     if(!container) return;
     container.className = 'flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2 w-full';
-    let html = `<button onclick="selectEditTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${editingTagId === null ? 'bg-zinc-900 border-zinc-900 text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
+    let html = `<button onclick="selectEditTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${editingTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
     tagsDb.forEach(t => {
         const isActive = editingTagId === t.id;
         const activeClass = isActive ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100';

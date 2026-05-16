@@ -277,7 +277,11 @@
                 </div>
 
                 <!-- Sub-view 2: Formulário (criar/editar) -->
-                <div id="routines-form-view" class="hidden flex-col h-full relative bg-white">
+                <!-- Sub-view 2: Formulário (criar/editar) 
+                     V40.3.2-fix3: flex-1 + min-h-0 (era h-full) pra propagar altura corretamente
+                     dentro da hierarquia flex da list-sheet. Sem isso, o botão "Salvar" e o 
+                     "+ Adicionar item" ficavam fora da área visível. -->
+                <div id="routines-form-view" class="hidden flex-1 flex-col min-h-0 relative bg-white">
                     <div class="shrink-0 px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <button onclick="closeRoutineForm()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-full hover:bg-zinc-200 transition active:scale-90">

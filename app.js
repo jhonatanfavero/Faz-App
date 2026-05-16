@@ -1722,16 +1722,22 @@ window.deleteConfigPeriod = (id) => {
     renderConfigPeriods();
 }
 
+// V40.3.4: addBacklogItem agora é deprecated — só mantido pra compatibilidade do listener de Enter.
+// O fluxo real de criação passa pela função saveBacklogForm() que vem do form.
 window.addBacklogItem = () => {
+    // V40.3.4: o Enter no input agora dispara saveBacklogForm (form completo) em vez do antigo "salvar inline".
+    if (typeof window.saveBacklogForm === 'function') {
+        window.saveBacklogForm();
+        return;
+    }
+    // Fallback caso saveBacklogForm não exista (não deve acontecer)
     const title = backlogInput.value.trim();
     if(!title) return;
-
     backlogDb.push({
         id: 'bl_' + Date.now(),
         title: title,
         duration: backlogSelectedDur
     });
-
     saveBacklog();
     backlogInput.value = '';
     renderBacklog();
@@ -1779,7 +1785,7 @@ function renderBacklog() {
     const listStats = document.getElementById('list-btn-stats');
     const listCount = document.getElementById('list-btn-count');
     const listTime = document.getElementById('list-btn-time');
-    const backlogTotalTime = document.getElementById('backlog-total-time'); // Keep this if exists
+    const backlogTotalTime = document.getElementById('backlog-total-time');
     
     if (backlogDb.length > 0) {
         listStats.classList.remove('hidden');
@@ -1798,32 +1804,59 @@ function renderBacklog() {
     
     if (backlogDb.length === 0) {
         container.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-full text-center opacity-50 py-8">
-                <i class="ph ph-inbox text-4xl mb-2"></i>
-                <p class="text-sm font-medium">Lista vazia!</p>
+            <div class="flex flex-col items-center justify-center text-center opacity-50 py-12">
+                <i class="ph ph-inbox text-4xl mb-2 text-zinc-400"></i>
+                <p class="text-sm font-medium text-zinc-500">Lista vazia!</p>
+                <p class="text-[11px] text-zinc-400 mt-1">Toque em + Nova Tarefa pra começar</p>
             </div>`;
         return;
     }
 
+    // V40.3.4: layout novo — botões ✋ + 🗑️ no INÍCIO (compactos), conteúdo à direita.
+    // Toque no card (não nos botões) abre edit. event.stopPropagation nos botões (C11).
     container.innerHTML = backlogDb.map(item => {
         const tagColor = item.tagId ? getTagColor(item.tagId) : null;
-        const tagHtml = tagColor ? `<div class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${tagColor};"></div>` : '';
-        return `
-        <div class="flex justify-between items-center bg-white border border-zinc-200 p-3.5 rounded-xl mb-3 shadow-sm hover:shadow transition-shadow group">
-            <div class="flex items-start gap-2 min-w-0 pr-3 flex-1">
-                ${tagHtml ? `<div class="mt-1">${tagHtml}</div>` : ''}
-                <div class="flex flex-col min-w-0">
-                    <span class="text-sm font-bold text-zinc-800 truncate mb-0.5">${item.title}</span>
-                    <span class="text-[11px] font-bold text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i> ${formatDur(item.duration)}</span>
+        const tagHtml = tagColor ? `<div class="w-2 h-2 rounded-full shrink-0" style="background-color: ${tagColor};"></div>` : '';
+        
+        // Checklist preview (C10: 3 primeiros + "mais X")
+        const mbs = item.microblocks || [];
+        const previewMbs = mbs.slice(0, 3);
+        const extraCount = mbs.length - 3;
+        let mbHtml = '';
+        if (mbs.length > 0) {
+            mbHtml = `<div class="flex flex-col mt-1.5 pl-1">`;
+            mbHtml += previewMbs.map(mb => `
+                <div class="flex items-center gap-1 mt-0.5">
+                    <i class="ph-bold ph-check text-[9px] text-zinc-300 shrink-0"></i>
+                    <span class="text-[10px] text-zinc-500 truncate">${escapeHtml(mb.title)}</span>
                 </div>
+            `).join('');
+            if (extraCount > 0) {
+                mbHtml += `<div class="text-[9px] text-zinc-400 font-bold mt-0.5 ml-3">+ ${extraCount} mais</div>`;
+            }
+            mbHtml += `</div>`;
+        }
+        
+        return `
+        <div onclick="openBacklogForm('${item.id}')" class="flex items-start gap-2 bg-white border border-zinc-200 p-3 rounded-xl mb-3 shadow-sm hover:shadow active:scale-[0.99] transition cursor-pointer">
+            <!-- Botões ✋ + 🗑️ no INÍCIO (decisão original + C9 + C11) -->
+            <div class="flex flex-col gap-1.5 shrink-0">
+                <button onclick="event.stopPropagation(); scheduleBacklogItem('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong active:scale-95 transition" title="Agendar">
+                    <i class="ph-fill ph-hand-tap text-sm"></i>
+                </button>
+                <button onclick="event.stopPropagation(); deleteBacklogItem('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
+                    <i class="ph ph-trash text-sm"></i>
+                </button>
             </div>
-            <div class="flex gap-2 shrink-0">
-                <button onclick="scheduleBacklogItem('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-app-focus-soft border border-app-focus-soft text-app-focus rounded-xl hover:bg-app-focus-soft-strong transition-colors" title="Segurar e Agendar">
-                    <i class="ph ph-hand-grabbing text-lg"></i>
-                </button>
-                <button onclick="deleteBacklogItem('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-red-50 border border-red-100 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors" title="Apagar">
-                    <i class="ph ph-trash text-lg"></i>
-                </button>
+            
+            <!-- Conteúdo: tag + título + duração + checklist preview -->
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5 mb-0.5">
+                    ${tagHtml}
+                    <span class="text-sm font-bold text-zinc-800 truncate">${escapeHtml(item.title)}</span>
+                </div>
+                <span class="text-[11px] font-bold text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i> ${formatDur(item.duration)}${mbs.length > 0 ? ` · ${mbs.length} ${mbs.length === 1 ? 'item' : 'itens'}` : ''}</span>
+                ${mbHtml}
             </div>
         </div>
     `}).join('');
@@ -2212,6 +2245,11 @@ window.switchListTab = function(tabName) {
         // V40.3 Fase 1: garante volta pra view-lista (não form) ao trocar de aba
         if (typeof closeRoutineForm === 'function') closeRoutineForm(true);
         if (typeof renderRoutinesList === 'function') renderRoutinesList();
+        notesFormOpen = false;
+        editingNoteId = null;
+    } else if (tabName === 'backlog') {
+        // V40.3.4: garante volta pra view-lista (não form) ao trocar de aba
+        if (typeof closeBacklogForm === 'function') closeBacklogForm(true);
         notesFormOpen = false;
         editingNoteId = null;
     } else {
@@ -3226,6 +3264,177 @@ window.cancelDeleteRoutine = function() {
     document.getElementById('routine-delete-modal').classList.add('hidden');
     document.getElementById('routine-delete-modal').classList.remove('flex');
 }
+
+// =====================================================
+// V40.3.4 — REDESIGN DA LISTA (Backlog com form + editar + checklist)
+// =====================================================
+// Refatora a aba Lista pra ter o mesmo padrão de Rotinas:
+// - 2 sub-views: lista de tarefas + formulário (criar/editar)
+// - Botão "+ Nova Tarefa" abre form vazio
+// - Toque no card abre form preenchido (editar)
+// - Cards com ✋ + 🗑️ no INÍCIO (decisão visual do usuário)
+// - Suporta checklist (microblocks) — preserva compat com moveToBacklog fix5
+//
+// Armadilhas tratadas (C1-C15):
+//   C1, C12: input 'backlog-input' mantido com mesmo ID (refs antigas continuam funcionando)
+//   C3, C4: scheduleBacklogItem e deleteBacklogItem NÃO TOCADAS
+//   C5: openBacklogForm(id) cria/edita igual openRoutineForm
+//   C7: ícone do botão Nova Tarefa = ph-plus (mesmo do FAB+ grande)
+//   C9: botões ✋ e 🗑️ no INÍCIO do card (flex order)
+//   C10: checklist preview com 3 primeiros + "mais X"
+//   C11: event.stopPropagation() nos botões (toque no card abre edit)
+//   C13: stepper -15/+15 (igual rotinas) em vez de quick buttons
+
+let currentBlId = null;
+let currentBlDur = 30;
+let currentBlTagId = null;
+let currentBlMicroblocks = [];
+
+window.openBacklogForm = function(id = null) {
+    document.getElementById('backlog-list-view').classList.add('hidden');
+    document.getElementById('backlog-form-view').classList.remove('hidden');
+    document.getElementById('backlog-form-view').classList.add('flex');
+    
+    currentBlId = id;
+    
+    if (id) {
+        const item = backlogDb.find(x => x.id === id);
+        if (!item) return;
+        document.getElementById('bl-form-title-label').innerText = 'Editar Tarefa';
+        document.getElementById('backlog-input').value = item.title;
+        currentBlDur = item.duration;
+        currentBlTagId = item.tagId || null;
+        currentBlMicroblocks = JSON.parse(JSON.stringify(item.microblocks || []));
+        document.getElementById('bl-form-delete-btn').classList.remove('hidden');
+        document.getElementById('bl-form-delete-btn').classList.add('flex');
+    } else {
+        document.getElementById('bl-form-title-label').innerText = 'Nova Tarefa';
+        document.getElementById('backlog-input').value = '';
+        currentBlDur = 30;
+        currentBlTagId = null;
+        currentBlMicroblocks = []; // C14: começa vazio
+        document.getElementById('bl-form-delete-btn').classList.add('hidden');
+        document.getElementById('bl-form-delete-btn').classList.remove('flex');
+    }
+    
+    updateBacklogFormVisuals();
+    renderBlFormMicroblocks();
+}
+
+window.closeBacklogForm = function(force = false) {
+    const formView = document.getElementById('backlog-form-view');
+    const listView = document.getElementById('backlog-list-view');
+    if (!formView || !listView) return;
+    formView.classList.add('hidden');
+    formView.classList.remove('flex');
+    listView.classList.remove('hidden');
+    if (!force) renderBacklog();
+}
+
+window.changeBacklogFormDuration = function(delta) {
+    currentBlDur += delta;
+    if (currentBlDur < 15) currentBlDur = 15;
+    if (currentBlDur > 480) currentBlDur = 480;
+    updateBacklogFormVisuals();
+}
+
+window.selectBacklogFormTag = function(tagId) {
+    currentBlTagId = currentBlTagId === tagId ? null : tagId;
+    updateBacklogFormVisuals();
+}
+
+function updateBacklogFormVisuals() {
+    const durLabel = document.getElementById('bl-form-dur-label');
+    if (durLabel) durLabel.innerText = formatDur(currentBlDur);
+    
+    const tagContainer = document.getElementById('bl-form-tag-container');
+    if (tagContainer) {
+        let html = `<button onclick="selectBacklogFormTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-xs font-bold transition whitespace-nowrap ${currentBlTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'}">Sem Tag</button>`;
+        tagsDb.forEach(t => {
+            const isActive = currentBlTagId === t.id;
+            const bgColor = isActive ? t.color : t.color + '15';
+            const textColor = isActive ? '#fff' : t.color;
+            const borderColor = isActive ? t.color : t.color + '40';
+            const dotColor = isActive ? '#fff' : t.color;
+            const extraClass = isActive ? 'shadow-md' : 'opacity-80 hover:opacity-100';
+            html += `<button onclick="selectBacklogFormTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold transition whitespace-nowrap ${extraClass}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid ${borderColor}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${dotColor};"></div>${escapeHtml(t.name)}</button>`;
+        });
+        tagContainer.innerHTML = html;
+    }
+}
+
+function syncBlMicroblocksFromDOM() {
+    currentBlMicroblocks = Array.from(document.querySelectorAll('.bl-mb-input')).map(input => ({ title: input.value }));
+}
+
+window.addBacklogMicroblockForm = function() {
+    syncBlMicroblocksFromDOM();
+    currentBlMicroblocks.push({title: ''});
+    renderBlFormMicroblocks();
+}
+
+window.removeBacklogMicroblockForm = function(index) {
+    syncBlMicroblocksFromDOM();
+    currentBlMicroblocks.splice(index, 1);
+    renderBlFormMicroblocks();
+}
+
+function renderBlFormMicroblocks() {
+    const container = document.getElementById('bl-form-microblocks');
+    if (!container) return;
+    if (currentBlMicroblocks.length === 0) {
+        container.innerHTML = `<div class="text-[11px] text-zinc-400 italic text-center py-2">Sem checklist (opcional)</div>`;
+        return;
+    }
+    container.innerHTML = currentBlMicroblocks.map((mb, i) => `
+        <div class="flex items-center gap-2">
+            <div class="w-5 h-5 rounded-md border border-zinc-300 shrink-0 bg-zinc-50 flex items-center justify-center"><i class="ph ph-check text-[10px] text-zinc-300"></i></div>
+            <input type="text" class="bl-mb-input flex-1 h-10 bg-zinc-50 border border-zinc-200 rounded-lg px-3 text-sm text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: Comprar leite" value="${escapeHtml(mb.title)}">
+            <button onclick="removeBacklogMicroblockForm(${i})" class="w-8 h-10 flex items-center justify-center text-zinc-400 hover:text-red-500 transition shrink-0"><i class="ph ph-x"></i></button>
+        </div>
+    `).join('');
+}
+
+window.saveBacklogForm = function() {
+    const title = document.getElementById('backlog-input').value.trim();
+    if (!title) return showToast('A tarefa precisa de um nome.');
+
+    syncBlMicroblocksFromDOM();
+    const validMbs = currentBlMicroblocks.filter(mb => mb.title.trim() !== '').map(mb => ({ title: mb.title.trim(), done: false }));
+
+    if (currentBlId) {
+        const item = backlogDb.find(x => x.id === currentBlId);
+        if (item) {
+            item.title = title;
+            item.duration = currentBlDur;
+            item.tagId = currentBlTagId;
+            item.microblocks = validMbs;
+        }
+        showToast('Tarefa atualizada!');
+    } else {
+        backlogDb.push({
+            id: 'bl_' + Date.now(),
+            title: title,
+            duration: currentBlDur,
+            tagId: currentBlTagId,
+            microblocks: validMbs
+        });
+        showToast('Tarefa adicionada!');
+    }
+    
+    saveBacklog();
+    closeBacklogForm();
+}
+
+window.deleteBacklogFromForm = function() {
+    if (!currentBlId) return;
+    // Decisão 3=a: sem confirmação no backlog (rápido, é rascunho)
+    backlogDb = backlogDb.filter(x => x.id !== currentBlId);
+    saveBacklog();
+    closeBacklogForm();
+    showToast('Tarefa apagada.');
+}
+
 
 // =====================================================
 // V40.3.3 — CARIMBAR ROTINA (Fase 2)

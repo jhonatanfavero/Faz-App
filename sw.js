@@ -1,5 +1,5 @@
-// V5.8 - v40.3.3 (Carimbar Rotinas Fase 2: botão ✋ no card de rotina → pendingIntent + blocos pulsantes + encaixe + card retraído com microblocks. getMaxGapForDay valida espaço antes.)
-const CACHE_NAME = 'timeblock-v40-3-3';
+// V5.9 - v40.3.4 (Redesign Lista: 2 sub-views (list + form), botão "+ Nova Tarefa" estilo FAB+, cards com ✋+🗑️ no início, checklist no item, edição via tap, stepper duração)
+const CACHE_NAME = 'timeblock-v40-3-4';
 const ASSETS = [
   './',
   './index.html',

@@ -1,5 +1,5 @@
-// V6.5 - v40.3.7-fix (Fixes do Gemini na V40.3.7: 6 sheets com header tinham X duplicado ou bloco isolado feio. Headers refeitos pra fundir título+X numa única linha em config/period/tags/clone/reports/link-note. bottom-sheet e list-sheet mantém X em barra própria — não têm título.)
-const CACHE_NAME = 'timeblock-v40-3-7-fix';
+// V6.6 - v40.3.8 (UX form Lista: Enter no título não salva mais — foca primeiro check (cria se necessário). Enter num check pula pro próximo (cria novo se for o último). Event delegation idempotente. focus({preventScroll:true}) respeita Regra de Ouro #2 do PWA Android.)
+const CACHE_NAME = 'timeblock-v40-3-8';
 const ASSETS = [
   './',
   './index.html',

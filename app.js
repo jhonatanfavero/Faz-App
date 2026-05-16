@@ -2513,7 +2513,25 @@ window.cancelPendingTask = () => {
 }
 
 input.addEventListener('keypress', e => { if (e.key === 'Enter') commitIntent(); });
-backlogInput.addEventListener('keypress', e => { if (e.key === 'Enter') addBacklogItem(); });
+// V40.3.8: Enter no título da Lista NÃO salva mais — pula pro primeiro check (ou cria um).
+// Regra de Ouro #2: usar preventScroll pra evitar buraco branco no PWA Android.
+backlogInput.addEventListener('keypress', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const title = backlogInput.value.trim();
+    if (!title) return; // sem título, ignora silenciosamente
+    
+    // Se não tem nenhum check ainda, cria um vazio e foca nele.
+    if (currentBlMicroblocks.length === 0) {
+        addBacklogMicroblockForm();
+    }
+    
+    // Foca o primeiro input de checklist (ou o último adicionado).
+    setTimeout(() => {
+        const firstMb = document.querySelector('.bl-mb-input');
+        if (firstMb) firstMb.focus({ preventScroll: true });
+    }, 50);
+});
 
 // V2.0 - Função de tema (declarada antes da inicialização)
 window.applyThemeColor = function() {
@@ -3465,10 +3483,41 @@ function renderBlFormMicroblocks() {
     container.innerHTML = currentBlMicroblocks.map((mb, i) => `
         <div class="flex items-center gap-2">
             <div class="w-5 h-5 rounded-md border border-zinc-300 shrink-0 bg-zinc-50 flex items-center justify-center"><i class="ph ph-check text-[10px] text-zinc-300"></i></div>
-            <input type="text" class="bl-mb-input flex-1 h-10 bg-zinc-50 border border-zinc-200 rounded-lg px-3 text-sm text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: Comprar leite" value="${escapeHtml(mb.title)}">
+            <input type="text" data-mb-idx="${i}" class="bl-mb-input flex-1 h-10 bg-zinc-50 border border-zinc-200 rounded-lg px-3 text-sm text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: Comprar leite" value="${escapeHtml(mb.title)}">
             <button onclick="removeBacklogMicroblockForm(${i})" class="w-8 h-10 flex items-center justify-center text-zinc-400 hover:text-red-500 transition shrink-0"><i class="ph ph-x"></i></button>
         </div>
     `).join('');
+    
+    // V40.3.8: setup do listener de Enter uma vez (idempotente — flag impede attach duplicado).
+    if (!container.dataset.enterListenerAttached) {
+        container.addEventListener('keypress', (e) => {
+            if (e.key !== 'Enter') return;
+            if (!e.target.classList.contains('bl-mb-input')) return;
+            e.preventDefault();
+            
+            const idx = parseInt(e.target.dataset.mbIdx, 10);
+            const inputs = container.querySelectorAll('.bl-mb-input');
+            const isLast = idx === inputs.length - 1;
+            
+            // Sincroniza o valor atual antes de qualquer ação (senão pode perder o que o user digitou).
+            syncBlMicroblocksFromDOM();
+            
+            if (isLast) {
+                // Último check → cria um novo vazio e foca nele.
+                addBacklogMicroblockForm();
+                setTimeout(() => {
+                    const newInputs = container.querySelectorAll('.bl-mb-input');
+                    const newLast = newInputs[newInputs.length - 1];
+                    if (newLast) newLast.focus({ preventScroll: true });
+                }, 50);
+            } else {
+                // Foca o próximo input.
+                const next = inputs[idx + 1];
+                if (next) next.focus({ preventScroll: true });
+            }
+        });
+        container.dataset.enterListenerAttached = 'true';
+    }
 }
 
 window.saveBacklogForm = function() {

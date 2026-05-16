@@ -1,5 +1,5 @@
-// V5.5 - v40.3.2-fix3 (Form de rotina: h-full → flex-1 flex-col min-h-0 pra botões Salvar e Adicionar item aparecerem)
-const CACHE_NAME = 'timeblock-v40-3-2-fix3';
+// V5.7 - v40.3.2-fix5 (FIX BUG ORIGINAL: moveToBacklog e scheduleBacklogItem agora preservam microblocks ao mover pra Lista e reagendar)
+const CACHE_NAME = 'timeblock-v40-3-2-fix5';
 const ASSETS = [
   './',
   './index.html',

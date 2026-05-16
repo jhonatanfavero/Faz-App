@@ -1017,9 +1017,14 @@ function drawBlock(block) {
     
     // V40.3.2: setup do drag de microblocks + tooltip de discovery (após appendChild pra
     // garantir que getBoundingClientRect funciona corretamente).
-    if (block.type !== 'empty' && block.expanded) {
-        setupMicroblockDrag(el, block);
-        maybeShowMbDragTooltip(el, block);
+    // V40.3.2-fix4 DIAGNÓSTICO: try/catch defensivo pra impedir que erro aqui quebre o init.
+    try {
+        if (block.type !== 'empty' && block.expanded) {
+            if (typeof setupMicroblockDrag === 'function') setupMicroblockDrag(el, block);
+            if (typeof maybeShowMbDragTooltip === 'function') maybeShowMbDragTooltip(el, block);
+        }
+    } catch (err) {
+        console.warn('[drawBlock] erro em setupMicroblockDrag/Tooltip:', err);
     }
 }
 
@@ -1745,7 +1750,16 @@ window.scheduleBacklogItem = (id) => {
     backlogDb = backlogDb.filter(i => i.id !== id);
     saveBacklog();
 
-    pendingIntent = { title: item.title, duration: item.duration, theme: 'focus', tagId: item.tagId || null };
+    // V40.3.2-fix5: propaga microblocks do item do backlog pro pendingIntent.
+    // performEncaixeMatematico (linha ~1029) já tem a lógica de clonar microblocks
+    // com IDs únicos. Só precisamos garantir que chegam aqui via pendingIntent.
+    pendingIntent = { 
+        title: item.title, 
+        duration: item.duration, 
+        theme: 'focus', 
+        tagId: item.tagId || null,
+        microblocks: item.microblocks || []
+    };
     selectedDur = item.duration;
     syncDurButtons(selectedDur);
     
@@ -2816,7 +2830,18 @@ window.moveToBacklog = function() {
     if(!deletingTaskId) return;
     const b = db.find(x => x.id === deletingTaskId);
     if(b) {
-        backlogDb.push({ id: 'bl_' + Date.now(), title: b.title, duration: b.duration, tagId: b.tagId || null });
+        // V40.3.2-fix5: agora preserva os microblocks (checks) ao mover pra Lista.
+        // ANTES: só salvava id+title+duration+tagId — perdia toda a checklist.
+        // AGORA: clone profundo dos microblocks, com done resetado pra false 
+        //        (faz sentido: ao reagendar, recomeça do zero, igual ao duplicate).
+        const clonedMbs = (b.microblocks || []).map(mb => ({ title: mb.title, done: false }));
+        backlogDb.push({ 
+            id: 'bl_' + Date.now(), 
+            title: b.title, 
+            duration: b.duration, 
+            tagId: b.tagId || null,
+            microblocks: clonedMbs
+        });
         saveBacklog();
         db = db.filter(x => x.id !== deletingTaskId);
         saveDb();

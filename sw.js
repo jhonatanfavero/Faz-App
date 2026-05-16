@@ -1,5 +1,5 @@
-// V5.2 - v40.3.2 (Pacote: V40.2.28 header memória + V40.3.1 Rotinas CRUD + V40.3.2 drag de microblocks via long-press 400ms)
-const CACHE_NAME = 'timeblock-v40-3-2';
+// V5.3 - v40.3.2-fix (FIX CRÍTICO: mbDragActive declarado no TOPO pra evitar ReferenceError TDZ que sumia timeline inteira)
+const CACHE_NAME = 'timeblock-v40-3-2-fix';
 const ASSETS = [
   './',
   './index.html',

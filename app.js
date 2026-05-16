@@ -24,6 +24,10 @@ let showOnlyCompleted = false;
 let taskToClone = null;
 let pendingCloneType = '';
 let selectedTagId = null;
+// V40.3.2 FIX: declarado no topo do arquivo pra evitar ReferenceError (TDZ)
+//   quando renderTimeline() é chamado no init (linha ~2589) ANTES do bloco V40.3.2
+//   ser executado (linha ~3211). typeof em variável let em TDZ LANÇA erro, não retorna 'undefined'.
+let mbDragActive = false;
 // V2.0 - Estado do header
 // V40.2.28: persistido em localStorage. Default false (1ª vez = expandido pra Descoberta).
 //   Depois que o usuário escolhe (toggleHeader), a escolha vira a nova default.
@@ -573,7 +577,8 @@ function showToast(msg) { const t = document.getElementById('toast'); document.g
 function renderTimeline() {
     // V40.3.2: bloqueia re-render durante drag de microbloc pra não invalidar mbDragRects/mbDragSourceEl.
     // O drag chamará renderTimeline() no final (onMbDragEnd) — não precisa renderizar enquanto rola.
-    if (typeof mbDragActive !== 'undefined' && mbDragActive) return;
+    // Variável declarada no topo do arquivo pra evitar TDZ.
+    if (mbDragActive) return;
     container.innerHTML = ''; 
     
     const timelineContainer = document.getElementById('timeline-container');
@@ -3208,7 +3213,7 @@ window.cancelDeleteRoutine = function() {
 //   A18: CSS touch-callout:none + user-select:none nos microblocks
 //   A19: só processa e.touches[0]
 //   A20: touchend sempre é capturado, mesmo fora do elemento
-let mbDragActive = false;
+// NOTA: mbDragActive declarado no TOPO do arquivo (linha ~30) pra evitar TDZ.
 let mbDragLongPressTimer = null;
 let mbDragInitialY = 0;
 let mbDragInitialX = 0;

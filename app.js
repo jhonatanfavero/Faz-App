@@ -24,7 +24,10 @@ let showOnlyCompleted = false;
 let taskToClone = null;
 let pendingCloneType = '';
 let selectedTagId = null;
-let headerHidden = false; // V2.0 - Estado do header
+// V2.0 - Estado do header
+// V40.2.28: persistido em localStorage. Default false (1ª vez = expandido pra Descoberta).
+//   Depois que o usuário escolhe (toggleHeader), a escolha vira a nova default.
+let headerHidden = localStorage.getItem('tb_header_collapsed') === 'true';
 let themeColor = localStorage.getItem('tb_theme_color') || '#4f46e5';
 let searchQuery = ''; // V40.2.5: termo de busca por título do cartão
 
@@ -51,6 +54,31 @@ let backlogSelectedDur = 30;
 // V40.1: Super Gabinete - Notas livres do dia
 let notesDb = JSON.parse(localStorage.getItem('tb_notes_db')) || [];
 let activeListTab = 'backlog'; // 'backlog' | 'routines' | 'notes'
+
+// V40.3 — MOTOR DE ROTINAS (Fase 1: CRUD).
+// Default: 3 rotinas de exemplo viciantes pra Discoverability (mesmo princípio do header em V40.2.28).
+let routinesDb = JSON.parse(localStorage.getItem('tb_routines_db'));
+if (!routinesDb || routinesDb.length === 0) {
+    routinesDb = [
+        {
+            id: 'rt_ex1', title: 'Manhã Produtiva', emoji: '🌞', duration: 120, theme: 'focus', tagId: null,
+            microblocks: [{title: 'Meditação e Café'}, {title: 'Revisar métricas de ontem'}, {title: 'Planejar o dia (Top 3)'}, {title: 'Email/Mensagens'}, {title: 'Leitura técnica'}],
+            createdAt: Date.now() - 2000
+        },
+        {
+            id: 'rt_ex2', title: 'Rotina Noturna', emoji: '🌙', duration: 60, theme: 'rest', tagId: null,
+            microblocks: [{title: 'Higiene pessoal'}, {title: 'Organizar amanhã'}, {title: 'Ler 10 minutos'}, {title: 'Meditação curta'}],
+            createdAt: Date.now() - 1000
+        },
+        {
+            id: 'rt_ex3', title: 'Treino', emoji: '💪', duration: 45, theme: 'focus', tagId: null,
+            microblocks: [{title: 'Aquecimento'}, {title: 'Cardio'}, {title: 'Força - Superiores'}, {title: 'Força - Core'}, {title: 'Alongamento'}],
+            createdAt: Date.now()
+        }
+    ];
+    localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb));
+}
+function saveRoutinesDb() { localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb)); }
 
 let periodsDb = JSON.parse(localStorage.getItem('tb_periods_db'));
 if (!periodsDb || periodsDb.length === 0) {
@@ -354,6 +382,10 @@ window.openSearchBar = function() {
     if (row) { row.classList.remove('hidden'); row.classList.add('flex'); }
     if (cluster) cluster.classList.add('hidden');
     
+    // V40.2.28: ao abrir search, header cresce (search-bar aparece). Recalcula paddingTop
+    // da timeline pra cards não ficarem atrás do header crescido.
+    setTimeout(adjustTimelinePadding, 50);
+    
     setTimeout(() => {
         const input = document.getElementById('search-input');
         if (input) input.focus();
@@ -384,6 +416,8 @@ window.closeSearchBar = function() {
     if (counter) { counter.classList.add('hidden'); counter.innerText = ''; }
     
     // V40.2.11: listener de clique fora foi removido — não há mais nada pra limpar aqui
+    // V40.2.28: header voltou ao tamanho original (sem search-bar), recalcula paddingTop.
+    setTimeout(adjustTimelinePadding, 50);
     
     renderTimeline();
 }
@@ -537,6 +571,9 @@ function formatDur(m) { const h = Math.floor(m/60), min = m%60; return h > 0 && 
 function showToast(msg) { const t = document.getElementById('toast'); document.getElementById('toast-msg').innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => t.classList.add('opacity-0'), 2500); }
 
 function renderTimeline() {
+    // V40.3.2: bloqueia re-render durante drag de microbloc pra não invalidar mbDragRects/mbDragSourceEl.
+    // O drag chamará renderTimeline() no final (onMbDragEnd) — não precisa renderizar enquanto rola.
+    if (typeof mbDragActive !== 'undefined' && mbDragActive) return;
     container.innerHTML = ''; 
     
     const timelineContainer = document.getElementById('timeline-container');
@@ -845,7 +882,7 @@ function drawBlock(block) {
 
         let microblocksSection = '';
         let microHtml = (block.microblocks || []).map(mb => `
-            <div class="flex items-start gap-1.5 mb-1.5 z-20 relative group/mb pointer-events-auto">
+            <div class="mb-item flex items-start gap-1.5 mb-1.5 z-20 relative group/mb pointer-events-auto" data-mb-id="${mb.id}">
                 <button onclick="toggleMicroblock('${block.id}', '${mb.id}', event)" class="mt-[3px] shrink-0 w-3.5 h-3.5 rounded-[4px] border ${mb.done ? (isDarkTheme ? 'bg-white border-white' : 'bg-emerald-500 border-emerald-500') : (isDarkTheme ? 'border-white/30' : 'border-black/20')} flex items-center justify-center transition-colors">
                     ${mb.done ? `<i class="ph-bold ph-check text-[10px] ${isDarkTheme ? 'text-app-focus' : 'text-white'}"></i>` : ''}
                 </button>
@@ -972,6 +1009,13 @@ function drawBlock(block) {
         enablePhysics(el, block);
     }
     container.appendChild(el);
+    
+    // V40.3.2: setup do drag de microblocks + tooltip de discovery (após appendChild pra
+    // garantir que getBoundingClientRect funciona corretamente).
+    if (block.type !== 'empty' && block.expanded) {
+        setupMicroblockDrag(el, block);
+        maybeShowMbDragTooltip(el, block);
+    }
 }
 
 // --- 5. ENCAIXE MATEMÁTICO ---
@@ -2145,6 +2189,12 @@ window.switchListTab = function(tabName) {
         notesFormOpen = false; // ao entrar na aba, sempre começa fechado
         editingNoteId = null;  // V40.1.2: garantir que não está em modo edição
         renderNotes();
+    } else if (tabName === 'routines') {
+        // V40.3 Fase 1: garante volta pra view-lista (não form) ao trocar de aba
+        if (typeof closeRoutineForm === 'function') closeRoutineForm(true);
+        if (typeof renderRoutinesList === 'function') renderRoutinesList();
+        notesFormOpen = false;
+        editingNoteId = null;
     } else {
         notesFormOpen = false; // ao sair da aba, garante que form fica fechado da próxima vez
         editingNoteId = null;  // V40.1.2: limpar modo edição ao sair
@@ -2635,26 +2685,33 @@ document.addEventListener('keydown', (e) => {
 // V2.0 - BLOCO 7: Toggle Header
 // V40.2.27 — Refatoração picaprofunda (diagnóstico Jules):
 //   ANTES: usava header.style.height='100px' + overflow:hidden + paddingTop='110px' fixos.
-//          Esse "hack" cortava as pílulas i/✓/TAGs/Relatórios pela metade ao invés de escondê-las.
-//          Frágil em diferentes tamanhos de tela e tamanhos de fonte do usuário.
 //   AGORA: esconde com .classList.toggle('hidden') os 2 blocos (filtros + barra Planejado).
 //          O header naturalmente encolhe via flexbox. adjustTimelinePadding cuida do espaço.
 //          Comportamento ELÁSTICO — adapta-se ao tamanho real do conteúdo.
-window.toggleHeader = function() {
-    headerHidden = !headerHidden;
+//
+// V40.2.28 — Memória do usuário + paddings compactos no retraído:
+//   - Estado persistido em localStorage 'tb_header_collapsed'.
+//   - Default false (1ª vez = expandido — princípio de Discoverability).
+//   - applyHeaderState() centraliza aplicação do estado (init + toggle usam a mesma).
+//   - Classe CSS .header-collapsed reduz pt-12→32px, pb-4→4px, mb-4→0px (ganho ~36px).
+
+function applyHeaderState() {
     const header = document.querySelector('header');
     const filtersRow = document.getElementById('header-filters-row');
     const progressRow = document.getElementById('header-progress-row');
     const btn = document.querySelector('[onclick="toggleHeader()"]');
+    if (!header || !filtersRow || !progressRow) return;
 
     if (headerHidden) {
         filtersRow.classList.add('hidden');
         progressRow.classList.add('hidden');
-        if(btn) btn.innerHTML = '<i class="ph ph-caret-down text-base text-app-focus"></i>';
+        header.classList.add('header-collapsed');
+        if (btn) btn.innerHTML = '<i class="ph ph-caret-down text-base text-app-focus"></i>';
     } else {
         filtersRow.classList.remove('hidden');
         progressRow.classList.remove('hidden');
-        if(btn) btn.innerHTML = '<i class="ph ph-caret-up text-base text-app-focus"></i>';
+        header.classList.remove('header-collapsed');
+        if (btn) btn.innerHTML = '<i class="ph ph-caret-up text-base text-app-focus"></i>';
     }
 
     // Recalcula paddingTop da timeline AGORA que a altura real do header mudou.
@@ -2665,6 +2722,16 @@ window.toggleHeader = function() {
         if (timeline) timeline.style.paddingTop = (h + 8) + 'px';
     }, 50);
 }
+
+window.toggleHeader = function() {
+    headerHidden = !headerHidden;
+    localStorage.setItem('tb_header_collapsed', headerHidden ? 'true' : 'false');
+    applyHeaderState();
+}
+
+// V40.2.28: aplica estado inicial logo no carregamento da página.
+// setTimeout 100ms garante que o DOM já está pronto pra querySelectors.
+setTimeout(applyHeaderState, 100);
 
 // --- V2.0 - COMBO A: Edição ---
 let editingTaskId = null;
@@ -2877,3 +2944,493 @@ window.selectThemeColor = function(btn) {
     applyThemeColor();
     showToast("Cor atualizada!");
 }
+
+// =====================================================
+// V40.3 — MOTOR DE ROTINAS (Fase 1 — CRUD)
+// =====================================================
+let currentRtId = null;
+let currentRtDur = 120;
+let currentRtTheme = 'focus';
+let currentRtTagId = null;
+let currentRtMicroblocks = [];
+
+window.renderRoutinesList = function() {
+    const container = document.getElementById('routines-container');
+    if (!container) return;
+
+    if (routinesDb.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-8 opacity-60">
+                <i class="ph ph-stamp text-4xl mb-2 text-zinc-400"></i>
+                <p class="text-sm font-medium text-zinc-500">Nenhuma rotina criada.</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = routinesDb.sort((a,b) => b.createdAt - a.createdAt).map(r => {
+        const mbs = r.microblocks || [];
+        const previewMbs = mbs.slice(0, 3);
+        const extraCount = mbs.length - 3;
+        
+        let mbHtml = previewMbs.map(mb => `
+            <div class="flex items-center gap-1.5 mt-1">
+                <i class="ph-bold ph-check text-[10px] text-zinc-300 shrink-0"></i>
+                <span class="text-[11px] text-zinc-500 truncate">${escapeHtml(mb.title)}</span>
+            </div>
+        `).join('');
+        
+        if (extraCount > 0) {
+            mbHtml += `<div class="text-[10px] text-zinc-400 font-bold mt-1.5 ml-4">+ ${extraCount} mais</div>`;
+        } else if (mbs.length === 0) {
+            mbHtml += `<div class="text-[10px] text-zinc-400 italic mt-1">Sem checklist</div>`;
+        }
+
+        return `
+        <div class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative group mb-1">
+            <div class="flex justify-between items-start mb-2">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center text-xl shrink-0 shadow-inner">
+                        ${r.emoji || '✨'}
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-sm text-zinc-800 leading-tight">${escapeHtml(r.title)}</h4>
+                        <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(r.duration)} · ${mbs.length} itens</p>
+                    </div>
+                </div>
+                <button onclick="openRoutineForm('${r.id}')" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-400 rounded-lg hover:bg-zinc-100 hover:text-zinc-700 transition border border-transparent hover:border-zinc-200 shrink-0">
+                    <i class="ph ph-pencil-simple text-sm"></i>
+                </button>
+            </div>
+            <div class="w-full h-px bg-zinc-100 my-2.5"></div>
+            <div class="flex flex-col">
+                ${mbHtml}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+window.openRoutineForm = function(id = null) {
+    document.getElementById('routines-list-view').classList.add('hidden');
+    document.getElementById('routines-form-view').classList.remove('hidden');
+    document.getElementById('routines-form-view').classList.add('flex');
+    
+    currentRtId = id;
+    
+    if (id) {
+        const r = routinesDb.find(x => x.id === id);
+        if (!r) return;
+        document.getElementById('rt-form-title-label').innerText = 'Editar Rotina';
+        document.getElementById('rt-form-emoji').value = r.emoji || '';
+        document.getElementById('rt-form-title').value = r.title;
+        currentRtDur = r.duration;
+        currentRtTheme = r.theme;
+        currentRtTagId = r.tagId;
+        currentRtMicroblocks = JSON.parse(JSON.stringify(r.microblocks || []));
+        document.getElementById('rt-form-delete-btn').classList.remove('hidden');
+        document.getElementById('rt-form-delete-btn').classList.add('flex');
+    } else {
+        document.getElementById('rt-form-title-label').innerText = 'Nova Rotina';
+        document.getElementById('rt-form-emoji').value = '';
+        document.getElementById('rt-form-title').value = '';
+        currentRtDur = 120;
+        currentRtTheme = 'focus';
+        currentRtTagId = null;
+        currentRtMicroblocks = [{title: ''}];
+        document.getElementById('rt-form-delete-btn').classList.add('hidden');
+        document.getElementById('rt-form-delete-btn').classList.remove('flex');
+    }
+    
+    updateRtFormVisuals();
+    renderRtFormMicroblocks();
+}
+
+window.closeRoutineForm = function(force = false) {
+    const formView = document.getElementById('routines-form-view');
+    const listView = document.getElementById('routines-list-view');
+    if (!formView || !listView) return;
+    formView.classList.add('hidden');
+    formView.classList.remove('flex');
+    listView.classList.remove('hidden');
+    if (!force) renderRoutinesList();
+}
+
+window.changeRoutineFormDuration = function(delta) {
+    currentRtDur += delta;
+    if (currentRtDur < 15) currentRtDur = 15;
+    if (currentRtDur > 480) currentRtDur = 480;
+    updateRtFormVisuals();
+}
+
+window.selectRoutineFormTheme = function(theme) {
+    currentRtTheme = theme;
+    updateRtFormVisuals();
+}
+
+window.selectRoutineFormTag = function(tagId) {
+    currentRtTagId = currentRtTagId === tagId ? null : tagId;
+    updateRtFormVisuals();
+}
+
+function updateRtFormVisuals() {
+    document.getElementById('rt-form-dur-label').innerText = formatDur(currentRtDur);
+    
+    const btnFocus = document.getElementById('rt-theme-focus');
+    const btnRest = document.getElementById('rt-theme-rest');
+    if (currentRtTheme === 'focus') {
+        btnFocus.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-app-focus text-white border-transparent shadow-sm';
+        btnRest.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50';
+    } else {
+        btnRest.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-zinc-700 text-white border-transparent shadow-sm';
+        btnFocus.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50';
+    }
+
+    const tagContainer = document.getElementById('rt-form-tag-container');
+    if (tagContainer) {
+        let html = `<button onclick="selectRoutineFormTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-xs font-bold transition whitespace-nowrap ${currentRtTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'}">Sem Tag</button>`;
+        tagsDb.forEach(t => {
+            const isActive = currentRtTagId === t.id;
+            const bgColor = isActive ? t.color : t.color + '15';
+            const textColor = isActive ? '#fff' : t.color;
+            const borderColor = isActive ? t.color : t.color + '40';
+            const dotColor = isActive ? '#fff' : t.color;
+            const extraClass = isActive ? 'shadow-md' : 'opacity-80 hover:opacity-100';
+            html += `<button onclick="selectRoutineFormTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold transition whitespace-nowrap ${extraClass}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid ${borderColor}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${dotColor};"></div>${escapeHtml(t.name)}</button>`;
+        });
+        tagContainer.innerHTML = html;
+    }
+}
+
+function syncRtMicroblocksFromDOM() {
+    currentRtMicroblocks = Array.from(document.querySelectorAll('.rt-mb-input')).map(input => ({ title: input.value }));
+}
+
+window.addRoutineMicroblockForm = function() {
+    syncRtMicroblocksFromDOM();
+    currentRtMicroblocks.push({title: ''});
+    renderRtFormMicroblocks();
+}
+
+window.removeRoutineMicroblockForm = function(index) {
+    syncRtMicroblocksFromDOM();
+    currentRtMicroblocks.splice(index, 1);
+    renderRtFormMicroblocks();
+}
+
+function renderRtFormMicroblocks() {
+    const container = document.getElementById('rt-form-microblocks');
+    if (!container) return;
+    container.innerHTML = currentRtMicroblocks.map((mb, i) => `
+        <div class="flex items-center gap-2">
+            <div class="w-5 h-5 rounded-md border border-zinc-300 shrink-0 bg-zinc-50 flex items-center justify-center"><i class="ph ph-check text-[10px] text-zinc-300"></i></div>
+            <input type="text" class="rt-mb-input flex-1 h-10 bg-zinc-50 border border-zinc-200 rounded-lg px-3 text-sm text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: Ler 10 páginas" value="${escapeHtml(mb.title)}">
+            <button onclick="removeRoutineMicroblockForm(${i})" class="w-8 h-10 flex items-center justify-center text-zinc-400 hover:text-red-500 transition shrink-0"><i class="ph ph-x"></i></button>
+        </div>
+    `).join('');
+}
+
+window.saveRoutine = function() {
+    const emoji = document.getElementById('rt-form-emoji').value.trim() || '✨';
+    const title = document.getElementById('rt-form-title').value.trim();
+    
+    if (!title) return showToast('A rotina precisa de um nome.');
+
+    syncRtMicroblocksFromDOM();
+    const validMbs = currentRtMicroblocks.filter(mb => mb.title.trim() !== '').map(mb => ({ title: mb.title.trim() }));
+
+    if (currentRtId) {
+        const r = routinesDb.find(x => x.id === currentRtId);
+        if (r) {
+            r.emoji = emoji;
+            r.title = title;
+            r.duration = currentRtDur;
+            r.theme = currentRtTheme;
+            r.tagId = currentRtTagId;
+            r.microblocks = validMbs;
+        }
+        showToast('Rotina atualizada!');
+    } else {
+        routinesDb.push({
+            id: 'rt_' + Date.now(),
+            title: title, emoji: emoji,
+            duration: currentRtDur, theme: currentRtTheme, tagId: currentRtTagId,
+            microblocks: validMbs, createdAt: Date.now()
+        });
+        showToast('Rotina criada!');
+    }
+    
+    saveRoutinesDb();
+    closeRoutineForm();
+}
+
+let pendingRoutineDeleteId = null;
+
+window.deleteRoutineFromForm = function() {
+    if (!currentRtId) return;
+    pendingRoutineDeleteId = currentRtId;
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    document.getElementById('routine-delete-modal').classList.remove('hidden');
+    document.getElementById('routine-delete-modal').classList.add('flex');
+}
+
+window.confirmDeleteRoutine = function() {
+    if (!pendingRoutineDeleteId) return;
+    routinesDb = routinesDb.filter(x => x.id !== pendingRoutineDeleteId);
+    saveRoutinesDb();
+    pendingRoutineDeleteId = null;
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    document.getElementById('routine-delete-modal').classList.add('hidden');
+    document.getElementById('routine-delete-modal').classList.remove('flex');
+    closeRoutineForm();
+    showToast('Rotina apagada.');
+}
+
+window.cancelDeleteRoutine = function() {
+    pendingRoutineDeleteId = null;
+    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    document.getElementById('routine-delete-modal').classList.add('hidden');
+    document.getElementById('routine-delete-modal').classList.remove('flex');
+}
+
+// =====================================================
+// V40.3.2 — DRAG DE MICROBLOCKS (reorder dentro do card expandido)
+// =====================================================
+// Gesto: long-press 400ms em qualquer parte do microbloc → escala 1.05 → arrastar pra reorder
+// Discovery: tooltip "Segure pra reordenar" nas primeiras 3 vezes que user expande card com >=2 microblocks
+//
+// Armadilhas tratadas (do dossiê A1-A20):
+//   A1: tocar em x<40 cai no drag-handle do card. Mitigação: microblocks ficam em ml-10 (x>=40)
+//   A2/A3/A7: touchmove com preventDefault impede scroll vazar (browser respeita após gesto consolidado)
+//   A4/A5: tap rápido (<400ms) → click padrão (toggle/delete); long-press → drag (cancela click)
+//   A6: setamos isPhysicsBusy=true durante drag de microbloc também (impede auto-retrair)
+//   A8: limitamos Y do dedo ao container microblocksSection (clamp)
+//   A9: getBoundingClientRect calculado UMA vez no longpress fire (cache pra performance)
+//   A11/A12: durante drag ativo, mbDragActive=true bloqueia renderTimeline reentrante
+//   A18: CSS touch-callout:none + user-select:none nos microblocks
+//   A19: só processa e.touches[0]
+//   A20: touchend sempre é capturado, mesmo fora do elemento
+let mbDragActive = false;
+let mbDragLongPressTimer = null;
+let mbDragInitialY = 0;
+let mbDragInitialX = 0;
+let mbDragBlockId = null;
+let mbDragFromIndex = -1;
+let mbDragToIndex = -1;
+let mbDragRects = [];
+let mbDragSourceEl = null;
+let mbDragDropLineEl = null;
+let mbDragClickSuppress = false;
+
+const MB_DRAG_LONGPRESS_MS = 400;
+const MB_DRAG_MOVE_CANCEL_PX = 8; // se mover >8px antes do timer, cancela longpress (= scroll)
+
+// Discovery tooltip (V40.3.2)
+function maybeShowMbDragTooltip(blockEl, block) {
+    if (!block.expanded) return;
+    if (!block.microblocks || block.microblocks.length < 2) return;
+    
+    const shownCount = parseInt(localStorage.getItem('tb_mb_drag_tooltip_count') || '0', 10);
+    if (shownCount >= 3) return;
+    
+    // Verifica se já tem tooltip nesse card (evita duplicar)
+    if (blockEl.querySelector('.mb-drag-tooltip')) return;
+    
+    const tooltip = document.createElement('div');
+    tooltip.className = 'mb-drag-tooltip absolute top-12 left-12 right-3 z-[55] px-3 py-1.5 bg-zinc-900/90 backdrop-blur-sm text-white text-[10px] font-medium rounded-lg shadow-lg pointer-events-none flex items-center gap-1.5 transition-opacity duration-500';
+    tooltip.innerHTML = '<i class="ph ph-hand-tap text-xs"></i> Segure num check pra reordenar';
+    blockEl.appendChild(tooltip);
+    
+    localStorage.setItem('tb_mb_drag_tooltip_count', String(shownCount + 1));
+    
+    setTimeout(() => {
+        tooltip.style.opacity = '0';
+        setTimeout(() => tooltip.remove(), 500);
+    }, 3000);
+}
+
+// Setup do drag em cada microbloc — chamado de drawBlock (ao final, junto com enablePhysics)
+function setupMicroblockDrag(cardEl, block) {
+    if (!block.expanded) return;
+    if (!block.microblocks || block.microblocks.length < 2) return; // 1 item só não tem o que reordenar
+    
+    const mbItems = cardEl.querySelectorAll('.mb-item');
+    mbItems.forEach((mbEl, idx) => {
+        mbEl.addEventListener('touchstart', (e) => onMbDragTouchStart(e, block, idx, mbEl), {passive: false});
+        mbEl.addEventListener('mousedown', (e) => onMbDragTouchStart(e, block, idx, mbEl));
+    });
+}
+
+function onMbDragTouchStart(e, block, idx, mbEl) {
+    // Multi-touch: só processa o primeiro dedo
+    if (e.touches && e.touches.length > 1) return;
+    
+    const point = e.touches ? e.touches[0] : e;
+    mbDragInitialY = point.clientY;
+    mbDragInitialX = point.clientX;
+    mbDragBlockId = block.id;
+    mbDragFromIndex = idx;
+    mbDragSourceEl = mbEl;
+    mbDragClickSuppress = false;
+    
+    // Inicia timer de long-press
+    mbDragLongPressTimer = setTimeout(() => {
+        activateMbDrag(block, idx, mbEl);
+    }, MB_DRAG_LONGPRESS_MS);
+    
+    // Listener de movimento — se mover >8px ANTES do timer disparar, cancela longpress (= scroll)
+    const onTouchMovePre = (ev) => {
+        const p = ev.touches ? ev.touches[0] : ev;
+        const dy = Math.abs(p.clientY - mbDragInitialY);
+        const dx = Math.abs(p.clientX - mbDragInitialX);
+        if ((dy > MB_DRAG_MOVE_CANCEL_PX || dx > MB_DRAG_MOVE_CANCEL_PX) && !mbDragActive) {
+            // cancela longpress — usuário tava tentando scroll/swipe normal
+            cancelMbDragLongPress();
+        }
+    };
+    
+    const onTouchEndPre = () => {
+        cancelMbDragLongPress();
+        document.removeEventListener('touchmove', onTouchMovePre);
+        document.removeEventListener('touchend', onTouchEndPre);
+        document.removeEventListener('mousemove', onTouchMovePre);
+        document.removeEventListener('mouseup', onTouchEndPre);
+    };
+    
+    document.addEventListener('touchmove', onTouchMovePre, {passive: true});
+    document.addEventListener('touchend', onTouchEndPre);
+    document.addEventListener('mousemove', onTouchMovePre);
+    document.addEventListener('mouseup', onTouchEndPre);
+}
+
+function cancelMbDragLongPress() {
+    if (mbDragLongPressTimer) {
+        clearTimeout(mbDragLongPressTimer);
+        mbDragLongPressTimer = null;
+    }
+}
+
+function activateMbDrag(block, idx, mbEl) {
+    mbDragLongPressTimer = null;
+    mbDragActive = true;
+    mbDragClickSuppress = true;
+    isPhysicsBusy = true; // A6/A11: impede card auto-retrair durante drag
+    
+    // Feedback visual no microbloc arrastado
+    mbEl.classList.add('mb-dragging');
+    
+    // Cache dos rects dos outros microblocks (A9/A17 — uma vez só)
+    const cardEl = document.querySelector(`[data-block-id="${block.id}"]`);
+    if (!cardEl) return;
+    const allMbs = cardEl.querySelectorAll('.mb-item');
+    mbDragRects = Array.from(allMbs).map((el, i) => ({
+        el: el,
+        idx: i,
+        rect: el.getBoundingClientRect()
+    }));
+    
+    // Cria linha de drop visual (drop indicator)
+    mbDragDropLineEl = document.createElement('div');
+    mbDragDropLineEl.className = 'mb-drop-line';
+    
+    // Vibração leve no Android pra confirmar pegou (se suportado)
+    if (navigator.vibrate) navigator.vibrate(20);
+    
+    // Agora registra os handlers de move/end (substitui os pre-handlers)
+    document.addEventListener('touchmove', onMbDragMove, {passive: false});
+    document.addEventListener('touchend', onMbDragEnd);
+    document.addEventListener('touchcancel', onMbDragEnd);
+    document.addEventListener('mousemove', onMbDragMove);
+    document.addEventListener('mouseup', onMbDragEnd);
+}
+
+function onMbDragMove(e) {
+    if (!mbDragActive) return;
+    e.preventDefault(); // A2/A3/A7: impede scroll vazar
+    
+    const point = e.touches ? e.touches[0] : e;
+    const y = point.clientY;
+    
+    // Calcula sobre qual microbloc o dedo está
+    let newIdx = mbDragFromIndex;
+    for (let i = 0; i < mbDragRects.length; i++) {
+        const r = mbDragRects[i].rect;
+        const midY = r.top + r.height / 2;
+        if (i === mbDragFromIndex) continue; // pula o próprio item arrastado
+        if (i < mbDragFromIndex && y < midY) {
+            newIdx = i;
+            break;
+        }
+        if (i > mbDragFromIndex && y > midY) {
+            newIdx = i;
+        }
+    }
+    
+    if (newIdx !== mbDragToIndex) {
+        mbDragToIndex = newIdx;
+        // Posiciona drop-line antes do mbDragRects[newIdx]
+        positionDropLine(newIdx);
+    }
+}
+
+function positionDropLine(targetIdx) {
+    if (!mbDragDropLineEl || !mbDragRects[targetIdx]) return;
+    const targetEl = mbDragRects[targetIdx].el;
+    
+    // Se newIdx > fromIndex, drop-line vai DEPOIS do target. Se <, vai ANTES.
+    if (targetIdx > mbDragFromIndex) {
+        targetEl.parentNode.insertBefore(mbDragDropLineEl, targetEl.nextSibling);
+    } else {
+        targetEl.parentNode.insertBefore(mbDragDropLineEl, targetEl);
+    }
+}
+
+function onMbDragEnd(e) {
+    document.removeEventListener('touchmove', onMbDragMove);
+    document.removeEventListener('touchend', onMbDragEnd);
+    document.removeEventListener('touchcancel', onMbDragEnd);
+    document.removeEventListener('mousemove', onMbDragMove);
+    document.removeEventListener('mouseup', onMbDragEnd);
+    
+    if (!mbDragActive) return;
+    mbDragActive = false;
+    
+    // Aplica reorder se mudou de posição
+    if (mbDragToIndex !== -1 && mbDragToIndex !== mbDragFromIndex && mbDragBlockId) {
+        const block = db.find(b => b.id === mbDragBlockId);
+        if (block && block.microblocks) {
+            const [moved] = block.microblocks.splice(mbDragFromIndex, 1);
+            block.microblocks.splice(mbDragToIndex, 0, moved);
+            saveDb();
+        }
+    }
+    
+    // Cleanup visual
+    if (mbDragSourceEl) mbDragSourceEl.classList.remove('mb-dragging');
+    if (mbDragDropLineEl) mbDragDropLineEl.remove();
+    
+    // Reset estado
+    mbDragSourceEl = null;
+    mbDragDropLineEl = null;
+    mbDragFromIndex = -1;
+    mbDragToIndex = -1;
+    mbDragRects = [];
+    mbDragBlockId = null;
+    
+    // Libera card pra retrair de novo, mas dá uma folga
+    setTimeout(() => { isPhysicsBusy = false; }, 200);
+    
+    // Re-render pra refletir nova ordem
+    renderTimeline();
+    
+    // Suprime o "click" sintético que vem após touchend (evita disparar toggle/delete)
+    setTimeout(() => { mbDragClickSuppress = false; }, 100);
+}
+
+// Interceptador de clicks: se mbDragClickSuppress true, cancela o click pra não disparar
+// toggleMicroblock/deleteMicroblock após um drag.
+document.addEventListener('click', (e) => {
+    if (mbDragClickSuppress) {
+        e.stopPropagation();
+        e.preventDefault();
+    }
+}, true);
+

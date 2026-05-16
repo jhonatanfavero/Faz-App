@@ -254,16 +254,95 @@
                 </div>
             </div>
 
-            <!-- V40.1: View 2 - Rotinas (placeholder, será implementado em V40.2) -->
-            <div id="view-routines" class="flex-1 flex flex-col min-h-0 hidden">
-                <div class="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
-                    <div class="w-16 h-16 rounded-2xl bg-app-focus-soft text-app-focus flex items-center justify-center mb-4">
-                        <i class="ph ph-arrows-clockwise text-3xl"></i>
+            <!-- V40.3 Fase 1: View Rotinas com CRUD funcional. 
+                 Mantém classes flex-1 flex flex-col min-h-0 hidden (padrão das outras views) -->
+            <div id="view-routines" class="flex-1 flex flex-col min-h-0 hidden bg-zinc-50/50 overflow-hidden">
+                
+                <!-- Sub-view 1: Lista de rotinas -->
+                <div id="routines-list-view" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 relative">
+                    <div class="text-center mb-5 mt-2">
+                        <p class="text-xs text-zinc-500 font-medium flex items-center justify-center gap-1.5">
+                            <i class="ph-fill ph-stamp text-app-focus text-sm"></i>
+                            Toque numa rotina pra carimbar no seu dia
+                        </p>
                     </div>
-                    <h3 class="text-base font-bold text-zinc-800 mb-1">Rotinas Visuais</h3>
-                    <p class="text-xs text-zinc-500 leading-relaxed max-w-[280px]">
-                        Em breve: crie kits de blocos (ex: "Manhã Produtiva") e carimbe na timeline com 1 toque.
-                    </p>
+                    
+                    <div id="routines-container" class="flex flex-col gap-3">
+                        <!-- preenchido por renderRoutinesList() -->
+                    </div>
+                    
+                    <button onclick="openRoutineForm()" class="mt-4 w-full py-3.5 rounded-xl border-2 border-dashed border-zinc-300 text-zinc-500 font-bold hover:bg-zinc-100 hover:border-zinc-400 hover:text-zinc-700 transition flex items-center justify-center gap-2 active:scale-[0.98]">
+                        <i class="ph ph-plus text-lg"></i> Nova Rotina
+                    </button>
+                </div>
+
+                <!-- Sub-view 2: Formulário (criar/editar) -->
+                <div id="routines-form-view" class="hidden flex-col h-full relative bg-white">
+                    <div class="shrink-0 px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <button onclick="closeRoutineForm()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-full hover:bg-zinc-200 transition active:scale-90">
+                                <i class="ph ph-arrow-left text-sm"></i>
+                            </button>
+                            <h3 id="rt-form-title-label" class="font-bold text-zinc-800 text-sm">Nova Rotina</h3>
+                        </div>
+                        <button id="rt-form-delete-btn" onclick="deleteRoutineFromForm()" class="hidden w-8 h-8 items-center justify-center text-zinc-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition">
+                            <i class="ph ph-trash"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto no-scrollbar p-4 pb-24">
+                        
+                        <div class="flex gap-2 mb-5">
+                            <div class="shrink-0 relative w-14">
+                                <input type="text" id="rt-form-emoji" class="w-full h-12 bg-zinc-50 border border-zinc-200 rounded-xl text-center text-xl outline-none focus:border-app-focus focus:bg-white transition" placeholder="🌞" maxlength="2">
+                            </div>
+                            <div class="flex-1 relative">
+                                <input type="text" id="rt-form-title" class="w-full h-12 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Nome da rotina" maxlength="40">
+                            </div>
+                        </div>
+
+                        <div class="mb-5">
+                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Duração Total</label>
+                            <div class="flex items-center gap-3">
+                                <button onclick="changeRoutineFormDuration(-15)" class="w-12 h-12 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition active:scale-95"><i class="ph ph-minus font-bold text-lg"></i></button>
+                                <div class="flex-1 h-12 flex items-center justify-center bg-zinc-50 border border-zinc-200 rounded-xl">
+                                    <span id="rt-form-dur-label" class="font-bold text-zinc-800 text-sm">2h 0m</span>
+                                </div>
+                                <button onclick="changeRoutineFormDuration(15)" class="w-12 h-12 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition active:scale-95"><i class="ph ph-plus font-bold text-lg"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="mb-5">
+                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Tipo</label>
+                            <div class="flex gap-2">
+                                <button onclick="selectRoutineFormTheme('focus')" id="rt-theme-focus" class="flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-app-focus text-white border-transparent shadow-sm">Foco</button>
+                                <button onclick="selectRoutineFormTheme('rest')" id="rt-theme-rest" class="flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50">Descanso</button>
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Tag (Opcional)</label>
+                            <div id="rt-form-tag-container" class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                                <!-- preenchido por updateRtFormVisuals() -->
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Checklist Interna</label>
+                            <div id="rt-form-microblocks" class="flex flex-col gap-2 mb-2">
+                                <!-- preenchido por renderRtFormMicroblocks() -->
+                            </div>
+                            <button onclick="addRoutineMicroblockForm()" class="w-full py-3 rounded-xl border border-zinc-200 bg-white text-zinc-600 text-xs font-bold hover:bg-zinc-50 transition flex items-center justify-center gap-1.5 mt-2 active:scale-[0.98]">
+                                <i class="ph ph-plus"></i> Adicionar item
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="absolute bottom-0 left-0 right-0 bg-white border-t border-zinc-100 p-4 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+                        <button onclick="saveRoutine()" class="w-full h-12 flex items-center justify-center bg-app-focus text-white rounded-xl font-bold hover:shadow-lg transition active:scale-95 text-sm">
+                            Salvar Rotina
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -608,6 +687,21 @@
                     <i class="ph ph-trash text-lg"></i> Excluir Definitivo
                 </button>
                 <button onclick="cancelDelete()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+
+        <!-- MODAL: DELETAR ROTINA (V40.3 Fase 1) — padrão visual do delete-task -->
+        <div id="routine-delete-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+            <div class="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-3"><i class="ph ph-warning text-2xl"></i></div>
+            <h3 class="text-lg font-bold text-zinc-900 mb-2 text-center leading-tight">Apagar Rotina?</h3>
+            <p class="text-xs text-zinc-500 text-center mb-6">Não afeta cartões já criados a partir dela na agenda.</p>
+            <div class="flex flex-col gap-2">
+                <button onclick="confirmDeleteRoutine()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] transition">
+                    <i class="ph ph-trash text-lg"></i> Apagar Rotina
+                </button>
+                <button onclick="cancelDeleteRoutine()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
                     Cancelar
                 </button>
             </div>

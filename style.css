@@ -6,8 +6,50 @@ html {
 }
 
 body { touch-action: pan-y; background-color: #e2e8f0; overscroll-behavior-x: none; }
+
+/* V40.2.28 — Header retraído COMPACTO (recupera ~36px de tela útil).
+   Quando o usuário recolhe o menu (toggleHeader), além de esconder os blocos internos
+   (filtros + barra Planejado), os paddings/margens externos também diminuem pra que
+   o cluster de botões fique colado quase rente ao topo e ao limite inferior do header.
+   - pt-12 (48px) → 32px (respeita notch/status bar mas mais econômico)
+   - pb-4 (16px) → 4px (botões quase encostam no border-bottom)
+   - mb-4 do flex interno (16px) → 0px (sem espaço residual depois do cluster)
+   Economia total: ~36px de tela útil visíveis a mais. */
+header.header-collapsed {
+    padding-top: 32px !important;
+    padding-bottom: 4px !important;
+}
+header.header-collapsed > div:first-child {
+    margin-bottom: 0 !important;
+}
+
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* V40.3.2 — Drag de microblocks dentro do card expandido.
+   .mb-item: bloqueia menu nativo do Android (long-press = copiar texto).
+   .mb-dragging: feedback visual durante drag — escala + sombra + opacidade.
+   .mb-drop-line: linha azul fina indicando onde o microbloc cairá. */
+.mb-item {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+.mb-dragging {
+    opacity: 0.5;
+    transform: scale(1.05);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    z-index: 45 !important;
+}
+.mb-drop-line {
+    height: 2px;
+    background-color: var(--app-focus, #4f46e5);
+    margin: 2px 0;
+    border-radius: 2px;
+    box-shadow: 0 0 8px var(--app-focus, #4f46e5);
+    pointer-events: none;
+}
 .glow-line { box-shadow: 0 0 8px rgba(0,210,255,0.8); }
 .drag-handle {
     /* V40.2.23: touch-action: none impede que o browser interprete o gesto inicial como

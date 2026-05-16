@@ -1,5 +1,5 @@
-// V4.9 - v40.2.27 (Header recolhível REFATORADO: removido hack do height:100px fixo + overflow:hidden — agora esconde blocos com display:none, header encolhe naturalmente, paddingTop dinâmico)
-const CACHE_NAME = 'timeblock-v40-2-27';
+// V5.2 - v40.3.2 (Pacote: V40.2.28 header memória + V40.3.1 Rotinas CRUD + V40.3.2 drag de microblocks via long-press 400ms)
+const CACHE_NAME = 'timeblock-v40-3-2';
 const ASSETS = [
   './',
   './index.html',

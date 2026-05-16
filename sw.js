@@ -1,5 +1,5 @@
-// V5.7 - v40.3.2-fix5 (FIX BUG ORIGINAL: moveToBacklog e scheduleBacklogItem agora preservam microblocks ao mover pra Lista e reagendar)
-const CACHE_NAME = 'timeblock-v40-3-2-fix5';
+// V5.8 - v40.3.3 (Carimbar Rotinas Fase 2: botão ✋ no card de rotina → pendingIntent + blocos pulsantes + encaixe + card retraído com microblocks. getMaxGapForDay valida espaço antes.)
+const CACHE_NAME = 'timeblock-v40-3-3';
 const ASSETS = [
   './',
   './index.html',

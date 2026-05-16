@@ -3027,9 +3027,15 @@ window.renderRoutinesList = function() {
                         <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(r.duration)} · ${mbs.length} itens</p>
                     </div>
                 </div>
-                <button onclick="openRoutineForm('${r.id}')" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-400 rounded-lg hover:bg-zinc-100 hover:text-zinc-700 transition border border-transparent hover:border-zinc-200 shrink-0">
-                    <i class="ph ph-pencil-simple text-sm"></i>
-                </button>
+                <!-- V40.3.3: botões ✋ Carimbar + ✏️ Editar (B14: gap-1.5 entre eles) -->
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button onclick="stampRoutine('${r.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong transition active:scale-95" title="Carimbar no dia">
+                        <i class="ph-fill ph-hand-tap text-sm"></i>
+                    </button>
+                    <button onclick="openRoutineForm('${r.id}')" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-400 rounded-lg hover:bg-zinc-100 hover:text-zinc-700 transition border border-transparent hover:border-zinc-200">
+                        <i class="ph ph-pencil-simple text-sm"></i>
+                    </button>
+                </div>
             </div>
             <div class="w-full h-px bg-zinc-100 my-2.5"></div>
             <div class="flex flex-col">
@@ -3219,6 +3225,87 @@ window.cancelDeleteRoutine = function() {
     document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
     document.getElementById('routine-delete-modal').classList.add('hidden');
     document.getElementById('routine-delete-modal').classList.remove('flex');
+}
+
+// =====================================================
+// V40.3.3 — CARIMBAR ROTINA (Fase 2)
+// =====================================================
+// Quando user toca em ✋ no card de rotina:
+// 1. Calcula maior gap disponível no dia ativo (replica lógica do renderTimeline)
+// 2. Se duração da rotina > maior gap → toast "Sem espaço suficiente" + return
+// 3. Senão: clona rotina pra pendingIntent (com microblocks)
+// 4. Fecha sheets, mostra floating-task, renderTimeline (blocos pulsantes ativam)
+// 5. Card carimbado vira block normal (retraído por default — decisão 3b do usuário)
+//
+// Armadilhas tratadas (B1-B15):
+//   B1: sobrescreve pendingIntent silenciosamente (igual scheduleBacklogItem)
+//   B2: microblocks sempre array (|| [])
+//   B3: getMaxGapForDay calcula, toast se não couber
+//   B4: theme propagado corretamente via pendingIntent
+//   B5: tagId pode apontar pra tag deletada — getTagColor lida
+//   B6: closeAllSheets antes de setar pendingIntent
+//   B8: stampRoutine não chama renderTimeline diretamente (renderFloatingTask faz)
+//   B13: emoji prefixado no title (visual igual aos outros cartões)
+//   B14: container flex com gap-1.5, botões w-8 h-8
+
+function getMaxGapForDay() {
+    // Replica a lógica de gap-detection do renderTimeline (linhas 656-674).
+    // Retorna a maior duração de gap (em minutos) no dia ativo.
+    const activeDate = getActiveDateStr();
+    let dailyDb = db.filter(b => b.date === activeDate || (!b.date && activeDate === getTodayStr()));
+    dailyDb = dailyDb.filter(b => b.startMin < END_HOUR * 60 && (b.startMin + b.duration) > START_HOUR * 60);
+    dailyDb.sort((a, b) => a.startMin - b.startMin);
+    
+    let cursorMin = START_HOUR * 60;
+    let maxGap = 0;
+    
+    dailyDb.forEach(fb => {
+        if (fb.startMin > cursorMin) {
+            maxGap = Math.max(maxGap, fb.startMin - cursorMin);
+        }
+        cursorMin = Math.max(cursorMin, fb.startMin + fb.duration);
+    });
+    
+    const endOfDay = END_HOUR * 60;
+    if (cursorMin < endOfDay) {
+        maxGap = Math.max(maxGap, endOfDay - cursorMin);
+    }
+    
+    return maxGap;
+}
+
+window.stampRoutine = function(routineId) {
+    const r = routinesDb.find(x => x.id === routineId);
+    if (!r) return;
+    
+    // B3: verifica se cabe no dia
+    const maxGap = getMaxGapForDay();
+    if (r.duration > maxGap) {
+        showToast(`Sem espaço suficiente hoje (livre: ${formatDur(maxGap)})`);
+        return;
+    }
+    
+    // B13: emoji prefixado no title pra visual consistente nos cartões existentes
+    const cardTitle = r.emoji ? `${r.emoji} ${r.title}` : r.title;
+    
+    // B1, B2: sobrescreve pendingIntent silenciosamente, microblocks sempre array
+    pendingIntent = {
+        title: cardTitle,
+        duration: r.duration,
+        theme: r.theme || 'focus',
+        tagId: r.tagId || null,
+        microblocks: (r.microblocks || []).map(mb => ({ title: mb.title, done: false }))
+    };
+    selectedDur = r.duration;
+    syncDurButtons(selectedDur);
+    
+    document.getElementById('floating-title').innerText = cardTitle;
+    document.getElementById('floating-task').classList.remove('hidden');
+    document.getElementById('floating-task').classList.add('flex');
+    
+    closeAllSheets(); // B6
+    renderTimeline(); // ativa blocos pulsantes via performEncaixe
+    showToast('Toque num Tempo Livre pra encaixar 👇');
 }
 
 // =====================================================

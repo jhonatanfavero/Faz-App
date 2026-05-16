@@ -2798,12 +2798,14 @@ function applyHeaderState() {
         filtersRow.classList.add('hidden');
         progressRow.classList.add('hidden');
         header.classList.add('header-collapsed');
-        if (btn) btn.innerHTML = '<i class="ph ph-caret-down text-base text-app-focus"></i>';
+        // V40.3.6: botão tem fundo bg-app-focus, ícone tem que ser branco pra contrastar.
+        if (btn) btn.innerHTML = '<i class="ph ph-caret-down text-base text-white"></i>';
     } else {
         filtersRow.classList.remove('hidden');
         progressRow.classList.remove('hidden');
         header.classList.remove('header-collapsed');
-        if (btn) btn.innerHTML = '<i class="ph ph-caret-up text-base text-app-focus"></i>';
+        // V40.3.6: idem
+        if (btn) btn.innerHTML = '<i class="ph ph-caret-up text-base text-white"></i>';
     }
 
     // Recalcula paddingTop da timeline AGORA que a altura real do header mudou.

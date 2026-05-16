@@ -1,5 +1,5 @@
-// V6.2 - v40.3.5-fix2 (FIX CRÍTICO TDZ: expandedBacklogIds e expandedRoutineIds movidas pro topo do arquivo. Eram declaradas DEPOIS de renderBacklog/renderRoutinesList ser chamado no init → ReferenceError fatal que parava o boot → botão Lista, toggleHeader e ocultação do pensamento do dia não funcionavam. Mesma lição do desastre TDZ V40.3.2 com mbDragActive.)
-const CACHE_NAME = 'timeblock-v40-3-5-fix2';
+// V6.3 - v40.3.6 (Botões "Hoje" e "Ocultar Menu" do header pintados com cor do tema — bg-app-focus + text-white pra contrastar. Aplicado em HTML e nos innerHTML do toggleHeader.)
+const CACHE_NAME = 'timeblock-v40-3-6';
 const ASSETS = [
   './',
   './index.html',

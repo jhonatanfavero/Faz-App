@@ -1,5 +1,5 @@
-// V5.9 - v40.3.4 (Redesign Lista: 2 sub-views (list + form), botão "+ Nova Tarefa" estilo FAB+, cards com ✋+🗑️ no início, checklist no item, edição via tap, stepper duração)
-const CACHE_NAME = 'timeblock-v40-3-4';
+// V6.1 - v40.3.5-fix (Fixes do Gemini: 🗑️ no card de Rotina + requestDeleteRoutine; overlay z-55 ao abrir modais novos; cleanup expanded Sets na deleção; closeAllSheets defensivo)
+const CACHE_NAME = 'timeblock-v40-3-5-fix';
 const ASSETS = [
   './',
   './index.html',

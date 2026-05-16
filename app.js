@@ -1483,6 +1483,9 @@ window.openListSheet = () => {
 
 window.closeAllSheets = () => {
     overlay.classList.add('opacity-0', 'pointer-events-none');
+    // V40.3.5-fix: reseta zIndex inline (caso requestDeleteBacklog/Routine tenha setado pra '55')
+    // pra não vazar pro próximo uso do overlay com outras sheets.
+    overlay.style.zIndex = '';
     sheet.classList.add('translate-y-full');
     listSheet.classList.add('translate-y-full');
     document.getElementById('config-sheet').classList.add('translate-y-full');
@@ -1509,6 +1512,9 @@ window.closeAllSheets = () => {
     cancelEdit();
     cancelDelete();
     cancelTimePicker();
+    // V40.3.5-fix: defesa em profundidade — fecha modais novos de delete se ainda estiverem abertos.
+    if (typeof cancelDeleteRoutine === 'function') cancelDeleteRoutine();
+    if (typeof cancelDeleteBacklog === 'function') cancelDeleteBacklog();
 
     input.blur();
     backlogInput.blur();
@@ -1812,54 +1818,76 @@ function renderBacklog() {
         return;
     }
 
-    // V40.3.4: layout novo — botões ✋ + 🗑️ no INÍCIO (compactos), conteúdo à direita.
-    // Toque no card (não nos botões) abre edit. event.stopPropagation nos botões (C11).
+    // V40.3.5: layout do card da Lista IDÊNTICO ao das Rotinas.
+    // Ícone genérico (📋) à esquerda, título + duração no meio, botões ✋ + 🗑️ no topo direito,
+    // divisor horizontal antes da checklist. Toque no corpo do card abre form de edição.
+    // 🗑️ pede confirmação via modal backlog-delete-modal (criado em V40.3.5).
     container.innerHTML = backlogDb.map(item => {
         const tagColor = item.tagId ? getTagColor(item.tagId) : null;
-        const tagHtml = tagColor ? `<div class="w-2 h-2 rounded-full shrink-0" style="background-color: ${tagColor};"></div>` : '';
         
-        // Checklist preview (C10: 3 primeiros + "mais X")
         const mbs = item.microblocks || [];
-        const previewMbs = mbs.slice(0, 3);
+        const isExpanded = expandedBacklogIds.has(item.id);
+        const visibleMbs = isExpanded ? mbs : mbs.slice(0, 3);
         const extraCount = mbs.length - 3;
-        let mbHtml = '';
-        if (mbs.length > 0) {
-            mbHtml = `<div class="flex flex-col mt-1.5 pl-1">`;
-            mbHtml += previewMbs.map(mb => `
-                <div class="flex items-center gap-1 mt-0.5">
-                    <i class="ph-bold ph-check text-[9px] text-zinc-300 shrink-0"></i>
-                    <span class="text-[10px] text-zinc-500 truncate">${escapeHtml(mb.title)}</span>
-                </div>
-            `).join('');
-            if (extraCount > 0) {
-                mbHtml += `<div class="text-[9px] text-zinc-400 font-bold mt-0.5 ml-3">+ ${extraCount} mais</div>`;
-            }
-            mbHtml += `</div>`;
+        
+        // Checks padronizados com Rotinas (text-[11px], gap-1.5, zinc-500)
+        let mbHtml = visibleMbs.map(mb => `
+            <div class="flex items-center gap-1.5 mt-1">
+                <i class="ph-bold ph-check text-[10px] text-zinc-300 shrink-0"></i>
+                <span class="text-[11px] text-zinc-500 truncate">${escapeHtml(mb.title)}</span>
+            </div>
+        `).join('');
+        
+        if (extraCount > 0 && !isExpanded) {
+            mbHtml += `<button onclick="event.stopPropagation(); toggleExpandBacklog('${item.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">+ ${extraCount} mais</button>`;
+        } else if (isExpanded && mbs.length > 3) {
+            mbHtml += `<button onclick="event.stopPropagation(); toggleExpandBacklog('${item.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">↑ Mostrar menos</button>`;
+        } else if (mbs.length === 0) {
+            mbHtml += `<div class="text-[10px] text-zinc-400 italic mt-1">Sem checklist</div>`;
         }
         
+        // Ícone genérico 📋 (decisão A). Se tem tag, cor de fundo herda da tag.
+        const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
+        const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
+        
         return `
-        <div onclick="openBacklogForm('${item.id}')" class="flex items-start gap-2 bg-white border border-zinc-200 p-3 rounded-xl mb-3 shadow-sm hover:shadow active:scale-[0.99] transition cursor-pointer">
-            <!-- Botões ✋ + 🗑️ no INÍCIO (decisão original + C9 + C11) -->
-            <div class="flex flex-col gap-1.5 shrink-0">
-                <button onclick="event.stopPropagation(); scheduleBacklogItem('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong active:scale-95 transition" title="Agendar">
-                    <i class="ph-fill ph-hand-tap text-sm"></i>
-                </button>
-                <button onclick="event.stopPropagation(); deleteBacklogItem('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
-                    <i class="ph ph-trash text-sm"></i>
-                </button>
-            </div>
-            
-            <!-- Conteúdo: tag + título + duração + checklist preview -->
-            <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-1.5 mb-0.5">
-                    ${tagHtml}
-                    <span class="text-sm font-bold text-zinc-800 truncate">${escapeHtml(item.title)}</span>
+        <div onclick="openBacklogForm('${item.id}')" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-1 cursor-pointer hover:shadow active:scale-[0.99] transition">
+            <div class="flex justify-between items-start mb-2">
+                <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                    <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 shadow-inner" style="${iconBgStyle}">
+                        <i class="ph-fill ph-clipboard-text text-lg" style="${iconColorStyle}"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(item.title)}</h4>
+                        <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(item.duration)}${mbs.length > 0 ? ` · ${mbs.length} ${mbs.length === 1 ? 'item' : 'itens'}` : ''}</p>
+                    </div>
                 </div>
-                <span class="text-[11px] font-bold text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i> ${formatDur(item.duration)}${mbs.length > 0 ? ` · ${mbs.length} ${mbs.length === 1 ? 'item' : 'itens'}` : ''}</span>
+                <!-- Botões ✋ Agendar + 🗑️ Apagar no topo direito (V40.3.5 padronização Lista=Rotinas) -->
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button onclick="event.stopPropagation(); scheduleBacklogItem('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong active:scale-95 transition" title="Agendar">
+                        <i class="ph-fill ph-hand-tap text-sm"></i>
+                    </button>
+                    <button onclick="event.stopPropagation(); requestDeleteBacklog('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
+                        <i class="ph ph-trash text-sm"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="w-full h-px bg-zinc-100 my-2.5"></div>
+            <div class="flex flex-col">
                 ${mbHtml}
             </div>
-        </div>
-    `}).join('');
+        </div>`;
+    }).join('');
+}
+
+// V40.3.5 Ajuste 4 (I): toggle expansão de checklist de um item da Lista.
+window.toggleExpandBacklog = function(itemId) {
+    if (expandedBacklogIds.has(itemId)) {
+        expandedBacklogIds.delete(itemId);
+    } else {
+        expandedBacklogIds.add(itemId);
+    }
+    renderBacklog();
 }
 
 // =====================================================
@@ -3022,6 +3050,10 @@ let currentRtTheme = 'focus';
 let currentRtTagId = null;
 let currentRtMicroblocks = [];
 
+// V40.3.5: Set de rotinas com checklist expandida (state in-memory, não persiste).
+// Toggle por toque em "+ X mais" ou "↑ Mostrar menos".
+let expandedRoutineIds = new Set();
+
 window.renderRoutinesList = function() {
     const container = document.getElementById('routines-container');
     if (!container) return;
@@ -3037,41 +3069,47 @@ window.renderRoutinesList = function() {
 
     container.innerHTML = routinesDb.sort((a,b) => b.createdAt - a.createdAt).map(r => {
         const mbs = r.microblocks || [];
-        const previewMbs = mbs.slice(0, 3);
+        const isExpanded = expandedRoutineIds.has(r.id);
+        // V40.3.5: se expandido, mostra todos; senão, 3 primeiros
+        const visibleMbs = isExpanded ? mbs : mbs.slice(0, 3);
         const extraCount = mbs.length - 3;
         
-        let mbHtml = previewMbs.map(mb => `
+        let mbHtml = visibleMbs.map(mb => `
             <div class="flex items-center gap-1.5 mt-1">
                 <i class="ph-bold ph-check text-[10px] text-zinc-300 shrink-0"></i>
                 <span class="text-[11px] text-zinc-500 truncate">${escapeHtml(mb.title)}</span>
             </div>
         `).join('');
         
-        if (extraCount > 0) {
-            mbHtml += `<div class="text-[10px] text-zinc-400 font-bold mt-1.5 ml-4">+ ${extraCount} mais</div>`;
+        // V40.3.5 Ajuste 4 (I): "+ X mais" → expande; "↑ Mostrar menos" → retrai. event.stopPropagation pra não disparar o openRoutineForm do card.
+        if (extraCount > 0 && !isExpanded) {
+            mbHtml += `<button onclick="event.stopPropagation(); toggleExpandRoutine('${r.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">+ ${extraCount} mais</button>`;
+        } else if (isExpanded && mbs.length > 3) {
+            mbHtml += `<button onclick="event.stopPropagation(); toggleExpandRoutine('${r.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">↑ Mostrar menos</button>`;
         } else if (mbs.length === 0) {
             mbHtml += `<div class="text-[10px] text-zinc-400 italic mt-1">Sem checklist</div>`;
         }
 
+        // V40.3.5 Ajuste 3b: toque no card abre edit (igual Lista). Botão ✏️ REMOVIDO (botão ✋ Carimbar continua com stopPropagation).
         return `
-        <div class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative group mb-1">
+        <div onclick="openRoutineForm('${r.id}')" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-1 cursor-pointer hover:shadow active:scale-[0.99] transition">
             <div class="flex justify-between items-start mb-2">
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
                     <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center text-xl shrink-0 shadow-inner">
                         ${r.emoji || '✨'}
                     </div>
-                    <div>
-                        <h4 class="font-bold text-sm text-zinc-800 leading-tight">${escapeHtml(r.title)}</h4>
+                    <div class="min-w-0">
+                        <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(r.title)}</h4>
                         <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(r.duration)} · ${mbs.length} itens</p>
                     </div>
                 </div>
-                <!-- V40.3.3: botões ✋ Carimbar + ✏️ Editar (B14: gap-1.5 entre eles) -->
+                <!-- V40.3.5-fix: ✋ Carimbar + 🗑️ Apagar (igual padrão da Lista). ✏️ removido (toque no card edita). -->
                 <div class="flex items-center gap-1.5 shrink-0">
-                    <button onclick="stampRoutine('${r.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong transition active:scale-95" title="Carimbar no dia">
+                    <button onclick="event.stopPropagation(); stampRoutine('${r.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong transition active:scale-95 shrink-0" title="Carimbar no dia">
                         <i class="ph-fill ph-hand-tap text-sm"></i>
                     </button>
-                    <button onclick="openRoutineForm('${r.id}')" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-400 rounded-lg hover:bg-zinc-100 hover:text-zinc-700 transition border border-transparent hover:border-zinc-200">
-                        <i class="ph ph-pencil-simple text-sm"></i>
+                    <button onclick="event.stopPropagation(); requestDeleteRoutine('${r.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition shrink-0" title="Apagar">
+                        <i class="ph ph-trash text-sm"></i>
                     </button>
                 </div>
             </div>
@@ -3081,6 +3119,16 @@ window.renderRoutinesList = function() {
             </div>
         </div>`;
     }).join('');
+}
+
+// V40.3.5 Ajuste 4 (I): toggle expansão de checklist de uma rotina.
+window.toggleExpandRoutine = function(routineId) {
+    if (expandedRoutineIds.has(routineId)) {
+        expandedRoutineIds.delete(routineId);
+    } else {
+        expandedRoutineIds.add(routineId);
+    }
+    renderRoutinesList();
 }
 
 window.openRoutineForm = function(id = null) {
@@ -3238,29 +3286,48 @@ window.saveRoutine = function() {
 
 let pendingRoutineDeleteId = null;
 
-window.deleteRoutineFromForm = function() {
-    if (!currentRtId) return;
-    pendingRoutineDeleteId = currentRtId;
-    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+// V40.3.5-fix: nova função pra apagar rotina direto da lista (sem precisar abrir form).
+// Issue 1 do Gemini: lixeira no card precisava existir.
+window.requestDeleteRoutine = function(id) {
+    pendingRoutineDeleteId = id;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+    // Issue 2 do Gemini: sheet tem z-50, overlay padrão é z-40. Sobe overlay pra z-55 (>sheet, <modal z-60)
+    // pra bloquear cliques na sheet enquanto o modal está aberto.
+    overlay.style.zIndex = '55';
     document.getElementById('routine-delete-modal').classList.remove('hidden');
     document.getElementById('routine-delete-modal').classList.add('flex');
 }
 
+// V40.3.5-fix: deleteRoutineFromForm agora delega pra requestDeleteRoutine (DRY).
+window.deleteRoutineFromForm = function() {
+    if (!currentRtId) return;
+    requestDeleteRoutine(currentRtId);
+}
+
 window.confirmDeleteRoutine = function() {
     if (!pendingRoutineDeleteId) return;
+    // Issue 3 do Gemini: limpa ID do Set de expansão pra não vazar memória.
+    expandedRoutineIds.delete(pendingRoutineDeleteId);
     routinesDb = routinesDb.filter(x => x.id !== pendingRoutineDeleteId);
     saveRoutinesDb();
     pendingRoutineDeleteId = null;
-    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = ''; // Issue 2: devolve z-index ao normal (z-40 do CSS)
     document.getElementById('routine-delete-modal').classList.add('hidden');
     document.getElementById('routine-delete-modal').classList.remove('flex');
-    closeRoutineForm();
+    // Se o form estiver aberto editando essa rotina, fecha
+    if (typeof closeRoutineForm === 'function') closeRoutineForm();
+    renderRoutinesList();
     showToast('Rotina apagada.');
 }
 
 window.cancelDeleteRoutine = function() {
     pendingRoutineDeleteId = null;
-    document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = ''; // Issue 2: devolve z-index ao normal
     document.getElementById('routine-delete-modal').classList.add('hidden');
     document.getElementById('routine-delete-modal').classList.remove('flex');
 }
@@ -3289,6 +3356,9 @@ let currentBlId = null;
 let currentBlDur = 30;
 let currentBlTagId = null;
 let currentBlMicroblocks = [];
+
+// V40.3.5: Set de itens da Lista com checklist expandida (state in-memory).
+let expandedBacklogIds = new Set();
 
 window.openBacklogForm = function(id = null) {
     document.getElementById('backlog-list-view').classList.add('hidden');
@@ -3382,10 +3452,8 @@ window.removeBacklogMicroblockForm = function(index) {
 function renderBlFormMicroblocks() {
     const container = document.getElementById('bl-form-microblocks');
     if (!container) return;
-    if (currentBlMicroblocks.length === 0) {
-        container.innerHTML = `<div class="text-[11px] text-zinc-400 italic text-center py-2">Sem checklist (opcional)</div>`;
-        return;
-    }
+    // V40.3.5 Ajuste 1: removido texto "Sem checklist (opcional)" — vazio fica vazio mesmo.
+    // User adiciona via botão "+ Adicionar item" embaixo.
     container.innerHTML = currentBlMicroblocks.map((mb, i) => `
         <div class="flex items-center gap-2">
             <div class="w-5 h-5 rounded-md border border-zinc-300 shrink-0 bg-zinc-50 flex items-center justify-center"><i class="ph ph-check text-[10px] text-zinc-300"></i></div>
@@ -3426,13 +3494,52 @@ window.saveBacklogForm = function() {
     closeBacklogForm();
 }
 
+// V40.3.5: deletar tarefa com modal de confirmação (igual Rotinas).
+// Caminhos: requestDeleteBacklog(id) abre modal → confirmDeleteBacklog() apaga / cancelDeleteBacklog() fecha.
+let pendingBacklogDeleteId = null;
+
+window.requestDeleteBacklog = function(id) {
+    pendingBacklogDeleteId = id;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+    // Issue 2 do Gemini: sheet (z-50) ficaria clicável atrás do modal (z-60). 
+    // Sobe overlay pra z-55 (entre sheet e modal) pra bloquear cliques na sheet.
+    overlay.style.zIndex = '55';
+    document.getElementById('backlog-delete-modal').classList.remove('hidden');
+    document.getElementById('backlog-delete-modal').classList.add('flex');
+}
+
+window.confirmDeleteBacklog = function() {
+    if (!pendingBacklogDeleteId) return;
+    // Issue 3 do Gemini: limpa ID do Set de expansão pra não vazar memória.
+    expandedBacklogIds.delete(pendingBacklogDeleteId);
+    backlogDb = backlogDb.filter(x => x.id !== pendingBacklogDeleteId);
+    saveBacklog();
+    pendingBacklogDeleteId = null;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = ''; // Issue 2: devolve z-index ao normal (z-40 do CSS)
+    document.getElementById('backlog-delete-modal').classList.add('hidden');
+    document.getElementById('backlog-delete-modal').classList.remove('flex');
+    // Se o form estiver aberto editando esse item, fecha
+    if (typeof closeBacklogForm === 'function') closeBacklogForm();
+    renderBacklog();
+    showToast('Tarefa apagada.');
+}
+
+window.cancelDeleteBacklog = function() {
+    pendingBacklogDeleteId = null;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = ''; // Issue 2: devolve z-index ao normal
+    document.getElementById('backlog-delete-modal').classList.add('hidden');
+    document.getElementById('backlog-delete-modal').classList.remove('flex');
+}
+
 window.deleteBacklogFromForm = function() {
     if (!currentBlId) return;
-    // Decisão 3=a: sem confirmação no backlog (rápido, é rascunho)
-    backlogDb = backlogDb.filter(x => x.id !== currentBlId);
-    saveBacklog();
-    closeBacklogForm();
-    showToast('Tarefa apagada.');
+    // V40.3.5: agora com confirmação via modal (igual delete de Rotina)
+    requestDeleteBacklog(currentBlId);
 }
 
 

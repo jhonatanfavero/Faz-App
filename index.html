@@ -314,20 +314,23 @@
                  Mantém classes flex-1 flex flex-col min-h-0 hidden (padrão das outras views) -->
             <div id="view-routines" class="flex-1 flex flex-col min-h-0 hidden bg-zinc-50/50 overflow-hidden">
                 
-                <!-- Sub-view 1: Lista de rotinas -->
-                <div id="routines-list-view" class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20 relative">
-                    <div class="text-center mb-5 mt-2">
-                        <p class="text-xs text-zinc-500 font-medium flex items-center justify-center gap-1.5">
-                            <i class="ph-fill ph-stamp text-app-focus text-sm"></i>
-                            Toque numa rotina pra carimbar no seu dia
-                        </p>
+                <!-- Sub-view 1: Lista de rotinas (V40.3.5: botão fixo no rodapé, container rola atrás) -->
+                <div id="routines-list-view" class="flex-1 flex flex-col min-h-0 relative">
+                    <div class="flex-1 overflow-y-auto no-scrollbar p-4 pb-20">
+                        <div class="text-center mb-5 mt-2">
+                            <p class="text-xs text-zinc-500 font-medium flex items-center justify-center gap-1.5">
+                                <i class="ph-fill ph-stamp text-app-focus text-sm"></i>
+                                Toque numa rotina pra carimbar no seu dia
+                            </p>
+                        </div>
+                        
+                        <div id="routines-container" class="flex flex-col gap-3">
+                            <!-- preenchido por renderRoutinesList() -->
+                        </div>
                     </div>
                     
-                    <div id="routines-container" class="flex flex-col gap-3">
-                        <!-- preenchido por renderRoutinesList() -->
-                    </div>
-                    
-                    <button onclick="openRoutineForm()" class="mt-4 w-full py-3.5 rounded-xl border-2 border-dashed border-zinc-300 text-zinc-500 font-bold hover:bg-zinc-100 hover:border-zinc-400 hover:text-zinc-700 transition flex items-center justify-center gap-2 active:scale-[0.98]">
+                    <!-- Botão "+ Nova Rotina" FIXO no rodapé (V40.3.5 Ajuste 5/6) -->
+                    <button onclick="openRoutineForm()" class="mx-4 mb-4 mt-2 py-3.5 rounded-xl border-2 border-dashed border-zinc-300 text-zinc-500 font-bold hover:bg-zinc-100 hover:border-zinc-400 hover:text-zinc-700 transition flex items-center justify-center gap-2 active:scale-[0.98] shrink-0">
                         <i class="ph ph-plus text-lg"></i> Nova Rotina
                     </button>
                 </div>
@@ -762,6 +765,21 @@
                     <i class="ph ph-trash text-lg"></i> Apagar Rotina
                 </button>
                 <button onclick="cancelDeleteRoutine()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+
+        <!-- MODAL: DELETAR TAREFA (V40.3.5) — réplica do routine-delete-modal com texto adaptado -->
+        <div id="backlog-delete-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+            <div class="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-3"><i class="ph ph-warning text-2xl"></i></div>
+            <h3 class="text-lg font-bold text-zinc-900 mb-2 text-center leading-tight">Apagar Tarefa?</h3>
+            <p class="text-xs text-zinc-500 text-center mb-6">Você pode adicionar de novo a qualquer momento.</p>
+            <div class="flex flex-col gap-2">
+                <button onclick="confirmDeleteBacklog()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] transition">
+                    <i class="ph ph-trash text-lg"></i> Apagar Tarefa
+                </button>
+                <button onclick="cancelDeleteBacklog()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
                     Cancelar
                 </button>
             </div>

@@ -1,5 +1,5 @@
-// V6.3 - v40.3.6 (Botões "Hoje" e "Ocultar Menu" do header pintados com cor do tema — bg-app-focus + text-white pra contrastar. Aplicado em HTML e nos innerHTML do toggleHeader.)
-const CACHE_NAME = 'timeblock-v40-3-6';
+// V6.5 - v40.3.7-fix (Fixes do Gemini na V40.3.7: 6 sheets com header tinham X duplicado ou bloco isolado feio. Headers refeitos pra fundir título+X numa única linha em config/period/tags/clone/reports/link-note. bottom-sheet e list-sheet mantém X em barra própria — não têm título.)
+const CACHE_NAME = 'timeblock-v40-3-7-fix';
 const ASSETS = [
   './',
   './index.html',

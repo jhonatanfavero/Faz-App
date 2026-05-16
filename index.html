@@ -171,7 +171,12 @@
         <div id="overlay" onclick="closeAllSheets()" class="absolute inset-0 bg-black/40 backdrop-blur-sm z-40 opacity-0 pointer-events-none transition-opacity duration-300"></div>
 
         <div id="bottom-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
-            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-6"></div>
+            <!-- V40.3.7: barra superior com botão X pra fechar. Cor do tema, sem fundo. -->
+            <div class="flex justify-end -mt-2 mb-4">
+                <button onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </div>
             
             <div class="flex gap-2 overflow-x-auto no-scrollbar mb-5">
                 <button onclick="commitSpecialIntent('Descanso', 'rest')" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 text-sm font-medium hover:bg-emerald-100 transition whitespace-nowrap">
@@ -210,7 +215,12 @@
         </div>
 
         <div id="list-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
-            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
+            <!-- V40.3.7: barra superior com botão X pra fechar. Cor do tema, sem fundo. Conteúdo abaixo, sem sobreposição. -->
+            <div class="flex justify-end -mt-2 mb-2 shrink-0">
+                <button onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </div>
             
             <!-- V40.1: Super Gabinete - Pills de navegação entre abas -->
             <div class="flex gap-1 bg-zinc-100 p-1 rounded-xl mb-4 shrink-0">
@@ -459,13 +469,13 @@
 
         <!-- V40.2: Sheet "Adicionar nota" (escolha entre criar nova ou vincular existente) -->
         <div id="link-note-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
-            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
+            <!-- V40.3.7-fix: X global removido (Gemini fix #1). As 2 sub-views já têm header próprio com X que chama closeLinkNoteSheet() (função específica). -->
             
             <!-- View 1: opções iniciais -->
             <div id="link-note-options">
                 <div class="flex items-center justify-between mb-5 shrink-0">
                     <h2 class="text-lg font-bold text-zinc-900">Adicionar nota</h2>
-                    <button onclick="closeLinkNoteSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-500 rounded-full hover:bg-zinc-200 transition"><i class="ph ph-x text-base"></i></button>
+                    <button onclick="closeLinkNoteSheet()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90"><i class="ph-bold ph-x text-lg"></i></button>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <button onclick="chooseCreateNewNote()" class="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl bg-app-focus-soft border border-app-focus-soft hover:bg-app-focus-soft-strong active:scale-[0.98] transition">
@@ -487,10 +497,12 @@
             
             <!-- View 2: lista de notas existentes -->
             <div id="link-note-existing-view" class="hidden flex flex-col flex-1 min-h-0">
-                <div class="flex items-center gap-2 mb-4 shrink-0">
-                    <button onclick="backToLinkOptions()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
-                    <h2 class="text-lg font-bold text-zinc-900 flex-1">Vincular nota</h2>
-                    <button onclick="closeLinkNoteSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-500 rounded-full hover:bg-zinc-200 transition"><i class="ph ph-x text-base"></i></button>
+                <div class="flex items-center justify-between mb-4 shrink-0">
+                    <div class="flex items-center gap-2">
+                        <button onclick="backToLinkOptions()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
+                        <h2 class="text-lg font-bold text-zinc-900">Vincular nota</h2>
+                    </div>
+                    <button onclick="closeLinkNoteSheet()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90"><i class="ph-bold ph-x text-lg"></i></button>
                 </div>
                 <div id="link-note-search-wrapper" class="shrink-0 mb-3 hidden">
                     <input type="text" id="link-note-search" placeholder="Buscar nota..." autocomplete="off" oninput="renderExistingNotesList(this.value)" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:border-app-focus outline-none transition-colors">
@@ -538,20 +550,30 @@
         </div>
 
         <div id="period-select-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
-            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
-            <div class="flex items-center gap-3 mb-4 shrink-0">
-                <button onclick="openSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
-                <h2 class="text-lg font-bold text-zinc-900">Selecionar Período</h2>
+            <!-- V40.3.7-fix: header fundido com X (Gemini fix #2) -->
+            <div class="flex items-center justify-between mb-4 shrink-0">
+                <div class="flex items-center gap-3">
+                    <button onclick="openSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
+                    <h2 class="text-lg font-bold text-zinc-900">Selecionar Período</h2>
+                </div>
+                <button onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
             </div>
             <div class="flex-1 overflow-y-auto no-scrollbar" id="period-select-container">
             </div>
         </div>
 
         <div id="config-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
-            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
-            <div class="flex items-center gap-3 mb-4 shrink-0">
-                <button id="config-back-btn" onclick="openSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
-                <h2 class="text-lg font-bold text-zinc-900" id="config-title">Configurações</h2>
+            <!-- V40.3.7-fix: header fundido com X (Gemini fix #2) — botão voltar à esquerda, título, X à direita -->
+            <div class="flex items-center justify-between mb-4 shrink-0">
+                <div class="flex items-center gap-3">
+                    <button id="config-back-btn" onclick="openSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
+                    <h2 class="text-lg font-bold text-zinc-900" id="config-title">Configurações</h2>
+                </div>
+                <button onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
             </div>
             
             <div class="flex-1 overflow-y-auto no-scrollbar" id="config-main-menu">
@@ -661,10 +683,12 @@
         </div>
 
         <div id="tags-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
-            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
-            <div class="flex items-center gap-3 mb-4 shrink-0">
-                <button onclick="closeAllSheets()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-x text-lg"></i></button>
+            <!-- V40.3.7-fix: header fundido com X colorido (Gemini fix #1) — removido X cinza antigo da esquerda -->
+            <div class="flex items-center justify-between mb-4 shrink-0">
                 <h2 class="text-lg font-bold text-zinc-900">Gerenciar Tags</h2>
+                <button onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
             </div>
             
             <div class="shrink-0 mb-4 bg-zinc-50 border border-zinc-200 p-3 rounded-2xl">
@@ -692,9 +716,12 @@
 
         <!-- ABA: CLONAR TAREFA -->
         <div id="clone-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
-            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
-            <div class="flex items-center gap-3 mb-6 shrink-0">
+            <!-- V40.3.7-fix: header fundido com X pra fechar (Gemini fix #1) -->
+            <div class="flex items-center justify-between mb-6 shrink-0">
                 <h2 class="text-lg font-bold text-zinc-900">Repetir Tarefa</h2>
+                <button onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
             </div>
             <div class="flex-1 overflow-y-auto no-scrollbar flex flex-col gap-2">
                 <button onclick="cloneManual()" class="w-full flex items-center gap-3 p-4 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left text-zinc-800 font-bold text-sm">
@@ -797,12 +824,12 @@
 
         <!-- V3.0 - COMBO E: Relatórios -->
         <div id="reports-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
-            <div class="w-12 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4 shrink-0"></div>
+            <!-- V40.3.7-fix: header fundido com X colorido (Gemini fix #1) — removido X cinza antigo da esquerda -->
             <div class="flex items-center justify-between mb-6 shrink-0">
-                <div class="flex items-center gap-3">
-                    <button onclick="closeAllSheets()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-x text-lg"></i></button>
-                    <h2 class="text-lg font-bold text-zinc-900">Produtividade</h2>
-                </div>
+                <h2 class="text-lg font-bold text-zinc-900">Produtividade</h2>
+                <button onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
             </div>
             
             <div class="flex gap-2 overflow-x-auto no-scrollbar mb-5 shrink-0 bg-zinc-50 p-1.5 rounded-xl border border-zinc-200">

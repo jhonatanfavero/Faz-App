@@ -28,6 +28,13 @@ let selectedTagId = null;
 //   quando renderTimeline() é chamado no init (linha ~2589) ANTES do bloco V40.3.2
 //   ser executado (linha ~3211). typeof em variável let em TDZ LANÇA erro, não retorna 'undefined'.
 let mbDragActive = false;
+// V40.3.5-fix2 FIX (mesma lição do TDZ): renderBacklog é chamado no init e usa
+//   expandedBacklogIds.has(). expandedRoutineIds idem (chamada via renderRoutinesList em
+//   eventos posteriores, mas movida junto pra coerência). Declaradas aqui no topo pra
+//   evitar ReferenceError fatal que parava o init e deixava botão Lista + toggleHeader
+//   + updateThoughtBtnVisibility sem funcionar.
+let expandedBacklogIds = new Set();
+let expandedRoutineIds = new Set();
 // V2.0 - Estado do header
 // V40.2.28: persistido em localStorage. Default false (1ª vez = expandido pra Descoberta).
 //   Depois que o usuário escolhe (toggleHeader), a escolha vira a nova default.
@@ -3050,9 +3057,8 @@ let currentRtTheme = 'focus';
 let currentRtTagId = null;
 let currentRtMicroblocks = [];
 
-// V40.3.5: Set de rotinas com checklist expandida (state in-memory, não persiste).
-// Toggle por toque em "+ X mais" ou "↑ Mostrar menos".
-let expandedRoutineIds = new Set();
+// V40.3.5-fix2: expandedRoutineIds movida pro topo do arquivo (linha ~32) pra evitar TDZ.
+// Declaração aqui REMOVIDA (era `let expandedRoutineIds = new Set();`).
 
 window.renderRoutinesList = function() {
     const container = document.getElementById('routines-container');
@@ -3357,8 +3363,8 @@ let currentBlDur = 30;
 let currentBlTagId = null;
 let currentBlMicroblocks = [];
 
-// V40.3.5: Set de itens da Lista com checklist expandida (state in-memory).
-let expandedBacklogIds = new Set();
+// V40.3.5-fix2: expandedBacklogIds movida pro topo do arquivo (linha ~36) pra evitar TDZ.
+// Declaração aqui REMOVIDA (era `let expandedBacklogIds = new Set();`).
 
 window.openBacklogForm = function(id = null) {
     document.getElementById('backlog-list-view').classList.add('hidden');

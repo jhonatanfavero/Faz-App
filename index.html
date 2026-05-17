@@ -214,7 +214,7 @@
             </button>
         </div>
 
-        <div id="list-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-[92%] flex flex-col">
+        <div id="list-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
             <!-- V40.3.7: barra superior com botão X pra fechar. Cor do tema, sem fundo. Conteúdo abaixo, sem sobreposição. -->
             <div class="flex justify-end -mt-2 mb-2 shrink-0">
                 <button onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
@@ -225,7 +225,7 @@
             <!-- V40.1: Super Gabinete - Pills de navegação entre abas -->
             <div class="flex gap-1 bg-zinc-100 p-1 rounded-xl mb-4 shrink-0">
                 <button id="btn-list-backlog" onclick="switchListTab('backlog')" class="flex-1 py-1.5 rounded-lg bg-white shadow-sm text-zinc-800 text-xs font-bold transition border border-black/5 flex items-center justify-center gap-1">
-                    <i class="ph ph-tray text-sm"></i> Lista
+                    <i class="ph ph-tray text-sm"></i> Listas
                 </button>
                 <button id="btn-list-routines" onclick="switchListTab('routines')" class="flex-1 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50 text-xs font-bold transition border border-transparent flex items-center justify-center gap-1">
                     <i class="ph ph-arrows-clockwise text-sm"></i> Rotinas
@@ -248,7 +248,8 @@
                 <div id="backlog-list-view" class="flex-1 flex flex-col min-h-0">
                     
                     <!-- Header do kanban (botão Nova Lista + indicador) -->
-                    <div class="flex items-center justify-between shrink-0 px-4 pt-4 pb-2">
+                    <!-- V40.5.1-fix1: pb-0 (era pb-2) pra reduzir gap entre título e dots/cards -->
+                    <div class="flex items-center justify-between shrink-0 px-4 pt-4 pb-0">
                         <div class="flex items-center gap-2 min-w-0">
                             <h2 class="text-lg font-bold text-zinc-900 truncate" id="backlog-column-title">Geral</h2>
                             <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider shrink-0" id="backlog-count">0</span>
@@ -264,13 +265,14 @@
                     </div>
                     
                     <!-- V40.5.0: Indicadores de coluna (dots) + nome -->
-                    <div id="backlog-column-dots" class="flex items-center justify-center gap-1.5 shrink-0 py-2 px-4 overflow-x-auto no-scrollbar">
+                    <!-- V40.5.1-fix1: py-1 (era py-2) pra reduzir gap -->
+                    <div id="backlog-column-dots" class="flex items-center justify-center gap-1.5 shrink-0 py-1 px-4 overflow-x-auto no-scrollbar">
                         <!-- dots preenchidos por renderBacklog() -->
                     </div>
                     
-                    <!-- V40.5.0-fix8: removido px-[11%]. Agora primeira coluna ganha ml-[11%]
-                         e última ganha mr-[11%] diretamente no render (centraliza sem cortar). -->
-                    <div id="backlog-columns-wrapper" class="flex-1 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar min-h-0 -mx-6">
+                    <!-- V40.5.1-fix1: wrapper sem -mx-6, coluna agora é w-full, respeita o p-6 da sheet
+                         igual outras abas (Rotinas/Notas/Finanças). Beiradinha removida (B). -->
+                    <div id="backlog-columns-wrapper" class="flex-1 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar min-h-0">
                         <!-- preenchido por renderBacklog() -->
                     </div>
                     

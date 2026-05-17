@@ -1,5 +1,5 @@
-// V8.9 - v40.5.1 (2 features pro kanban Lista: 1) Botão "Mover pra outra lista" (ícone setas) no card, entre Agendar e Apagar. Só aparece se >1 lista. Abre modal com lista de destinos (exclui atual). 2) Drag vertical MVP: long-press 400ms num card inicia drag, arrasta vertical, solta em outro = reordena. touch-action durante drag evita conflito com swipe horizontal entre colunas. Sem polish (animação suave, scroll auto). 10 armadilhas M1-M4 + D1-D10 mapeadas e mitigadas. Boot test 23/23. 6 cenários de reorder simulados.)
-const CACHE_NAME = 'timeblock-v40-5-1';
+// V9.0 - v40.5.1-fix1 (5 ajustes visuais: 1) Sheet das 4 abas h-[92%] → h-full (ocupa tela inteira). 2) Cards do Kanban Lista w-full (mesma largura das Rotinas/Notas/Finanças) — perde beiradinha lateral, mas DOTS embaixo do header indicam múltiplas listas. Wrapper sem -mx-6. 3) Reduzido gap entre título da coluna e dots/cards: header pb-0 (era pb-2), dots py-1 (era py-2) = 16px ganhos. 4) Label da aba "Lista" → "Listas" (plural condizente com kanban). 5) REMOVIDO ícone clipboard dos cards de Lista — ganha ~50px pro título caber inteiro. Indicador de TAG preservado via BORDA ESQUERDA colorida (4px) — sem ocupar largura horizontal. Outras abas (Rotinas/Notas/Finanças) intactas.)
+const CACHE_NAME = 'timeblock-v40-5-1-fix1';
 const ASSETS = [
   './',
   './index.html',

@@ -2114,8 +2114,11 @@ function renderBacklogCard(item) {
     }
     // V40.5.0-fix3: SEM checklist = SEM texto "Sem checklist" (card fica menor)
     
-    const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
-    const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
+    // V40.5.1-fix1: removido ícone clipboard (ganha espaço pro título). 
+    // Indicador de tag preservado via BORDA ESQUERDA colorida (4px), sem ocupar largura horizontal do conteúdo.
+    const cardBorderStyle = tagColor 
+        ? `border-left-color: ${tagColor}; border-left-width: 4px;` 
+        : '';
     
     // V40.5.0-fix3: divisor + seção de checks SÓ se tem mbHtml (item com checklist)
     const hasChecks = mbs.length > 0;
@@ -2132,16 +2135,11 @@ function renderBacklogCard(item) {
                 </button>` : '';
     
     return `
-    <div onclick="openBacklogForm('${item.id}')" data-bl-card="${item.id}" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition">
+    <div onclick="openBacklogForm('${item.id}')" data-bl-card="${item.id}" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition" style="${cardBorderStyle}">
         <div class="flex justify-between items-start mb-2">
-            <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
-                <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 shadow-inner" style="${iconBgStyle}">
-                    <i class="ph-fill ph-clipboard-text text-lg" style="${iconColorStyle}"></i>
-                </div>
-                <div class="min-w-0">
-                    <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(item.title)}</h4>
-                    <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(item.duration)}${mbs.length > 0 ? ` · ${mbs.length} ${mbs.length === 1 ? 'item' : 'itens'}` : ''}</p>
-                </div>
+            <div class="min-w-0 flex-1 pr-2">
+                <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(item.title)}</h4>
+                <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(item.duration)}${mbs.length > 0 ? ` · ${mbs.length} ${mbs.length === 1 ? 'item' : 'itens'}` : ''}</p>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
                 <button onclick="event.stopPropagation(); scheduleBacklogItem('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong active:scale-95 transition" title="Agendar">
@@ -2198,15 +2196,10 @@ function renderBacklog() {
         } else {
             cardsHtml = colItems.map(renderBacklogCard).join('');
         }
-        // V40.5.0-fix8: BUG das extremidades cortando — primeira coluna ganha ml extra,
-        // última ganha mr extra. Isso permite que snap-center as centralize visualmente
-        // sem precisar do px-[11%] no wrapper (que estava cortando).
-        const isFirst = idx === 0;
-        const isLast = idx === backlogColumnsDb.length - 1;
-        const extraLeft = isFirst ? 'ml-[11%]' : '';
-        const extraRight = isLast ? 'mr-[11%]' : '';
+        // V40.5.1-fix1: w-full (era w-[78%]) — cards iguais aos das outras abas.
+        // Sem beiradinha — descoberta do swipe fica nos DOTS embaixo do header.
         return `
-            <div class="snap-center snap-always shrink-0 w-[78%] mx-[1%] ${extraLeft} ${extraRight} h-full overflow-y-auto no-scrollbar px-3 pb-4" data-column-id="${col.id}">
+            <div class="snap-center snap-always shrink-0 w-full h-full overflow-y-auto no-scrollbar px-4 pb-4" data-column-id="${col.id}">
                 ${cardsHtml}
             </div>`;
     }).join('');

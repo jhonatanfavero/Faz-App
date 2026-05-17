@@ -1,5 +1,5 @@
-// V7.2 - v40.4.4-fix (3 ajustes UX: 1) Toast z-50 → z-[70] pra aparecer acima das sheets e modais — validações invisíveis agora aparecem. 2) list-sheet max-h 85% → 92% aproveita mais tela. 3) Botão de adicionar nota padronizado: removido '+' pequeno do header, adicionado botão tracejado '+ Nova Nota' no rodapé igual Lista/Rotinas/Finanças.)
-const CACHE_NAME = 'timeblock-v40-4-4-fix';
+// V7.3 - v40.4.4-fix2 (Notas faltou padronizar completo no fix anterior: view-notes ganhou bg-zinc-50/50 overflow-hidden, header e container ganharam px-4 pt-4, form de nota ganhou mx-4, botão Nova Nota ganhou mx-4 mb-4. Agora as 4 abas (Lista/Rotinas/Notas/Finanças) são visualmente idênticas em altura, fundo e padding.)
+const CACHE_NAME = 'timeblock-v40-4-4-fix2';
 const ASSETS = [
   './',
   './index.html',

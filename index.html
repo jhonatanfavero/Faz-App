@@ -424,9 +424,9 @@
             </div>
 
             <!-- V40.1.1: View 3 - Notas livres do dia (3 estados: empty / form / list) -->
-            <div id="view-notes" class="flex-1 flex flex-col min-h-0 hidden">
+            <div id="view-notes" class="flex-1 flex flex-col min-h-0 hidden bg-zinc-50/50 overflow-hidden">
                 <!-- V40.4.4-fix: Header sem "+" pequeno (padronização — botão tracejado fica no rodapé). Header só com título + contador. -->
-                <div id="notes-header" class="flex items-center justify-between mb-4 shrink-0 hidden">
+                <div id="notes-header" class="flex items-center justify-between mb-4 shrink-0 hidden px-4 pt-4">
                     <div class="flex items-center gap-2">
                         <h2 class="text-lg font-bold text-zinc-900">Notas Soltas</h2>
                         <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider" id="notes-count">0</span>
@@ -448,7 +448,7 @@
                 </div>
 
                 <!-- Estado B: Form aberto (criando nota) -->
-                <div id="notes-form" class="shrink-0 mb-4 bg-zinc-50 border border-zinc-200 p-3 rounded-2xl hidden">
+                <div id="notes-form" class="shrink-0 mb-4 mx-4 bg-zinc-50 border border-zinc-200 p-3 rounded-2xl hidden">
                     <div class="flex items-center justify-between mb-2">
                         <span id="notes-form-label" class="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Nova nota</span>
                         <button onclick="cancelNoteForm()" class="w-7 h-7 flex items-center justify-center bg-white border border-zinc-200 text-zinc-500 rounded-lg hover:bg-zinc-100 transition" title="Cancelar">
@@ -463,11 +463,11 @@
                 </div>
 
                 <!-- Estado C: Lista de notas existentes -->
-                <div class="flex-1 overflow-y-auto min-h-0 no-scrollbar border-t border-zinc-100 pt-4 flex flex-col gap-2 hidden" id="notes-container">
+                <div class="flex-1 overflow-y-auto min-h-0 no-scrollbar border-t border-zinc-100 pt-4 px-4 flex flex-col gap-2 hidden" id="notes-container">
                 </div>
 
                 <!-- V40.4.4-fix: Botão "+ Nova Nota" tracejado no rodapé (padronizado com Lista/Rotinas/Finanças). Só aparece quando NÃO está no estado empty (escondido pelo JS junto com notes-empty). -->
-                <button id="notes-fab-btn" onclick="openNoteForm()" class="hidden mt-2 py-3.5 rounded-xl border-2 border-dashed border-zinc-300 text-zinc-500 font-bold hover:bg-zinc-100 hover:border-zinc-400 hover:text-zinc-700 transition flex items-center justify-center gap-2 active:scale-[0.98] shrink-0">
+                <button id="notes-fab-btn" onclick="openNoteForm()" class="hidden mx-4 mb-4 mt-2 py-3.5 rounded-xl border-2 border-dashed border-zinc-300 text-zinc-500 font-bold hover:bg-zinc-100 hover:border-zinc-400 hover:text-zinc-700 transition flex items-center justify-center gap-2 active:scale-[0.98] shrink-0">
                     <i class="ph ph-plus text-lg"></i> Nova Nota
                 </button>
             </div>

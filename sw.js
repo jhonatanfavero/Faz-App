@@ -1,5 +1,5 @@
-// V8.8 - v40.5.0-fix8 (2 fixes críticos: 1) Extremidades do kanban NÃO cortam mais: removido px-[11%] do wrapper, primeira coluna ganha ml-[11%] e última ganha mr-[11%] direto no render — centralização perfeita sem corte. 2) Bug crítico do agendar: scheduleBacklogItem APAGAVA a tarefa do backlog imediatamente; se user cancelasse o picker de horário, sumia pra sempre. Agora guarda fromBacklogId no pendingIntent e SÓ apaga em performEncaixeMatematico (= confirmar). Cancelar mantém tarefa intacta.)
-const CACHE_NAME = 'timeblock-v40-5-0-fix8';
+// V8.9 - v40.5.1 (2 features pro kanban Lista: 1) Botão "Mover pra outra lista" (ícone setas) no card, entre Agendar e Apagar. Só aparece se >1 lista. Abre modal com lista de destinos (exclui atual). 2) Drag vertical MVP: long-press 400ms num card inicia drag, arrasta vertical, solta em outro = reordena. touch-action durante drag evita conflito com swipe horizontal entre colunas. Sem polish (animação suave, scroll auto). 10 armadilhas M1-M4 + D1-D10 mapeadas e mitigadas. Boot test 23/23. 6 cenários de reorder simulados.)
+const CACHE_NAME = 'timeblock-v40-5-1';
 const ASSETS = [
   './',
   './index.html',

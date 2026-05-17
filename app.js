@@ -1818,6 +1818,8 @@ window.closeAllSheets = () => {
     if (typeof cancelDeleteColumn === 'function') cancelDeleteColumn();
     if (typeof cancelColumnName === 'function') cancelColumnName();
     if (typeof closeColumnMenu === 'function') closeColumnMenu();
+    // V40.5.1: fecha modal de mover card
+    if (typeof cancelMoveCard === 'function') cancelMoveCard();
 
     input.blur();
     backlogInput.blur();
@@ -2123,8 +2125,14 @@ function renderBacklogCard(item) {
             ${mbHtml}
         </div>` : '';
     
+    // V40.5.1: botão Mover só aparece se tem >1 lista (M4)
+    const moveBtn = backlogColumnsDb.length > 1 ? `
+                <button onclick="event.stopPropagation(); openMoveCardModal('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 active:scale-95 transition" title="Mover pra outra lista">
+                    <i class="ph ph-arrows-left-right text-sm"></i>
+                </button>` : '';
+    
     return `
-    <div onclick="openBacklogForm('${item.id}')" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition">
+    <div onclick="openBacklogForm('${item.id}')" data-bl-card="${item.id}" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition">
         <div class="flex justify-between items-start mb-2">
             <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
                 <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 shadow-inner" style="${iconBgStyle}">
@@ -2139,6 +2147,7 @@ function renderBacklogCard(item) {
                 <button onclick="event.stopPropagation(); scheduleBacklogItem('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong active:scale-95 transition" title="Agendar">
                     <i class="ph-fill ph-hand-tap text-sm"></i>
                 </button>
+                ${moveBtn}
                 <button onclick="event.stopPropagation(); requestDeleteBacklog('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
                     <i class="ph ph-trash text-sm"></i>
                 </button>
@@ -2226,6 +2235,8 @@ function renderBacklog() {
             wrapper.addEventListener('scroll', onBacklogColumnsScroll, { passive: true });
             wrapper.dataset.scrollListenerAttached = 'true';
         }
+        // V40.5.1: liga listeners de drag (idempotente)
+        attachBacklogDragListeners();
     });
 }
 
@@ -2280,6 +2291,148 @@ function updateColumnDots() {
             dot.className = 'w-2 h-2 rounded-full bg-zinc-300 shrink-0 transition active:scale-90';
         }
     });
+}
+
+// =====================================================
+// V40.5.1 — DRAG VERTICAL DE CARDS (MVP)
+// Long-press 400ms → arrasta vertical na MESMA coluna → solta = reordena.
+// Sem polish (animação suave, scroll auto). Touch-action garante que swipe horizontal
+// entre colunas NÃO é disparado durante drag vertical (D2).
+// =====================================================
+const DRAG_LONGPRESS_MS = 400;
+const DRAG_MOVE_THRESHOLD = 8; // pixels antes de cancelar long-press
+
+let _dragState = null; // { itemId, columnEl, cardEl, startY, longPressTimer, dragging }
+
+function backlogDragOnTouchStart(e) {
+    const card = e.target.closest('[data-bl-card]');
+    if (!card) return;
+    
+    // Ignora se toque foi em botão (Agendar/Mover/Apagar) dentro do card
+    if (e.target.closest('button')) return;
+    
+    const itemId = card.dataset.blCard;
+    const columnEl = card.closest('[data-column-id]');
+    if (!columnEl) return;
+    
+    const touch = e.touches[0];
+    _dragState = {
+        itemId,
+        columnEl,
+        cardEl: card,
+        startY: touch.clientY,
+        startX: touch.clientX,
+        dragging: false,
+        longPressTimer: null
+    };
+    
+    // D1: long-press 400ms = inicia drag
+    _dragState.longPressTimer = setTimeout(() => {
+        if (!_dragState) return;
+        _dragState.dragging = true;
+        // D4: feedback visual
+        card.classList.add('opacity-60', 'scale-105', 'shadow-lg', 'z-10', 'relative');
+        // D2: durante drag, navegador só permite scroll vertical (sem swipe horizontal)
+        card.style.touchAction = 'none';
+        // Haptic feedback se disponível
+        if (navigator.vibrate) navigator.vibrate(30);
+    }, DRAG_LONGPRESS_MS);
+}
+
+function backlogDragOnTouchMove(e) {
+    if (!_dragState) return;
+    
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - _dragState.startX);
+    const dy = Math.abs(touch.clientY - _dragState.startY);
+    
+    // Se moveu muito ANTES do long-press completar → cancela drag (era scroll comum)
+    if (!_dragState.dragging) {
+        if (dx > DRAG_MOVE_THRESHOLD || dy > DRAG_MOVE_THRESHOLD) {
+            clearTimeout(_dragState.longPressTimer);
+            _dragState = null;
+        }
+        return;
+    }
+    
+    // Já está em modo drag — previne scroll
+    e.preventDefault();
+    
+    // D5: detecta sobre qual card está
+    const columnEl = _dragState.columnEl;
+    const cards = Array.from(columnEl.querySelectorAll('[data-bl-card]'));
+    const touchY = touch.clientY;
+    
+    // Visual: empurra cards pra cima/baixo via translate (feedback enquanto arrasta)
+    // MVP: só destaca o card alvo, não anima os outros (mais simples)
+    cards.forEach(c => c.classList.remove('ring-2', 'ring-app-focus'));
+    for (const c of cards) {
+        if (c === _dragState.cardEl) continue;
+        const rect = c.getBoundingClientRect();
+        if (touchY >= rect.top && touchY <= rect.bottom) {
+            c.classList.add('ring-2', 'ring-app-focus');
+            break;
+        }
+    }
+}
+
+function backlogDragOnTouchEnd(e) {
+    if (!_dragState) return;
+    
+    // D10: SEMPRE limpa o timer/visual
+    clearTimeout(_dragState.longPressTimer);
+    
+    if (!_dragState.dragging) {
+        _dragState = null;
+        return;
+    }
+    
+    // Restaura visual do card arrastado
+    const card = _dragState.cardEl;
+    card.classList.remove('opacity-60', 'scale-105', 'shadow-lg', 'z-10', 'relative');
+    card.style.touchAction = '';
+    
+    // Encontra card alvo (último com ring)
+    const columnEl = _dragState.columnEl;
+    let targetCardEl = null;
+    columnEl.querySelectorAll('[data-bl-card]').forEach(c => {
+        if (c.classList.contains('ring-2')) {
+            targetCardEl = c;
+            c.classList.remove('ring-2', 'ring-app-focus');
+        }
+    });
+    
+    // Reordena no backlogDb se há alvo válido
+    if (targetCardEl && targetCardEl !== card) {
+        const fromId = _dragState.itemId;
+        const toId = targetCardEl.dataset.blCard;
+        reorderBacklog(fromId, toId);
+    }
+    
+    _dragState = null;
+}
+
+// D3: reordena backlogDb (array plano) movendo `fromId` pra posição de `toId`
+function reorderBacklog(fromId, toId) {
+    const fromIdx = backlogDb.findIndex(i => i.id === fromId);
+    const toIdx = backlogDb.findIndex(i => i.id === toId);
+    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+    
+    const [item] = backlogDb.splice(fromIdx, 1);
+    backlogDb.splice(toIdx, 0, item); // simplificado — sempre pra toIdx no array já encurtado
+    saveBacklog();
+    renderBacklog();
+}
+
+// Ativa os listeners de drag no wrapper (idempotente, chamado uma vez)
+function attachBacklogDragListeners() {
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    if (!wrapper || wrapper.dataset.dragListenersAttached) return;
+    wrapper.addEventListener('touchstart', backlogDragOnTouchStart, { passive: true });
+    wrapper.addEventListener('touchmove', backlogDragOnTouchMove, { passive: false });
+    wrapper.addEventListener('touchend', backlogDragOnTouchEnd, { passive: true });
+    wrapper.addEventListener('touchcancel', backlogDragOnTouchEnd, { passive: true });
+    wrapper.dataset.dragListenersAttached = 'true';
 }
 
 // V40.5.0: ir programaticamente pra uma coluna (toque no dot)
@@ -4212,6 +4365,57 @@ window.confirmDeleteColumn = function() {
 
 window.cancelDeleteColumn = function() {
     hideModal('column-delete-modal');
+};
+
+// =====================================================
+// V40.5.1 — MOVER CARD PRA OUTRA LISTA
+// =====================================================
+let _moveCardPendingId = null;
+
+window.openMoveCardModal = function(cardId) {
+    const card = backlogDb.find(c => c.id === cardId);
+    if (!card) return;
+    
+    _moveCardPendingId = cardId;
+    const currentColId = getItemColumn(card);
+    
+    // M2: opções = todas colunas EXCETO a atual
+    const others = backlogColumnsDb.filter(c => c.id !== currentColId);
+    if (others.length === 0) {
+        showToast('Não há outras listas pra mover.');
+        return;
+    }
+    
+    document.getElementById('column-move-subtitle').innerText = `"${card.title}" pra qual lista?`;
+    
+    const optionsEl = document.getElementById('column-move-options');
+    optionsEl.innerHTML = others.map(col => `
+        <button onclick="confirmMoveCard('${col.id}')" class="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-sm hover:bg-zinc-100 active:scale-[0.98] transition">
+            <i class="ph-fill ph-list-dashes text-lg text-app-focus"></i>
+            <span class="truncate">${escapeHtml(col.name)}</span>
+        </button>
+    `).join('');
+    
+    showModal('column-move-modal');
+};
+
+window.confirmMoveCard = function(destColId) {
+    if (!_moveCardPendingId) return;
+    const card = backlogDb.find(c => c.id === _moveCardPendingId);
+    if (card) {
+        card.columnId = destColId;
+        saveBacklog();
+        const destCol = backlogColumnsDb.find(c => c.id === destColId);
+        showToast(`Movido pra ${destCol ? destCol.name : 'lista'}!`);
+    }
+    _moveCardPendingId = null;
+    hideModal('column-move-modal');
+    renderBacklog();
+};
+
+window.cancelMoveCard = function() {
+    _moveCardPendingId = null;
+    hideModal('column-move-modal');
 };
 
 // Helpers de modal (centraliza show/hide com overlay)

@@ -1177,6 +1177,13 @@ function performEncaixeMatematico(gapStart, gapDuration) {
         linkedNoteIds: [] // V40.2: notas vinculadas começam vazias (clone não copia notas)
     });
     saveDb();
+    
+    // V40.5.0-fix8: se veio do backlog (scheduleBacklogItem), só remove de lá AGORA (após confirmar)
+    if (pendingIntent.fromBacklogId) {
+        backlogDb = backlogDb.filter(i => i.id !== pendingIntent.fromBacklogId);
+        saveBacklog();
+    }
+    
     cancelPendingTask(); 
 }
 
@@ -2057,19 +2064,18 @@ window.deleteBacklogItem = (id) => {
 window.scheduleBacklogItem = (id) => {
     const item = backlogDb.find(i => i.id === id);
     if(!item) return;
+    
+    // V40.5.0-fix8: ANTES — backlogDb.filter() apagava IMEDIATAMENTE. Se user cancelasse
+    // o agendamento (fechasse picker sem confirmar), a tarefa sumia pra sempre.
+    // AGORA — guarda o id em pendingIntent.fromBacklogId. Só apaga em confirmIntent/commitIntent.
 
-    backlogDb = backlogDb.filter(i => i.id !== id);
-    saveBacklog();
-
-    // V40.3.2-fix5: propaga microblocks do item do backlog pro pendingIntent.
-    // performEncaixeMatematico (linha ~1029) já tem a lógica de clonar microblocks
-    // com IDs únicos. Só precisamos garantir que chegam aqui via pendingIntent.
     pendingIntent = { 
         title: item.title, 
         duration: item.duration, 
         theme: 'focus', 
         tagId: item.tagId || null,
-        microblocks: item.microblocks || []
+        microblocks: item.microblocks || [],
+        fromBacklogId: id  // V40.5.0-fix8: marker pra cleanup só se confirmar
     };
     selectedDur = item.duration;
     syncDurButtons(selectedDur);
@@ -2170,7 +2176,7 @@ function renderBacklog() {
     updateActiveColumnHeader();
     
     // Renderiza cada coluna como uma "página" no scroll horizontal
-    wrapper.innerHTML = backlogColumnsDb.map(col => {
+    wrapper.innerHTML = backlogColumnsDb.map((col, idx) => {
         const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
         let cardsHtml;
         if (colItems.length === 0) {
@@ -2183,12 +2189,15 @@ function renderBacklog() {
         } else {
             cardsHtml = colItems.map(renderBacklogCard).join('');
         }
-        // V40.5.0-fix (Gemini diretriz 3): w-[78%] + mx-[1%] pra deixar beiradinha SIMÉTRICA
-        // visível em TODAS as colunas (primeira, meio e última), não só na primeira.
-        // V40.5.0-fix4: largura reduzida de 82%→78% pra beiradinha mais perceptível (~10% de cada lado).
-        // snap-always força parada em CADA coluna mesmo com swipe rápido.
+        // V40.5.0-fix8: BUG das extremidades cortando — primeira coluna ganha ml extra,
+        // última ganha mr extra. Isso permite que snap-center as centralize visualmente
+        // sem precisar do px-[11%] no wrapper (que estava cortando).
+        const isFirst = idx === 0;
+        const isLast = idx === backlogColumnsDb.length - 1;
+        const extraLeft = isFirst ? 'ml-[11%]' : '';
+        const extraRight = isLast ? 'mr-[11%]' : '';
         return `
-            <div class="snap-center snap-always shrink-0 w-[78%] mx-[1%] h-full overflow-y-auto no-scrollbar px-3 pb-4" data-column-id="${col.id}">
+            <div class="snap-center snap-always shrink-0 w-[78%] mx-[1%] ${extraLeft} ${extraRight} h-full overflow-y-auto no-scrollbar px-3 pb-4" data-column-id="${col.id}">
                 ${cardsHtml}
             </div>`;
     }).join('');

@@ -268,14 +268,9 @@
                         <!-- dots preenchidos por renderBacklog() -->
                     </div>
                     
-                    <!-- Container horizontal de colunas com scroll-snap -->
-                    <!-- V40.5.0-fix5: -mx-6 faz o wrapper ESTOURAR pra fora do p-6 da sheet,
-                         eliminando as "listras brancas" laterais. -->
-                    <!-- V40.5.0-fix6: px-[11%] no wrapper cria espaço FÍSICO nas extremidades pra
-                         PRIMEIRA e ÚLTIMA coluna também ficarem CENTRALIZADAS (não coladas nas bordas).
-                         Sem isso, a primeira não tinha espaço à esquerda e a última não tinha à direita.
-                         Padrão Trello: card sempre no centro, beiradinhas iguais dos 2 lados. -->
-                    <div id="backlog-columns-wrapper" class="flex-1 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar min-h-0 -mx-6 px-[11%]">
+                    <!-- V40.5.0-fix8: removido px-[11%]. Agora primeira coluna ganha ml-[11%]
+                         e última ganha mr-[11%] diretamente no render (centraliza sem cortar). -->
+                    <div id="backlog-columns-wrapper" class="flex-1 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar min-h-0 -mx-6">
                         <!-- preenchido por renderBacklog() -->
                     </div>
                     

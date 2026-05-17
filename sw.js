@@ -1,5 +1,5 @@
-// V8.7 - v40.5.0-fix7 (NAVIGATION HARDENING — 2 bugs UX críticos antes da V40.5.1: 1) Overlay inteligente: clique no fundo escuro com modal aberto agora fecha SÓ o modal (não fecha sheet inteira indo pra agenda). Helper getOpenModal() detecta z-[60] aberto, closeTopmostModal() fecha só ele. 2) History API: botão voltar do Android agora intercepta — fecha modal > form > sheet > toast 'toque voltar de novo' (2s) > fecha app. pushNavState() idempotente em 19 lugares: 8 sheets + 6 modais + 5 helpers. 15 armadilhas N1-N15 mapeadas e mitigadas. Simulação lógica 4/4 cenários OK. Boot test 23/23.)
-const CACHE_NAME = 'timeblock-v40-5-0-fix7';
+// V8.8 - v40.5.0-fix8 (2 fixes críticos: 1) Extremidades do kanban NÃO cortam mais: removido px-[11%] do wrapper, primeira coluna ganha ml-[11%] e última ganha mr-[11%] direto no render — centralização perfeita sem corte. 2) Bug crítico do agendar: scheduleBacklogItem APAGAVA a tarefa do backlog imediatamente; se user cancelasse o picker de horário, sumia pra sempre. Agora guarda fromBacklogId no pendingIntent e SÓ apaga em performEncaixeMatematico (= confirmar). Cancelar mantém tarefa intacta.)
+const CACHE_NAME = 'timeblock-v40-5-0-fix8';
 const ASSETS = [
   './',
   './index.html',

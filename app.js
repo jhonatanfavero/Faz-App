@@ -2523,6 +2523,8 @@ window.renderNotes = function() {
     const form = document.getElementById('notes-form');
     const container = document.getElementById('notes-container');
     const counter = document.getElementById('notes-count');
+    // V40.4.4-fix: novo botão tracejado no rodapé (padronização)
+    const fabBtn = document.getElementById('notes-fab-btn');
     
     if (!container || !empty || !form || !header) return;
     
@@ -2538,18 +2540,21 @@ window.renderNotes = function() {
         form.classList.remove('hidden');
         if (hasNotes) header.classList.remove('hidden');
         else header.classList.add('hidden');
+        if (fabBtn) fabBtn.classList.add('hidden'); // V40.4.4-fix: esconde botão durante form
     } else if (!hasNotes) {
         // Estado A: Empty. Mostra só o convite central.
         empty.classList.remove('hidden');
         form.classList.add('hidden');
         container.classList.add('hidden');
         header.classList.add('hidden');
+        if (fabBtn) fabBtn.classList.add('hidden'); // V40.4.4-fix: empty já tem botão central
     } else {
-        // Estado C: Lista. Header com botão + e cards.
+        // Estado C: Lista. Header (sem +) + cards + botão tracejado embaixo.
         empty.classList.add('hidden');
         form.classList.add('hidden');
         container.classList.remove('hidden');
         header.classList.remove('hidden');
+        if (fabBtn) fabBtn.classList.remove('hidden'); // V40.4.4-fix: mostra botão tracejado
     }
     
     // V40.1.2: atualizar labels do form conforme modo (criar vs editar)

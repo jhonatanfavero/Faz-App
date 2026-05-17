@@ -137,7 +137,7 @@
             </div>
         </div>
 
-        <div id="toast" class="absolute top-32 left-1/2 -translate-x-1/2 px-4 py-2 bg-red-100 border border-red-300 rounded-full shadow-lg z-50 text-xs font-bold text-red-800 opacity-0 pointer-events-none transition-opacity duration-300 flex items-center gap-2">
+        <div id="toast" class="absolute top-32 left-1/2 -translate-x-1/2 px-4 py-2 bg-red-100 border border-red-300 rounded-full shadow-lg z-[70] text-xs font-bold text-red-800 opacity-0 pointer-events-none transition-opacity duration-300 flex items-center gap-2">
             <i class="ph ph-warning-circle text-lg"></i>
             <span id="toast-msg">Mensagem</span>
         </div>
@@ -214,7 +214,7 @@
             </button>
         </div>
 
-        <div id="list-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+        <div id="list-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[92%] flex flex-col">
             <!-- V40.3.7: barra superior com botão X pra fechar. Cor do tema, sem fundo. Conteúdo abaixo, sem sobreposição. -->
             <div class="flex justify-end -mt-2 mb-2 shrink-0">
                 <button onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
@@ -425,15 +425,12 @@
 
             <!-- V40.1.1: View 3 - Notas livres do dia (3 estados: empty / form / list) -->
             <div id="view-notes" class="flex-1 flex flex-col min-h-0 hidden">
-                <!-- Header da view (só aparece se tem notas) -->
+                <!-- V40.4.4-fix: Header sem "+" pequeno (padronização — botão tracejado fica no rodapé). Header só com título + contador. -->
                 <div id="notes-header" class="flex items-center justify-between mb-4 shrink-0 hidden">
                     <div class="flex items-center gap-2">
                         <h2 class="text-lg font-bold text-zinc-900">Notas Soltas</h2>
                         <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider" id="notes-count">0</span>
                     </div>
-                    <button onclick="openNoteForm()" class="w-9 h-9 flex items-center justify-center bg-app-focus-soft border border-app-focus-soft text-app-focus rounded-xl hover:bg-app-focus-soft-strong active:scale-[0.95] transition shadow-sm" title="Nova nota">
-                        <i class="ph-bold ph-plus text-base"></i>
-                    </button>
                 </div>
 
                 <!-- Estado A: Empty (nenhuma nota) -->
@@ -468,6 +465,11 @@
                 <!-- Estado C: Lista de notas existentes -->
                 <div class="flex-1 overflow-y-auto min-h-0 no-scrollbar border-t border-zinc-100 pt-4 flex flex-col gap-2 hidden" id="notes-container">
                 </div>
+
+                <!-- V40.4.4-fix: Botão "+ Nova Nota" tracejado no rodapé (padronizado com Lista/Rotinas/Finanças). Só aparece quando NÃO está no estado empty (escondido pelo JS junto com notes-empty). -->
+                <button id="notes-fab-btn" onclick="openNoteForm()" class="hidden mt-2 py-3.5 rounded-xl border-2 border-dashed border-zinc-300 text-zinc-500 font-bold hover:bg-zinc-100 hover:border-zinc-400 hover:text-zinc-700 transition flex items-center justify-center gap-2 active:scale-[0.98] shrink-0">
+                    <i class="ph ph-plus text-lg"></i> Nova Nota
+                </button>
             </div>
 
             <!-- V40.4.1: ABA FINANCEIRO (MVP - despesas avulsas do mês atual) -->

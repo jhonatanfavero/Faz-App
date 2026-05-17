@@ -1,5 +1,5 @@
-// V7.1 - v40.4.4 (Finanças: Recorrente (12m) e Parcelada (N meses) ATIVADAS. Schema novo: durationMonths, isRecurring, paidMonths[], startMonth. Retrocompat total com despesas V40.4.1-3 (month, paid:bool). Subtítulos diferenciados (Avulsa/Recorrente/Parcela X/N). togglePaid agora marca paga só num mês específico. 15 armadilhas mapeadas e cobertas. Boot test em TZ='America/Sao_Paulo'. Próxima fase V40.4.5: renovação no último mês + modal 'atualizar essa/futuras/todas'.)
-const CACHE_NAME = 'timeblock-v40-4-4';
+// V7.2 - v40.4.4-fix (3 ajustes UX: 1) Toast z-50 → z-[70] pra aparecer acima das sheets e modais — validações invisíveis agora aparecem. 2) list-sheet max-h 85% → 92% aproveita mais tela. 3) Botão de adicionar nota padronizado: removido '+' pequeno do header, adicionado botão tracejado '+ Nova Nota' no rodapé igual Lista/Rotinas/Finanças.)
+const CACHE_NAME = 'timeblock-v40-4-4-fix';
 const ASSETS = [
   './',
   './index.html',

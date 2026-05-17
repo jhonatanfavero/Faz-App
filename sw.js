@@ -1,5 +1,5 @@
-// V8.0 - v40.5.0 (KANBAN na aba Lista: colunas horizontais com swipe nativo (scroll-snap), coluna "Geral" padrão sempre presente, criar/renomear/apagar listas, apagar lista apaga tarefas com confirmação robusta, "+ Nova Tarefa" adiciona na coluna ativa, retrocompat total com tarefas V40.4.x sem columnId. SEM drag entre colunas. 15 armadilhas mapeadas e mitigadas. Boot test 23/23 + 8 cenários simulados OK. Outras abas (Rotinas/Notas/Finanças) intactas.)
-const CACHE_NAME = 'timeblock-v40-5-0';
+// V8.2 - v40.5.0-fix2 (BUG REAL: swipe rápido pulava 2+ listas porque scroll-snap-type: mandatory deixa o browser usar inércia. Fix: adicionado snap-always (scroll-snap-stop: always) em cada coluna — força o browser a parar em CADA coluna mesmo com swipe rápido. CSS nativo, respeita diretriz 2 do Gemini, zero JS. Outras diretrizes 1, 3, 4 já OK.)
+const CACHE_NAME = 'timeblock-v40-5-0-fix2';
 const ASSETS = [
   './',
   './index.html',

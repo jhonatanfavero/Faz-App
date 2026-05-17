@@ -2003,9 +2003,13 @@ function renderBacklog() {
         } else {
             cardsHtml = colItems.map(renderBacklogCard).join('');
         }
-        // Cada coluna ocupa 100% do wrapper, snap-start, scroll vertical interno
+        // V40.5.0-fix (Gemini diretriz 3): w-[88%] em vez de w-full pra deixar "beiradinha"
+        // da próxima coluna visível, incentivando o user a descobrir o swipe horizontal.
+        // mr-3 dá um respiro entre colunas. snap-center centraliza a coluna ativa.
+        // V40.5.0-fix2: snap-always força o browser a parar em CADA coluna mesmo com swipe rápido
+        // (sem isso, mandatory deixa o swipe rápido pular múltiplas colunas).
         return `
-            <div class="snap-start shrink-0 w-full h-full overflow-y-auto no-scrollbar px-4 pb-4" data-column-id="${col.id}">
+            <div class="snap-center snap-always shrink-0 w-[88%] mr-3 h-full overflow-y-auto no-scrollbar px-3 pb-4" data-column-id="${col.id}">
                 ${cardsHtml}
             </div>`;
     }).join('');
@@ -2025,7 +2029,8 @@ function renderBacklog() {
         if (activeIdx >= 0) {
             const cols = wrapper.children;
             if (cols[activeIdx]) {
-                wrapper.scrollLeft = cols[activeIdx].offsetLeft;
+                // V40.5.0-fix: centraliza (compatível com snap-center + w-[88%])
+                wrapper.scrollLeft = cols[activeIdx].offsetLeft + (cols[activeIdx].offsetWidth / 2) - (wrapper.clientWidth / 2);
             }
         }
         // Liga listener de scroll (idempotente)
@@ -2037,18 +2042,21 @@ function renderBacklog() {
 }
 
 // V40.5.0: detecta qual coluna está visível após scroll-snap e atualiza activeColumnId
+// V40.5.0-fix: usa CENTRO do viewport pra ser compatível com snap-center + w-[88%]
 let _scrollDebounceTimer = null;
 function onBacklogColumnsScroll() {
     if (_scrollDebounceTimer) clearTimeout(_scrollDebounceTimer);
     _scrollDebounceTimer = setTimeout(() => {
         const wrapper = document.getElementById('backlog-columns-wrapper');
         if (!wrapper) return;
-        const scrollPos = wrapper.scrollLeft;
+        // Centro visível do wrapper
+        const viewportCenter = wrapper.scrollLeft + (wrapper.clientWidth / 2);
         const cols = wrapper.children;
         let bestIdx = 0;
         let bestDist = Infinity;
         for (let i = 0; i < cols.length; i++) {
-            const dist = Math.abs(cols[i].offsetLeft - scrollPos);
+            const colCenter = cols[i].offsetLeft + (cols[i].offsetWidth / 2);
+            const dist = Math.abs(colCenter - viewportCenter);
             if (dist < bestDist) { bestDist = dist; bestIdx = i; }
         }
         const newCol = backlogColumnsDb[bestIdx];
@@ -2087,6 +2095,7 @@ function updateColumnDots() {
 }
 
 // V40.5.0: ir programaticamente pra uma coluna (toque no dot)
+// V40.5.0-fix: centraliza a coluna no viewport (compatível com snap-center + w-[88%])
 window.scrollToColumn = function(columnId) {
     const wrapper = document.getElementById('backlog-columns-wrapper');
     if (!wrapper) return;
@@ -2094,7 +2103,9 @@ window.scrollToColumn = function(columnId) {
     if (idx < 0) return;
     const col = wrapper.children[idx];
     if (!col) return;
-    wrapper.scrollTo({ left: col.offsetLeft, behavior: 'smooth' });
+    // Posiciona o centro da coluna no centro do viewport
+    const targetScroll = col.offsetLeft + (col.offsetWidth / 2) - (wrapper.clientWidth / 2);
+    wrapper.scrollTo({ left: targetScroll, behavior: 'smooth' });
     activeColumnId = columnId;
     updateActiveColumnHeader();
     updateColumnDots();

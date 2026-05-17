@@ -1913,8 +1913,10 @@ function renderBacklogCard(item) {
     const tagColor = item.tagId ? getTagColor(item.tagId) : null;
     const mbs = item.microblocks || [];
     const isExpanded = expandedBacklogIds.has(item.id);
-    const visibleMbs = isExpanded ? mbs : mbs.slice(0, 3);
-    const extraCount = mbs.length - 3;
+    // V40.5.0-fix3: preview reduzido de 3 → 2 checks pra cards menores
+    const PREVIEW_COUNT = 2;
+    const visibleMbs = isExpanded ? mbs : mbs.slice(0, PREVIEW_COUNT);
+    const extraCount = mbs.length - PREVIEW_COUNT;
     
     let mbHtml = visibleMbs.map(mb => `
         <div class="flex items-center gap-1.5 mt-1">
@@ -1925,14 +1927,21 @@ function renderBacklogCard(item) {
     
     if (extraCount > 0 && !isExpanded) {
         mbHtml += `<button onclick="event.stopPropagation(); toggleExpandBacklog('${item.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">+ ${extraCount} mais</button>`;
-    } else if (isExpanded && mbs.length > 3) {
+    } else if (isExpanded && mbs.length > PREVIEW_COUNT) {
         mbHtml += `<button onclick="event.stopPropagation(); toggleExpandBacklog('${item.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">↑ Mostrar menos</button>`;
-    } else if (mbs.length === 0) {
-        mbHtml += `<div class="text-[10px] text-zinc-400 italic mt-1">Sem checklist</div>`;
     }
+    // V40.5.0-fix3: SEM checklist = SEM texto "Sem checklist" (card fica menor)
     
     const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
     const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
+    
+    // V40.5.0-fix3: divisor + seção de checks SÓ se tem mbHtml (item com checklist)
+    const hasChecks = mbs.length > 0;
+    const checksSection = hasChecks ? `
+        <div class="w-full h-px bg-zinc-100 my-2.5"></div>
+        <div class="flex flex-col">
+            ${mbHtml}
+        </div>` : '';
     
     return `
     <div onclick="openBacklogForm('${item.id}')" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition">
@@ -1955,10 +1964,7 @@ function renderBacklogCard(item) {
                 </button>
             </div>
         </div>
-        <div class="w-full h-px bg-zinc-100 my-2.5"></div>
-        <div class="flex flex-col">
-            ${mbHtml}
-        </div>
+        ${checksSection}
     </div>`;
 }
 
@@ -2003,13 +2009,12 @@ function renderBacklog() {
         } else {
             cardsHtml = colItems.map(renderBacklogCard).join('');
         }
-        // V40.5.0-fix (Gemini diretriz 3): w-[88%] em vez de w-full pra deixar "beiradinha"
-        // da próxima coluna visível, incentivando o user a descobrir o swipe horizontal.
-        // mr-3 dá um respiro entre colunas. snap-center centraliza a coluna ativa.
-        // V40.5.0-fix2: snap-always força o browser a parar em CADA coluna mesmo com swipe rápido
-        // (sem isso, mandatory deixa o swipe rápido pular múltiplas colunas).
+        // V40.5.0-fix (Gemini diretriz 3): w-[82%] + mx-[1.5%] pra deixar beiradinha SIMÉTRICA
+        // visível em TODAS as colunas (primeira, meio e última), não só na primeira.
+        // 82% + 1.5% mx esquerda + 1.5% mx direita = 85% total, sobrando ~15% beiradinha.
+        // snap-always força parada em CADA coluna mesmo com swipe rápido.
         return `
-            <div class="snap-center snap-always shrink-0 w-[88%] mr-3 h-full overflow-y-auto no-scrollbar px-3 pb-4" data-column-id="${col.id}">
+            <div class="snap-center snap-always shrink-0 w-[82%] mx-[1.5%] h-full overflow-y-auto no-scrollbar px-3 pb-4" data-column-id="${col.id}">
                 ${cardsHtml}
             </div>`;
     }).join('');
@@ -3334,9 +3339,10 @@ window.renderRoutinesList = function() {
     container.innerHTML = routinesDb.sort((a,b) => b.createdAt - a.createdAt).map(r => {
         const mbs = r.microblocks || [];
         const isExpanded = expandedRoutineIds.has(r.id);
-        // V40.3.5: se expandido, mostra todos; senão, 3 primeiros
-        const visibleMbs = isExpanded ? mbs : mbs.slice(0, 3);
-        const extraCount = mbs.length - 3;
+        // V40.5.0-fix3: preview reduzido de 3 → 2 pra cards menores
+        const PREVIEW_COUNT = 2;
+        const visibleMbs = isExpanded ? mbs : mbs.slice(0, PREVIEW_COUNT);
+        const extraCount = mbs.length - PREVIEW_COUNT;
         
         let mbHtml = visibleMbs.map(mb => `
             <div class="flex items-center gap-1.5 mt-1">
@@ -3348,11 +3354,18 @@ window.renderRoutinesList = function() {
         // V40.3.5 Ajuste 4 (I): "+ X mais" → expande; "↑ Mostrar menos" → retrai. event.stopPropagation pra não disparar o openRoutineForm do card.
         if (extraCount > 0 && !isExpanded) {
             mbHtml += `<button onclick="event.stopPropagation(); toggleExpandRoutine('${r.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">+ ${extraCount} mais</button>`;
-        } else if (isExpanded && mbs.length > 3) {
+        } else if (isExpanded && mbs.length > PREVIEW_COUNT) {
             mbHtml += `<button onclick="event.stopPropagation(); toggleExpandRoutine('${r.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">↑ Mostrar menos</button>`;
-        } else if (mbs.length === 0) {
-            mbHtml += `<div class="text-[10px] text-zinc-400 italic mt-1">Sem checklist</div>`;
         }
+        // V40.5.0-fix3: SEM checklist = SEM texto "Sem checklist" (card fica menor)
+        
+        // V40.5.0-fix3: divisor + seção de checks SÓ se tem checklist (card menor quando vazio)
+        const hasChecks = mbs.length > 0;
+        const checksSection = hasChecks ? `
+            <div class="w-full h-px bg-zinc-100 my-2.5"></div>
+            <div class="flex flex-col">
+                ${mbHtml}
+            </div>` : '';
 
         // V40.3.5 Ajuste 3b: toque no card abre edit (igual Lista). Botão ✏️ REMOVIDO (botão ✋ Carimbar continua com stopPropagation).
         return `
@@ -3377,10 +3390,7 @@ window.renderRoutinesList = function() {
                     </button>
                 </div>
             </div>
-            <div class="w-full h-px bg-zinc-100 my-2.5"></div>
-            <div class="flex flex-col">
-                ${mbHtml}
-            </div>
+            ${checksSection}
         </div>`;
     }).join('');
 }

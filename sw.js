@@ -1,5 +1,5 @@
-// V8.2 - v40.5.0-fix2 (BUG REAL: swipe rápido pulava 2+ listas porque scroll-snap-type: mandatory deixa o browser usar inércia. Fix: adicionado snap-always (scroll-snap-stop: always) em cada coluna — força o browser a parar em CADA coluna mesmo com swipe rápido. CSS nativo, respeita diretriz 2 do Gemini, zero JS. Outras diretrizes 1, 3, 4 já OK.)
-const CACHE_NAME = 'timeblock-v40-5-0-fix2';
+// V8.3 - v40.5.0-fix3 (3 ajustes: 1) Beiradinha SIMÉTRICA em todas as colunas — w-[88%] + mr-3 trocado por w-[82%] + mx-[1.5%]: agora primeira/meio/última têm a mesma beiradinha visível de cada lado. 2) Preview de checks 3 → 2 nos cards de Lista e Rotinas (cards 1 linha menores). 3) Cards SEM checklist agora NÃO mostram texto 'Sem checklist' nem divisor horizontal (card fica visualmente mais limpo e menor). Notas não tem microblocks, então não afetada.)
+const CACHE_NAME = 'timeblock-v40-5-0-fix3';
 const ASSETS = [
   './',
   './index.html',

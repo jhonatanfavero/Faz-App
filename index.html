@@ -269,8 +269,11 @@
                     </div>
                     
                     <!-- Container horizontal de colunas com scroll-snap -->
-                    <div id="backlog-columns-wrapper" class="flex-1 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar min-h-0">
-                        <!-- preenchido por renderBacklog() — cada coluna é um <div class="snap-start shrink-0 w-full"> -->
+                    <!-- V40.5.0-fix5: -mx-6 faz o wrapper ESTOURAR pra fora do p-6 da sheet,
+                         eliminando as "listras brancas" laterais. Outros elementos (header, dots, 
+                         botão Nova Tarefa) continuam com seu px-4 alinhado dentro da sheet. -->
+                    <div id="backlog-columns-wrapper" class="flex-1 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar min-h-0 -mx-6">
+                        <!-- preenchido por renderBacklog() -->
                     </div>
                     
                     <!-- Botão "+ Nova Tarefa" — adiciona na coluna ativa -->

@@ -1,5 +1,5 @@
-// V8.4 - v40.5.0-fix4 (Ajuste visual: largura das colunas 82%→78% + margens 1.5%→1% pra beiradinha da próxima coluna ficar mais PERCEPTÍVEL (~10% de cada lado visível). Conteúdo dos cards ainda confortável de ler dentro do 78%. Outros 3 ajustes da fix3 mantidos: 2 checks no preview, sem 'Sem checklist' nem divisor quando card vazio.)
-const CACHE_NAME = 'timeblock-v40-5-0-fix4';
+// V8.5 - v40.5.0-fix5 (Eliminado as 'listras brancas' laterais do kanban: backlog-columns-wrapper ganhou -mx-6 pra estourar pra fora do p-6 da sheet. Coluna agora ocupa ~78% da tela inteira (não da sheet com padding), beiradinha das vizinhas ~11% de cada lado mais perceptível. Header, dots e botão Nova Tarefa continuam alinhados dentro do padding da sheet. Outras abas (Rotinas/Notas/Finanças) intactas.)
+const CACHE_NAME = 'timeblock-v40-5-0-fix5';
 const ASSETS = [
   './',
   './index.html',

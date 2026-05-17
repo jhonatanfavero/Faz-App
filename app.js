@@ -2009,12 +2009,12 @@ function renderBacklog() {
         } else {
             cardsHtml = colItems.map(renderBacklogCard).join('');
         }
-        // V40.5.0-fix (Gemini diretriz 3): w-[82%] + mx-[1.5%] pra deixar beiradinha SIMÉTRICA
+        // V40.5.0-fix (Gemini diretriz 3): w-[78%] + mx-[1%] pra deixar beiradinha SIMÉTRICA
         // visível em TODAS as colunas (primeira, meio e última), não só na primeira.
-        // 82% + 1.5% mx esquerda + 1.5% mx direita = 85% total, sobrando ~15% beiradinha.
+        // V40.5.0-fix4: largura reduzida de 82%→78% pra beiradinha mais perceptível (~10% de cada lado).
         // snap-always força parada em CADA coluna mesmo com swipe rápido.
         return `
-            <div class="snap-center snap-always shrink-0 w-[82%] mx-[1.5%] h-full overflow-y-auto no-scrollbar px-3 pb-4" data-column-id="${col.id}">
+            <div class="snap-center snap-always shrink-0 w-[78%] mx-[1%] h-full overflow-y-auto no-scrollbar px-3 pb-4" data-column-id="${col.id}">
                 ${cardsHtml}
             </div>`;
     }).join('');

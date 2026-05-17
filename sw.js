@@ -1,5 +1,5 @@
-// V8.3 - v40.5.0-fix3 (3 ajustes: 1) Beiradinha SIMÉTRICA em todas as colunas — w-[88%] + mr-3 trocado por w-[82%] + mx-[1.5%]: agora primeira/meio/última têm a mesma beiradinha visível de cada lado. 2) Preview de checks 3 → 2 nos cards de Lista e Rotinas (cards 1 linha menores). 3) Cards SEM checklist agora NÃO mostram texto 'Sem checklist' nem divisor horizontal (card fica visualmente mais limpo e menor). Notas não tem microblocks, então não afetada.)
-const CACHE_NAME = 'timeblock-v40-5-0-fix3';
+// V8.4 - v40.5.0-fix4 (Ajuste visual: largura das colunas 82%→78% + margens 1.5%→1% pra beiradinha da próxima coluna ficar mais PERCEPTÍVEL (~10% de cada lado visível). Conteúdo dos cards ainda confortável de ler dentro do 78%. Outros 3 ajustes da fix3 mantidos: 2 checks no preview, sem 'Sem checklist' nem divisor quando card vazio.)
+const CACHE_NAME = 'timeblock-v40-5-0-fix4';
 const ASSETS = [
   './',
   './index.html',

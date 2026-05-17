@@ -1,5 +1,5 @@
-// V6.8 - v40.4.2 (Finanças: marcar despesa como paga (checkbox no card + no form), 2 seções A Pagar/Pagas, 3 totais destacados Total/Pago/Aberto, navegação entre meses com setas + botão Hoje condicional. Recorrente/Parcelada permanecem desabilitados — V40.4.3.)
-const CACHE_NAME = 'timeblock-v40-4-2';
+// V7.0 - v40.4.3-fix (FIX CRÍTICO Fuso Horário pego pelo Gemini: toISOString() retorna UTC, então 21h+ no fim do mês no Brasil (UTC-3) já era "dia seguinte mês seguinte" → todas despesas viravam atrasadas prematuramente. Substituído por getLocalMonthStr() em 4 lugares.)
+const CACHE_NAME = 'timeblock-v40-4-3-fix';
 const ASSETS = [
   './',
   './index.html',

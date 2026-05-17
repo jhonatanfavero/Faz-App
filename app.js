@@ -37,7 +37,14 @@ let expandedBacklogIds = new Set();
 let expandedRoutineIds = new Set();
 // V40.4.1: estado financeiro no topo (lição TDZ V40.3.2 — declarar antes do init).
 let financialDb = JSON.parse(localStorage.getItem('tb_financial_db') || '[]');
-let currentFinanceMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM' do mês atual
+// V40.4.3-fix (Gemini): fuso horário — toISOString() retorna UTC, então no fim do mês
+// às 21h+ no Brasil (UTC-3) já mostrava o mês seguinte e marcava tudo como atrasado.
+// Usar getFullYear() + getMonth() do Date local resolve.
+function getLocalMonthStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+let currentFinanceMonth = getLocalMonthStr(); // 'YYYY-MM' do mês atual (local, não UTC)
 function saveFinancial() { localStorage.setItem('tb_financial_db', JSON.stringify(financialDb)); }
 // V2.0 - Estado do header
 // V40.2.28: persistido em localStorage. Default false (1ª vez = expandido pra Descoberta).
@@ -3638,24 +3645,61 @@ function formatMonthLabel(monthStr) {
 let currentFinId = null;
 let currentFinType = 'oneshot'; // V40.4.2 vai adicionar 'recurring' e 'parceled'
 
+// V40.4.3: detecta se despesa está atrasada (3 casos da armadilha mapeada)
+// - Mês selecionado < mês atual: SEMPRE atrasada (se não paga)
+// - Mês selecionado === mês atual + dueDay < dia atual: atrasada (se não paga)
+// - Mês selecionado > mês atual: nunca atrasada (futuro)
+// V40.4.3-fix (Gemini): usar horário LOCAL, não UTC, senão às 21h+ do último dia
+// do mês no Brasil tudo virava "atrasada" prematuramente.
+function isFinancialOverdue(item) {
+    if (item.paid === true) return false;
+    if (!item.dueDay) return false; // sem vencimento, nunca marca atrasada
+    
+    const today = new Date();
+    const todayMonth = getLocalMonthStr(); // YYYY-MM local
+    const todayDay = today.getDate();      // dia local (não UTC)
+    const itemMonth = item.month;
+    
+    if (itemMonth < todayMonth) return true;  // mês passado, não pago
+    if (itemMonth > todayMonth) return false; // mês futuro
+    return item.dueDay < todayDay;            // mês atual, dia já passou
+}
+
 // V40.4.2: helper de card de despesa (reusado pelas 2 seções A Pagar / Pagas)
+// V40.4.3: agora mostra vencimento no subtítulo + destaque visual se atrasada
 function renderFinancialCard(item) {
     const isPaid = item.paid === true;
+    const isOverdue = isFinancialOverdue(item);
     const tagColor = item.tagId ? getTagColor(item.tagId) : null;
     const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
     const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
     
     // Decisão 2(I): valor riscado + opacidade 60% quando pago
     const opacityClass = isPaid ? 'opacity-60' : '';
-    const valueClass = isPaid ? 'line-through text-zinc-500' : 'text-zinc-800';
+    const valueClass = isPaid ? 'line-through text-zinc-500' : (isOverdue ? 'text-red-600' : 'text-zinc-800');
     const titleClass = isPaid ? 'text-zinc-500' : 'text-zinc-800';
+    
+    // V40.4.3: borda vermelha sutil + badge "Atrasada" se vencida
+    const cardBorderClass = isOverdue ? 'border-red-300 bg-red-50/30' : 'border-zinc-200';
     
     // Decisão 1(B): checkbox redondo à esquerda. Marcado = preenchido com app-focus.
     const checkboxBg = isPaid ? 'bg-app-focus border-app-focus' : 'bg-white border-zinc-300';
     const checkIconClass = isPaid ? '' : 'hidden';
     
+    // V40.4.3 decisão 3(P): subtítulo "Avulsa · Venc. dia X" ou "Avulsa · Atrasada" se vencida
+    let subtitleText = 'Avulsa';
+    let subtitleClass = 'text-zinc-400';
+    if (item.dueDay) {
+        if (isOverdue) {
+            subtitleText = `Atrasada · venceu dia ${item.dueDay}`;
+            subtitleClass = 'text-red-600';
+        } else {
+            subtitleText = `Avulsa · venc. dia ${item.dueDay}`;
+        }
+    }
+    
     return `
-    <div onclick="openFinancialForm('${item.id}')" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition ${opacityClass}">
+    <div onclick="openFinancialForm('${item.id}')" class="bg-white border rounded-xl p-3.5 shadow-sm mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition ${opacityClass} ${cardBorderClass}">
         <div class="flex justify-between items-center gap-3">
             <div class="flex items-center gap-3 min-w-0 flex-1">
                 <!-- V40.4.2: checkbox de paga (decisão B) -->
@@ -3667,7 +3711,7 @@ function renderFinancialCard(item) {
                 </div>
                 <div class="min-w-0">
                     <h4 class="font-bold text-sm leading-tight truncate ${titleClass}">${escapeHtml(item.title)}</h4>
-                    <p class="text-[11px] text-zinc-400 font-bold mt-0.5">Avulsa</p>
+                    <p class="text-[11px] font-bold mt-0.5 ${subtitleClass}">${subtitleText}</p>
                 </div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -3692,8 +3736,9 @@ window.renderFinancial = function() {
     if (monthLabel) monthLabel.innerText = formatMonthLabel(currentFinanceMonth);
     
     // V40.4.2: botão "Hoje" só aparece se NÃO está no mês atual (decisão δ)
+    // V40.4.3-fix (Gemini): horário local em vez de UTC.
     if (todayBtn) {
-        const currentRealMonth = new Date().toISOString().slice(0, 7);
+        const currentRealMonth = getLocalMonthStr();
         if (currentFinanceMonth === currentRealMonth) {
             todayBtn.classList.add('hidden');
             todayBtn.classList.remove('flex');
@@ -3730,7 +3775,16 @@ window.renderFinancial = function() {
     }
 
     // V40.4.2: separar em 2 seções (decisão X) — A Pagar e Pagas
-    const sorted = monthItems.sort((a, b) => b.createdAt - a.createdAt);
+    // V40.4.3: ordenação por dia de vencimento crescente. Sem dueDay vai pro fim (ordenado por createdAt DESC).
+    function sortByDueDay(a, b) {
+        const aHas = !!a.dueDay;
+        const bHas = !!b.dueDay;
+        if (aHas && bHas) return a.dueDay - b.dueDay; // ambos têm: crescente
+        if (aHas) return -1;                          // só A tem: A primeiro
+        if (bHas) return 1;                           // só B tem: B primeiro
+        return b.createdAt - a.createdAt;             // nenhum tem: mais recente primeiro
+    }
+    const sorted = monthItems.slice().sort(sortByDueDay);
     const unpaid = sorted.filter(i => i.paid !== true);
     const paid = sorted.filter(i => i.paid === true);
     
@@ -3771,8 +3825,9 @@ window.changeFinanceMonth = function(delta) {
 }
 
 // V40.4.2: voltar pro mês atual (decisão δ)
+// V40.4.3-fix (Gemini): horário local.
 window.goToFinanceToday = function() {
-    currentFinanceMonth = new Date().toISOString().slice(0, 7);
+    currentFinanceMonth = getLocalMonthStr();
     renderFinancial();
 }
 
@@ -3811,6 +3866,7 @@ window.openFinancialForm = function(id = null) {
         document.getElementById('fin-form-title-label').innerText = 'Editar Despesa';
         document.getElementById('financial-input').value = item.title;
         document.getElementById('financial-amount-input').value = item.amount || '';
+        document.getElementById('financial-dueday-input').value = item.dueDay || ''; // V40.4.3
         currentFinPaid = item.paid === true; // V40.4.2: carrega estado paid
         document.getElementById('fin-form-delete-btn').classList.remove('hidden');
         document.getElementById('fin-form-delete-btn').classList.add('flex');
@@ -3818,6 +3874,7 @@ window.openFinancialForm = function(id = null) {
         document.getElementById('fin-form-title-label').innerText = 'Nova Despesa';
         document.getElementById('financial-input').value = '';
         document.getElementById('financial-amount-input').value = '';
+        document.getElementById('financial-dueday-input').value = ''; // V40.4.3
         currentFinPaid = false; // V40.4.2: nova despesa começa não-paga
         document.getElementById('fin-form-delete-btn').classList.add('hidden');
         document.getElementById('fin-form-delete-btn').classList.remove('flex');
@@ -3849,12 +3906,24 @@ window.saveFinancialForm = function() {
     const amount = parseFloat(amountRaw);
     if (isNaN(amount) || amount <= 0) return showToast('Informe um valor maior que zero.');
 
+    // V40.4.3: parse do dia do vencimento (opcional, 1-31)
+    const dueDayRaw = document.getElementById('financial-dueday-input').value.trim();
+    let dueDay = null;
+    if (dueDayRaw) {
+        const parsed = parseInt(dueDayRaw, 10);
+        if (isNaN(parsed) || parsed < 1 || parsed > 31) {
+            return showToast('Dia do vencimento deve ser entre 1 e 31.');
+        }
+        dueDay = parsed;
+    }
+
     if (currentFinId) {
         const item = financialDb.find(x => x.id === currentFinId);
         if (item) {
             item.title = title;
             item.amount = amount;
             item.paid = currentFinPaid; // V40.4.2
+            item.dueDay = dueDay;       // V40.4.3 (null se vazio)
         }
         showToast('Despesa atualizada!');
     } else {
@@ -3866,6 +3935,7 @@ window.saveFinancialForm = function() {
             type: 'oneshot',
             tagId: null,
             paid: currentFinPaid, // V40.4.2
+            dueDay: dueDay,       // V40.4.3
             createdAt: Date.now()
         });
         showToast('Despesa adicionada!');

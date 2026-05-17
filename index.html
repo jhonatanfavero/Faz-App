@@ -548,13 +548,22 @@
                             </div>
                         </div>
 
-                        <!-- 3 botões de tipo (V40.4.3 ativará Recorrente + Parcelada) -->
+                        <!-- V40.4.3: Dia do vencimento (opcional, 1-31) -->
+                        <div class="mb-5">
+                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Vencimento <span class="normal-case font-normal text-zinc-400">(opcional)</span></label>
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-bold text-zinc-500">Dia</span>
+                                <input type="number" id="financial-dueday-input" min="1" max="31" inputmode="numeric" class="flex-1 h-12 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: 15">
+                            </div>
+                        </div>
+
+                        <!-- 3 botões de tipo (V40.4.4 ativará Recorrente + Parcelada) -->
                         <div class="mb-5">
                             <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Tipo</label>
                             <div class="flex gap-2">
                                 <button onclick="selectFinancialType('oneshot')" id="fin-type-oneshot" class="flex-1 py-2.5 rounded-lg bg-app-focus text-white border border-app-focus text-xs font-bold transition active:scale-95">Avulsa</button>
-                                <button disabled class="flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-300 border border-zinc-200 text-xs font-bold cursor-not-allowed" title="Em breve (V40.4.3)">Recorrente</button>
-                                <button disabled class="flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-300 border border-zinc-200 text-xs font-bold cursor-not-allowed" title="Em breve (V40.4.3)">Parcelada</button>
+                                <button disabled class="flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-300 border border-zinc-200 text-xs font-bold cursor-not-allowed" title="Em breve (V40.4.4)">Recorrente</button>
+                                <button disabled class="flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-300 border border-zinc-200 text-xs font-bold cursor-not-allowed" title="Em breve (V40.4.4)">Parcelada</button>
                             </div>
                         </div>
 

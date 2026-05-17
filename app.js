@@ -35,6 +35,10 @@ let mbDragActive = false;
 //   + updateThoughtBtnVisibility sem funcionar.
 let expandedBacklogIds = new Set();
 let expandedRoutineIds = new Set();
+// V40.4.1: estado financeiro no topo (lição TDZ V40.3.2 — declarar antes do init).
+let financialDb = JSON.parse(localStorage.getItem('tb_financial_db') || '[]');
+let currentFinanceMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM' do mês atual
+function saveFinancial() { localStorage.setItem('tb_financial_db', JSON.stringify(financialDb)); }
 // V2.0 - Estado do header
 // V40.2.28: persistido em localStorage. Default false (1ª vez = expandido pra Descoberta).
 //   Depois que o usuário escolhe (toggleHeader), a escolha vira a nova default.
@@ -1522,6 +1526,7 @@ window.closeAllSheets = () => {
     // V40.3.5-fix: defesa em profundidade — fecha modais novos de delete se ainda estiverem abertos.
     if (typeof cancelDeleteRoutine === 'function') cancelDeleteRoutine();
     if (typeof cancelDeleteBacklog === 'function') cancelDeleteBacklog();
+    if (typeof cancelDeleteFinancial === 'function') cancelDeleteFinancial();
 
     input.blur();
     backlogInput.blur();
@@ -2252,8 +2257,11 @@ let editingNoteId = null;
 window.switchListTab = function(tabName) {
     activeListTab = tabName;
     
+    // V40.4.1: tabs agora inclui 'financial'
+    const TABS = ['backlog', 'routines', 'notes', 'financial'];
+    
     // Atualizar pills
-    ['backlog', 'routines', 'notes'].forEach(t => {
+    TABS.forEach(t => {
         const btn = document.getElementById(`btn-list-${t}`);
         if (!btn) return;
         if (t === tabName) {
@@ -2264,7 +2272,7 @@ window.switchListTab = function(tabName) {
     });
     
     // Mostrar view correspondente, esconder outras
-    ['backlog', 'routines', 'notes'].forEach(t => {
+    TABS.forEach(t => {
         const view = document.getElementById(`view-${t}`);
         if (!view) return;
         if (t === tabName) view.classList.remove('hidden');
@@ -2285,6 +2293,12 @@ window.switchListTab = function(tabName) {
     } else if (tabName === 'backlog') {
         // V40.3.4: garante volta pra view-lista (não form) ao trocar de aba
         if (typeof closeBacklogForm === 'function') closeBacklogForm(true);
+        notesFormOpen = false;
+        editingNoteId = null;
+    } else if (tabName === 'financial') {
+        // V40.4.1: garante volta pra view-lista do financeiro
+        if (typeof closeFinancialForm === 'function') closeFinancialForm(true);
+        if (typeof renderFinancial === 'function') renderFinancial();
         notesFormOpen = false;
         editingNoteId = null;
     } else {
@@ -3597,6 +3611,197 @@ window.deleteBacklogFromForm = function() {
     if (!currentBlId) return;
     // V40.3.5: agora com confirmação via modal (igual delete de Rotina)
     requestDeleteBacklog(currentBlId);
+}
+
+
+// =====================================================
+// V40.4.1 — ABA FINANCEIRO (MVP — despesa avulsa + mês atual)
+// =====================================================
+// Schema do financialDb (no topo, linha ~37):
+//   { id, title, amount, month: 'YYYY-MM', type: 'oneshot', tagId: null, createdAt }
+// V40.4.2 adicionará: durationMonths, isRecurring, startMonth, currentInstallment
+// V40.4.3 adicionará: navegação entre meses (currentFinanceMonth já existe)
+//
+// Helpers de formatação:
+function formatBRL(amount) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount || 0);
+}
+
+function formatMonthLabel(monthStr) {
+    // 'YYYY-MM' → 'Maio 2026'
+    const [y, m] = monthStr.split('-');
+    const names = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    return `${names[parseInt(m) - 1]} ${y}`;
+}
+
+// Estado do form
+let currentFinId = null;
+let currentFinType = 'oneshot'; // V40.4.2 vai adicionar 'recurring' e 'parceled'
+
+window.renderFinancial = function() {
+    const container = document.getElementById('financial-container');
+    const monthLabel = document.getElementById('financial-month-label');
+    const totalEl = document.getElementById('financial-total');
+    if (!container) return;
+    
+    if (monthLabel) monthLabel.innerText = formatMonthLabel(currentFinanceMonth);
+    
+    // Filtra despesas do mês atual (MVP: só tipo 'oneshot' filtrado por month)
+    const monthItems = financialDb.filter(item => item.month === currentFinanceMonth);
+    
+    const total = monthItems.reduce((acc, item) => acc + (item.amount || 0), 0);
+    if (totalEl) totalEl.innerText = formatBRL(total);
+    
+    if (monthItems.length === 0) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center text-center opacity-50 py-12">
+                <i class="ph ph-receipt text-4xl mb-2 text-zinc-400"></i>
+                <p class="text-sm font-medium text-zinc-500">Nenhuma despesa em ${formatMonthLabel(currentFinanceMonth)}.</p>
+                <p class="text-[11px] text-zinc-400 mt-1">Toque em + Nova Despesa pra começar</p>
+            </div>`;
+        return;
+    }
+
+    // Layout do card: nome + valor (decisão 3P — sem ícones extras, sem checklist)
+    container.innerHTML = monthItems.sort((a, b) => b.createdAt - a.createdAt).map(item => {
+        const tagColor = item.tagId ? getTagColor(item.tagId) : null;
+        const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
+        const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
+        
+        return `
+        <div onclick="openFinancialForm('${item.id}')" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition">
+            <div class="flex justify-between items-center gap-3">
+                <div class="flex items-center gap-3 min-w-0 flex-1">
+                    <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 shadow-inner" style="${iconBgStyle}">
+                        <i class="ph-fill ph-currency-circle-dollar text-lg" style="${iconColorStyle}"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(item.title)}</h4>
+                        <p class="text-[11px] text-zinc-400 font-bold mt-0.5">Avulsa</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <span class="text-sm font-bold text-zinc-800">${formatBRL(item.amount)}</span>
+                    <button onclick="event.stopPropagation(); requestDeleteFinancial('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
+                        <i class="ph ph-trash text-sm"></i>
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+window.openFinancialForm = function(id = null) {
+    document.getElementById('financial-list-view').classList.add('hidden');
+    document.getElementById('financial-form-view').classList.remove('hidden');
+    document.getElementById('financial-form-view').classList.add('flex');
+    
+    currentFinId = id;
+    currentFinType = 'oneshot';
+    
+    if (id) {
+        const item = financialDb.find(x => x.id === id);
+        if (!item) return;
+        document.getElementById('fin-form-title-label').innerText = 'Editar Despesa';
+        document.getElementById('financial-input').value = item.title;
+        document.getElementById('financial-amount-input').value = item.amount || '';
+        document.getElementById('fin-form-delete-btn').classList.remove('hidden');
+        document.getElementById('fin-form-delete-btn').classList.add('flex');
+    } else {
+        document.getElementById('fin-form-title-label').innerText = 'Nova Despesa';
+        document.getElementById('financial-input').value = '';
+        document.getElementById('financial-amount-input').value = '';
+        document.getElementById('fin-form-delete-btn').classList.add('hidden');
+        document.getElementById('fin-form-delete-btn').classList.remove('flex');
+    }
+}
+
+window.closeFinancialForm = function(force = false) {
+    const formView = document.getElementById('financial-form-view');
+    const listView = document.getElementById('financial-list-view');
+    if (!formView || !listView) return;
+    formView.classList.add('hidden');
+    formView.classList.remove('flex');
+    listView.classList.remove('hidden');
+    if (!force) renderFinancial();
+}
+
+window.selectFinancialType = function(type) {
+    // V40.4.1: por enquanto só 'oneshot' funcional. V40.4.2 ativa os outros.
+    currentFinType = type;
+}
+
+window.saveFinancialForm = function() {
+    const title = document.getElementById('financial-input').value.trim();
+    if (!title) return showToast('A despesa precisa de um nome.');
+    
+    const amountRaw = document.getElementById('financial-amount-input').value;
+    const amount = parseFloat(amountRaw);
+    if (isNaN(amount) || amount <= 0) return showToast('Informe um valor maior que zero.');
+
+    if (currentFinId) {
+        const item = financialDb.find(x => x.id === currentFinId);
+        if (item) {
+            item.title = title;
+            item.amount = amount;
+        }
+        showToast('Despesa atualizada!');
+    } else {
+        financialDb.push({
+            id: 'fin_' + Date.now(),
+            title: title,
+            amount: amount,
+            month: currentFinanceMonth,
+            type: 'oneshot',
+            tagId: null,
+            createdAt: Date.now()
+        });
+        showToast('Despesa adicionada!');
+    }
+    
+    saveFinancial();
+    closeFinancialForm();
+}
+
+// V40.4.1: delete com modal de confirmação (padrão V40.3.5)
+let pendingFinancialDeleteId = null;
+
+window.requestDeleteFinancial = function(id) {
+    pendingFinancialDeleteId = id;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '55'; // sobre a sheet (z-50), abaixo do modal (z-60)
+    document.getElementById('financial-delete-modal').classList.remove('hidden');
+    document.getElementById('financial-delete-modal').classList.add('flex');
+}
+
+window.confirmDeleteFinancial = function() {
+    if (!pendingFinancialDeleteId) return;
+    financialDb = financialDb.filter(x => x.id !== pendingFinancialDeleteId);
+    saveFinancial();
+    pendingFinancialDeleteId = null;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '';
+    document.getElementById('financial-delete-modal').classList.add('hidden');
+    document.getElementById('financial-delete-modal').classList.remove('flex');
+    if (typeof closeFinancialForm === 'function') closeFinancialForm();
+    renderFinancial();
+    showToast('Despesa apagada.');
+}
+
+window.cancelDeleteFinancial = function() {
+    pendingFinancialDeleteId = null;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '';
+    document.getElementById('financial-delete-modal').classList.add('hidden');
+    document.getElementById('financial-delete-modal').classList.remove('flex');
+}
+
+window.deleteFinancialFromForm = function() {
+    if (!currentFinId) return;
+    requestDeleteFinancial(currentFinId);
 }
 
 

@@ -1,5 +1,5 @@
-// V6.6 - v40.3.8 (UX form Lista: Enter no título não salva mais — foca primeiro check (cria se necessário). Enter num check pula pro próximo (cria novo se for o último). Event delegation idempotente. focus({preventScroll:true}) respeita Regra de Ouro #2 do PWA Android.)
-const CACHE_NAME = 'timeblock-v40-3-8';
+// V6.7 - v40.4.1 (MVP Aba Financeiro: 4ª pill 'Finanças', cadastrar despesa avulsa + listar + somar mês atual + delete com modal. Em breve: V40.4.2 recorrente/parcelada, V40.4.3 navegação por mês, V40.4.4 edição inteligente, V40.4.5 renovação, V40.4.6 relatório+tags.)
+const CACHE_NAME = 'timeblock-v40-4-1';
 const ASSETS = [
   './',
   './index.html',

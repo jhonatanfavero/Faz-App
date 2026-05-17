@@ -1,5 +1,5 @@
-// V6.7 - v40.4.1 (MVP Aba Financeiro: 4ª pill 'Finanças', cadastrar despesa avulsa + listar + somar mês atual + delete com modal. Em breve: V40.4.2 recorrente/parcelada, V40.4.3 navegação por mês, V40.4.4 edição inteligente, V40.4.5 renovação, V40.4.6 relatório+tags.)
-const CACHE_NAME = 'timeblock-v40-4-1';
+// V6.8 - v40.4.2 (Finanças: marcar despesa como paga (checkbox no card + no form), 2 seções A Pagar/Pagas, 3 totais destacados Total/Pago/Aberto, navegação entre meses com setas + botão Hoje condicional. Recorrente/Parcelada permanecem desabilitados — V40.4.3.)
+const CACHE_NAME = 'timeblock-v40-4-2';
 const ASSETS = [
   './',
   './index.html',

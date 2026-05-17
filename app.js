@@ -3638,19 +3638,86 @@ function formatMonthLabel(monthStr) {
 let currentFinId = null;
 let currentFinType = 'oneshot'; // V40.4.2 vai adicionar 'recurring' e 'parceled'
 
+// V40.4.2: helper de card de despesa (reusado pelas 2 seções A Pagar / Pagas)
+function renderFinancialCard(item) {
+    const isPaid = item.paid === true;
+    const tagColor = item.tagId ? getTagColor(item.tagId) : null;
+    const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
+    const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
+    
+    // Decisão 2(I): valor riscado + opacidade 60% quando pago
+    const opacityClass = isPaid ? 'opacity-60' : '';
+    const valueClass = isPaid ? 'line-through text-zinc-500' : 'text-zinc-800';
+    const titleClass = isPaid ? 'text-zinc-500' : 'text-zinc-800';
+    
+    // Decisão 1(B): checkbox redondo à esquerda. Marcado = preenchido com app-focus.
+    const checkboxBg = isPaid ? 'bg-app-focus border-app-focus' : 'bg-white border-zinc-300';
+    const checkIconClass = isPaid ? '' : 'hidden';
+    
+    return `
+    <div onclick="openFinancialForm('${item.id}')" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition ${opacityClass}">
+        <div class="flex justify-between items-center gap-3">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+                <!-- V40.4.2: checkbox de paga (decisão B) -->
+                <button onclick="event.stopPropagation(); togglePaidFinancial('${item.id}')" aria-label="Marcar como paga" class="w-6 h-6 rounded-full border-2 ${checkboxBg} flex items-center justify-center shrink-0 transition active:scale-90">
+                    <i class="ph-bold ph-check text-xs text-white ${checkIconClass}"></i>
+                </button>
+                <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 shadow-inner" style="${iconBgStyle}">
+                    <i class="ph-fill ph-currency-circle-dollar text-lg" style="${iconColorStyle}"></i>
+                </div>
+                <div class="min-w-0">
+                    <h4 class="font-bold text-sm leading-tight truncate ${titleClass}">${escapeHtml(item.title)}</h4>
+                    <p class="text-[11px] text-zinc-400 font-bold mt-0.5">Avulsa</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="text-sm font-bold ${valueClass}">${formatBRL(item.amount)}</span>
+                <button onclick="event.stopPropagation(); requestDeleteFinancial('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
+                    <i class="ph ph-trash text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </div>`;
+}
+
 window.renderFinancial = function() {
     const container = document.getElementById('financial-container');
     const monthLabel = document.getElementById('financial-month-label');
     const totalEl = document.getElementById('financial-total');
+    const paidEl = document.getElementById('financial-paid');
+    const openEl = document.getElementById('financial-open');
+    const todayBtn = document.getElementById('financial-today-btn');
     if (!container) return;
     
     if (monthLabel) monthLabel.innerText = formatMonthLabel(currentFinanceMonth);
     
+    // V40.4.2: botão "Hoje" só aparece se NÃO está no mês atual (decisão δ)
+    if (todayBtn) {
+        const currentRealMonth = new Date().toISOString().slice(0, 7);
+        if (currentFinanceMonth === currentRealMonth) {
+            todayBtn.classList.add('hidden');
+            todayBtn.classList.remove('flex');
+        } else {
+            todayBtn.classList.remove('hidden');
+            todayBtn.classList.add('flex');
+        }
+    }
+    
     // Filtra despesas do mês atual (MVP: só tipo 'oneshot' filtrado por month)
     const monthItems = financialDb.filter(item => item.month === currentFinanceMonth);
     
-    const total = monthItems.reduce((acc, item) => acc + (item.amount || 0), 0);
-    if (totalEl) totalEl.innerText = formatBRL(total);
+    // V40.4.2: 3 totais num único reduce (F2 - performance)
+    const totals = monthItems.reduce((acc, item) => {
+        const amt = item.amount || 0;
+        acc.total += amt;
+        if (item.paid === true) acc.paid += amt;
+        else acc.open += amt;
+        return acc;
+    }, { total: 0, paid: 0, open: 0 });
+    
+    if (totalEl) totalEl.innerText = formatBRL(totals.total);
+    if (paidEl) paidEl.innerText = formatBRL(totals.paid);
+    if (openEl) openEl.innerText = formatBRL(totals.open);
     
     if (monthItems.length === 0) {
         container.innerHTML = `
@@ -3662,33 +3729,72 @@ window.renderFinancial = function() {
         return;
     }
 
-    // Layout do card: nome + valor (decisão 3P — sem ícones extras, sem checklist)
-    container.innerHTML = monthItems.sort((a, b) => b.createdAt - a.createdAt).map(item => {
-        const tagColor = item.tagId ? getTagColor(item.tagId) : null;
-        const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
-        const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
-        
-        return `
-        <div onclick="openFinancialForm('${item.id}')" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition">
-            <div class="flex justify-between items-center gap-3">
-                <div class="flex items-center gap-3 min-w-0 flex-1">
-                    <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 shadow-inner" style="${iconBgStyle}">
-                        <i class="ph-fill ph-currency-circle-dollar text-lg" style="${iconColorStyle}"></i>
-                    </div>
-                    <div class="min-w-0">
-                        <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(item.title)}</h4>
-                        <p class="text-[11px] text-zinc-400 font-bold mt-0.5">Avulsa</p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2 shrink-0">
-                    <span class="text-sm font-bold text-zinc-800">${formatBRL(item.amount)}</span>
-                    <button onclick="event.stopPropagation(); requestDeleteFinancial('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
-                        <i class="ph ph-trash text-sm"></i>
-                    </button>
-                </div>
-            </div>
-        </div>`;
-    }).join('');
+    // V40.4.2: separar em 2 seções (decisão X) — A Pagar e Pagas
+    const sorted = monthItems.sort((a, b) => b.createdAt - a.createdAt);
+    const unpaid = sorted.filter(i => i.paid !== true);
+    const paid = sorted.filter(i => i.paid === true);
+    
+    let html = '';
+    
+    // Seção "A Pagar" — só mostra header se tem unpaid (F6)
+    if (unpaid.length > 0) {
+        html += `<div class="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-2 mt-1 px-1">A Pagar (${unpaid.length})</div>`;
+        html += unpaid.map(renderFinancialCard).join('');
+    }
+    
+    // Seção "Pagas" — só mostra header se tem paid (F6)
+    if (paid.length > 0) {
+        html += `<div class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2 mt-4 px-1">Pagas (${paid.length})</div>`;
+        html += paid.map(renderFinancialCard).join('');
+    }
+    
+    container.innerHTML = html;
+}
+
+// V40.4.2: toggle paid (decisão 1B)
+window.togglePaidFinancial = function(id) {
+    const item = financialDb.find(x => x.id === id);
+    if (!item) return;
+    item.paid = !(item.paid === true);
+    saveFinancial();
+    renderFinancial();
+}
+
+// V40.4.2: navegação entre meses (decisão α)
+window.changeFinanceMonth = function(delta) {
+    const [y, m] = currentFinanceMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    const newY = d.getFullYear();
+    const newM = String(d.getMonth() + 1).padStart(2, '0');
+    currentFinanceMonth = `${newY}-${newM}`;
+    renderFinancial();
+}
+
+// V40.4.2: voltar pro mês atual (decisão δ)
+window.goToFinanceToday = function() {
+    currentFinanceMonth = new Date().toISOString().slice(0, 7);
+    renderFinancial();
+}
+
+// V40.4.2: toggle pago no form (estado in-memory antes de salvar)
+let currentFinPaid = false;
+
+window.toggleFinancialFormPaid = function() {
+    currentFinPaid = !currentFinPaid;
+    updateFinancialFormPaidUI();
+}
+
+function updateFinancialFormPaidUI() {
+    const checkBox = document.getElementById('fin-form-paid-check');
+    const icon = document.getElementById('fin-form-paid-icon');
+    if (!checkBox || !icon) return;
+    if (currentFinPaid) {
+        checkBox.className = 'w-6 h-6 rounded-full border-2 border-app-focus bg-app-focus flex items-center justify-center shrink-0 transition';
+        icon.classList.remove('hidden');
+    } else {
+        checkBox.className = 'w-6 h-6 rounded-full border-2 border-zinc-300 bg-white flex items-center justify-center shrink-0 transition';
+        icon.classList.add('hidden');
+    }
 }
 
 window.openFinancialForm = function(id = null) {
@@ -3705,15 +3811,19 @@ window.openFinancialForm = function(id = null) {
         document.getElementById('fin-form-title-label').innerText = 'Editar Despesa';
         document.getElementById('financial-input').value = item.title;
         document.getElementById('financial-amount-input').value = item.amount || '';
+        currentFinPaid = item.paid === true; // V40.4.2: carrega estado paid
         document.getElementById('fin-form-delete-btn').classList.remove('hidden');
         document.getElementById('fin-form-delete-btn').classList.add('flex');
     } else {
         document.getElementById('fin-form-title-label').innerText = 'Nova Despesa';
         document.getElementById('financial-input').value = '';
         document.getElementById('financial-amount-input').value = '';
+        currentFinPaid = false; // V40.4.2: nova despesa começa não-paga
         document.getElementById('fin-form-delete-btn').classList.add('hidden');
         document.getElementById('fin-form-delete-btn').classList.remove('flex');
     }
+    
+    updateFinancialFormPaidUI(); // V40.4.2: sincroniza visual do checkbox
 }
 
 window.closeFinancialForm = function(force = false) {
@@ -3744,6 +3854,7 @@ window.saveFinancialForm = function() {
         if (item) {
             item.title = title;
             item.amount = amount;
+            item.paid = currentFinPaid; // V40.4.2
         }
         showToast('Despesa atualizada!');
     } else {
@@ -3754,6 +3865,7 @@ window.saveFinancialForm = function() {
             month: currentFinanceMonth,
             type: 'oneshot',
             tagId: null,
+            paid: currentFinPaid, // V40.4.2
             createdAt: Date.now()
         });
         showToast('Despesa adicionada!');

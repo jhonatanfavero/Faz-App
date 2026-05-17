@@ -142,6 +142,38 @@ let db = JSON.parse(localStorage.getItem('tb_master_db'));
 let backlogDb = JSON.parse(localStorage.getItem('tb_backlog_db')) || [];
 let backlogSelectedDur = 30;
 
+// ===== V40.5.0: KANBAN — colunas no backlog =====
+// Schema: { id, name, isDefault, createdAt }
+// Coluna "Geral" (id: 'col_geral') é criada automaticamente. Não pode ser apagada.
+let backlogColumnsDb = JSON.parse(localStorage.getItem('tb_backlog_columns')) || [];
+let activeColumnId = 'col_geral'; // coluna que está sendo visualizada (pra criar nova tarefa nela)
+
+function saveBacklogColumns() {
+    localStorage.setItem('tb_backlog_columns', JSON.stringify(backlogColumnsDb));
+}
+
+// K3: garante que coluna padrão Geral sempre existe (executa no init e antes de operações).
+function ensureDefaultColumn() {
+    const hasDefault = backlogColumnsDb.some(c => c.id === 'col_geral');
+    if (!hasDefault) {
+        backlogColumnsDb.unshift({
+            id: 'col_geral',
+            name: 'Geral',
+            isDefault: true,
+            createdAt: Date.now()
+        });
+        saveBacklogColumns();
+    }
+}
+
+// K2: retrocompat — tarefas sem columnId vão pra Geral
+function getItemColumn(item) {
+    return item.columnId || 'col_geral';
+}
+
+// Chama uma vez no carregamento.
+ensureDefaultColumn();
+
 // V40.1: Super Gabinete - Notas livres do dia
 let notesDb = JSON.parse(localStorage.getItem('tb_notes_db')) || [];
 let activeListTab = 'backlog'; // 'backlog' | 'routines' | 'notes'
@@ -1603,6 +1635,10 @@ window.closeAllSheets = () => {
     if (typeof cancelDeleteRoutine === 'function') cancelDeleteRoutine();
     if (typeof cancelDeleteBacklog === 'function') cancelDeleteBacklog();
     if (typeof cancelDeleteFinancial === 'function') cancelDeleteFinancial();
+    // V40.5.0: fecha modais do kanban também
+    if (typeof cancelDeleteColumn === 'function') cancelDeleteColumn();
+    if (typeof cancelColumnName === 'function') cancelColumnName();
+    if (typeof closeColumnMenu === 'function') closeColumnMenu();
 
     input.blur();
     backlogInput.blur();
@@ -1830,7 +1866,8 @@ window.addBacklogItem = () => {
     backlogDb.push({
         id: 'bl_' + Date.now(),
         title: title,
-        duration: backlogSelectedDur
+        duration: backlogSelectedDur,
+        columnId: activeColumnId || 'col_geral'  // V40.5.0
     });
     saveBacklog();
     backlogInput.value = '';
@@ -1871,102 +1908,197 @@ window.scheduleBacklogItem = (id) => {
     renderTimeline();
 };
 
-function renderBacklog() {
-    const container = document.getElementById('backlog-container');
-    document.getElementById('backlog-count').innerText = backlogDb.length;
+// V40.5.0: helper extraído — gera HTML do card de uma tarefa (sem mudar nada por dentro).
+function renderBacklogCard(item) {
+    const tagColor = item.tagId ? getTagColor(item.tagId) : null;
+    const mbs = item.microblocks || [];
+    const isExpanded = expandedBacklogIds.has(item.id);
+    const visibleMbs = isExpanded ? mbs : mbs.slice(0, 3);
+    const extraCount = mbs.length - 3;
     
+    let mbHtml = visibleMbs.map(mb => `
+        <div class="flex items-center gap-1.5 mt-1">
+            <i class="ph-bold ph-check text-[10px] text-zinc-300 shrink-0"></i>
+            <span class="text-[11px] text-zinc-500 truncate">${escapeHtml(mb.title)}</span>
+        </div>
+    `).join('');
+    
+    if (extraCount > 0 && !isExpanded) {
+        mbHtml += `<button onclick="event.stopPropagation(); toggleExpandBacklog('${item.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">+ ${extraCount} mais</button>`;
+    } else if (isExpanded && mbs.length > 3) {
+        mbHtml += `<button onclick="event.stopPropagation(); toggleExpandBacklog('${item.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">↑ Mostrar menos</button>`;
+    } else if (mbs.length === 0) {
+        mbHtml += `<div class="text-[10px] text-zinc-400 italic mt-1">Sem checklist</div>`;
+    }
+    
+    const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
+    const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
+    
+    return `
+    <div onclick="openBacklogForm('${item.id}')" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition">
+        <div class="flex justify-between items-start mb-2">
+            <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 shadow-inner" style="${iconBgStyle}">
+                    <i class="ph-fill ph-clipboard-text text-lg" style="${iconColorStyle}"></i>
+                </div>
+                <div class="min-w-0">
+                    <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(item.title)}</h4>
+                    <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(item.duration)}${mbs.length > 0 ? ` · ${mbs.length} ${mbs.length === 1 ? 'item' : 'itens'}` : ''}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+                <button onclick="event.stopPropagation(); scheduleBacklogItem('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong active:scale-95 transition" title="Agendar">
+                    <i class="ph-fill ph-hand-tap text-sm"></i>
+                </button>
+                <button onclick="event.stopPropagation(); requestDeleteBacklog('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
+                    <i class="ph ph-trash text-sm"></i>
+                </button>
+            </div>
+        </div>
+        <div class="w-full h-px bg-zinc-100 my-2.5"></div>
+        <div class="flex flex-col">
+            ${mbHtml}
+        </div>
+    </div>`;
+}
+
+function renderBacklog() {
+    // V40.5.0: KANBAN — colunas horizontais com scroll-snap
+    ensureDefaultColumn(); // K3: garante que Geral sempre existe
+    
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    const dotsContainer = document.getElementById('backlog-column-dots');
+    if (!wrapper) return;
+    
+    // Stats globais do header inferior (botão Lista) — soma de TODAS as colunas
     const totalMins = backlogDb.reduce((acc, item) => acc + item.duration, 0);
     const listStats = document.getElementById('list-btn-stats');
     const listCount = document.getElementById('list-btn-count');
     const listTime = document.getElementById('list-btn-time');
-    const backlogTotalTime = document.getElementById('backlog-total-time');
     
     if (backlogDb.length > 0) {
         listStats.classList.remove('hidden');
         listStats.classList.add('flex');
         listCount.innerText = backlogDb.length + (backlogDb.length === 1 ? ' item' : ' itens');
         listTime.innerText = formatDur(totalMins);
-        if (backlogTotalTime) {
-            backlogTotalTime.innerText = formatDur(totalMins);
-            backlogTotalTime.classList.remove('hidden');
-        }
     } else {
         listStats.classList.add('hidden');
         listStats.classList.remove('flex');
-        if (backlogTotalTime) backlogTotalTime.classList.add('hidden');
     }
     
-    if (backlogDb.length === 0) {
-        container.innerHTML = `
-            <div class="flex flex-col items-center justify-center text-center opacity-50 py-12">
-                <i class="ph ph-inbox text-4xl mb-2 text-zinc-400"></i>
-                <p class="text-sm font-medium text-zinc-500">Lista vazia!</p>
-                <p class="text-[11px] text-zinc-400 mt-1">Toque em + Nova Tarefa pra começar</p>
-            </div>`;
-        return;
-    }
-
-    // V40.3.5: layout do card da Lista IDÊNTICO ao das Rotinas.
-    // Ícone genérico (📋) à esquerda, título + duração no meio, botões ✋ + 🗑️ no topo direito,
-    // divisor horizontal antes da checklist. Toque no corpo do card abre form de edição.
-    // 🗑️ pede confirmação via modal backlog-delete-modal (criado em V40.3.5).
-    container.innerHTML = backlogDb.map(item => {
-        const tagColor = item.tagId ? getTagColor(item.tagId) : null;
-        
-        const mbs = item.microblocks || [];
-        const isExpanded = expandedBacklogIds.has(item.id);
-        const visibleMbs = isExpanded ? mbs : mbs.slice(0, 3);
-        const extraCount = mbs.length - 3;
-        
-        // Checks padronizados com Rotinas (text-[11px], gap-1.5, zinc-500)
-        let mbHtml = visibleMbs.map(mb => `
-            <div class="flex items-center gap-1.5 mt-1">
-                <i class="ph-bold ph-check text-[10px] text-zinc-300 shrink-0"></i>
-                <span class="text-[11px] text-zinc-500 truncate">${escapeHtml(mb.title)}</span>
-            </div>
-        `).join('');
-        
-        if (extraCount > 0 && !isExpanded) {
-            mbHtml += `<button onclick="event.stopPropagation(); toggleExpandBacklog('${item.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">+ ${extraCount} mais</button>`;
-        } else if (isExpanded && mbs.length > 3) {
-            mbHtml += `<button onclick="event.stopPropagation(); toggleExpandBacklog('${item.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">↑ Mostrar menos</button>`;
-        } else if (mbs.length === 0) {
-            mbHtml += `<div class="text-[10px] text-zinc-400 italic mt-1">Sem checklist</div>`;
+    // Atualiza header da coluna ATIVA (título + contador)
+    updateActiveColumnHeader();
+    
+    // Renderiza cada coluna como uma "página" no scroll horizontal
+    wrapper.innerHTML = backlogColumnsDb.map(col => {
+        const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
+        let cardsHtml;
+        if (colItems.length === 0) {
+            cardsHtml = `
+                <div class="flex flex-col items-center justify-center text-center opacity-50 py-12 px-6">
+                    <i class="ph ph-inbox text-4xl mb-2 text-zinc-400"></i>
+                    <p class="text-sm font-medium text-zinc-500">Lista vazia!</p>
+                    <p class="text-[11px] text-zinc-400 mt-1">Toque em + Nova Tarefa pra começar</p>
+                </div>`;
+        } else {
+            cardsHtml = colItems.map(renderBacklogCard).join('');
         }
-        
-        // Ícone genérico 📋 (decisão A). Se tem tag, cor de fundo herda da tag.
-        const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
-        const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
-        
+        // Cada coluna ocupa 100% do wrapper, snap-start, scroll vertical interno
         return `
-        <div onclick="openBacklogForm('${item.id}')" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-1 cursor-pointer hover:shadow active:scale-[0.99] transition">
-            <div class="flex justify-between items-start mb-2">
-                <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
-                    <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 shadow-inner" style="${iconBgStyle}">
-                        <i class="ph-fill ph-clipboard-text text-lg" style="${iconColorStyle}"></i>
-                    </div>
-                    <div class="min-w-0">
-                        <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(item.title)}</h4>
-                        <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(item.duration)}${mbs.length > 0 ? ` · ${mbs.length} ${mbs.length === 1 ? 'item' : 'itens'}` : ''}</p>
-                    </div>
-                </div>
-                <!-- Botões ✋ Agendar + 🗑️ Apagar no topo direito (V40.3.5 padronização Lista=Rotinas) -->
-                <div class="flex items-center gap-1.5 shrink-0">
-                    <button onclick="event.stopPropagation(); scheduleBacklogItem('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong active:scale-95 transition" title="Agendar">
-                        <i class="ph-fill ph-hand-tap text-sm"></i>
-                    </button>
-                    <button onclick="event.stopPropagation(); requestDeleteBacklog('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
-                        <i class="ph ph-trash text-sm"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="w-full h-px bg-zinc-100 my-2.5"></div>
-            <div class="flex flex-col">
-                ${mbHtml}
-            </div>
-        </div>`;
+            <div class="snap-start shrink-0 w-full h-full overflow-y-auto no-scrollbar px-4 pb-4" data-column-id="${col.id}">
+                ${cardsHtml}
+            </div>`;
     }).join('');
+    
+    // Dots de navegação
+    if (dotsContainer) {
+        dotsContainer.innerHTML = backlogColumnsDb.map((col, idx) => {
+            const isActive = col.id === activeColumnId;
+            const dotClass = isActive ? 'bg-app-focus' : 'bg-zinc-300';
+            return `<button onclick="scrollToColumn('${col.id}')" class="w-2 h-2 rounded-full ${dotClass} shrink-0 transition active:scale-90" aria-label="Ir para ${escapeHtml(col.name)}"></button>`;
+        }).join('');
+    }
+    
+    // Após render, garante que o scroll está na coluna ativa (sem animação)
+    requestAnimationFrame(() => {
+        const activeIdx = backlogColumnsDb.findIndex(c => c.id === activeColumnId);
+        if (activeIdx >= 0) {
+            const cols = wrapper.children;
+            if (cols[activeIdx]) {
+                wrapper.scrollLeft = cols[activeIdx].offsetLeft;
+            }
+        }
+        // Liga listener de scroll (idempotente)
+        if (!wrapper.dataset.scrollListenerAttached) {
+            wrapper.addEventListener('scroll', onBacklogColumnsScroll, { passive: true });
+            wrapper.dataset.scrollListenerAttached = 'true';
+        }
+    });
 }
+
+// V40.5.0: detecta qual coluna está visível após scroll-snap e atualiza activeColumnId
+let _scrollDebounceTimer = null;
+function onBacklogColumnsScroll() {
+    if (_scrollDebounceTimer) clearTimeout(_scrollDebounceTimer);
+    _scrollDebounceTimer = setTimeout(() => {
+        const wrapper = document.getElementById('backlog-columns-wrapper');
+        if (!wrapper) return;
+        const scrollPos = wrapper.scrollLeft;
+        const cols = wrapper.children;
+        let bestIdx = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < cols.length; i++) {
+            const dist = Math.abs(cols[i].offsetLeft - scrollPos);
+            if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+        }
+        const newCol = backlogColumnsDb[bestIdx];
+        if (newCol && newCol.id !== activeColumnId) {
+            activeColumnId = newCol.id;
+            updateActiveColumnHeader();
+            updateColumnDots();
+        }
+    }, 100);
+}
+
+function updateActiveColumnHeader() {
+    const col = backlogColumnsDb.find(c => c.id === activeColumnId) || backlogColumnsDb[0];
+    if (!col) return;
+    const titleEl = document.getElementById('backlog-column-title');
+    const countEl = document.getElementById('backlog-count');
+    if (titleEl) titleEl.innerText = col.name;
+    if (countEl) {
+        const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
+        countEl.innerText = colItems.length;
+    }
+}
+
+function updateColumnDots() {
+    const dotsContainer = document.getElementById('backlog-column-dots');
+    if (!dotsContainer) return;
+    Array.from(dotsContainer.children).forEach((dot, idx) => {
+        const col = backlogColumnsDb[idx];
+        if (!col) return;
+        if (col.id === activeColumnId) {
+            dot.className = 'w-2 h-2 rounded-full bg-app-focus shrink-0 transition active:scale-90';
+        } else {
+            dot.className = 'w-2 h-2 rounded-full bg-zinc-300 shrink-0 transition active:scale-90';
+        }
+    });
+}
+
+// V40.5.0: ir programaticamente pra uma coluna (toque no dot)
+window.scrollToColumn = function(columnId) {
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    if (!wrapper) return;
+    const idx = backlogColumnsDb.findIndex(c => c.id === columnId);
+    if (idx < 0) return;
+    const col = wrapper.children[idx];
+    if (!col) return;
+    wrapper.scrollTo({ left: col.offsetLeft, behavior: 'smooth' });
+    activeColumnId = columnId;
+    updateActiveColumnHeader();
+    updateColumnDots();
+};
 
 // V40.3.5 Ajuste 4 (I): toggle expansão de checklist de um item da Lista.
 window.toggleExpandBacklog = function(itemId) {
@@ -3668,7 +3800,8 @@ window.saveBacklogForm = function() {
             title: title,
             duration: currentBlDur,
             tagId: currentBlTagId,
-            microblocks: validMbs
+            microblocks: validMbs,
+            columnId: activeColumnId || 'col_geral'  // V40.5.0: nova tarefa nasce na coluna ativa
         });
         showToast('Tarefa adicionada!');
     }
@@ -3723,6 +3856,187 @@ window.deleteBacklogFromForm = function() {
     if (!currentBlId) return;
     // V40.3.5: agora com confirmação via modal (igual delete de Rotina)
     requestDeleteBacklog(currentBlId);
+}
+
+
+// =====================================================
+// V40.5.0 — KANBAN: gerenciamento de colunas (listas)
+// =====================================================
+// Schema: { id, name, isDefault, createdAt }
+// Coluna padrão: id='col_geral', isDefault: true, não pode ser apagada.
+
+// Estado do modal de nome (criar vs renomear)
+let columnNameMode = null; // 'create' | 'rename'
+let columnNameTargetId = null; // id da coluna sendo renomeada (se mode='rename')
+
+window.promptCreateColumn = function() {
+    columnNameMode = 'create';
+    columnNameTargetId = null;
+    document.getElementById('column-name-title').innerText = 'Nova Lista';
+    const input = document.getElementById('column-name-input');
+    input.value = '';
+    
+    showColumnNameModal();
+};
+
+window.openColumnMenuFromHeader = function() {
+    // Abre o menu da coluna ATIVA atual
+    const col = backlogColumnsDb.find(c => c.id === activeColumnId);
+    if (!col) return;
+    
+    document.getElementById('column-menu-title').innerText = col.name;
+    
+    // K8: coluna padrão NÃO mostra botão Apagar
+    const deleteBtn = document.getElementById('column-menu-delete-btn');
+    if (col.isDefault) {
+        deleteBtn.classList.add('hidden');
+    } else {
+        deleteBtn.classList.remove('hidden');
+    }
+    
+    showColumnMenuModal();
+};
+
+window.closeColumnMenu = function() {
+    hideModal('column-menu-modal');
+};
+
+window.openRenameColumn = function() {
+    const col = backlogColumnsDb.find(c => c.id === activeColumnId);
+    if (!col) return;
+    
+    hideModal('column-menu-modal');
+    
+    columnNameMode = 'rename';
+    columnNameTargetId = col.id;
+    document.getElementById('column-name-title').innerText = 'Renomear Lista';
+    document.getElementById('column-name-input').value = col.name;
+    
+    showColumnNameModal();
+};
+
+window.confirmColumnName = function() {
+    const input = document.getElementById('column-name-input');
+    const name = input.value.trim();
+    if (!name) return showToast('Dê um nome pra lista.');
+    if (name.length > 30) return showToast('Nome muito longo (máx 30).');
+    
+    if (columnNameMode === 'create') {
+        const newCol = {
+            id: 'col_' + Date.now(),
+            name: name,
+            isDefault: false,
+            createdAt: Date.now()
+        };
+        backlogColumnsDb.push(newCol);
+        saveBacklogColumns();
+        hideModal('column-name-modal');
+        // Vai pra coluna recém-criada
+        activeColumnId = newCol.id;
+        renderBacklog();
+        // Após render, scroll pra coluna nova
+        setTimeout(() => scrollToColumn(newCol.id), 100);
+        showToast('Lista criada!');
+    } else if (columnNameMode === 'rename') {
+        const col = backlogColumnsDb.find(c => c.id === columnNameTargetId);
+        if (col) {
+            col.name = name;
+            saveBacklogColumns();
+        }
+        hideModal('column-name-modal');
+        renderBacklog();
+        showToast('Lista renomeada!');
+    }
+};
+
+window.cancelColumnName = function() {
+    hideModal('column-name-modal');
+};
+
+window.openDeleteColumn = function() {
+    const col = backlogColumnsDb.find(c => c.id === activeColumnId);
+    if (!col) return;
+    if (col.isDefault) return showToast('A lista padrão não pode ser apagada.');
+    
+    hideModal('column-menu-modal');
+    
+    const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
+    document.getElementById('column-delete-title').innerText = `Apagar "${col.name}"?`;
+    
+    let subtitle;
+    if (colItems.length === 0) {
+        subtitle = 'Esta lista está vazia. Esta ação não pode ser desfeita.';
+    } else {
+        subtitle = `${colItems.length} ${colItems.length === 1 ? 'tarefa será apagada' : 'tarefas serão apagadas'} junto. Esta ação não pode ser desfeita.`;
+    }
+    document.getElementById('column-delete-subtitle').innerText = subtitle;
+    
+    showModal('column-delete-modal');
+};
+
+window.confirmDeleteColumn = function() {
+    const colId = activeColumnId;
+    const col = backlogColumnsDb.find(c => c.id === colId);
+    if (!col || col.isDefault) {
+        hideModal('column-delete-modal');
+        return;
+    }
+    
+    // Apaga TODOS os cards dessa coluna
+    backlogDb = backlogDb.filter(item => getItemColumn(item) !== colId);
+    
+    // Apaga a coluna
+    backlogColumnsDb = backlogColumnsDb.filter(c => c.id !== colId);
+    
+    saveBacklog();
+    saveBacklogColumns();
+    
+    // Volta pra coluna Geral
+    activeColumnId = 'col_geral';
+    
+    hideModal('column-delete-modal');
+    renderBacklog();
+    showToast('Lista apagada!');
+};
+
+window.cancelDeleteColumn = function() {
+    hideModal('column-delete-modal');
+};
+
+// Helpers de modal (centraliza show/hide com overlay)
+function showColumnNameModal() {
+    showModal('column-name-modal');
+    // Foco diferido pra evitar buraco branco (Regra de Ouro #2)
+    setTimeout(() => {
+        const input = document.getElementById('column-name-input');
+        if (input) input.focus({ preventScroll: true });
+    }, 100);
+}
+
+function showColumnMenuModal() {
+    showModal('column-menu-modal');
+}
+
+function showModal(id) {
+    const overlay = document.getElementById('overlay');
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '55';
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function hideModal(id) {
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '';
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
 }
 
 

@@ -241,23 +241,39 @@
 
             <!-- V40.1: View 1 - Banco (conteúdo original do backlog) -->
             <!-- V40.3.4: View Lista refatorada com 2 sub-views (igual Rotinas) -->
+            <!-- V40.5.0: KANBAN — sub-view 1 vira container horizontal de colunas -->
             <div id="view-backlog" class="flex-1 flex flex-col min-h-0 bg-zinc-50/50 overflow-hidden">
                 
-                <!-- Sub-view 1: Lista de tarefas -->
+                <!-- Sub-view 1: KANBAN — cabeçalho fixo + scroll horizontal de colunas -->
                 <div id="backlog-list-view" class="flex-1 flex flex-col min-h-0">
-                    <div class="flex items-center justify-between mb-4 shrink-0 px-4 pt-4">
-                        <h2 class="text-lg font-bold text-zinc-900">Lista de Tarefas</h2>
-                        <div class="flex gap-1.5 items-center">
-                            <span class="bg-app-focus-soft text-app-focus text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider hidden" id="backlog-total-time">0h</span>
-                            <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider" id="backlog-count">0</span>
+                    
+                    <!-- Header do kanban (botão Nova Lista + indicador) -->
+                    <div class="flex items-center justify-between shrink-0 px-4 pt-4 pb-2">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <h2 class="text-lg font-bold text-zinc-900 truncate" id="backlog-column-title">Geral</h2>
+                            <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider shrink-0" id="backlog-count">0</span>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button onclick="openColumnMenuFromHeader()" id="backlog-column-menu-btn" aria-label="Opções da lista" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 transition active:scale-90">
+                                <i class="ph-bold ph-dots-three-vertical text-base"></i>
+                            </button>
+                            <button onclick="promptCreateColumn()" aria-label="Nova lista" class="w-8 h-8 flex items-center justify-center bg-app-focus text-white rounded-lg hover:opacity-90 transition active:scale-90 shadow-sm">
+                                <i class="ph-bold ph-plus text-base"></i>
+                            </button>
                         </div>
                     </div>
                     
-                    <div class="flex-1 overflow-y-auto no-scrollbar px-4 pb-20" id="backlog-container">
-                        <!-- preenchido por renderBacklog() -->
+                    <!-- V40.5.0: Indicadores de coluna (dots) + nome -->
+                    <div id="backlog-column-dots" class="flex items-center justify-center gap-1.5 shrink-0 py-2 px-4 overflow-x-auto no-scrollbar">
+                        <!-- dots preenchidos por renderBacklog() -->
                     </div>
                     
-                    <!-- Botão "+ Nova Tarefa" estilo FAB+ (decisão 1=a) -->
+                    <!-- Container horizontal de colunas com scroll-snap -->
+                    <div id="backlog-columns-wrapper" class="flex-1 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar min-h-0">
+                        <!-- preenchido por renderBacklog() — cada coluna é um <div class="snap-start shrink-0 w-full"> -->
+                    </div>
+                    
+                    <!-- Botão "+ Nova Tarefa" — adiciona na coluna ativa -->
                     <button onclick="openBacklogForm()" class="mx-4 mb-4 mt-2 w-auto py-2.5 rounded-xl border-2 border-dashed border-zinc-300 text-zinc-500 text-sm font-bold hover:bg-zinc-100 hover:border-zinc-400 hover:text-zinc-700 transition flex items-center justify-center gap-2 active:scale-[0.98] shrink-0">
                         <i class="ph ph-plus text-base"></i> Nova Tarefa
                     </button>
@@ -938,6 +954,51 @@
                     <i class="ph ph-trash text-lg"></i> Apagar Tarefa
                 </button>
                 <button onclick="cancelDeleteBacklog()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+
+        <!-- V40.5.0: MODAL APAGAR LISTA (kanban) — confirmação robusta com nome + nº tarefas -->
+        <div id="column-delete-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+            <div class="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-3"><i class="ph ph-warning text-2xl"></i></div>
+            <h3 class="text-lg font-bold text-zinc-900 mb-2 text-center leading-tight" id="column-delete-title">Apagar Lista?</h3>
+            <p class="text-xs text-zinc-500 text-center mb-6" id="column-delete-subtitle">Esta ação não pode ser desfeita.</p>
+            <div class="flex flex-col gap-2">
+                <button onclick="confirmDeleteColumn()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] transition">
+                    <i class="ph ph-trash text-lg"></i> Apagar Lista
+                </button>
+                <button onclick="cancelDeleteColumn()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+
+        <!-- V40.5.0: MODAL INPUT NOME DA LISTA (criar/renomear) -->
+        <div id="column-name-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+            <h3 class="text-lg font-bold text-zinc-900 mb-4 text-center" id="column-name-title">Nova Lista</h3>
+            <input type="text" id="column-name-input" maxlength="30" placeholder="Ex: GJM, QUALITE, LOIE..." autocomplete="off" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition mb-6">
+            <div class="flex flex-col gap-2">
+                <button onclick="confirmColumnName()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-app-focus text-white font-bold text-sm transition active:scale-95">
+                    Salvar
+                </button>
+                <button onclick="cancelColumnName()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+
+        <!-- V40.5.0: MODAL MENU DA COLUNA (Renomear / Apagar) -->
+        <div id="column-menu-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+            <h3 class="text-base font-bold text-zinc-900 mb-4 text-center" id="column-menu-title">Lista</h3>
+            <div class="flex flex-col gap-2">
+                <button onclick="openRenameColumn()" class="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-sm hover:bg-zinc-100 transition">
+                    <i class="ph ph-pencil-simple text-lg text-zinc-600"></i> Renomear
+                </button>
+                <button id="column-menu-delete-btn" onclick="openDeleteColumn()" class="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-red-50 border border-red-200 text-red-600 font-bold text-sm hover:bg-red-100 transition">
+                    <i class="ph ph-trash text-lg"></i> Apagar Lista
+                </button>
+                <button onclick="closeColumnMenu()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
                     Cancelar
                 </button>
             </div>

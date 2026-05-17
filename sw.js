@@ -1,5 +1,5 @@
-// V7.5 - v40.4.4-fix4 (UX: ao dar Enter num check da Lista/Rotina, ele rolava com preventScroll (Regra de Ouro #2) e ficava escondido atrás do teclado Android. Agora função scrollNewCheckIntoView rola APENAS o container interno do form pra trazer o novo check à vista — não rola a página (evita 'buraco branco'). Posiciona em ~1/3 do scroller pra ficar bem acima do teclado.)
-const CACHE_NAME = 'timeblock-v40-4-4-fix4';
+// V8.0 - v40.5.0 (KANBAN na aba Lista: colunas horizontais com swipe nativo (scroll-snap), coluna "Geral" padrão sempre presente, criar/renomear/apagar listas, apagar lista apaga tarefas com confirmação robusta, "+ Nova Tarefa" adiciona na coluna ativa, retrocompat total com tarefas V40.4.x sem columnId. SEM drag entre colunas. 15 armadilhas mapeadas e mitigadas. Boot test 23/23 + 8 cenários simulados OK. Outras abas (Rotinas/Notas/Finanças) intactas.)
+const CACHE_NAME = 'timeblock-v40-5-0';
 const ASSETS = [
   './',
   './index.html',

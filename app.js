@@ -46,6 +46,75 @@ function getLocalMonthStr() {
 }
 let currentFinanceMonth = getLocalMonthStr(); // 'YYYY-MM' do mês atual (local, não UTC)
 function saveFinancial() { localStorage.setItem('tb_financial_db', JSON.stringify(financialDb)); }
+
+// ===== V40.4.4: HELPERS RECORRENTE + PARCELADA =====
+// Declarados no TOPO pra evitar TDZ (lição V40.3.2 e V40.3.5-fix2).
+
+// G1: retrocompat — itens antigos (V40.4.1-3) têm 'month', novos têm 'startMonth'.
+function getItemStartMonth(item) {
+    return item.startMonth || item.month;
+}
+
+// G4 + G15: soma N meses ao startMonth, retorna endMonth no fuso local.
+// Ex: addMonths('2026-05', 9) = '2027-02' (parcelada 10x = de Maio a Fevereiro, 10 meses inclusive)
+function addMonths(monthStr, n) {
+    const [y, m] = monthStr.split('-').map(Number);
+    const d = new Date(y, m - 1 + n, 1); // local (não UTC)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// G11: decide se item aparece num mês específico.
+// Avulsa (durationMonths=1 OU sem durationMonths): só no startMonth.
+// Recorrente/Parcelada (durationMonths>1): de startMonth até startMonth+durationMonths-1 (inclusive).
+function isItemInMonth(item, monthStr) {
+    const start = getItemStartMonth(item);
+    if (!start) return false;
+    
+    const duration = item.durationMonths || 1;
+    if (duration === 1) {
+        return start === monthStr;
+    }
+    
+    const endMonth = addMonths(start, duration - 1);
+    return monthStr >= start && monthStr <= endMonth;
+}
+
+// G2: retrocompat de paid. Item antigo (V40.4.1-3) tem paid:bool aplicado a item.month.
+// Item novo (V40.4.4+) tem paidMonths:[]. isPaidInMonth aceita ambos.
+function isPaidInMonth(item, monthStr) {
+    if (Array.isArray(item.paidMonths)) {
+        return item.paidMonths.includes(monthStr);
+    }
+    // Retrocompat: paid:true antigo só vale pro startMonth do item
+    return item.paid === true && getItemStartMonth(item) === monthStr;
+}
+
+// G7: calcula "parcela X/N" pra parceladas. Retorna null se não-parcelada ou fora do range.
+function getInstallmentLabel(item, monthStr) {
+    const duration = item.durationMonths || 1;
+    if (duration <= 1 || item.isRecurring) return null; // não é parcelada
+    if (!isItemInMonth(item, monthStr)) return null;
+    
+    const start = getItemStartMonth(item);
+    const [sy, sm] = start.split('-').map(Number);
+    const [my, mm] = monthStr.split('-').map(Number);
+    const idx = (my - sy) * 12 + (mm - sm) + 1; // 1-indexed
+    return `${idx}/${duration}`;
+}
+
+// G2: marca/desmarca paga em um mês específico (cria paidMonths se não existir).
+function setPaidInMonth(item, monthStr, paid) {
+    if (!Array.isArray(item.paidMonths)) {
+        // Migra retrocompat: se item antigo tinha paid:true no startMonth, mantém
+        item.paidMonths = (item.paid === true) ? [getItemStartMonth(item)] : [];
+        delete item.paid; // remove campo antigo pra não confundir
+    }
+    if (paid) {
+        if (!item.paidMonths.includes(monthStr)) item.paidMonths.push(monthStr);
+    } else {
+        item.paidMonths = item.paidMonths.filter(m => m !== monthStr);
+    }
+}
 // V2.0 - Estado do header
 // V40.2.28: persistido em localStorage. Default false (1ª vez = expandido pra Descoberta).
 //   Depois que o usuário escolhe (toggleHeader), a escolha vira a nova default.
@@ -3649,27 +3718,27 @@ let currentFinType = 'oneshot'; // V40.4.2 vai adicionar 'recurring' e 'parceled
 // - Mês selecionado < mês atual: SEMPRE atrasada (se não paga)
 // - Mês selecionado === mês atual + dueDay < dia atual: atrasada (se não paga)
 // - Mês selecionado > mês atual: nunca atrasada (futuro)
-// V40.4.3-fix (Gemini): usar horário LOCAL, não UTC, senão às 21h+ do último dia
-// do mês no Brasil tudo virava "atrasada" prematuramente.
-function isFinancialOverdue(item) {
-    if (item.paid === true) return false;
+// V40.4.3-fix (Gemini): usar horário LOCAL, não UTC.
+// V40.4.4 (G12): recebe monthStr — pra recorrentes/parceladas que ocupam vários meses.
+function isFinancialOverdue(item, monthStr) {
+    if (isPaidInMonth(item, monthStr)) return false;
     if (!item.dueDay) return false; // sem vencimento, nunca marca atrasada
     
     const today = new Date();
-    const todayMonth = getLocalMonthStr(); // YYYY-MM local
-    const todayDay = today.getDate();      // dia local (não UTC)
-    const itemMonth = item.month;
+    const todayMonth = getLocalMonthStr();
+    const todayDay = today.getDate();
     
-    if (itemMonth < todayMonth) return true;  // mês passado, não pago
-    if (itemMonth > todayMonth) return false; // mês futuro
-    return item.dueDay < todayDay;            // mês atual, dia já passou
+    if (monthStr < todayMonth) return true;
+    if (monthStr > todayMonth) return false;
+    return item.dueDay < todayDay;
 }
 
 // V40.4.2: helper de card de despesa (reusado pelas 2 seções A Pagar / Pagas)
-// V40.4.3: agora mostra vencimento no subtítulo + destaque visual se atrasada
-function renderFinancialCard(item) {
-    const isPaid = item.paid === true;
-    const isOverdue = isFinancialOverdue(item);
+// V40.4.3: mostra vencimento + destaque visual se atrasada.
+// V40.4.4 (decisão 5α): subtítulo diferente por tipo (Avulsa / Recorrente / Parcela X/N).
+function renderFinancialCard(item, monthStr) {
+    const isPaid = isPaidInMonth(item, monthStr);
+    const isOverdue = isFinancialOverdue(item, monthStr);
     const tagColor = item.tagId ? getTagColor(item.tagId) : null;
     const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
     const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
@@ -3679,31 +3748,41 @@ function renderFinancialCard(item) {
     const valueClass = isPaid ? 'line-through text-zinc-500' : (isOverdue ? 'text-red-600' : 'text-zinc-800');
     const titleClass = isPaid ? 'text-zinc-500' : 'text-zinc-800';
     
-    // V40.4.3: borda vermelha sutil + badge "Atrasada" se vencida
+    // V40.4.3: borda vermelha sutil quando vencida
     const cardBorderClass = isOverdue ? 'border-red-300 bg-red-50/30' : 'border-zinc-200';
     
     // Decisão 1(B): checkbox redondo à esquerda. Marcado = preenchido com app-focus.
     const checkboxBg = isPaid ? 'bg-app-focus border-app-focus' : 'bg-white border-zinc-300';
     const checkIconClass = isPaid ? '' : 'hidden';
     
-    // V40.4.3 decisão 3(P): subtítulo "Avulsa · Venc. dia X" ou "Avulsa · Atrasada" se vencida
-    let subtitleText = 'Avulsa';
-    let subtitleClass = 'text-zinc-400';
-    if (item.dueDay) {
-        if (isOverdue) {
-            subtitleText = `Atrasada · venceu dia ${item.dueDay}`;
-            subtitleClass = 'text-red-600';
+    // V40.4.4 (decisão 5α): texto do tipo
+    let typeText = 'Avulsa';
+    const duration = item.durationMonths || 1;
+    if (duration > 1) {
+        if (item.isRecurring) {
+            typeText = 'Recorrente';
         } else {
-            subtitleText = `Avulsa · venc. dia ${item.dueDay}`;
+            const label = getInstallmentLabel(item, monthStr); // ex "3/10"
+            typeText = label ? `Parcela ${label}` : 'Parcelada';
         }
+    }
+    
+    // Subtítulo: junta tipo + venc/atrasada
+    let subtitleText = typeText;
+    let subtitleClass = 'text-zinc-400';
+    if (isOverdue && item.dueDay) {
+        subtitleText = `Atrasada · venceu dia ${item.dueDay}`;
+        subtitleClass = 'text-red-600';
+    } else if (item.dueDay) {
+        subtitleText = `${typeText} · venc. dia ${item.dueDay}`;
     }
     
     return `
     <div onclick="openFinancialForm('${item.id}')" class="bg-white border rounded-xl p-3.5 shadow-sm mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition ${opacityClass} ${cardBorderClass}">
         <div class="flex justify-between items-center gap-3">
             <div class="flex items-center gap-3 min-w-0 flex-1">
-                <!-- V40.4.2: checkbox de paga (decisão B) -->
-                <button onclick="event.stopPropagation(); togglePaidFinancial('${item.id}')" aria-label="Marcar como paga" class="w-6 h-6 rounded-full border-2 ${checkboxBg} flex items-center justify-center shrink-0 transition active:scale-90">
+                <!-- V40.4.4 (G6): togglePaidFinancial agora recebe id + mês -->
+                <button onclick="event.stopPropagation(); togglePaidFinancial('${item.id}', '${monthStr}')" aria-label="Marcar como paga" class="w-6 h-6 rounded-full border-2 ${checkboxBg} flex items-center justify-center shrink-0 transition active:scale-90">
                     <i class="ph-bold ph-check text-xs text-white ${checkIconClass}"></i>
                 </button>
                 <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 shadow-inner" style="${iconBgStyle}">
@@ -3748,14 +3827,15 @@ window.renderFinancial = function() {
         }
     }
     
-    // Filtra despesas do mês atual (MVP: só tipo 'oneshot' filtrado por month)
-    const monthItems = financialDb.filter(item => item.month === currentFinanceMonth);
+    // V40.4.4 (G11): em vez de filtrar por item.month === current, usa isItemInMonth
+    // que conta avulsa, recorrente e parcelada.
+    const monthItems = financialDb.filter(item => isItemInMonth(item, currentFinanceMonth));
     
-    // V40.4.2: 3 totais num único reduce (F2 - performance)
+    // V40.4.4 (G13): 3 totais usando isPaidInMonth pra retrocompat + paidMonths
     const totals = monthItems.reduce((acc, item) => {
         const amt = item.amount || 0;
         acc.total += amt;
-        if (item.paid === true) acc.paid += amt;
+        if (isPaidInMonth(item, currentFinanceMonth)) acc.paid += amt;
         else acc.open += amt;
         return acc;
     }, { total: 0, paid: 0, open: 0 });
@@ -3779,37 +3859,39 @@ window.renderFinancial = function() {
     function sortByDueDay(a, b) {
         const aHas = !!a.dueDay;
         const bHas = !!b.dueDay;
-        if (aHas && bHas) return a.dueDay - b.dueDay; // ambos têm: crescente
-        if (aHas) return -1;                          // só A tem: A primeiro
-        if (bHas) return 1;                           // só B tem: B primeiro
-        return b.createdAt - a.createdAt;             // nenhum tem: mais recente primeiro
+        if (aHas && bHas) return a.dueDay - b.dueDay;
+        if (aHas) return -1;
+        if (bHas) return 1;
+        return b.createdAt - a.createdAt;
     }
     const sorted = monthItems.slice().sort(sortByDueDay);
-    const unpaid = sorted.filter(i => i.paid !== true);
-    const paid = sorted.filter(i => i.paid === true);
+    // V40.4.4: agora usa isPaidInMonth, não item.paid direto
+    const unpaid = sorted.filter(i => !isPaidInMonth(i, currentFinanceMonth));
+    const paid = sorted.filter(i => isPaidInMonth(i, currentFinanceMonth));
     
     let html = '';
     
-    // Seção "A Pagar" — só mostra header se tem unpaid (F6)
     if (unpaid.length > 0) {
         html += `<div class="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-2 mt-1 px-1">A Pagar (${unpaid.length})</div>`;
-        html += unpaid.map(renderFinancialCard).join('');
+        html += unpaid.map(item => renderFinancialCard(item, currentFinanceMonth)).join('');
     }
     
-    // Seção "Pagas" — só mostra header se tem paid (F6)
     if (paid.length > 0) {
         html += `<div class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2 mt-4 px-1">Pagas (${paid.length})</div>`;
-        html += paid.map(renderFinancialCard).join('');
+        html += paid.map(item => renderFinancialCard(item, currentFinanceMonth)).join('');
     }
     
     container.innerHTML = html;
 }
 
 // V40.4.2: toggle paid (decisão 1B)
-window.togglePaidFinancial = function(id) {
+// V40.4.4 (G6): agora recebe id + mês — pra recorrentes/parceladas, marca paga só naquele mês.
+window.togglePaidFinancial = function(id, monthStr) {
     const item = financialDb.find(x => x.id === id);
     if (!item) return;
-    item.paid = !(item.paid === true);
+    const month = monthStr || currentFinanceMonth; // fallback
+    const wasPaid = isPaidInMonth(item, month);
+    setPaidInMonth(item, month, !wasPaid);
     saveFinancial();
     renderFinancial();
 }
@@ -3866,21 +3948,34 @@ window.openFinancialForm = function(id = null) {
         document.getElementById('fin-form-title-label').innerText = 'Editar Despesa';
         document.getElementById('financial-input').value = item.title;
         document.getElementById('financial-amount-input').value = item.amount || '';
-        document.getElementById('financial-dueday-input').value = item.dueDay || ''; // V40.4.3
-        currentFinPaid = item.paid === true; // V40.4.2: carrega estado paid
+        document.getElementById('financial-dueday-input').value = item.dueDay || '';
+        // V40.4.4: deduz tipo a partir do schema (retrocompat com itens antigos)
+        const duration = item.durationMonths || 1;
+        if (duration === 1) {
+            currentFinType = 'oneshot';
+        } else if (item.isRecurring) {
+            currentFinType = 'recurring';
+        } else {
+            currentFinType = 'installment';
+            document.getElementById('financial-installments-input').value = duration;
+        }
+        // V40.4.4: paid usa isPaidInMonth com retrocompat (item.paid bool antigo)
+        currentFinPaid = isPaidInMonth(item, currentFinanceMonth);
         document.getElementById('fin-form-delete-btn').classList.remove('hidden');
         document.getElementById('fin-form-delete-btn').classList.add('flex');
     } else {
         document.getElementById('fin-form-title-label').innerText = 'Nova Despesa';
         document.getElementById('financial-input').value = '';
         document.getElementById('financial-amount-input').value = '';
-        document.getElementById('financial-dueday-input').value = ''; // V40.4.3
-        currentFinPaid = false; // V40.4.2: nova despesa começa não-paga
+        document.getElementById('financial-dueday-input').value = '';
+        document.getElementById('financial-installments-input').value = '2';
+        currentFinPaid = false;
         document.getElementById('fin-form-delete-btn').classList.add('hidden');
         document.getElementById('fin-form-delete-btn').classList.remove('flex');
     }
     
-    updateFinancialFormPaidUI(); // V40.4.2: sincroniza visual do checkbox
+    updateFinancialFormPaidUI();
+    updateFinancialTypeButtonsUI(); // V40.4.4: sincroniza visual dos 3 botões de tipo
 }
 
 window.closeFinancialForm = function(force = false) {
@@ -3893,9 +3988,31 @@ window.closeFinancialForm = function(force = false) {
     if (!force) renderFinancial();
 }
 
+// V40.4.4: atualiza visual dos 3 botões + mostra/esconde inputs auxiliares.
+function updateFinancialTypeButtonsUI() {
+    const types = ['oneshot', 'recurring', 'installment'];
+    types.forEach(t => {
+        const btn = document.getElementById(`fin-type-${t}`);
+        if (!btn) return;
+        if (t === currentFinType) {
+            btn.className = 'flex-1 py-2.5 rounded-lg bg-app-focus text-white border border-app-focus text-xs font-bold transition active:scale-95';
+        } else {
+            btn.className = 'flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-600 border border-zinc-200 text-xs font-bold transition active:scale-95 hover:bg-zinc-100';
+        }
+    });
+    
+    // Input "Quantas parcelas?" só aparece em Parcelada
+    const wrapInst = document.getElementById('fin-installments-wrapper');
+    if (wrapInst) wrapInst.classList.toggle('hidden', currentFinType !== 'installment');
+    
+    // Aviso pra Recorrente
+    const infoRec = document.getElementById('fin-recurring-info');
+    if (infoRec) infoRec.classList.toggle('hidden', currentFinType !== 'recurring');
+}
+
 window.selectFinancialType = function(type) {
-    // V40.4.1: por enquanto só 'oneshot' funcional. V40.4.2 ativa os outros.
     currentFinType = type;
+    updateFinancialTypeButtonsUI();
 }
 
 window.saveFinancialForm = function() {
@@ -3917,27 +4034,69 @@ window.saveFinancialForm = function() {
         dueDay = parsed;
     }
 
+    // V40.4.4 (decisões 2I, 3α): calcula durationMonths e isRecurring a partir do tipo selecionado
+    let durationMonths = 1;
+    let isRecurring = false;
+    if (currentFinType === 'recurring') {
+        durationMonths = 12;
+        isRecurring = true;
+    } else if (currentFinType === 'installment') {
+        const instRaw = document.getElementById('financial-installments-input').value.trim();
+        const inst = parseInt(instRaw, 10);
+        // G9: validação 2-60
+        if (isNaN(inst) || inst < 2 || inst > 60) {
+            return showToast('Parcelas devem ser entre 2 e 60.');
+        }
+        durationMonths = inst;
+        isRecurring = false;
+    }
+
     if (currentFinId) {
         const item = financialDb.find(x => x.id === currentFinId);
         if (item) {
+            // G10: se tipo mudou, resetar paidMonths
+            const prevDuration = item.durationMonths || 1;
+            const prevRecurring = item.isRecurring === true;
+            const typeChanged = (prevDuration !== durationMonths) || (prevRecurring !== isRecurring);
+            
             item.title = title;
             item.amount = amount;
-            item.paid = currentFinPaid; // V40.4.2
-            item.dueDay = dueDay;       // V40.4.3 (null se vazio)
+            item.dueDay = dueDay;
+            item.durationMonths = durationMonths;
+            item.isRecurring = isRecurring;
+            
+            // V40.4.4: migra/normaliza paidMonths
+            if (!Array.isArray(item.paidMonths)) item.paidMonths = [];
+            if (typeChanged) {
+                item.paidMonths = []; // reset ao trocar tipo
+            }
+            // Aplica o toggle "Marcar como paga" do form ao mês atual
+            setPaidInMonth(item, currentFinanceMonth, currentFinPaid);
+            
+            // Garante startMonth (retrocompat com item.month antigo)
+            if (!item.startMonth) {
+                item.startMonth = item.month || currentFinanceMonth;
+            }
         }
         showToast('Despesa atualizada!');
     } else {
-        financialDb.push({
+        // V40.4.4: schema novo
+        const newItem = {
             id: 'fin_' + Date.now(),
             title: title,
             amount: amount,
-            month: currentFinanceMonth,
-            type: 'oneshot',
+            startMonth: currentFinanceMonth, // decisão 8: mês onde está navegando
+            durationMonths: durationMonths,
+            isRecurring: isRecurring,
+            dueDay: dueDay,
             tagId: null,
-            paid: currentFinPaid, // V40.4.2
-            dueDay: dueDay,       // V40.4.3
+            paidMonths: [],
             createdAt: Date.now()
-        });
+        };
+        if (currentFinPaid) {
+            newItem.paidMonths.push(currentFinanceMonth);
+        }
+        financialDb.push(newItem);
         showToast('Despesa adicionada!');
     }
     

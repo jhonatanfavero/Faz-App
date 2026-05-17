@@ -1,5 +1,5 @@
-// V7.0 - v40.4.3-fix (FIX CRÍTICO Fuso Horário pego pelo Gemini: toISOString() retorna UTC, então 21h+ no fim do mês no Brasil (UTC-3) já era "dia seguinte mês seguinte" → todas despesas viravam atrasadas prematuramente. Substituído por getLocalMonthStr() em 4 lugares.)
-const CACHE_NAME = 'timeblock-v40-4-3-fix';
+// V7.1 - v40.4.4 (Finanças: Recorrente (12m) e Parcelada (N meses) ATIVADAS. Schema novo: durationMonths, isRecurring, paidMonths[], startMonth. Retrocompat total com despesas V40.4.1-3 (month, paid:bool). Subtítulos diferenciados (Avulsa/Recorrente/Parcela X/N). togglePaid agora marca paga só num mês específico. 15 armadilhas mapeadas e cobertas. Boot test em TZ='America/Sao_Paulo'. Próxima fase V40.4.5: renovação no último mês + modal 'atualizar essa/futuras/todas'.)
+const CACHE_NAME = 'timeblock-v40-4-4';
 const ASSETS = [
   './',
   './index.html',

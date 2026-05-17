@@ -562,8 +562,17 @@
                             <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Tipo</label>
                             <div class="flex gap-2">
                                 <button onclick="selectFinancialType('oneshot')" id="fin-type-oneshot" class="flex-1 py-2.5 rounded-lg bg-app-focus text-white border border-app-focus text-xs font-bold transition active:scale-95">Avulsa</button>
-                                <button disabled class="flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-300 border border-zinc-200 text-xs font-bold cursor-not-allowed" title="Em breve (V40.4.4)">Recorrente</button>
-                                <button disabled class="flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-300 border border-zinc-200 text-xs font-bold cursor-not-allowed" title="Em breve (V40.4.4)">Parcelada</button>
+                                <button onclick="selectFinancialType('recurring')" id="fin-type-recurring" class="flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-600 border border-zinc-200 text-xs font-bold transition active:scale-95 hover:bg-zinc-100">Recorrente</button>
+                                <button onclick="selectFinancialType('installment')" id="fin-type-installment" class="flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-600 border border-zinc-200 text-xs font-bold transition active:scale-95 hover:bg-zinc-100">Parcelada</button>
+                            </div>
+                            <!-- V40.4.4: Input "Quantas parcelas?" só aparece quando 'Parcelada' selecionada (decisão 2I) -->
+                            <div id="fin-installments-wrapper" class="hidden mt-3">
+                                <label class="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Quantas parcelas?</label>
+                                <input type="number" id="financial-installments-input" min="2" max="60" inputmode="numeric" value="2" class="w-full h-11 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: 10">
+                            </div>
+                            <!-- V40.4.4: Aviso pra Recorrente -->
+                            <div id="fin-recurring-info" class="hidden mt-3 text-[11px] text-zinc-500 px-1 leading-relaxed">
+                                <i class="ph-fill ph-info text-zinc-400"></i> Aparecerá pelos próximos 12 meses. No último, você pode renovar.
                             </div>
                         </div>
 

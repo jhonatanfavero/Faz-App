@@ -1,5 +1,5 @@
-// V8.5 - v40.5.0-fix5 (Eliminado as 'listras brancas' laterais do kanban: backlog-columns-wrapper ganhou -mx-6 pra estourar pra fora do p-6 da sheet. Coluna agora ocupa ~78% da tela inteira (não da sheet com padding), beiradinha das vizinhas ~11% de cada lado mais perceptível. Header, dots e botão Nova Tarefa continuam alinhados dentro do padding da sheet. Outras abas (Rotinas/Notas/Finanças) intactas.)
-const CACHE_NAME = 'timeblock-v40-5-0-fix5';
+// V8.7 - v40.5.0-fix7 (NAVIGATION HARDENING — 2 bugs UX críticos antes da V40.5.1: 1) Overlay inteligente: clique no fundo escuro com modal aberto agora fecha SÓ o modal (não fecha sheet inteira indo pra agenda). Helper getOpenModal() detecta z-[60] aberto, closeTopmostModal() fecha só ele. 2) History API: botão voltar do Android agora intercepta — fecha modal > form > sheet > toast 'toque voltar de novo' (2s) > fecha app. pushNavState() idempotente em 19 lugares: 8 sheets + 6 modais + 5 helpers. 15 armadilhas N1-N15 mapeadas e mitigadas. Simulação lógica 4/4 cenários OK. Boot test 23/23.)
+const CACHE_NAME = 'timeblock-v40-5-0-fix7';
 const ASSETS = [
   './',
   './index.html',

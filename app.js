@@ -292,6 +292,7 @@ window.openTagsSheet = () => {
     renderTagsList();
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('tags-sheet').classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.selectTagColor = (btn) => {
@@ -1198,6 +1199,7 @@ window.duplicateTask = function(id, e) {
         closeAllSheets();
         document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
         document.getElementById('clone-sheet').classList.remove('translate-y-full');
+        pushNavState(); // V40.5.0-fix7
     }
 }
 
@@ -1576,7 +1578,7 @@ window.changeFloatDuration = function(mins) {
 }
 
 window.openSheet = () => {
-    clearFilters(); // V40.2.1: limpa filtros pra não confundir
+    clearFilters();
     document.getElementById('config-sheet').classList.add('translate-y-full');
     document.getElementById('period-select-sheet').classList.add('translate-y-full');
     
@@ -1585,6 +1587,7 @@ window.openSheet = () => {
 
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     sheet.classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7: captura botão voltar
     
     // V40.1.4: foco automático no input após animação do sheet (350ms)
     setTimeout(() => {
@@ -1594,11 +1597,180 @@ window.openSheet = () => {
 }
 
 window.openListSheet = () => {
-    clearFilters(); // V40.2.1: limpa filtros pra não confundir
-    switchListTab('backlog'); // V40.1: sempre abrir na aba Banco
+    clearFilters();
+    switchListTab('backlog');
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     listSheet.classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7: captura botão voltar
 }
+
+// =====================================================
+// V40.5.0-fix7 — NAVIGATION HARDENING
+// Bug 1: clique no overlay fecha SHEETS (vai pra agenda) mesmo com modal aberto.
+// Bug 2: botão "voltar" do Android fecha o app inteiro.
+// =====================================================
+
+// N1: detecta QUALQUER modal aberto (procura por z-[60] que esteja com flex visível).
+// Como todos os modais usam o padrão Tailwind `hidden flex-col` → `flex`, basta procurar
+// por elementos com z-[60] que NÃO tenham .hidden.
+function getOpenModal() {
+    // Tailwind compila z-[60] como zIndex: 60. Selector funciona com classe.
+    const modals = document.querySelectorAll('.z-\\[60\\]');
+    for (const m of modals) {
+        if (!m.classList.contains('hidden')) return m;
+    }
+    return null;
+}
+
+// N4: fecha apenas o modal topmost, preserva sheets atrás.
+function closeTopmostModal() {
+    const modal = getOpenModal();
+    if (!modal) return false;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    
+    // N4: se ainda tem sheets atrás (qualquer .translate-y-0 — sheets abertas), mantém overlay.
+    // Senão, esconde overlay também.
+    const anySheetOpen = document.querySelector('.app-frame-locked [class*="translate-y-0"]') ||
+                          document.querySelector('#list-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#sheet:not(.translate-y-full)') ||
+                          document.querySelector('#config-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#tags-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#reports-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#period-select-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#clone-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#link-note-sheet:not(.translate-y-full)');
+    
+    if (!anySheetOpen) {
+        const ov = document.getElementById('overlay');
+        if (ov) {
+            ov.classList.add('opacity-0', 'pointer-events-none');
+            ov.style.zIndex = '';
+        }
+    } else {
+        // Restaura zIndex pra ficar acima das sheets (z-50) mas abaixo dos modais (z-60)
+        const ov = document.getElementById('overlay');
+        if (ov) ov.style.zIndex = '55';
+    }
+    return true;
+}
+
+// Handler do overlay (substitui o antigo closeAllSheets direto).
+// Se tem modal aberto, fecha APENAS o modal. Senão, fecha tudo.
+window.onOverlayClick = function() {
+    if (closeTopmostModal()) return;
+    closeAllSheets();
+};
+
+// =====================================================
+// V40.5.0-fix7 — HISTORY API (botão voltar do Android)
+// =====================================================
+// Estratégia: SEMPRE manter 1 entry "extra" no history quando uma sheet/modal está aberta.
+// Botão voltar dispara popstate → fechamos a camada topmost → repushamos pra manter buffer.
+
+let _navBackToConfirmTimer = null; // N11: flag pra "toque voltar de novo pra fechar"
+let _navIgnoreNextPopstate = false; // N8: ignora popstate disparado por history.back() interno
+
+// Empilha uma entry no history (chamar ao abrir qualquer sheet/modal).
+// IDEMPOTENTE: nunca empilha 2x se já tem entry de navegação ativa.
+function pushNavState() {
+    try {
+        if (history.state && history.state.tbNavLayer) return; // já tem entry, não empilha
+        history.pushState({ tbNavLayer: true }, '', location.href);
+    } catch (e) {
+        // N5: PWA em iframe pode bloquear pushState — falha silenciosa, não trava o app.
+    }
+}
+
+// Determina o que está aberto e fecha a camada topmost.
+// Retorna true se fechou algo, false se nada estava aberto (= raiz).
+function closeTopmostLayer() {
+    // Prioridade 1: Modal aberto (z-[60])
+    if (closeTopmostModal()) return true;
+    
+    // Prioridade 2: Sub-form aberto dentro de uma sheet (N13)
+    // Form de Lista (backlog-form-view), Rotinas (routines-form-view), Finanças (financial-form-view).
+    const formViews = [
+        ['backlog-form-view', 'closeBacklogForm'],
+        ['routines-form-view', 'closeRoutineForm'],
+        ['financial-form-view', 'closeFinancialForm'],
+    ];
+    for (const [viewId, closeFn] of formViews) {
+        const v = document.getElementById(viewId);
+        if (v && !v.classList.contains('hidden')) {
+            if (typeof window[closeFn] === 'function') {
+                window[closeFn]();
+                return true;
+            }
+        }
+    }
+    
+    // Prioridade 3: Sheet aberta (qualquer uma com translate-y-0)
+    const sheetIds = ['list-sheet', 'sheet', 'config-sheet', 'tags-sheet', 
+                       'reports-sheet', 'period-select-sheet', 'clone-sheet', 'link-note-sheet'];
+    for (const id of sheetIds) {
+        const s = document.getElementById(id);
+        if (s && !s.classList.contains('translate-y-full')) {
+            closeAllSheets();
+            return true;
+        }
+    }
+    
+    return false; // raiz — nada aberto
+}
+
+// popstate handler — chamado quando user aperta voltar no Android.
+window.addEventListener('popstate', (e) => {
+    if (_navIgnoreNextPopstate) {
+        _navIgnoreNextPopstate = false;
+        return;
+    }
+    
+    const closedSomething = closeTopmostLayer();
+    
+    if (closedSomething) {
+        // Reinjetamos a entry pra que o próximo "voltar" também seja capturado
+        // (se ainda houver camada aberta — modal por trás, por exemplo).
+        if (closeTopmostModal === null || getOpenModal() || 
+            document.querySelector('#list-sheet:not(.translate-y-full)') ||
+            document.querySelector('#sheet:not(.translate-y-full)') ||
+            document.querySelector('#config-sheet:not(.translate-y-full)') ||
+            document.querySelector('#tags-sheet:not(.translate-y-full)')) {
+            pushNavState();
+        }
+    } else {
+        // N10/N11: raiz — "toque voltar de novo pra fechar"
+        if (_navBackToConfirmTimer) {
+            // 2ª vez dentro de 2s — deixa o navegador fechar de verdade
+            clearTimeout(_navBackToConfirmTimer);
+            _navBackToConfirmTimer = null;
+            // Não chamamos history.back() — o popstate JÁ aconteceu. App vai sair naturalmente.
+            // Em PWA standalone Android, sair do último entry fecha o app.
+            return;
+        }
+        // 1ª vez — mostra toast e reinjeta entry
+        showToast('Toque voltar de novo pra fechar o app');
+        _navBackToConfirmTimer = setTimeout(() => {
+            _navBackToConfirmTimer = null;
+        }, 2000);
+        pushNavState(); // reinjeta pra capturar o "próximo voltar"
+    }
+});
+
+// N12: ao carregar o app, garante que o estado base é "raiz".
+// replaceState (não pushState) pra não empilhar.
+try {
+    if (!history.state || !history.state.tbNavRoot) {
+        history.replaceState({ tbNavRoot: true }, '', location.href);
+    }
+} catch (e) {
+    // Falha silenciosa em ambientes restritos
+}
+
+
+// Wrapper de openListSheet pra pushar nav state ao abrir.
+// (Outros openXSheet vão chamar pushNavState() também, ver patches abaixo.)
+
 
 window.closeAllSheets = () => {
     overlay.classList.add('opacity-0', 'pointer-events-none');
@@ -1684,6 +1856,7 @@ window.openPeriodSelectSheet = () => {
     sheet.classList.add('translate-y-full'); 
     renderPeriodSelect();
     document.getElementById('period-select-sheet').classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.comingSoonMetas = () => {
@@ -1703,6 +1876,7 @@ window.openConfigSheet = () => {
     document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
     
     document.getElementById('config-sheet').classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.openConfigHours = () => {
@@ -2273,6 +2447,7 @@ window.openLinkNoteSheet = function(blockId, e) {
     activeLinkBlockId = blockId;
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('link-note-sheet').classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7
     // Reset visual: mostrar opções, esconder lista
     document.getElementById('link-note-options').classList.remove('hidden');
     document.getElementById('link-note-existing-view').classList.add('hidden');
@@ -2409,6 +2584,7 @@ window.viewLinkedNote = function(blockId, noteId, e) {
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('linked-note-view-modal').classList.remove('hidden');
     document.getElementById('linked-note-view-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.closeLinkedNoteView = function() {
@@ -2822,6 +2998,7 @@ window.openReportsSheet = function() {
     renderReports('today');
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('reports-sheet').classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.renderReports = function(period) {
@@ -3108,6 +3285,7 @@ window.openEditModal = function(id, e) {
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('edit-task-modal').classList.remove('hidden');
     document.getElementById('edit-task-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.selectEditTag = function(id) {
@@ -3160,6 +3338,7 @@ window.openDeleteModal = function(id, e) {
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('delete-task-modal').classList.remove('hidden');
     document.getElementById('delete-task-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.moveToBacklog = function() {
@@ -3571,6 +3750,7 @@ window.requestDeleteRoutine = function(id) {
     overlay.style.zIndex = '55';
     document.getElementById('routine-delete-modal').classList.remove('hidden');
     document.getElementById('routine-delete-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
 }
 
 // V40.3.5-fix: deleteRoutineFromForm agora delega pra requestDeleteRoutine (DRY).
@@ -3844,6 +4024,7 @@ window.requestDeleteBacklog = function(id) {
     overlay.style.zIndex = '55';
     document.getElementById('backlog-delete-modal').classList.remove('hidden');
     document.getElementById('backlog-delete-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.confirmDeleteBacklog = function() {
@@ -4047,6 +4228,7 @@ function showModal(id) {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
     }
+    pushNavState(); // V40.5.0-fix7
 }
 
 function hideModal(id) {
@@ -4485,6 +4667,7 @@ window.requestDeleteFinancial = function(id) {
     overlay.style.zIndex = '55'; // sobre a sheet (z-50), abaixo do modal (z-60)
     document.getElementById('financial-delete-modal').classList.remove('hidden');
     document.getElementById('financial-delete-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.confirmDeleteFinancial = function() {

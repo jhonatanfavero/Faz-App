@@ -3603,16 +3603,47 @@ function renderBlFormMicroblocks() {
                 setTimeout(() => {
                     const newInputs = container.querySelectorAll('.bl-mb-input');
                     const newLast = newInputs[newInputs.length - 1];
-                    if (newLast) newLast.focus({ preventScroll: true });
+                    if (newLast) {
+                        newLast.focus({ preventScroll: true });
+                        // V40.4.4-fix4: rola o CONTAINER interno (não a página) pro novo check ficar
+                        // visível acima do teclado. preventScroll evita o buraco branco da Regra de Ouro #2.
+                        scrollNewCheckIntoView(newLast);
+                    }
                 }, 50);
             } else {
                 // Foca o próximo input.
                 const next = inputs[idx + 1];
-                if (next) next.focus({ preventScroll: true });
+                if (next) {
+                    next.focus({ preventScroll: true });
+                    scrollNewCheckIntoView(next);
+                }
             }
         });
         container.dataset.enterListenerAttached = 'true';
     }
+}
+
+// V40.4.4-fix4: rola APENAS o scroller interno do form pra trazer o check à vista.
+// NÃO usa scrollIntoView (que rola a página/body — causa "buraco branco" no PWA Android).
+function scrollNewCheckIntoView(inputEl) {
+    if (!inputEl) return;
+    // Procura o ancestral scrollável (o div com overflow-y-auto dentro do bl-form-view)
+    let scroller = inputEl.parentElement;
+    while (scroller && scroller !== document.body) {
+        const style = window.getComputedStyle(scroller);
+        if (style.overflowY === 'auto' || style.overflowY === 'scroll') break;
+        scroller = scroller.parentElement;
+    }
+    if (!scroller || scroller === document.body) return;
+    
+    // Calcula offset relativo: posição do input dentro do scroller
+    const inputRect = inputEl.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    const relTop = inputRect.top - scrollerRect.top + scroller.scrollTop;
+    
+    // Rola pra colocar o input ~no meio da área visível do scroller (não no final perto do teclado)
+    const target = relTop - (scrollerRect.height / 3);
+    scroller.scrollTo({ top: target, behavior: 'smooth' });
 }
 
 window.saveBacklogForm = function() {

@@ -1,5 +1,5 @@
-// V7.4 - v40.4.4-fix3 (UX: list-sheet com ALTURA FIXA h-[92%] em vez de max-h — as 4 abas (Lista/Rotinas/Notas/Finanças) agora têm sempre a mesma altura independente do conteúdo. Botões '+ Nova X' reduzidos de py-3.5 pra py-2.5 + ícone text-lg pra text-base + adicionado text-sm na fonte = mais elegantes, ocupam menos espaço.)
-const CACHE_NAME = 'timeblock-v40-4-4-fix3';
+// V7.5 - v40.4.4-fix4 (UX: ao dar Enter num check da Lista/Rotina, ele rolava com preventScroll (Regra de Ouro #2) e ficava escondido atrás do teclado Android. Agora função scrollNewCheckIntoView rola APENAS o container interno do form pra trazer o novo check à vista — não rola a página (evita 'buraco branco'). Posiciona em ~1/3 do scroller pra ficar bem acima do teclado.)
+const CACHE_NAME = 'timeblock-v40-4-4-fix4';
 const ASSETS = [
   './',
   './index.html',

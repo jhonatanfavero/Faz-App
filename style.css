@@ -15,11 +15,18 @@ body { touch-action: pan-y; background-color: #e2e8f0; overscroll-behavior-x: no
    - pb-4 (16px) → 4px (botões quase encostam no border-bottom)
    - mb-4 do flex interno (16px) → 0px (sem espaço residual depois do cluster)
    Economia total: ~36px de tela útil visíveis a mais. */
-/* V40.5.1-fix3: padding-top 32px → 16px reduz ~16px no estado RETRAÍDO.
-   Expandido continua usando o pt-12 (48px) do Tailwind no HTML.
-   Resultado: "Sábado, 16 mai" fica colado na linha vermelha quando menu retraído. */
+/* V40.5.1-fix4: padding-top inteligente que respeita notch/buraco da câmera.
+   max() escolhe o MAIOR entre safe-area-inset-top (calculado pelo OS) e o valor fixo.
+   - Telas SEM notch: usa 16px (expandido) ou 12px (retraído) — visual compacto.
+   - Telas COM notch grande: respeita o tamanho real do notch — sem cortar conteúdo.
+   Funciona porque viewport-fit=cover está setado no <meta viewport> (line 5 index.html). */
+.compact-header-padding {
+    padding-top: max(env(safe-area-inset-top), 16px);
+}
+
+/* V40.5.1-fix3 + fix4: padding-top 12px no retraído com proteção de notch também. */
 header.header-collapsed {
-    padding-top: 16px !important;
+    padding-top: max(env(safe-area-inset-top), 12px) !important;
     padding-bottom: 4px !important;
 }
 header.header-collapsed > div:first-child {

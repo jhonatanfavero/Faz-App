@@ -1,5 +1,5 @@
-// V9.4 - v40.5.1-fix5 (UNIFICAÇÃO do padding-top: expandido e retraído agora têm padding-top IDÊNTICO (12px). Antes era 16px expandido / 12px retraído — diferença visualmente perceptível. Agora 'Segunda, 18 mai' fica na MESMA distância da linha vermelha em ambos os estados, respeitando notch automaticamente via max(env(safe-area-inset-top), 12px). A única diferença visual entre expandido/retraído continua sendo: mb-4 do div interno (que cria o espaço pra mostrar TAGs/Relatórios/PLANEJADO), e padding-bottom (16px expandido vs 4px retraído).)
-const CACHE_NAME = 'timeblock-v40-5-1-fix5';
+// V9.5 - v40.5.1-fix6 (Padding-top do EXPANDIDO 12px → 20px (+8px) — visualmente igual ao retraído sem mexer no retraído. User reportou que no expandido o texto 'Segunda' parecia encostado na linha vermelha (provavelmente devido ao conteúdo abaixo TAGs/Progress 'puxar' visualmente). Solução: 2 regras CSS com :not(.header-collapsed) e .header-collapsed pra aplicar valor diferente conforme presença da classe. RETRAÍDO 12px INTOCADO. !important garante prioridade absoluta no retraído. max(env(), 20px) respeita notch automaticamente.)
+const CACHE_NAME = 'timeblock-v40-5-1-fix6';
 const ASSETS = [
   './',
   './index.html',

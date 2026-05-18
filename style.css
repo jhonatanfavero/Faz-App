@@ -15,20 +15,20 @@ body { touch-action: pan-y; background-color: #e2e8f0; overscroll-behavior-x: no
    - pb-4 (16px) → 4px (botões quase encostam no border-bottom)
    - mb-4 do flex interno (16px) → 0px (sem espaço residual depois do cluster)
    Economia total: ~36px de tela útil visíveis a mais. */
-/* V40.5.1-fix5: padding-top inteligente igual em AMBOS estados (expandido e retraído).
-   Anteriormente o expandido tinha 16px e retraído 12px — diferença visualmente perceptível.
-   Agora: 12px nos 2, máxima compactação. max() respeita notch automaticamente.
-   - Telas SEM notch: 12px (compacto, bom UX).
-   - Telas COM notch: respeita o notch (env() retorna o valor real). */
-.compact-header-padding {
-    padding-top: max(env(safe-area-inset-top), 12px);
+/* V40.5.1-fix6: Padding-top maior pro expandido (20px) — visualmente igual ao retraído.
+   Retraído tem 12px de padding e "Segunda" fica centralizada no flex de 36px (botões).
+   Expandido com 12px ficava "puxado pra cima" pela presença de mais conteúdo embaixo,
+   parecendo encostado na linha vermelha. 20px no expandido compensa essa diferença visual
+   sem mexer no retraído. !important não necessário aqui (sem conflito). */
+.compact-header-padding:not(.header-collapsed) {
+    padding-top: max(env(safe-area-inset-top), 20px);
+}
+.compact-header-padding.header-collapsed {
+    padding-top: max(env(safe-area-inset-top), 12px) !important;
 }
 
-/* Retraído mantém padding-top igual ao expandido. !important garante prioridade sobre
-   outras regras herdadas. padding-bottom continua 4px (vs 16px do expandido) — economia
-   no estado retraído. */
+/* Retraído INTACTO: padding-bottom 4px conforme fix5. */
 header.header-collapsed {
-    padding-top: max(env(safe-area-inset-top), 12px) !important;
     padding-bottom: 4px !important;
 }
 header.header-collapsed > div:first-child {

@@ -1682,14 +1682,18 @@ let _navBackToConfirmTimer = null; // N11: flag pra "toque voltar de novo pra fe
 let _navIgnoreNextPopstate = false; // N8: ignora popstate disparado por history.back() interno
 
 // Empilha uma entry no history (chamar ao abrir qualquer sheet/modal).
-// IDEMPOTENTE: nunca empilha 2x se já tem entry de navegação ativa.
+// V40.5.1-fix11 (Opção A): NO-OP. Função preservada (assinatura intacta) pra que as
+// 19 chamadas existentes no código continuem funcionando sem erro, mas não fazem nada.
+// Como o popstate listener foi desligado, não precisamos mais empilhar state.
 function pushNavState() {
+    // intencionalmente vazio — V40.5.1-fix11 Opção A
+    // (lógica original comentada abaixo pra reativar quando corrigirmos)
+    /*
     try {
-        if (history.state && history.state.tbNavLayer) return; // já tem entry, não empilha
+        if (history.state && history.state.tbNavLayer) return;
         history.pushState({ tbNavLayer: true }, '', location.href);
-    } catch (e) {
-        // N5: PWA em iframe pode bloquear pushState — falha silenciosa, não trava o app.
-    }
+    } catch (e) {}
+    */
 }
 
 // Determina o que está aberto e fecha a camada topmost.
@@ -1730,6 +1734,13 @@ function closeTopmostLayer() {
 }
 
 // popstate handler — chamado quando user aperta voltar no Android.
+// V40.5.1-fix11 (Opção A): DESLIGADO. A interceptação do botão voltar estava causando
+// bug de "tela fosca presa" em algumas sheets/sub-views (ex: Aparência, Períodos, Lista
+// QUALITÊ). Voltar Android agora tem comportamento padrão do PWA (fecha app). User usa
+// botão X das sheets pra fechar. Re-ativar exige correção da lógica de detecção de
+// sub-views (config-appearance-view, config-hours-view, config-periods-view não
+// estavam contemplados).
+/*
 window.addEventListener('popstate', (e) => {
     if (_navIgnoreNextPopstate) {
         _navIgnoreNextPopstate = false;
@@ -1739,8 +1750,6 @@ window.addEventListener('popstate', (e) => {
     const closedSomething = closeTopmostLayer();
     
     if (closedSomething) {
-        // Reinjetamos a entry pra que o próximo "voltar" também seja capturado
-        // (se ainda houver camada aberta — modal por trás, por exemplo).
         if (closeTopmostModal === null || getOpenModal() || 
             document.querySelector('#list-sheet:not(.translate-y-full)') ||
             document.querySelector('#sheet:not(.translate-y-full)') ||
@@ -1749,23 +1758,19 @@ window.addEventListener('popstate', (e) => {
             pushNavState();
         }
     } else {
-        // N10/N11: raiz — "toque voltar de novo pra fechar"
         if (_navBackToConfirmTimer) {
-            // 2ª vez dentro de 2s — deixa o navegador fechar de verdade
             clearTimeout(_navBackToConfirmTimer);
             _navBackToConfirmTimer = null;
-            // Não chamamos history.back() — o popstate JÁ aconteceu. App vai sair naturalmente.
-            // Em PWA standalone Android, sair do último entry fecha o app.
             return;
         }
-        // 1ª vez — mostra toast e reinjeta entry
         showToast('Toque voltar de novo pra fechar o app');
         _navBackToConfirmTimer = setTimeout(() => {
             _navBackToConfirmTimer = null;
         }, 2000);
-        pushNavState(); // reinjeta pra capturar o "próximo voltar"
+        pushNavState();
     }
 });
+*/
 
 // N12: ao carregar o app, garante que o estado base é "raiz".
 // replaceState (não pushState) pra não empilhar.

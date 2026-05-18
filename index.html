@@ -41,7 +41,9 @@
          No desktop ganha visual de "moldura de celular" via sm:rounded-[40px] + sm:border-[6px]. -->
     <div class="app-frame-locked relative w-full max-w-[420px] h-[100dvh] sm:h-full sm:max-h-[850px] bg-app-bg sm:rounded-[40px] shadow-2xl sm:border-[6px] border-zinc-300 overflow-hidden flex flex-col mx-auto sm:my-8">
         
-        <header class="absolute top-0 w-full z-30 pt-12 pb-4 px-6 bg-app-bg/90 backdrop-blur-xl border-b border-black/5 pointer-events-none">
+        <!-- V40.5.1-fix2: pt-12 → pt-4 reduz ~32px do topo. Sábado fica colado na linha do app.
+             A barra de status do Android já reserva seu próprio espaço fora do viewport visual. -->
+        <header class="absolute top-0 w-full z-30 pt-4 pb-4 px-6 bg-app-bg/90 backdrop-blur-xl border-b border-black/5 pointer-events-none">
             <div class="flex flex-col gap-4 mb-4 pointer-events-auto">
                 <div class="flex justify-between items-center gap-2">
                     <div class="min-w-0 flex-1">

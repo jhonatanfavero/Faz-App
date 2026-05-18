@@ -1,5 +1,5 @@
-// V9.7 - v40.5.1-fix8 (REVERTI fix7 ultra-defensiva que não resolveu + nova abordagem com SALVAGUARDA REAL: scheduleOverlayForceCheck() agendado em onOverlayClick E closeAllSheets. 350ms depois (> transition 300ms), verifica se há algo legitimamente aberto; se não, FORÇA limpeza completa do overlay (opacity-0 + pointer-events-none + reseta zIndex/opacity/pointerEvents inline). Bug reportado: clicar fora de Config/Aparência travava tela toda fosca + deslocava botões inferiores. Causa raiz incerta mas agora IMPOSSÍVEL travar: máximo 350ms e overlay é forçado. Idempotente via clearTimeout. 5/5 cenários cobertos.)
-const CACHE_NAME = 'timeblock-v40-5-1-fix8';
+// V9.8 - v40.5.1-fix9 (REVERSÃO COMPLETA das fix7 e fix8 que adicionaram complexidade sem resolver bug. onOverlayClick voltou ao estado MAIS SIMPLES: if closeTopmostModal returns true → return, else closeAllSheets. ScheduleOverlayForceCheck removido. Se o bug persiste após este revert, é causado por outra coisa não relacionada ao handler do overlay. Estado idêntico à versão Navigation Hardening V40.5.0-fix7 ORIGINAL que estava em uso antes dos prints reportados.)
+const CACHE_NAME = 'timeblock-v40-5-1-fix9';
 const ASSETS = [
   './',
   './index.html',

@@ -3378,7 +3378,7 @@ document.addEventListener('keydown', (e) => {
 //   - Estado persistido em localStorage 'tb_header_collapsed'.
 //   - Default false (1ª vez = expandido — princípio de Discoverability).
 //   - applyHeaderState() centraliza aplicação do estado (init + toggle usam a mesma).
-//   - Classe CSS .header-collapsed reduz pt-12→32px, pb-4→4px, mb-4→0px (ganho ~36px).
+//   - Classe CSS .header-collapsed reduz pt-12→16px (V40.5.1-fix3), pb-4→4px, mb-4→0px (ganho ~52px).
 
 function applyHeaderState() {
     const header = document.querySelector('header');

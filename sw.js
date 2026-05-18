@@ -1,5 +1,5 @@
-// V9.1 - v40.5.1-fix2 (Ajuste visual: header pt-12 → pt-4 reduz ~32px de espaço vazio no topo da tela. 'Sábado, 16 mai' fica colado na linha do app (status bar do Android reserva seu espaço fora do viewport). Timeline padding-top é recalculado automaticamente pelo JS adjustTimelinePadding via offsetHeight do header. Resultado: +32px de área útil pra ver mais blocos da agenda.)
-const CACHE_NAME = 'timeblock-v40-5-1-fix2';
+// V9.2 - v40.5.1-fix3 (Reversão da fix2 + abordagem correta: REVERTIDO pt-12 do header HTML (expandido estava CORRETO, não devia ter mexido). Mudança real: style.css .header-collapsed padding-top 32px → 16px. Resultado: estado RETRAÍDO ganha 16px (Sábado fica colado na linha vermelha), estado EXPANDIDO mantém pt-12 original. adjustTimelinePadding já recalcula timeline padding via header.offsetHeight dinamicamente em ambos os estados.)
+const CACHE_NAME = 'timeblock-v40-5-1-fix3';
 const ASSETS = [
   './',
   './index.html',

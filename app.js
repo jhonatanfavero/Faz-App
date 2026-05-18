@@ -1,5 +1,11 @@
 // --- 1. FÍSICA UNIVERSAL ---
-const PX_PER_MIN = 2.5; 
+// V40.2.22 — Micro-ajuste de conforto (decisão Jules):
+//   ANTES: 2.5px/min → 1h ocupava 150px, cards de 15min apertados (37.5px)
+//   AGORA: 3.0px/min → 1h ocupa 180px, cards de 15min com 45px (ideal pros botões w-7 h-7 = 28px)
+//   POR QUE NÃO IR MAIS ALTO: Jules vetou escalas 4.0/5.0 — destruiriam a "Bird's-Eye View"
+//   (visão panorâmica do dia inteiro). Card de 5min só vai ser viável quando tivermos
+//   movimento de pinça/zoom (planejado pra V41).
+const PX_PER_MIN = 3.0; 
 
 // VARIÁVEIS DE HORÁRIO AGORA SÃO DINÂMICAS E SALVAS NO LOCALSTORAGE
 let storedStart = localStorage.getItem('tb_start_hour');
@@ -18,7 +24,101 @@ let showOnlyCompleted = false;
 let taskToClone = null;
 let pendingCloneType = '';
 let selectedTagId = null;
-let headerHidden = false; // V2.0 - Estado do header
+// V40.3.2 FIX: declarado no topo do arquivo pra evitar ReferenceError (TDZ)
+//   quando renderTimeline() é chamado no init (linha ~2589) ANTES do bloco V40.3.2
+//   ser executado (linha ~3211). typeof em variável let em TDZ LANÇA erro, não retorna 'undefined'.
+let mbDragActive = false;
+// V40.3.5-fix2 FIX (mesma lição do TDZ): renderBacklog é chamado no init e usa
+//   expandedBacklogIds.has(). expandedRoutineIds idem (chamada via renderRoutinesList em
+//   eventos posteriores, mas movida junto pra coerência). Declaradas aqui no topo pra
+//   evitar ReferenceError fatal que parava o init e deixava botão Lista + toggleHeader
+//   + updateThoughtBtnVisibility sem funcionar.
+let expandedBacklogIds = new Set();
+let expandedRoutineIds = new Set();
+// V40.4.1: estado financeiro no topo (lição TDZ V40.3.2 — declarar antes do init).
+let financialDb = JSON.parse(localStorage.getItem('tb_financial_db') || '[]');
+// V40.4.3-fix (Gemini): fuso horário — toISOString() retorna UTC, então no fim do mês
+// às 21h+ no Brasil (UTC-3) já mostrava o mês seguinte e marcava tudo como atrasado.
+// Usar getFullYear() + getMonth() do Date local resolve.
+function getLocalMonthStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+let currentFinanceMonth = getLocalMonthStr(); // 'YYYY-MM' do mês atual (local, não UTC)
+function saveFinancial() { localStorage.setItem('tb_financial_db', JSON.stringify(financialDb)); }
+
+// ===== V40.4.4: HELPERS RECORRENTE + PARCELADA =====
+// Declarados no TOPO pra evitar TDZ (lição V40.3.2 e V40.3.5-fix2).
+
+// G1: retrocompat — itens antigos (V40.4.1-3) têm 'month', novos têm 'startMonth'.
+function getItemStartMonth(item) {
+    return item.startMonth || item.month;
+}
+
+// G4 + G15: soma N meses ao startMonth, retorna endMonth no fuso local.
+// Ex: addMonths('2026-05', 9) = '2027-02' (parcelada 10x = de Maio a Fevereiro, 10 meses inclusive)
+function addMonths(monthStr, n) {
+    const [y, m] = monthStr.split('-').map(Number);
+    const d = new Date(y, m - 1 + n, 1); // local (não UTC)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// G11: decide se item aparece num mês específico.
+// Avulsa (durationMonths=1 OU sem durationMonths): só no startMonth.
+// Recorrente/Parcelada (durationMonths>1): de startMonth até startMonth+durationMonths-1 (inclusive).
+function isItemInMonth(item, monthStr) {
+    const start = getItemStartMonth(item);
+    if (!start) return false;
+    
+    const duration = item.durationMonths || 1;
+    if (duration === 1) {
+        return start === monthStr;
+    }
+    
+    const endMonth = addMonths(start, duration - 1);
+    return monthStr >= start && monthStr <= endMonth;
+}
+
+// G2: retrocompat de paid. Item antigo (V40.4.1-3) tem paid:bool aplicado a item.month.
+// Item novo (V40.4.4+) tem paidMonths:[]. isPaidInMonth aceita ambos.
+function isPaidInMonth(item, monthStr) {
+    if (Array.isArray(item.paidMonths)) {
+        return item.paidMonths.includes(monthStr);
+    }
+    // Retrocompat: paid:true antigo só vale pro startMonth do item
+    return item.paid === true && getItemStartMonth(item) === monthStr;
+}
+
+// G7: calcula "parcela X/N" pra parceladas. Retorna null se não-parcelada ou fora do range.
+function getInstallmentLabel(item, monthStr) {
+    const duration = item.durationMonths || 1;
+    if (duration <= 1 || item.isRecurring) return null; // não é parcelada
+    if (!isItemInMonth(item, monthStr)) return null;
+    
+    const start = getItemStartMonth(item);
+    const [sy, sm] = start.split('-').map(Number);
+    const [my, mm] = monthStr.split('-').map(Number);
+    const idx = (my - sy) * 12 + (mm - sm) + 1; // 1-indexed
+    return `${idx}/${duration}`;
+}
+
+// G2: marca/desmarca paga em um mês específico (cria paidMonths se não existir).
+function setPaidInMonth(item, monthStr, paid) {
+    if (!Array.isArray(item.paidMonths)) {
+        // Migra retrocompat: se item antigo tinha paid:true no startMonth, mantém
+        item.paidMonths = (item.paid === true) ? [getItemStartMonth(item)] : [];
+        delete item.paid; // remove campo antigo pra não confundir
+    }
+    if (paid) {
+        if (!item.paidMonths.includes(monthStr)) item.paidMonths.push(monthStr);
+    } else {
+        item.paidMonths = item.paidMonths.filter(m => m !== monthStr);
+    }
+}
+// V2.0 - Estado do header
+// V40.2.28: persistido em localStorage. Default false (1ª vez = expandido pra Descoberta).
+//   Depois que o usuário escolhe (toggleHeader), a escolha vira a nova default.
+let headerHidden = localStorage.getItem('tb_header_collapsed') === 'true';
 let themeColor = localStorage.getItem('tb_theme_color') || '#4f46e5';
 let searchQuery = ''; // V40.2.5: termo de busca por título do cartão
 
@@ -42,9 +142,66 @@ let db = JSON.parse(localStorage.getItem('tb_master_db'));
 let backlogDb = JSON.parse(localStorage.getItem('tb_backlog_db')) || [];
 let backlogSelectedDur = 30;
 
+// ===== V40.5.0: KANBAN — colunas no backlog =====
+// Schema: { id, name, isDefault, createdAt }
+// Coluna "Geral" (id: 'col_geral') é criada automaticamente. Não pode ser apagada.
+let backlogColumnsDb = JSON.parse(localStorage.getItem('tb_backlog_columns')) || [];
+let activeColumnId = 'col_geral'; // coluna que está sendo visualizada (pra criar nova tarefa nela)
+
+function saveBacklogColumns() {
+    localStorage.setItem('tb_backlog_columns', JSON.stringify(backlogColumnsDb));
+}
+
+// K3: garante que coluna padrão Geral sempre existe (executa no init e antes de operações).
+function ensureDefaultColumn() {
+    const hasDefault = backlogColumnsDb.some(c => c.id === 'col_geral');
+    if (!hasDefault) {
+        backlogColumnsDb.unshift({
+            id: 'col_geral',
+            name: 'Geral',
+            isDefault: true,
+            createdAt: Date.now()
+        });
+        saveBacklogColumns();
+    }
+}
+
+// K2: retrocompat — tarefas sem columnId vão pra Geral
+function getItemColumn(item) {
+    return item.columnId || 'col_geral';
+}
+
+// Chama uma vez no carregamento.
+ensureDefaultColumn();
+
 // V40.1: Super Gabinete - Notas livres do dia
 let notesDb = JSON.parse(localStorage.getItem('tb_notes_db')) || [];
 let activeListTab = 'backlog'; // 'backlog' | 'routines' | 'notes'
+
+// V40.3 — MOTOR DE ROTINAS (Fase 1: CRUD).
+// Default: 3 rotinas de exemplo viciantes pra Discoverability (mesmo princípio do header em V40.2.28).
+let routinesDb = JSON.parse(localStorage.getItem('tb_routines_db'));
+if (!routinesDb || routinesDb.length === 0) {
+    routinesDb = [
+        {
+            id: 'rt_ex1', title: 'Manhã Produtiva', emoji: '🌞', duration: 120, theme: 'focus', tagId: null,
+            microblocks: [{title: 'Meditação e Café'}, {title: 'Revisar métricas de ontem'}, {title: 'Planejar o dia (Top 3)'}, {title: 'Email/Mensagens'}, {title: 'Leitura técnica'}],
+            createdAt: Date.now() - 2000
+        },
+        {
+            id: 'rt_ex2', title: 'Rotina Noturna', emoji: '🌙', duration: 60, theme: 'rest', tagId: null,
+            microblocks: [{title: 'Higiene pessoal'}, {title: 'Organizar amanhã'}, {title: 'Ler 10 minutos'}, {title: 'Meditação curta'}],
+            createdAt: Date.now() - 1000
+        },
+        {
+            id: 'rt_ex3', title: 'Treino', emoji: '💪', duration: 45, theme: 'focus', tagId: null,
+            microblocks: [{title: 'Aquecimento'}, {title: 'Cardio'}, {title: 'Força - Superiores'}, {title: 'Força - Core'}, {title: 'Alongamento'}],
+            createdAt: Date.now()
+        }
+    ];
+    localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb));
+}
+function saveRoutinesDb() { localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb)); }
 
 let periodsDb = JSON.parse(localStorage.getItem('tb_periods_db'));
 if (!periodsDb || periodsDb.length === 0) {
@@ -135,6 +292,7 @@ window.openTagsSheet = () => {
     renderTagsList();
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('tags-sheet').classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.selectTagColor = (btn) => {
@@ -300,6 +458,40 @@ function normalizeText(str) {
     return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
+// V40.2.24: Helper centralizado de match de busca em cards.
+//   Busca em 3 campos (Opção B aprovada por Jules + Jhonatan):
+//   1. Título do cartão (b.title)
+//   2. Microblocos (b.microblocks[].title)
+//   3. Nome da tag (tagsDb.find(t => t.id === b.tagId).name)
+//
+//   Notas vinculadas (linkedNoteIds) foram propositalmente EXCLUÍDAS do escopo —
+//   adicionariam custo de O(n × m) (cards × notas) por keystroke, e notas têm sua
+//   própria sheet pra navegar.
+//
+//   Argumento `normalizedQuery` recebe a string já passada por normalizeText()
+//   pra não chamar normalizeText 4 vezes por bloco. Performance.
+function cardMatchesSearch(block, normalizedQuery) {
+    if (!normalizedQuery) return false;
+
+    // 1. Título do cartão
+    if (normalizeText(block.title).includes(normalizedQuery)) return true;
+
+    // 2. Microblocos (checklist interna)
+    if (block.microblocks && block.microblocks.length > 0) {
+        if (block.microblocks.some(mb => normalizeText(mb.title).includes(normalizedQuery))) {
+            return true;
+        }
+    }
+
+    // 3. Nome da tag (se tiver tag vinculada)
+    if (block.tagId) {
+        const tag = tagsDb.find(t => t.id === block.tagId);
+        if (tag && normalizeText(tag.name).includes(normalizedQuery)) return true;
+    }
+
+    return false;
+}
+
 // V40.2.5: Abre a barra de busca
 window.openSearchBar = function() {
     // Limpa outros filtros pra evitar combinações confusas
@@ -313,6 +505,10 @@ window.openSearchBar = function() {
     const cluster = document.getElementById('header-btns-cluster');
     if (row) { row.classList.remove('hidden'); row.classList.add('flex'); }
     if (cluster) cluster.classList.add('hidden');
+    
+    // V40.2.28: ao abrir search, header cresce (search-bar aparece). Recalcula paddingTop
+    // da timeline pra cards não ficarem atrás do header crescido.
+    setTimeout(adjustTimelinePadding, 50);
     
     setTimeout(() => {
         const input = document.getElementById('search-input');
@@ -344,6 +540,8 @@ window.closeSearchBar = function() {
     if (counter) { counter.classList.add('hidden'); counter.innerText = ''; }
     
     // V40.2.11: listener de clique fora foi removido — não há mais nada pra limpar aqui
+    // V40.2.28: header voltou ao tamanho original (sem search-bar), recalcula paddingTop.
+    setTimeout(adjustTimelinePadding, 50);
     
     renderTimeline();
 }
@@ -366,7 +564,8 @@ function updateSearchCounter() {
         return;
     }
     const q = normalizeText(searchQuery);
-    const matched = db.filter(b => normalizeText(b.title).includes(q)).length;
+    // V40.2.24: usa cardMatchesSearch (título + microblocos + tag)
+    const matched = db.filter(b => cardMatchesSearch(b, q)).length;
     counter.innerText = `${matched} ${matched === 1 ? 'resultado' : 'resultados'} de "${searchQuery}"`;
     counter.classList.remove('hidden');
 }
@@ -496,6 +695,10 @@ function formatDur(m) { const h = Math.floor(m/60), min = m%60; return h > 0 && 
 function showToast(msg) { const t = document.getElementById('toast'); document.getElementById('toast-msg').innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => t.classList.add('opacity-0'), 2500); }
 
 function renderTimeline() {
+    // V40.3.2: bloqueia re-render durante drag de microbloc pra não invalidar mbDragRects/mbDragSourceEl.
+    // O drag chamará renderTimeline() no final (onMbDragEnd) — não precisa renderizar enquanto rola.
+    // Variável declarada no topo do arquivo pra evitar TDZ.
+    if (mbDragActive) return;
     container.innerHTML = ''; 
     
     const timelineContainer = document.getElementById('timeline-container');
@@ -537,7 +740,8 @@ function renderTimeline() {
         }
         if (isSearching) {
             const q = normalizeText(searchQuery);
-            filteredForWindow = filteredForWindow.filter(b => normalizeText(b.title).includes(q));
+            // V40.2.24: filtro expandido pra título + microblocos + tag
+            filteredForWindow = filteredForWindow.filter(b => cardMatchesSearch(b, q));
         }
         
         if (filteredForWindow.length > 0) {
@@ -563,9 +767,10 @@ function renderTimeline() {
     }
 
     // V40.2.5: filtro de busca por nome (normaliza acentos, case-insensitive)
+    // V40.2.24: expandido pra incluir microblocos e tag via cardMatchesSearch
     if (searchQuery && searchQuery.trim()) {
         const q = normalizeText(searchQuery);
-        dailyDb = dailyDb.filter(b => normalizeText(b.title).includes(q));
+        dailyDb = dailyDb.filter(b => cardMatchesSearch(b, q));
     }
 
     dailyDb = dailyDb.filter(b => b.startMin < END_HOUR * 60 && (b.startMin + b.duration) > START_HOUR * 60);
@@ -602,7 +807,8 @@ function renderSearchResultsAllDays() {
     const today = getTodayStr();
     
     // Pega TODOS os blocos do db (qualquer data) que batem com a busca
-    let results = db.filter(b => normalizeText(b.title).includes(q));
+    // V40.2.24: agora busca em título + microblocos + nome da tag
+    let results = db.filter(b => cardMatchesSearch(b, q));
     
     // Ordena por data (crescente) e depois por hora
     results.sort((a, b) => {
@@ -740,11 +946,26 @@ function drawBlock(block) {
         const isPast = block.type === 'past';
         const isRest = block.theme === 'rest';
 
-        let bgClass = block.completed ? 'bg-emerald-100 border-emerald-200' : (isRest ? 'bg-emerald-50 border-emerald-300' : 'bg-app-focus border-transparent shadow-md');
-        if (isPast && !block.completed) {
-            bgClass = isRest ? 'bg-zinc-50 border-zinc-200 opacity-80 saturate-50' : 'bg-app-focus-soft border-app-focus-soft opacity-80 saturate-50';
-        } else if (isPast && block.completed) {
-            bgClass = 'bg-emerald-50 border-emerald-200 opacity-80 saturate-50';
+        // V40.2.20 — Sem mais "fantasma" no final do dia.
+        //   ANTES: atrasado não-concluído ganhava bg-app-focus-soft + opacity-80 saturate-50,
+        //          virando uma cor desbotada/transparente que tirava a vida da agenda.
+        //          Concluídos eram emerald-100/50 (verde claro lavadinho) com saturate-50 quando atrasados.
+        //   AGORA:
+        //   - Atrasado não-concluído mantém cor SÓLIDA do tema (bg-app-focus), idêntica ao futuro.
+        //     O único indicador de atraso é o ícone "i" (pastIconHtml) que JÁ aparece quando isPast.
+        //   - Concluído (no prazo ou atrasado, rest ou normal) vira emerald-500 sólido e vivo —
+        //     injeção de dopamina de missão cumprida (chancela Jules).
+        //   - Rest atrasado mantém zinc claro mas SEM desbotamento (coerência com a lei "sem opacity").
+        let bgClass;
+        if (block.completed) {
+            // Qualquer concluído (futuro ou passado, rest ou normal) = verde vivo sólido
+            bgClass = 'bg-emerald-500 border-emerald-600 shadow-md';
+        } else if (isRest) {
+            // Descanso não-concluído: esquema claro (zinc se atrasado, emerald-50 se futuro), sem desbotamento
+            bgClass = isPast ? 'bg-zinc-50 border-zinc-200' : 'bg-emerald-50 border-emerald-300';
+        } else {
+            // Foco normal (futuro OU atrasado) = cor sólida do tema
+            bgClass = 'bg-app-focus border-transparent shadow-md';
         }
         const tagColor = getTagColor(block.tagId);
         // V40.2.14: tag agora tem destaque claro mesmo quando bate com cor do card.
@@ -759,25 +980,34 @@ function drawBlock(block) {
 
         const isMicro = !block.expanded && block.duration <= 25;
         if (block.expanded) {
-            el.className += ` ${bgClass} shadow-2xl border px-3 pt-2 pb-6 group select-none transition-all duration-300`;
+            // V40.2.21: pb-12 (era pb-6) pra dar espaço pra action bar (Editar/Duplicar/Apagar)
+            // que agora ocupa o rodapé via absolute. A barra usa bottom-1, height ~32px.
+            // V40.2.23: px-3 → pr-3 (drag-handle absolute agora ocupa os 40px da esquerda).
+            el.className += ` ${bgClass} shadow-2xl border pr-3 pt-2 pb-12 group select-none transition-all duration-300`;
             el.style.height = 'auto'; el.style.minHeight = `${heightPx}px`; el.style.zIndex = '35'; 
         } else {
-            el.className += ` ${bgClass} border px-3 ${isMicro ? 'pt-1.5 pb-1.5' : 'pt-2 pb-4'} group select-none transition-all duration-300`;
+            // V40.2.23: px-3 → pr-3 (drag-handle absolute ocupa a esquerda).
+            el.className += ` ${bgClass} border pr-3 ${isMicro ? 'pt-1.5 pb-1.5' : 'pt-2 pb-4'} group select-none transition-all duration-300`;
         }
         if (borderStyle) el.style.cssText += borderStyle;
 
-        const isDarkTheme = !isPast && !block.completed && !isRest;
+        // V40.2.20: isDarkTheme agora cobre TODOS os fundos escuros do app:
+        //   - foco normal (futuro OU atrasado, ambos com bg-app-focus)
+        //   - concluído (sempre emerald-500)
+        // Só rest não-concluído (emerald-50 / zinc-50) usa tema claro.
+        const isDarkTheme = !isRest || block.completed;
 
         const timeColor = isDarkTheme ? 'text-white/60' : 'text-zinc-500';
-        const titleClass = `${block.completed ? 'line-through opacity-60 text-emerald-900' : (isDarkTheme ? 'text-white' : (isRest ? 'text-emerald-900' : 'text-zinc-800'))}`;
+        // V40.2.20: título do concluído agora é branco riscado (sobre fundo emerald-500), não mais emerald-900 desbotado.
+        const titleClass = `${block.completed ? 'line-through opacity-90 text-white' : (isDarkTheme ? 'text-white' : (isRest ? 'text-emerald-900' : 'text-zinc-800'))}`;
         const iconColor = isDarkTheme ? 'text-white/60 hover:text-white' : 'text-zinc-400 hover:text-zinc-700';
-        const checkColor = isDarkTheme ? 'text-white/60 hover:text-white' : (block.completed ? 'text-emerald-600 hover:text-emerald-700' : 'text-zinc-400 hover:text-emerald-600');
+        const checkColor = isDarkTheme ? (block.completed ? 'text-white hover:text-white/80' : 'text-white/60 hover:text-white') : (block.completed ? 'text-emerald-600 hover:text-emerald-700' : 'text-zinc-400 hover:text-emerald-600');
         const btnBg = isDarkTheme ? 'bg-black/20 hover:bg-black/30' : 'bg-black/5 hover:bg-black/10';
         const glowCircle = isDarkTheme ? 'bg-white/10' : 'bg-white/60';
 
         let microblocksSection = '';
         let microHtml = (block.microblocks || []).map(mb => `
-            <div class="flex items-start gap-1.5 mb-1.5 z-20 relative group/mb pointer-events-auto">
+            <div class="mb-item flex items-start gap-1.5 mb-1.5 z-20 relative group/mb pointer-events-auto" data-mb-id="${mb.id}">
                 <button onclick="toggleMicroblock('${block.id}', '${mb.id}', event)" class="mt-[3px] shrink-0 w-3.5 h-3.5 rounded-[4px] border ${mb.done ? (isDarkTheme ? 'bg-white border-white' : 'bg-emerald-500 border-emerald-500') : (isDarkTheme ? 'border-white/30' : 'border-black/20')} flex items-center justify-center transition-colors">
                     ${mb.done ? `<i class="ph-bold ph-check text-[10px] ${isDarkTheme ? 'text-app-focus' : 'text-white'}"></i>` : ''}
                 </button>
@@ -793,7 +1023,7 @@ function drawBlock(block) {
             : 'bg-black/5 hover:bg-black/10 focus:bg-white focus:border-zinc-300 text-zinc-900 placeholder-zinc-500 border-transparent shadow-sm';
 
         microblocksSection = `
-            <div class="flex-1 overflow-y-auto no-scrollbar mt-2 mb-2 z-20 relative pointer-events-auto ${!block.expanded && block.duration <= 25 ? 'hidden' : ''}">
+            <div class="flex-1 overflow-y-auto no-scrollbar mt-2 mb-2 ml-10 z-20 relative pointer-events-auto ${!block.expanded && block.duration <= 25 ? 'hidden' : ''}">
                 ${microHtml}
                 <div class="mt-1">
                     <input type="text" id="micro-input-${block.id}" placeholder="+ Adicionar Check" class="microblock-input w-full rounded-md px-2 py-1.5 text-[10px] font-medium outline-none transition-colors border ${mbInputClasses}" onkeypress="if(event.key==='Enter') addMicroblock('${block.id}', this, event)">
@@ -805,13 +1035,74 @@ function drawBlock(block) {
         const showInfoIcon = isPast || block.wasDelayed;
         const pastIconHtml = showInfoIcon ? `<div class="pointer-events-auto w-3.5 h-3.5 rounded-full ${isDarkTheme ? 'bg-black/20 border-black/30 text-white/80' : 'bg-black/10 border-black/10 text-zinc-500'} flex items-center justify-center shrink-0 border mr-1.5" title="Tempo Esgotado / Realocado"><i class="ph-bold ph-info text-[8px]"></i></div>` : '';
 
+        // V40.2.21 — Divulgação Progressiva (Progressive Disclosure):
+        //   ANTES: 5 botões amontoados no topo direito do card (expandir, concluir, editar,
+        //          duplicar, apagar) → comprimia o título a ~50% da largura, com truncate.
+        //   AGORA:
+        //   - Topo retraído: só 2 botões essenciais (▼ expandir, ✓ concluir), tamanho w-7 h-7
+        //     pra melhor área de toque no mobile (Touch Target accessibility). Título ganha
+        //     ~3 botões de largura extra.
+        //   - Rodapé do expandido: barra horizontal com Editar / Duplicar / Apagar com ícone
+        //     + texto. Aparece SÓ quando o card está expandido (chancela Jules + Jhonatan).
+        //   - Resize handle continua no canto inferior esquerdo absoluto (z-40), a action bar
+        //     usa right-0 com inset (left-3 right-3 bottom-1), não colidem em posição.
+
+        // Botões internos do rodapé do expandido (só renderizados quando block.expanded === true)
+        const actionBarBtnClass = isDarkTheme
+            ? 'bg-black/20 hover:bg-black/30 text-white/85 active:scale-95'
+            : 'bg-black/5 hover:bg-black/10 text-zinc-700 active:scale-95';
+        const actionBarDeleteClass = isDarkTheme
+            ? 'bg-black/20 hover:bg-red-500/70 text-white/85 hover:text-white active:scale-95'
+            : 'bg-black/5 hover:bg-red-500/80 text-zinc-700 hover:text-white active:scale-95';
+        const actionBarHtml = block.expanded ? `
+            <div class="absolute left-12 right-3 bottom-1 flex gap-1.5 z-30 pointer-events-auto">
+                <button onclick="openEditModal('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarBtnClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Editar">
+                    <i class="ph ph-pencil-simple text-[12px]"></i>Editar
+                </button>
+                <button onclick="duplicateTask('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarBtnClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Duplicar">
+                    <i class="ph ph-copy text-[12px]"></i>Duplicar
+                </button>
+                <button onclick="openDeleteModal('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarDeleteClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Apagar">
+                    <i class="ph ph-trash text-[12px]"></i>Apagar
+                </button>
+            </div>
+        ` : '';
+
         el.innerHTML = `
             <div class="absolute top-0 right-0 w-32 h-32 ${glowCircle} rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
-            <div class="flex justify-between items-start z-30 relative">
-                <div class="flex flex-1 min-w-0 pr-2 gap-2">
-                    <div class="drag-handle w-6 h-6 flex items-center justify-center ${btnBg} ${iconColor} rounded transition pointer-events-auto shrink-0 mt-0.5" title="Arrastar (Mover)">
-                        <i class="ph ph-dots-six-vertical"></i>
-                    </div>
+
+            <!-- V40.2.23 — DRAG ZONE EXPANDIDA (faixa esquerda inteira)
+                 ANTES: drag-handle era um quadradinho w-6 h-6 (24px²) no canto superior esquerdo.
+                        Usuário tinha que MIRAR no alvo pequeno pra arrastar — gargalo de UX.
+                 AGORA: a faixa esquerda inteira do card (w-10 = 40px, altura total) vira zona de drag.
+                        Inclui a área da border-left colorida (tag) e o halo branco — visualmente
+                        nada muda, mas a área de toque cresceu 8x.
+
+                 V40.2.25 — Ícone ⋮⋮ ANCORADO NO TOPO:
+                 - items-start + pt condicional + mt-0.5 = ícone alinhado com 1ª linha de texto
+                 - opacity-100 = ícone visível em fundos escuros (emerald-500)
+
+                 V40.2.26 — FIX DO BLOQUEIO FANTASMA (diagnóstico Jules):
+                 ANTES: drag-handle tinha z-20. flex container conteúdo tinha z-30. Mesmo com
+                        ml-10 deslocando o flex pra x=40, podia haver bloqueio sutil em alguns
+                        navegadores ou em estados específicos do card. Drag parava de funcionar.
+                 AGORA: drag-handle ganhou Z-50 (era z-20). Agora é o ELEMENTO MAIS ALTO da
+                        cadeia de hit-testing dentro do card. Nenhuma outra camada (z-10, 20, 30,
+                        40) pode interceptar toques na faixa esquerda. Belt-and-suspenders. -->
+            <div class="drag-handle absolute left-0 top-0 bottom-0 w-10 flex items-start justify-center ${isMicro ? 'pt-1.5' : 'pt-2'} pointer-events-auto z-50" title="Arrastar (Mover)">
+                <i class="ph ph-dots-six-vertical ${iconColor} text-base mt-0.5"></i>
+            </div>
+
+            <!-- V40.2.26 FIX CRÍTICO: pl-10 → ml-10
+                 ANTES (V40.2.23-25): pl-10 (padding-left 40px) criava uma área de 40px à esquerda
+                                       do flex container. Como o flex tem z-30 e o drag-handle tem
+                                       z-20, esses 40px de padding INTERCEPTAVAM os toques que
+                                       deveriam ir pro drag-handle. Resultado: drag NÃO funcionava.
+                 AGORA: ml-10 (margin-left 40px) desloca o flex container pra x=40, deixando os
+                        primeiros 40px do card LIVRES pra receber toques do drag-handle (z-20).
+                 Foi um bug invisível: visualmente idêntico, mas a área de toque era diferente. -->
+            <div class="flex justify-between items-start z-30 relative ml-10">
+                <div class="flex flex-1 min-w-0 pr-2">
                     <div class="flex flex-col flex-1 min-w-0 pointer-events-auto">
                         <span ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition max-w-full" title="${isSearching ? '' : 'Alterar Horário'}">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
                         <div class="title-wrapper flex items-center ${isMicro ? 'mt-0' : 'mt-0.5'} min-w-0 pointer-events-none">
@@ -822,34 +1113,39 @@ function drawBlock(block) {
                     </div>
                 </div>
                 
-                <div class="flex gap-1.5 shrink-0 relative z-50 pointer-events-auto select-auto">
-                    <button onclick="toggleExpandBlock('${block.id}', event)" class="w-6 h-6 flex items-center justify-center ${btnBg} ${iconColor} rounded transition" title="Expandir/Recolher">
+                <div class="flex gap-1.5 shrink-0 relative z-[60] pointer-events-auto select-auto">
+                    <button onclick="toggleExpandBlock('${block.id}', event)" class="w-7 h-7 flex items-center justify-center ${btnBg} ${iconColor} rounded transition" title="Expandir/Recolher">
                         <i class="ph ${block.expanded ? 'ph-caret-up' : 'ph-caret-down'}"></i>
                     </button>
-                    <button onclick="toggleBlockCompletion('${block.id}', event)" class="w-6 h-6 flex items-center justify-center ${btnBg} ${checkColor} rounded transition" title="Concluir">
+                    <button onclick="toggleBlockCompletion('${block.id}', event)" class="w-7 h-7 flex items-center justify-center ${btnBg} ${checkColor} rounded transition" title="Concluir">
                         <i class="${block.completed ? 'ph-fill ph-check-circle' : 'ph ph-check'}"></i>
-                    </button>
-                    <button onclick="openEditModal('${block.id}', event)" class="flex w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Editar">
-                        <i class="ph ph-pencil-simple"></i>
-                    </button>
-                    <button onclick="duplicateTask('${block.id}', event)" class="flex w-6 h-6 items-center justify-center ${btnBg} ${iconColor} hover:text-white rounded transition" title="Duplicar">
-                        <i class="ph ph-copy"></i>
-                    </button>
-                    <button onclick="openDeleteModal('${block.id}', event)" class="flex w-6 h-6 items-center justify-center ${btnBg} hover:bg-red-500/80 ${iconColor} hover:text-white rounded transition" title="Apagar">
-                        <i class="ph ph-trash"></i>
                     </button>
                 </div>
             </div>
             
             ${microblocksSection}
 
-            <div class="resize-handle absolute bottom-0 left-12 w-12 h-6 flex items-end justify-start pb-1.5 z-40">
+            ${actionBarHtml}
+
+            <div class="resize-handle absolute bottom-0 left-12 w-12 h-6 flex items-end justify-start pb-1.5 z-40 ${block.expanded ? 'hidden' : ''}">
                 <div class="w-8 h-1 ${isDarkTheme ? 'bg-white/40' : 'bg-black/20'} rounded-full pointer-events-none"></div>
             </div>
         `;
         enablePhysics(el, block);
     }
     container.appendChild(el);
+    
+    // V40.3.2: setup do drag de microblocks + tooltip de discovery (após appendChild pra
+    // garantir que getBoundingClientRect funciona corretamente).
+    // V40.3.2-fix4 DIAGNÓSTICO: try/catch defensivo pra impedir que erro aqui quebre o init.
+    try {
+        if (block.type !== 'empty' && block.expanded) {
+            if (typeof setupMicroblockDrag === 'function') setupMicroblockDrag(el, block);
+            if (typeof maybeShowMbDragTooltip === 'function') maybeShowMbDragTooltip(el, block);
+        }
+    } catch (err) {
+        console.warn('[drawBlock] erro em setupMicroblockDrag/Tooltip:', err);
+    }
 }
 
 // --- 5. ENCAIXE MATEMÁTICO ---
@@ -881,6 +1177,13 @@ function performEncaixeMatematico(gapStart, gapDuration) {
         linkedNoteIds: [] // V40.2: notas vinculadas começam vazias (clone não copia notas)
     });
     saveDb();
+    
+    // V40.5.0-fix8: se veio do backlog (scheduleBacklogItem), só remove de lá AGORA (após confirmar)
+    if (pendingIntent.fromBacklogId) {
+        backlogDb = backlogDb.filter(i => i.id !== pendingIntent.fromBacklogId);
+        saveBacklog();
+    }
+    
     cancelPendingTask(); 
 }
 
@@ -903,6 +1206,7 @@ window.duplicateTask = function(id, e) {
         closeAllSheets();
         document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
         document.getElementById('clone-sheet').classList.remove('translate-y-full');
+        pushNavState(); // V40.5.0-fix7
     }
 }
 
@@ -1000,42 +1304,111 @@ function collapseAllBlocks() {
 // Flag para evitar retração durante drag/resize (a física já gerencia o expanded)
 let isPhysicsBusy = false;
 
-// 3a) Click-out: clicar na timeline fora de um card expandido retrai todos
-// Usamos delegação no #timeline-scroll, capturando na fase de bubbling
+// 3a) V40.2.19 — Click-out por NEUTRALIDADE (não mais por "está expandido")
+//
+//   PROBLEMA RESOLVIDO:
+//   No celular, ao expandir um card pra ler, o usuário rola a tela apoiando o dedo
+//   em OUTROS cards retraídos (porque a timeline é densa, raramente há área vazia
+//   acessível). O navegador interpreta esse toque inicial (a "gordura do dedo")
+//   como CLIQUE no card retraído. A regra antiga ("clicou fora do expandido →
+//   fecha") matava o expandido injustamente.
+//
+//   NOVA REGRA (Opção A aprovada por Jhonatan + Jules):
+//   - Tocar em QUALQUER card REAL (type='focus' ou 'past'), expandido ou retraído
+//     → IGNORA (cards não se fecham uns aos outros).
+//   - Tocar em "Tempo Livre" (type='empty', bg-hatched) → FECHA. Área neutra.
+//   - Tocar em qualquer área fora de cards (y-axis, padding, fundo) → FECHA.
+//   - Botões internos dos cards (concluir, editar, lápis, etc) já chamam
+//     stopPropagation no próprio onclick — nunca chegam aqui.
+//
+//   ROTAS PRA FECHAR O EXPANDIDO:
+//   1. Botão ▲ do próprio card (toggleExpandBlock)
+//   2. Rolar até o card sumir do viewport + 20px (handler 3b, V40.2.18)
+//   3. Tocar em "Tempo Livre" ou área neutra (este handler)
 (function setupClickOutCollapse() {
     const timeline = document.getElementById('timeline-scroll');
     if (!timeline) return;
     timeline.addEventListener('click', (e) => {
         if (isPhysicsBusy) return;
-        // Se o click foi dentro de um card que ESTÁ expandido, ignora
-        // (operações dentro do card como microbloco, lápis, lixeira, etc continuam funcionando)
+
         const blockEl = e.target.closest('.block-item');
         if (blockEl) {
+            // Tocou em algum card. Descobre se é real (focus/past) ou vazio (empty).
             const id = blockEl.dataset.blockId;
             const b = id ? db.find(x => x.id === id) : null;
-            if (b && b.expanded) return; // click dentro do expandido — não fazer nada
+
+            // Card real (focus/past) → ignora, deixa o usuário interagir/rolar livre.
+            // Vale tanto pro expandido (preserva leitura) quanto pra retraído (evita
+            // o "clique fantasma" quando o dedo só esbarra pra rolar).
+            if (b && b.type !== 'empty') return;
+
+            // Tempo Livre (type='empty'): cai pro fechamento padrão (área neutra).
+            // Se b não foi encontrado no db (caso raro de dataset corrompido),
+            // também cai pro padrão — comportamento seguro.
         }
-        // Click fora de qualquer card expandido (área vazia, ou em card retraído sem afetá-lo)
+
+        // Toque em área neutra (fora de cards) ou em Tempo Livre → fecha expandido.
         collapseAllBlocks();
     });
 })();
 
-// 3b) Scroll com threshold: precisa rolar > 30px para retrair (evita acidente)
-//     Debounce: só reage 120ms após o usuário parar de rolar (suaviza)
+// 3b) V40.2.18 — Scroll collapse por VISIBILIDADE (não mais por distância de scroll)
+//
+//   PROBLEMA RESOLVIDO:
+//   Versão antiga (V40.1.3) fechava o card expandido após apenas 30px de scroll.
+//   Isso quebrava o uso real: o usuário expandia o card pra ler microblocos / notas
+//   vinculadas, deslizava o dedo só pra ajustar a posição na tela, e o card já fechava.
+//
+//   NOVA LÓGICA (Opção A aprovada por Jhonatan + Jules):
+//   Em vez de medir "quanto rolou", medimos "o card expandido ainda está visível?".
+//   Usamos getBoundingClientRect() do card e do container #timeline-scroll.
+//   O card só é fechado quando sai COMPLETAMENTE do viewport visível do scroller,
+//   com TOLERÂNCIA de 20px de amortecimento (evita "piscadas" quando o card está
+//   bem na borda — fecharia/abriria/fecharia em micro-scrolls).
+//
+//   CRITÉRIOS DE FECHAMENTO (basta UM ser verdadeiro):
+//   - cardRect.bottom < timelineRect.top - TOLERANCE  → saiu pra cima
+//   - cardRect.top    > timelineRect.bottom + TOLERANCE → saiu pra baixo
+//
+//   GUARDS PRESERVADOS:
+//   - isPhysicsBusy: drag/resize não dispara collapse (mantido da V40.1.3)
+//   - Debounce 120ms: continua suavizando reação ao scroll
+//   - Click-out (handler 3a, linhas 1003–1021): intocado, continua fechando em tap
+//
+//   COMPATIBILIDADE:
+//   - Modo lista (filter-list-mode + search-mode): cards usam position:relative,
+//     mas getBoundingClientRect() funciona igual — retorna posição real na tela.
+//   - Múltiplos cards expandidos: impossível pela regra "1 por vez" da
+//     toggleExpandBlock (linha 985), então o break no primeiro encontrado basta.
 (function setupScrollCollapse() {
     const timeline = document.getElementById('timeline-scroll');
     if (!timeline) return;
-    let scrollStartY = null;
     let scrollDebounce = null;
-    const THRESHOLD = 30; // px
+    const TOLERANCE = 20; // px de margem antes de considerar o card "fora da tela"
+
     timeline.addEventListener('scroll', () => {
         if (isPhysicsBusy) return;
-        if (scrollStartY === null) scrollStartY = timeline.scrollTop;
         clearTimeout(scrollDebounce);
         scrollDebounce = setTimeout(() => {
-            const delta = Math.abs(timeline.scrollTop - scrollStartY);
-            if (delta > THRESHOLD) collapseAllBlocks();
-            scrollStartY = null;
+            // Existe algum card expandido no db? Se não, nada a fazer.
+            const expandedBlock = db.find(b => b.expanded);
+            if (!expandedBlock) return;
+
+            // Localiza o elemento DOM do card expandido
+            const cardEl = timeline.querySelector(
+                `.block-item[data-block-id="${expandedBlock.id}"]`
+            );
+            if (!cardEl) return; // card não está renderizado (ex: mudou de dia) — nada a fazer
+
+            const cardRect = cardEl.getBoundingClientRect();
+            const timelineRect = timeline.getBoundingClientRect();
+
+            const saiuPraCima  = cardRect.bottom < timelineRect.top    - TOLERANCE;
+            const saiuPraBaixo = cardRect.top    > timelineRect.bottom + TOLERANCE;
+
+            if (saiuPraCima || saiuPraBaixo) {
+                collapseAllBlocks();
+            }
         }, 120);
     }, { passive: true });
 })();
@@ -1212,7 +1585,7 @@ window.changeFloatDuration = function(mins) {
 }
 
 window.openSheet = () => {
-    clearFilters(); // V40.2.1: limpa filtros pra não confundir
+    clearFilters();
     document.getElementById('config-sheet').classList.add('translate-y-full');
     document.getElementById('period-select-sheet').classList.add('translate-y-full');
     
@@ -1221,6 +1594,7 @@ window.openSheet = () => {
 
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     sheet.classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7: captura botão voltar
     
     // V40.1.4: foco automático no input após animação do sheet (350ms)
     setTimeout(() => {
@@ -1230,14 +1604,237 @@ window.openSheet = () => {
 }
 
 window.openListSheet = () => {
-    clearFilters(); // V40.2.1: limpa filtros pra não confundir
-    switchListTab('backlog'); // V40.1: sempre abrir na aba Banco
+    clearFilters();
+    switchListTab('backlog');
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     listSheet.classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7: captura botão voltar
 }
+
+// =====================================================
+// V40.5.0-fix7 — NAVIGATION HARDENING
+// Bug 1: clique no overlay fecha SHEETS (vai pra agenda) mesmo com modal aberto.
+// Bug 2: botão "voltar" do Android fecha o app inteiro.
+// =====================================================
+
+// N1: detecta QUALQUER modal aberto (procura por z-[60] que esteja com flex visível).
+// Como todos os modais usam o padrão Tailwind `hidden flex-col` → `flex`, basta procurar
+// por elementos com z-[60] que NÃO tenham .hidden.
+function getOpenModal() {
+    // Tailwind compila z-[60] como zIndex: 60. Selector funciona com classe.
+    const modals = document.querySelectorAll('.z-\\[60\\]');
+    for (const m of modals) {
+        if (!m.classList.contains('hidden')) return m;
+    }
+    return null;
+}
+
+// N4: fecha apenas o modal topmost, preserva sheets atrás.
+function closeTopmostModal() {
+    const modal = getOpenModal();
+    if (!modal) return false;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    
+    // N4: se ainda tem sheets atrás (qualquer .translate-y-0 — sheets abertas), mantém overlay.
+    // Senão, esconde overlay também.
+    const anySheetOpen = document.querySelector('.app-frame-locked [class*="translate-y-0"]') ||
+                          document.querySelector('#list-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#sheet:not(.translate-y-full)') ||
+                          document.querySelector('#config-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#tags-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#reports-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#period-select-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#clone-sheet:not(.translate-y-full)') ||
+                          document.querySelector('#link-note-sheet:not(.translate-y-full)');
+    
+    if (!anySheetOpen) {
+        const ov = document.getElementById('overlay');
+        if (ov) {
+            ov.classList.add('opacity-0', 'pointer-events-none');
+            ov.style.zIndex = '';
+        }
+    } else {
+        // Restaura zIndex pra ficar acima das sheets (z-50) mas abaixo dos modais (z-60)
+        const ov = document.getElementById('overlay');
+        if (ov) ov.style.zIndex = '55';
+    }
+    return true;
+}
+
+// Handler do overlay (substitui o antigo closeAllSheets direto).
+// V40.5.1-fix7: ULTRA-DEFENSIVO. Bug reportado: clique acima da sheet deixava tela toda
+// fosca e travada (precisava recarregar app). Causa raiz incerta, mas sintoma: overlay
+// ficava com z-index alto e pointer-events ativo, bloqueando interação.
+// Solução: sempre limpa estado do overlay + fecha tudo OU fecha só modal se visível de verdade.
+window.onOverlayClick = function() {
+    const ov = document.getElementById('overlay');
+    
+    // 1. Detecta modal REALMENTE visível (não fantasma com display:none ou opacity:0)
+    let modalReallyOpen = null;
+    document.querySelectorAll('.z-\\[60\\]').forEach(m => {
+        if (modalReallyOpen) return;
+        if (m.classList.contains('hidden')) return;
+        const cs = window.getComputedStyle(m);
+        if (cs.display === 'none') return;
+        if (parseFloat(cs.opacity) < 0.1) return;
+        modalReallyOpen = m;
+    });
+    
+    // 2. Caso A: modal de verdade aberto → fecha SÓ o modal
+    if (modalReallyOpen) {
+        modalReallyOpen.classList.add('hidden');
+        modalReallyOpen.classList.remove('flex');
+        // Reseta zIndex inline pra evitar resíduo
+        if (ov) ov.style.zIndex = '';
+        // Se ainda tem sheet aberta atrás, mantém overlay com pointer-events
+        const sheetAtras = document.querySelector(
+            '#list-sheet:not(.translate-y-full),' +
+            '#bottom-sheet:not(.translate-y-full),' +
+            '#config-sheet:not(.translate-y-full),' +
+            '#tags-sheet:not(.translate-y-full),' +
+            '#reports-sheet:not(.translate-y-full),' +
+            '#period-select-sheet:not(.translate-y-full),' +
+            '#clone-sheet:not(.translate-y-full),' +
+            '#link-note-sheet:not(.translate-y-full)'
+        );
+        if (!sheetAtras && ov) {
+            ov.classList.add('opacity-0', 'pointer-events-none');
+        }
+        return;
+    }
+    
+    // 3. Caso B: nenhum modal real aberto → fecha tudo (incluindo modais fantasma)
+    document.querySelectorAll('.z-\\[60\\]').forEach(m => {
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+    });
+    closeAllSheets();
+    
+    // 4. Garantia FINAL: força limpeza do overlay (cinto+suspensórios)
+    if (ov) {
+        ov.style.zIndex = '';
+        ov.style.opacity = '';
+        ov.style.pointerEvents = '';
+        ov.classList.add('opacity-0', 'pointer-events-none');
+    }
+};
+
+// =====================================================
+// V40.5.0-fix7 — HISTORY API (botão voltar do Android)
+// =====================================================
+// Estratégia: SEMPRE manter 1 entry "extra" no history quando uma sheet/modal está aberta.
+// Botão voltar dispara popstate → fechamos a camada topmost → repushamos pra manter buffer.
+
+let _navBackToConfirmTimer = null; // N11: flag pra "toque voltar de novo pra fechar"
+let _navIgnoreNextPopstate = false; // N8: ignora popstate disparado por history.back() interno
+
+// Empilha uma entry no history (chamar ao abrir qualquer sheet/modal).
+// IDEMPOTENTE: nunca empilha 2x se já tem entry de navegação ativa.
+function pushNavState() {
+    try {
+        if (history.state && history.state.tbNavLayer) return; // já tem entry, não empilha
+        history.pushState({ tbNavLayer: true }, '', location.href);
+    } catch (e) {
+        // N5: PWA em iframe pode bloquear pushState — falha silenciosa, não trava o app.
+    }
+}
+
+// Determina o que está aberto e fecha a camada topmost.
+// Retorna true se fechou algo, false se nada estava aberto (= raiz).
+function closeTopmostLayer() {
+    // Prioridade 1: Modal aberto (z-[60])
+    if (closeTopmostModal()) return true;
+    
+    // Prioridade 2: Sub-form aberto dentro de uma sheet (N13)
+    // Form de Lista (backlog-form-view), Rotinas (routines-form-view), Finanças (financial-form-view).
+    const formViews = [
+        ['backlog-form-view', 'closeBacklogForm'],
+        ['routines-form-view', 'closeRoutineForm'],
+        ['financial-form-view', 'closeFinancialForm'],
+    ];
+    for (const [viewId, closeFn] of formViews) {
+        const v = document.getElementById(viewId);
+        if (v && !v.classList.contains('hidden')) {
+            if (typeof window[closeFn] === 'function') {
+                window[closeFn]();
+                return true;
+            }
+        }
+    }
+    
+    // Prioridade 3: Sheet aberta (qualquer uma com translate-y-0)
+    const sheetIds = ['list-sheet', 'sheet', 'config-sheet', 'tags-sheet', 
+                       'reports-sheet', 'period-select-sheet', 'clone-sheet', 'link-note-sheet'];
+    for (const id of sheetIds) {
+        const s = document.getElementById(id);
+        if (s && !s.classList.contains('translate-y-full')) {
+            closeAllSheets();
+            return true;
+        }
+    }
+    
+    return false; // raiz — nada aberto
+}
+
+// popstate handler — chamado quando user aperta voltar no Android.
+window.addEventListener('popstate', (e) => {
+    if (_navIgnoreNextPopstate) {
+        _navIgnoreNextPopstate = false;
+        return;
+    }
+    
+    const closedSomething = closeTopmostLayer();
+    
+    if (closedSomething) {
+        // Reinjetamos a entry pra que o próximo "voltar" também seja capturado
+        // (se ainda houver camada aberta — modal por trás, por exemplo).
+        if (closeTopmostModal === null || getOpenModal() || 
+            document.querySelector('#list-sheet:not(.translate-y-full)') ||
+            document.querySelector('#sheet:not(.translate-y-full)') ||
+            document.querySelector('#config-sheet:not(.translate-y-full)') ||
+            document.querySelector('#tags-sheet:not(.translate-y-full)')) {
+            pushNavState();
+        }
+    } else {
+        // N10/N11: raiz — "toque voltar de novo pra fechar"
+        if (_navBackToConfirmTimer) {
+            // 2ª vez dentro de 2s — deixa o navegador fechar de verdade
+            clearTimeout(_navBackToConfirmTimer);
+            _navBackToConfirmTimer = null;
+            // Não chamamos history.back() — o popstate JÁ aconteceu. App vai sair naturalmente.
+            // Em PWA standalone Android, sair do último entry fecha o app.
+            return;
+        }
+        // 1ª vez — mostra toast e reinjeta entry
+        showToast('Toque voltar de novo pra fechar o app');
+        _navBackToConfirmTimer = setTimeout(() => {
+            _navBackToConfirmTimer = null;
+        }, 2000);
+        pushNavState(); // reinjeta pra capturar o "próximo voltar"
+    }
+});
+
+// N12: ao carregar o app, garante que o estado base é "raiz".
+// replaceState (não pushState) pra não empilhar.
+try {
+    if (!history.state || !history.state.tbNavRoot) {
+        history.replaceState({ tbNavRoot: true }, '', location.href);
+    }
+} catch (e) {
+    // Falha silenciosa em ambientes restritos
+}
+
+
+// Wrapper de openListSheet pra pushar nav state ao abrir.
+// (Outros openXSheet vão chamar pushNavState() também, ver patches abaixo.)
+
 
 window.closeAllSheets = () => {
     overlay.classList.add('opacity-0', 'pointer-events-none');
+    // V40.3.5-fix: reseta zIndex inline (caso requestDeleteBacklog/Routine tenha setado pra '55')
+    // pra não vazar pro próximo uso do overlay com outras sheets.
+    overlay.style.zIndex = '';
     sheet.classList.add('translate-y-full');
     listSheet.classList.add('translate-y-full');
     document.getElementById('config-sheet').classList.add('translate-y-full');
@@ -1264,6 +1861,16 @@ window.closeAllSheets = () => {
     cancelEdit();
     cancelDelete();
     cancelTimePicker();
+    // V40.3.5-fix: defesa em profundidade — fecha modais novos de delete se ainda estiverem abertos.
+    if (typeof cancelDeleteRoutine === 'function') cancelDeleteRoutine();
+    if (typeof cancelDeleteBacklog === 'function') cancelDeleteBacklog();
+    if (typeof cancelDeleteFinancial === 'function') cancelDeleteFinancial();
+    // V40.5.0: fecha modais do kanban também
+    if (typeof cancelDeleteColumn === 'function') cancelDeleteColumn();
+    if (typeof cancelColumnName === 'function') cancelColumnName();
+    if (typeof closeColumnMenu === 'function') closeColumnMenu();
+    // V40.5.1: fecha modal de mover card
+    if (typeof cancelMoveCard === 'function') cancelMoveCard();
 
     input.blur();
     backlogInput.blur();
@@ -1309,6 +1916,7 @@ window.openPeriodSelectSheet = () => {
     sheet.classList.add('translate-y-full'); 
     renderPeriodSelect();
     document.getElementById('period-select-sheet').classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.comingSoonMetas = () => {
@@ -1328,6 +1936,7 @@ window.openConfigSheet = () => {
     document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
     
     document.getElementById('config-sheet').classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.openConfigHours = () => {
@@ -1477,16 +2086,23 @@ window.deleteConfigPeriod = (id) => {
     renderConfigPeriods();
 }
 
+// V40.3.4: addBacklogItem agora é deprecated — só mantido pra compatibilidade do listener de Enter.
+// O fluxo real de criação passa pela função saveBacklogForm() que vem do form.
 window.addBacklogItem = () => {
+    // V40.3.4: o Enter no input agora dispara saveBacklogForm (form completo) em vez do antigo "salvar inline".
+    if (typeof window.saveBacklogForm === 'function') {
+        window.saveBacklogForm();
+        return;
+    }
+    // Fallback caso saveBacklogForm não exista (não deve acontecer)
     const title = backlogInput.value.trim();
     if(!title) return;
-
     backlogDb.push({
         id: 'bl_' + Date.now(),
         title: title,
-        duration: backlogSelectedDur
+        duration: backlogSelectedDur,
+        columnId: activeColumnId || 'col_geral'  // V40.5.0
     });
-
     saveBacklog();
     backlogInput.value = '';
     renderBacklog();
@@ -1501,11 +2117,19 @@ window.deleteBacklogItem = (id) => {
 window.scheduleBacklogItem = (id) => {
     const item = backlogDb.find(i => i.id === id);
     if(!item) return;
+    
+    // V40.5.0-fix8: ANTES — backlogDb.filter() apagava IMEDIATAMENTE. Se user cancelasse
+    // o agendamento (fechasse picker sem confirmar), a tarefa sumia pra sempre.
+    // AGORA — guarda o id em pendingIntent.fromBacklogId. Só apaga em confirmIntent/commitIntent.
 
-    backlogDb = backlogDb.filter(i => i.id !== id);
-    saveBacklog();
-
-    pendingIntent = { title: item.title, duration: item.duration, theme: 'focus', tagId: item.tagId || null };
+    pendingIntent = { 
+        title: item.title, 
+        duration: item.duration, 
+        theme: 'focus', 
+        tagId: item.tagId || null,
+        microblocks: item.microblocks || [],
+        fromBacklogId: id  // V40.5.0-fix8: marker pra cleanup só se confirmar
+    };
     selectedDur = item.duration;
     syncDurButtons(selectedDur);
     
@@ -1517,62 +2141,369 @@ window.scheduleBacklogItem = (id) => {
     renderTimeline();
 };
 
-function renderBacklog() {
-    const container = document.getElementById('backlog-container');
-    document.getElementById('backlog-count').innerText = backlogDb.length;
+// V40.5.0: helper extraído — gera HTML do card de uma tarefa (sem mudar nada por dentro).
+function renderBacklogCard(item) {
+    const tagColor = item.tagId ? getTagColor(item.tagId) : null;
+    const mbs = item.microblocks || [];
+    const isExpanded = expandedBacklogIds.has(item.id);
+    // V40.5.0-fix3: preview reduzido de 3 → 2 checks pra cards menores
+    const PREVIEW_COUNT = 2;
+    const visibleMbs = isExpanded ? mbs : mbs.slice(0, PREVIEW_COUNT);
+    const extraCount = mbs.length - PREVIEW_COUNT;
     
+    let mbHtml = visibleMbs.map(mb => `
+        <div class="flex items-center gap-1.5 mt-1">
+            <i class="ph-bold ph-check text-[10px] text-zinc-300 shrink-0"></i>
+            <span class="text-[11px] text-zinc-500 truncate">${escapeHtml(mb.title)}</span>
+        </div>
+    `).join('');
+    
+    if (extraCount > 0 && !isExpanded) {
+        mbHtml += `<button onclick="event.stopPropagation(); toggleExpandBacklog('${item.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">+ ${extraCount} mais</button>`;
+    } else if (isExpanded && mbs.length > PREVIEW_COUNT) {
+        mbHtml += `<button onclick="event.stopPropagation(); toggleExpandBacklog('${item.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">↑ Mostrar menos</button>`;
+    }
+    // V40.5.0-fix3: SEM checklist = SEM texto "Sem checklist" (card fica menor)
+    
+    // V40.5.1-fix1: removido ícone clipboard (ganha espaço pro título). 
+    // Indicador de tag preservado via BORDA ESQUERDA colorida (4px), sem ocupar largura horizontal do conteúdo.
+    const cardBorderStyle = tagColor 
+        ? `border-left-color: ${tagColor}; border-left-width: 4px;` 
+        : '';
+    
+    // V40.5.0-fix3: divisor + seção de checks SÓ se tem mbHtml (item com checklist)
+    const hasChecks = mbs.length > 0;
+    const checksSection = hasChecks ? `
+        <div class="w-full h-px bg-zinc-100 my-2.5"></div>
+        <div class="flex flex-col">
+            ${mbHtml}
+        </div>` : '';
+    
+    // V40.5.1: botão Mover só aparece se tem >1 lista (M4)
+    const moveBtn = backlogColumnsDb.length > 1 ? `
+                <button onclick="event.stopPropagation(); openMoveCardModal('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 active:scale-95 transition" title="Mover pra outra lista">
+                    <i class="ph ph-arrows-left-right text-sm"></i>
+                </button>` : '';
+    
+    return `
+    <div onclick="openBacklogForm('${item.id}')" data-bl-card="${item.id}" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition" style="${cardBorderStyle}">
+        <div class="flex justify-between items-start mb-2">
+            <div class="min-w-0 flex-1 pr-2">
+                <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(item.title)}</h4>
+                <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(item.duration)}${mbs.length > 0 ? ` · ${mbs.length} ${mbs.length === 1 ? 'item' : 'itens'}` : ''}</p>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+                <button onclick="event.stopPropagation(); scheduleBacklogItem('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong active:scale-95 transition" title="Agendar">
+                    <i class="ph-fill ph-hand-tap text-sm"></i>
+                </button>
+                ${moveBtn}
+                <button onclick="event.stopPropagation(); requestDeleteBacklog('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
+                    <i class="ph ph-trash text-sm"></i>
+                </button>
+            </div>
+        </div>
+        ${checksSection}
+    </div>`;
+}
+
+function renderBacklog() {
+    // V40.5.0: KANBAN — colunas horizontais com scroll-snap
+    ensureDefaultColumn(); // K3: garante que Geral sempre existe
+    
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    const dotsContainer = document.getElementById('backlog-column-dots');
+    if (!wrapper) return;
+    
+    // Stats globais do header inferior (botão Lista) — soma de TODAS as colunas
     const totalMins = backlogDb.reduce((acc, item) => acc + item.duration, 0);
     const listStats = document.getElementById('list-btn-stats');
     const listCount = document.getElementById('list-btn-count');
     const listTime = document.getElementById('list-btn-time');
-    const backlogTotalTime = document.getElementById('backlog-total-time'); // Keep this if exists
     
     if (backlogDb.length > 0) {
         listStats.classList.remove('hidden');
         listStats.classList.add('flex');
         listCount.innerText = backlogDb.length + (backlogDb.length === 1 ? ' item' : ' itens');
         listTime.innerText = formatDur(totalMins);
-        if (backlogTotalTime) {
-            backlogTotalTime.innerText = formatDur(totalMins);
-            backlogTotalTime.classList.remove('hidden');
-        }
     } else {
         listStats.classList.add('hidden');
         listStats.classList.remove('flex');
-        if (backlogTotalTime) backlogTotalTime.classList.add('hidden');
     }
     
-    if (backlogDb.length === 0) {
-        container.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-full text-center opacity-50 py-8">
-                <i class="ph ph-inbox text-4xl mb-2"></i>
-                <p class="text-sm font-medium">Lista vazia!</p>
+    // Atualiza header da coluna ATIVA (título + contador)
+    updateActiveColumnHeader();
+    
+    // Renderiza cada coluna como uma "página" no scroll horizontal
+    wrapper.innerHTML = backlogColumnsDb.map((col, idx) => {
+        const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
+        let cardsHtml;
+        if (colItems.length === 0) {
+            cardsHtml = `
+                <div class="flex flex-col items-center justify-center text-center opacity-50 py-12 px-6">
+                    <i class="ph ph-inbox text-4xl mb-2 text-zinc-400"></i>
+                    <p class="text-sm font-medium text-zinc-500">Lista vazia!</p>
+                    <p class="text-[11px] text-zinc-400 mt-1">Toque em + Nova Tarefa pra começar</p>
+                </div>`;
+        } else {
+            cardsHtml = colItems.map(renderBacklogCard).join('');
+        }
+        // V40.5.1-fix1: w-full (era w-[78%]) — cards iguais aos das outras abas.
+        // Sem beiradinha — descoberta do swipe fica nos DOTS embaixo do header.
+        return `
+            <div class="snap-center snap-always shrink-0 w-full h-full overflow-y-auto no-scrollbar px-4 pb-4" data-column-id="${col.id}">
+                ${cardsHtml}
             </div>`;
+    }).join('');
+    
+    // Dots de navegação
+    if (dotsContainer) {
+        dotsContainer.innerHTML = backlogColumnsDb.map((col, idx) => {
+            const isActive = col.id === activeColumnId;
+            const dotClass = isActive ? 'bg-app-focus' : 'bg-zinc-300';
+            return `<button onclick="scrollToColumn('${col.id}')" class="w-2 h-2 rounded-full ${dotClass} shrink-0 transition active:scale-90" aria-label="Ir para ${escapeHtml(col.name)}"></button>`;
+        }).join('');
+    }
+    
+    // Após render, garante que o scroll está na coluna ativa (sem animação)
+    requestAnimationFrame(() => {
+        const activeIdx = backlogColumnsDb.findIndex(c => c.id === activeColumnId);
+        if (activeIdx >= 0) {
+            const cols = wrapper.children;
+            if (cols[activeIdx]) {
+                // V40.5.0-fix: centraliza (compatível com snap-center + w-[88%])
+                wrapper.scrollLeft = cols[activeIdx].offsetLeft + (cols[activeIdx].offsetWidth / 2) - (wrapper.clientWidth / 2);
+            }
+        }
+        // Liga listener de scroll (idempotente)
+        if (!wrapper.dataset.scrollListenerAttached) {
+            wrapper.addEventListener('scroll', onBacklogColumnsScroll, { passive: true });
+            wrapper.dataset.scrollListenerAttached = 'true';
+        }
+        // V40.5.1: liga listeners de drag (idempotente)
+        attachBacklogDragListeners();
+    });
+}
+
+// V40.5.0: detecta qual coluna está visível após scroll-snap e atualiza activeColumnId
+// V40.5.0-fix: usa CENTRO do viewport pra ser compatível com snap-center + w-[88%]
+let _scrollDebounceTimer = null;
+function onBacklogColumnsScroll() {
+    if (_scrollDebounceTimer) clearTimeout(_scrollDebounceTimer);
+    _scrollDebounceTimer = setTimeout(() => {
+        const wrapper = document.getElementById('backlog-columns-wrapper');
+        if (!wrapper) return;
+        // Centro visível do wrapper
+        const viewportCenter = wrapper.scrollLeft + (wrapper.clientWidth / 2);
+        const cols = wrapper.children;
+        let bestIdx = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < cols.length; i++) {
+            const colCenter = cols[i].offsetLeft + (cols[i].offsetWidth / 2);
+            const dist = Math.abs(colCenter - viewportCenter);
+            if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+        }
+        const newCol = backlogColumnsDb[bestIdx];
+        if (newCol && newCol.id !== activeColumnId) {
+            activeColumnId = newCol.id;
+            updateActiveColumnHeader();
+            updateColumnDots();
+        }
+    }, 100);
+}
+
+function updateActiveColumnHeader() {
+    const col = backlogColumnsDb.find(c => c.id === activeColumnId) || backlogColumnsDb[0];
+    if (!col) return;
+    const titleEl = document.getElementById('backlog-column-title');
+    const countEl = document.getElementById('backlog-count');
+    if (titleEl) titleEl.innerText = col.name;
+    if (countEl) {
+        const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
+        countEl.innerText = colItems.length;
+    }
+}
+
+function updateColumnDots() {
+    const dotsContainer = document.getElementById('backlog-column-dots');
+    if (!dotsContainer) return;
+    Array.from(dotsContainer.children).forEach((dot, idx) => {
+        const col = backlogColumnsDb[idx];
+        if (!col) return;
+        if (col.id === activeColumnId) {
+            dot.className = 'w-2 h-2 rounded-full bg-app-focus shrink-0 transition active:scale-90';
+        } else {
+            dot.className = 'w-2 h-2 rounded-full bg-zinc-300 shrink-0 transition active:scale-90';
+        }
+    });
+}
+
+// =====================================================
+// V40.5.1 — DRAG VERTICAL DE CARDS (MVP)
+// Long-press 400ms → arrasta vertical na MESMA coluna → solta = reordena.
+// Sem polish (animação suave, scroll auto). Touch-action garante que swipe horizontal
+// entre colunas NÃO é disparado durante drag vertical (D2).
+// =====================================================
+const DRAG_LONGPRESS_MS = 400;
+const DRAG_MOVE_THRESHOLD = 8; // pixels antes de cancelar long-press
+
+let _dragState = null; // { itemId, columnEl, cardEl, startY, longPressTimer, dragging }
+
+function backlogDragOnTouchStart(e) {
+    const card = e.target.closest('[data-bl-card]');
+    if (!card) return;
+    
+    // Ignora se toque foi em botão (Agendar/Mover/Apagar) dentro do card
+    if (e.target.closest('button')) return;
+    
+    const itemId = card.dataset.blCard;
+    const columnEl = card.closest('[data-column-id]');
+    if (!columnEl) return;
+    
+    const touch = e.touches[0];
+    _dragState = {
+        itemId,
+        columnEl,
+        cardEl: card,
+        startY: touch.clientY,
+        startX: touch.clientX,
+        dragging: false,
+        longPressTimer: null
+    };
+    
+    // D1: long-press 400ms = inicia drag
+    _dragState.longPressTimer = setTimeout(() => {
+        if (!_dragState) return;
+        _dragState.dragging = true;
+        // D4: feedback visual
+        card.classList.add('opacity-60', 'scale-105', 'shadow-lg', 'z-10', 'relative');
+        // D2: durante drag, navegador só permite scroll vertical (sem swipe horizontal)
+        card.style.touchAction = 'none';
+        // Haptic feedback se disponível
+        if (navigator.vibrate) navigator.vibrate(30);
+    }, DRAG_LONGPRESS_MS);
+}
+
+function backlogDragOnTouchMove(e) {
+    if (!_dragState) return;
+    
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - _dragState.startX);
+    const dy = Math.abs(touch.clientY - _dragState.startY);
+    
+    // Se moveu muito ANTES do long-press completar → cancela drag (era scroll comum)
+    if (!_dragState.dragging) {
+        if (dx > DRAG_MOVE_THRESHOLD || dy > DRAG_MOVE_THRESHOLD) {
+            clearTimeout(_dragState.longPressTimer);
+            _dragState = null;
+        }
         return;
     }
+    
+    // Já está em modo drag — previne scroll
+    e.preventDefault();
+    
+    // D5: detecta sobre qual card está
+    const columnEl = _dragState.columnEl;
+    const cards = Array.from(columnEl.querySelectorAll('[data-bl-card]'));
+    const touchY = touch.clientY;
+    
+    // Visual: empurra cards pra cima/baixo via translate (feedback enquanto arrasta)
+    // MVP: só destaca o card alvo, não anima os outros (mais simples)
+    cards.forEach(c => c.classList.remove('ring-2', 'ring-app-focus'));
+    for (const c of cards) {
+        if (c === _dragState.cardEl) continue;
+        const rect = c.getBoundingClientRect();
+        if (touchY >= rect.top && touchY <= rect.bottom) {
+            c.classList.add('ring-2', 'ring-app-focus');
+            break;
+        }
+    }
+}
 
-    container.innerHTML = backlogDb.map(item => {
-        const tagColor = item.tagId ? getTagColor(item.tagId) : null;
-        const tagHtml = tagColor ? `<div class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${tagColor};"></div>` : '';
-        return `
-        <div class="flex justify-between items-center bg-white border border-zinc-200 p-3.5 rounded-xl mb-3 shadow-sm hover:shadow transition-shadow group">
-            <div class="flex items-start gap-2 min-w-0 pr-3 flex-1">
-                ${tagHtml ? `<div class="mt-1">${tagHtml}</div>` : ''}
-                <div class="flex flex-col min-w-0">
-                    <span class="text-sm font-bold text-zinc-800 truncate mb-0.5">${item.title}</span>
-                    <span class="text-[11px] font-bold text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i> ${formatDur(item.duration)}</span>
-                </div>
-            </div>
-            <div class="flex gap-2 shrink-0">
-                <button onclick="scheduleBacklogItem('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-app-focus-soft border border-app-focus-soft text-app-focus rounded-xl hover:bg-app-focus-soft-strong transition-colors" title="Segurar e Agendar">
-                    <i class="ph ph-hand-grabbing text-lg"></i>
-                </button>
-                <button onclick="deleteBacklogItem('${item.id}')" class="w-10 h-10 flex items-center justify-center bg-red-50 border border-red-100 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors" title="Apagar">
-                    <i class="ph ph-trash text-lg"></i>
-                </button>
-            </div>
-        </div>
-    `}).join('');
+function backlogDragOnTouchEnd(e) {
+    if (!_dragState) return;
+    
+    // D10: SEMPRE limpa o timer/visual
+    clearTimeout(_dragState.longPressTimer);
+    
+    if (!_dragState.dragging) {
+        _dragState = null;
+        return;
+    }
+    
+    // Restaura visual do card arrastado
+    const card = _dragState.cardEl;
+    card.classList.remove('opacity-60', 'scale-105', 'shadow-lg', 'z-10', 'relative');
+    card.style.touchAction = '';
+    
+    // Encontra card alvo (último com ring)
+    const columnEl = _dragState.columnEl;
+    let targetCardEl = null;
+    columnEl.querySelectorAll('[data-bl-card]').forEach(c => {
+        if (c.classList.contains('ring-2')) {
+            targetCardEl = c;
+            c.classList.remove('ring-2', 'ring-app-focus');
+        }
+    });
+    
+    // Reordena no backlogDb se há alvo válido
+    if (targetCardEl && targetCardEl !== card) {
+        const fromId = _dragState.itemId;
+        const toId = targetCardEl.dataset.blCard;
+        reorderBacklog(fromId, toId);
+    }
+    
+    _dragState = null;
+}
+
+// D3: reordena backlogDb (array plano) movendo `fromId` pra posição de `toId`
+function reorderBacklog(fromId, toId) {
+    const fromIdx = backlogDb.findIndex(i => i.id === fromId);
+    const toIdx = backlogDb.findIndex(i => i.id === toId);
+    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+    
+    const [item] = backlogDb.splice(fromIdx, 1);
+    backlogDb.splice(toIdx, 0, item); // simplificado — sempre pra toIdx no array já encurtado
+    saveBacklog();
+    renderBacklog();
+}
+
+// Ativa os listeners de drag no wrapper (idempotente, chamado uma vez)
+function attachBacklogDragListeners() {
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    if (!wrapper || wrapper.dataset.dragListenersAttached) return;
+    wrapper.addEventListener('touchstart', backlogDragOnTouchStart, { passive: true });
+    wrapper.addEventListener('touchmove', backlogDragOnTouchMove, { passive: false });
+    wrapper.addEventListener('touchend', backlogDragOnTouchEnd, { passive: true });
+    wrapper.addEventListener('touchcancel', backlogDragOnTouchEnd, { passive: true });
+    wrapper.dataset.dragListenersAttached = 'true';
+}
+
+// V40.5.0: ir programaticamente pra uma coluna (toque no dot)
+// V40.5.0-fix: centraliza a coluna no viewport (compatível com snap-center + w-[88%])
+window.scrollToColumn = function(columnId) {
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    if (!wrapper) return;
+    const idx = backlogColumnsDb.findIndex(c => c.id === columnId);
+    if (idx < 0) return;
+    const col = wrapper.children[idx];
+    if (!col) return;
+    // Posiciona o centro da coluna no centro do viewport
+    const targetScroll = col.offsetLeft + (col.offsetWidth / 2) - (wrapper.clientWidth / 2);
+    wrapper.scrollTo({ left: targetScroll, behavior: 'smooth' });
+    activeColumnId = columnId;
+    updateActiveColumnHeader();
+    updateColumnDots();
+};
+
+// V40.3.5 Ajuste 4 (I): toggle expansão de checklist de um item da Lista.
+window.toggleExpandBacklog = function(itemId) {
+    if (expandedBacklogIds.has(itemId)) {
+        expandedBacklogIds.delete(itemId);
+    } else {
+        expandedBacklogIds.add(itemId);
+    }
+    renderBacklog();
 }
 
 // =====================================================
@@ -1722,6 +2653,7 @@ window.openLinkNoteSheet = function(blockId, e) {
     activeLinkBlockId = blockId;
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('link-note-sheet').classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7
     // Reset visual: mostrar opções, esconder lista
     document.getElementById('link-note-options').classList.remove('hidden');
     document.getElementById('link-note-existing-view').classList.add('hidden');
@@ -1858,6 +2790,7 @@ window.viewLinkedNote = function(blockId, noteId, e) {
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('linked-note-view-modal').classList.remove('hidden');
     document.getElementById('linked-note-view-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.closeLinkedNoteView = function() {
@@ -1930,8 +2863,11 @@ let editingNoteId = null;
 window.switchListTab = function(tabName) {
     activeListTab = tabName;
     
+    // V40.4.1: tabs agora inclui 'financial'
+    const TABS = ['backlog', 'routines', 'notes', 'financial'];
+    
     // Atualizar pills
-    ['backlog', 'routines', 'notes'].forEach(t => {
+    TABS.forEach(t => {
         const btn = document.getElementById(`btn-list-${t}`);
         if (!btn) return;
         if (t === tabName) {
@@ -1942,7 +2878,7 @@ window.switchListTab = function(tabName) {
     });
     
     // Mostrar view correspondente, esconder outras
-    ['backlog', 'routines', 'notes'].forEach(t => {
+    TABS.forEach(t => {
         const view = document.getElementById(`view-${t}`);
         if (!view) return;
         if (t === tabName) view.classList.remove('hidden');
@@ -1954,6 +2890,23 @@ window.switchListTab = function(tabName) {
         notesFormOpen = false; // ao entrar na aba, sempre começa fechado
         editingNoteId = null;  // V40.1.2: garantir que não está em modo edição
         renderNotes();
+    } else if (tabName === 'routines') {
+        // V40.3 Fase 1: garante volta pra view-lista (não form) ao trocar de aba
+        if (typeof closeRoutineForm === 'function') closeRoutineForm(true);
+        if (typeof renderRoutinesList === 'function') renderRoutinesList();
+        notesFormOpen = false;
+        editingNoteId = null;
+    } else if (tabName === 'backlog') {
+        // V40.3.4: garante volta pra view-lista (não form) ao trocar de aba
+        if (typeof closeBacklogForm === 'function') closeBacklogForm(true);
+        notesFormOpen = false;
+        editingNoteId = null;
+    } else if (tabName === 'financial') {
+        // V40.4.1: garante volta pra view-lista do financeiro
+        if (typeof closeFinancialForm === 'function') closeFinancialForm(true);
+        if (typeof renderFinancial === 'function') renderFinancial();
+        notesFormOpen = false;
+        editingNoteId = null;
     } else {
         notesFormOpen = false; // ao sair da aba, garante que form fica fechado da próxima vez
         editingNoteId = null;  // V40.1.2: limpar modo edição ao sair
@@ -2100,6 +3053,8 @@ window.renderNotes = function() {
     const form = document.getElementById('notes-form');
     const container = document.getElementById('notes-container');
     const counter = document.getElementById('notes-count');
+    // V40.4.4-fix: novo botão tracejado no rodapé (padronização)
+    const fabBtn = document.getElementById('notes-fab-btn');
     
     if (!container || !empty || !form || !header) return;
     
@@ -2115,18 +3070,21 @@ window.renderNotes = function() {
         form.classList.remove('hidden');
         if (hasNotes) header.classList.remove('hidden');
         else header.classList.add('hidden');
+        if (fabBtn) fabBtn.classList.add('hidden'); // V40.4.4-fix: esconde botão durante form
     } else if (!hasNotes) {
         // Estado A: Empty. Mostra só o convite central.
         empty.classList.remove('hidden');
         form.classList.add('hidden');
         container.classList.add('hidden');
         header.classList.add('hidden');
+        if (fabBtn) fabBtn.classList.add('hidden'); // V40.4.4-fix: empty já tem botão central
     } else {
-        // Estado C: Lista. Header com botão + e cards.
+        // Estado C: Lista. Header (sem +) + cards + botão tracejado embaixo.
         empty.classList.add('hidden');
         form.classList.add('hidden');
         container.classList.remove('hidden');
         header.classList.remove('hidden');
+        if (fabBtn) fabBtn.classList.remove('hidden'); // V40.4.4-fix: mostra botão tracejado
     }
     
     // V40.1.2: atualizar labels do form conforme modo (criar vs editar)
@@ -2180,7 +3138,25 @@ window.cancelPendingTask = () => {
 }
 
 input.addEventListener('keypress', e => { if (e.key === 'Enter') commitIntent(); });
-backlogInput.addEventListener('keypress', e => { if (e.key === 'Enter') addBacklogItem(); });
+// V40.3.8: Enter no título da Lista NÃO salva mais — pula pro primeiro check (ou cria um).
+// Regra de Ouro #2: usar preventScroll pra evitar buraco branco no PWA Android.
+backlogInput.addEventListener('keypress', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const title = backlogInput.value.trim();
+    if (!title) return; // sem título, ignora silenciosamente
+    
+    // Se não tem nenhum check ainda, cria um vazio e foca nele.
+    if (currentBlMicroblocks.length === 0) {
+        addBacklogMicroblockForm();
+    }
+    
+    // Foca o primeiro input de checklist (ou o último adicionado).
+    setTimeout(() => {
+        const firstMb = document.querySelector('.bl-mb-input');
+        if (firstMb) firstMb.focus({ preventScroll: true });
+    }, 50);
+});
 
 // V2.0 - Função de tema (declarada antes da inicialização)
 window.applyThemeColor = function() {
@@ -2228,6 +3204,7 @@ window.openReportsSheet = function() {
     renderReports('today');
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('reports-sheet').classList.remove('translate-y-full');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.renderReports = function(period) {
@@ -2403,11 +3380,13 @@ if ('serviceWorker' in navigator) {
 }
 
 // V3.0 - V37: Ajustar paddingTop da timeline conforme altura real do header
+// V40.2.27: removido o "if (headerHidden) return" — agora calcula dinâmicamente em
+//           ambos os estados, porque o header encolhe naturalmente via display:none
+//           nos blocos internos (não mais via altura fixa).
 window.adjustTimelinePadding = function() {
     const header = document.querySelector('header');
     const timeline = document.getElementById('timeline-scroll');
     if (!header || !timeline) return;
-    if (headerHidden) return; // Modo retraído controla próprio padding
     const h = header.offsetHeight;
     timeline.style.paddingTop = (h + 8) + 'px';
 }
@@ -2440,28 +3419,57 @@ document.addEventListener('keydown', (e) => {
 });
 
 // V2.0 - BLOCO 7: Toggle Header
+// V40.2.27 — Refatoração picaprofunda (diagnóstico Jules):
+//   ANTES: usava header.style.height='100px' + overflow:hidden + paddingTop='110px' fixos.
+//   AGORA: esconde com .classList.toggle('hidden') os 2 blocos (filtros + barra Planejado).
+//          O header naturalmente encolhe via flexbox. adjustTimelinePadding cuida do espaço.
+//          Comportamento ELÁSTICO — adapta-se ao tamanho real do conteúdo.
+//
+// V40.2.28 — Memória do usuário + paddings compactos no retraído:
+//   - Estado persistido em localStorage 'tb_header_collapsed'.
+//   - Default false (1ª vez = expandido — princípio de Discoverability).
+//   - applyHeaderState() centraliza aplicação do estado (init + toggle usam a mesma).
+//   - Classe CSS .header-collapsed reduz pt-12→16px (V40.5.1-fix3), pb-4→4px, mb-4→0px (ganho ~52px).
+
+function applyHeaderState() {
+    const header = document.querySelector('header');
+    const filtersRow = document.getElementById('header-filters-row');
+    const progressRow = document.getElementById('header-progress-row');
+    const btn = document.querySelector('[onclick="toggleHeader()"]');
+    if (!header || !filtersRow || !progressRow) return;
+
+    if (headerHidden) {
+        filtersRow.classList.add('hidden');
+        progressRow.classList.add('hidden');
+        header.classList.add('header-collapsed');
+        // V40.3.6: botão tem fundo bg-app-focus, ícone tem que ser branco pra contrastar.
+        if (btn) btn.innerHTML = '<i class="ph ph-caret-down text-base text-white"></i>';
+    } else {
+        filtersRow.classList.remove('hidden');
+        progressRow.classList.remove('hidden');
+        header.classList.remove('header-collapsed');
+        // V40.3.6: idem
+        if (btn) btn.innerHTML = '<i class="ph ph-caret-up text-base text-white"></i>';
+    }
+
+    // Recalcula paddingTop da timeline AGORA que a altura real do header mudou.
+    // setTimeout 50ms dá tempo do browser aplicar o display:none e recalcular offsetHeight.
+    setTimeout(() => {
+        const h = header.offsetHeight;
+        const timeline = document.getElementById('timeline-scroll');
+        if (timeline) timeline.style.paddingTop = (h + 8) + 'px';
+    }, 50);
+}
+
 window.toggleHeader = function() {
     headerHidden = !headerHidden;
-    const header = document.querySelector('header');
-    const timeline = document.getElementById('timeline-scroll');
-    const btn = document.querySelector('[onclick="toggleHeader()"]');
-    
-    if (headerHidden) {
-        header.style.height = '100px'; // V38: 48px de pt-12 + 52px para botões respirarem (box-sizing: border-box)
-        header.style.overflow = 'hidden';
-        timeline.style.paddingTop = '110px';
-        if(btn) btn.innerHTML = '<i class="ph ph-caret-down text-lg sm:text-xl text-zinc-600"></i>';
-    } else {
-        header.style.height = 'auto';
-        header.style.overflow = 'visible';
-        if(btn) btn.innerHTML = '<i class="ph ph-caret-up text-lg sm:text-xl text-zinc-600"></i>';
-        // V3.0 V37: padding dinâmico baseado na altura real do header
-        setTimeout(() => {
-            const h = header.offsetHeight;
-            timeline.style.paddingTop = (h + 8) + 'px';
-        }, 50);
-    }
+    localStorage.setItem('tb_header_collapsed', headerHidden ? 'true' : 'false');
+    applyHeaderState();
 }
+
+// V40.2.28: aplica estado inicial logo no carregamento da página.
+// setTimeout 100ms garante que o DOM já está pronto pra querySelectors.
+setTimeout(applyHeaderState, 100);
 
 // --- V2.0 - COMBO A: Edição ---
 let editingTaskId = null;
@@ -2483,6 +3491,7 @@ window.openEditModal = function(id, e) {
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('edit-task-modal').classList.remove('hidden');
     document.getElementById('edit-task-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.selectEditTag = function(id) {
@@ -2535,13 +3544,25 @@ window.openDeleteModal = function(id, e) {
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('delete-task-modal').classList.remove('hidden');
     document.getElementById('delete-task-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
 }
 
 window.moveToBacklog = function() {
     if(!deletingTaskId) return;
     const b = db.find(x => x.id === deletingTaskId);
     if(b) {
-        backlogDb.push({ id: 'bl_' + Date.now(), title: b.title, duration: b.duration, tagId: b.tagId || null });
+        // V40.3.2-fix5: agora preserva os microblocks (checks) ao mover pra Lista.
+        // ANTES: só salvava id+title+duration+tagId — perdia toda a checklist.
+        // AGORA: clone profundo dos microblocks, com done resetado pra false 
+        //        (faz sentido: ao reagendar, recomeça do zero, igual ao duplicate).
+        const clonedMbs = (b.microblocks || []).map(mb => ({ title: mb.title, done: false }));
+        backlogDb.push({ 
+            id: 'bl_' + Date.now(), 
+            title: b.title, 
+            duration: b.duration, 
+            tagId: b.tagId || null,
+            microblocks: clonedMbs
+        });
         saveBacklog();
         db = db.filter(x => x.id !== deletingTaskId);
         saveDb();
@@ -2674,3 +3695,1589 @@ window.selectThemeColor = function(btn) {
     applyThemeColor();
     showToast("Cor atualizada!");
 }
+
+// =====================================================
+// V40.3 — MOTOR DE ROTINAS (Fase 1 — CRUD)
+// =====================================================
+let currentRtId = null;
+let currentRtDur = 120;
+let currentRtTheme = 'focus';
+let currentRtTagId = null;
+let currentRtMicroblocks = [];
+
+// V40.3.5-fix2: expandedRoutineIds movida pro topo do arquivo (linha ~32) pra evitar TDZ.
+// Declaração aqui REMOVIDA (era `let expandedRoutineIds = new Set();`).
+
+window.renderRoutinesList = function() {
+    const container = document.getElementById('routines-container');
+    if (!container) return;
+
+    if (routinesDb.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-8 opacity-60">
+                <i class="ph ph-stamp text-4xl mb-2 text-zinc-400"></i>
+                <p class="text-sm font-medium text-zinc-500">Nenhuma rotina criada.</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = routinesDb.sort((a,b) => b.createdAt - a.createdAt).map(r => {
+        const mbs = r.microblocks || [];
+        const isExpanded = expandedRoutineIds.has(r.id);
+        // V40.5.0-fix3: preview reduzido de 3 → 2 pra cards menores
+        const PREVIEW_COUNT = 2;
+        const visibleMbs = isExpanded ? mbs : mbs.slice(0, PREVIEW_COUNT);
+        const extraCount = mbs.length - PREVIEW_COUNT;
+        
+        let mbHtml = visibleMbs.map(mb => `
+            <div class="flex items-center gap-1.5 mt-1">
+                <i class="ph-bold ph-check text-[10px] text-zinc-300 shrink-0"></i>
+                <span class="text-[11px] text-zinc-500 truncate">${escapeHtml(mb.title)}</span>
+            </div>
+        `).join('');
+        
+        // V40.3.5 Ajuste 4 (I): "+ X mais" → expande; "↑ Mostrar menos" → retrai. event.stopPropagation pra não disparar o openRoutineForm do card.
+        if (extraCount > 0 && !isExpanded) {
+            mbHtml += `<button onclick="event.stopPropagation(); toggleExpandRoutine('${r.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">+ ${extraCount} mais</button>`;
+        } else if (isExpanded && mbs.length > PREVIEW_COUNT) {
+            mbHtml += `<button onclick="event.stopPropagation(); toggleExpandRoutine('${r.id}')" class="text-[10px] text-app-focus font-bold mt-1.5 ml-4 hover:underline text-left active:scale-95 transition">↑ Mostrar menos</button>`;
+        }
+        // V40.5.0-fix3: SEM checklist = SEM texto "Sem checklist" (card fica menor)
+        
+        // V40.5.0-fix3: divisor + seção de checks SÓ se tem checklist (card menor quando vazio)
+        const hasChecks = mbs.length > 0;
+        const checksSection = hasChecks ? `
+            <div class="w-full h-px bg-zinc-100 my-2.5"></div>
+            <div class="flex flex-col">
+                ${mbHtml}
+            </div>` : '';
+
+        // V40.3.5 Ajuste 3b: toque no card abre edit (igual Lista). Botão ✏️ REMOVIDO (botão ✋ Carimbar continua com stopPropagation).
+        return `
+        <div onclick="openRoutineForm('${r.id}')" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-1 cursor-pointer hover:shadow active:scale-[0.99] transition">
+            <div class="flex justify-between items-start mb-2">
+                <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                    <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center text-xl shrink-0 shadow-inner">
+                        ${r.emoji || '✨'}
+                    </div>
+                    <div class="min-w-0">
+                        <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(r.title)}</h4>
+                        <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(r.duration)} · ${mbs.length} itens</p>
+                    </div>
+                </div>
+                <!-- V40.3.5-fix: ✋ Carimbar + 🗑️ Apagar (igual padrão da Lista). ✏️ removido (toque no card edita). -->
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button onclick="event.stopPropagation(); stampRoutine('${r.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong transition active:scale-95 shrink-0" title="Carimbar no dia">
+                        <i class="ph-fill ph-hand-tap text-sm"></i>
+                    </button>
+                    <button onclick="event.stopPropagation(); requestDeleteRoutine('${r.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition shrink-0" title="Apagar">
+                        <i class="ph ph-trash text-sm"></i>
+                    </button>
+                </div>
+            </div>
+            ${checksSection}
+        </div>`;
+    }).join('');
+}
+
+// V40.3.5 Ajuste 4 (I): toggle expansão de checklist de uma rotina.
+window.toggleExpandRoutine = function(routineId) {
+    if (expandedRoutineIds.has(routineId)) {
+        expandedRoutineIds.delete(routineId);
+    } else {
+        expandedRoutineIds.add(routineId);
+    }
+    renderRoutinesList();
+}
+
+window.openRoutineForm = function(id = null) {
+    document.getElementById('routines-list-view').classList.add('hidden');
+    document.getElementById('routines-form-view').classList.remove('hidden');
+    document.getElementById('routines-form-view').classList.add('flex');
+    
+    currentRtId = id;
+    
+    if (id) {
+        const r = routinesDb.find(x => x.id === id);
+        if (!r) return;
+        document.getElementById('rt-form-title-label').innerText = 'Editar Rotina';
+        document.getElementById('rt-form-emoji').value = r.emoji || '';
+        document.getElementById('rt-form-title').value = r.title;
+        currentRtDur = r.duration;
+        currentRtTheme = r.theme;
+        currentRtTagId = r.tagId;
+        currentRtMicroblocks = JSON.parse(JSON.stringify(r.microblocks || []));
+        document.getElementById('rt-form-delete-btn').classList.remove('hidden');
+        document.getElementById('rt-form-delete-btn').classList.add('flex');
+    } else {
+        document.getElementById('rt-form-title-label').innerText = 'Nova Rotina';
+        document.getElementById('rt-form-emoji').value = '';
+        document.getElementById('rt-form-title').value = '';
+        currentRtDur = 120;
+        currentRtTheme = 'focus';
+        currentRtTagId = null;
+        currentRtMicroblocks = [{title: ''}];
+        document.getElementById('rt-form-delete-btn').classList.add('hidden');
+        document.getElementById('rt-form-delete-btn').classList.remove('flex');
+    }
+    
+    updateRtFormVisuals();
+    renderRtFormMicroblocks();
+}
+
+window.closeRoutineForm = function(force = false) {
+    const formView = document.getElementById('routines-form-view');
+    const listView = document.getElementById('routines-list-view');
+    if (!formView || !listView) return;
+    formView.classList.add('hidden');
+    formView.classList.remove('flex');
+    listView.classList.remove('hidden');
+    if (!force) renderRoutinesList();
+}
+
+window.changeRoutineFormDuration = function(delta) {
+    currentRtDur += delta;
+    if (currentRtDur < 15) currentRtDur = 15;
+    if (currentRtDur > 480) currentRtDur = 480;
+    updateRtFormVisuals();
+}
+
+window.selectRoutineFormTheme = function(theme) {
+    currentRtTheme = theme;
+    updateRtFormVisuals();
+}
+
+window.selectRoutineFormTag = function(tagId) {
+    currentRtTagId = currentRtTagId === tagId ? null : tagId;
+    updateRtFormVisuals();
+}
+
+function updateRtFormVisuals() {
+    document.getElementById('rt-form-dur-label').innerText = formatDur(currentRtDur);
+    
+    const btnFocus = document.getElementById('rt-theme-focus');
+    const btnRest = document.getElementById('rt-theme-rest');
+    if (currentRtTheme === 'focus') {
+        btnFocus.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-app-focus text-white border-transparent shadow-sm';
+        btnRest.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50';
+    } else {
+        btnRest.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-zinc-700 text-white border-transparent shadow-sm';
+        btnFocus.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50';
+    }
+
+    const tagContainer = document.getElementById('rt-form-tag-container');
+    if (tagContainer) {
+        let html = `<button onclick="selectRoutineFormTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-xs font-bold transition whitespace-nowrap ${currentRtTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'}">Sem Tag</button>`;
+        tagsDb.forEach(t => {
+            const isActive = currentRtTagId === t.id;
+            const bgColor = isActive ? t.color : t.color + '15';
+            const textColor = isActive ? '#fff' : t.color;
+            const borderColor = isActive ? t.color : t.color + '40';
+            const dotColor = isActive ? '#fff' : t.color;
+            const extraClass = isActive ? 'shadow-md' : 'opacity-80 hover:opacity-100';
+            html += `<button onclick="selectRoutineFormTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold transition whitespace-nowrap ${extraClass}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid ${borderColor}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${dotColor};"></div>${escapeHtml(t.name)}</button>`;
+        });
+        tagContainer.innerHTML = html;
+    }
+}
+
+function syncRtMicroblocksFromDOM() {
+    currentRtMicroblocks = Array.from(document.querySelectorAll('.rt-mb-input')).map(input => ({ title: input.value }));
+}
+
+window.addRoutineMicroblockForm = function() {
+    syncRtMicroblocksFromDOM();
+    currentRtMicroblocks.push({title: ''});
+    renderRtFormMicroblocks();
+}
+
+window.removeRoutineMicroblockForm = function(index) {
+    syncRtMicroblocksFromDOM();
+    currentRtMicroblocks.splice(index, 1);
+    renderRtFormMicroblocks();
+}
+
+function renderRtFormMicroblocks() {
+    const container = document.getElementById('rt-form-microblocks');
+    if (!container) return;
+    container.innerHTML = currentRtMicroblocks.map((mb, i) => `
+        <div class="flex items-center gap-2">
+            <div class="w-5 h-5 rounded-md border border-zinc-300 shrink-0 bg-zinc-50 flex items-center justify-center"><i class="ph ph-check text-[10px] text-zinc-300"></i></div>
+            <input type="text" class="rt-mb-input flex-1 h-10 bg-zinc-50 border border-zinc-200 rounded-lg px-3 text-sm text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: Ler 10 páginas" value="${escapeHtml(mb.title)}">
+            <button onclick="removeRoutineMicroblockForm(${i})" class="w-8 h-10 flex items-center justify-center text-zinc-400 hover:text-red-500 transition shrink-0"><i class="ph ph-x"></i></button>
+        </div>
+    `).join('');
+}
+
+window.saveRoutine = function() {
+    const emoji = document.getElementById('rt-form-emoji').value.trim() || '✨';
+    const title = document.getElementById('rt-form-title').value.trim();
+    
+    if (!title) return showToast('A rotina precisa de um nome.');
+
+    syncRtMicroblocksFromDOM();
+    const validMbs = currentRtMicroblocks.filter(mb => mb.title.trim() !== '').map(mb => ({ title: mb.title.trim() }));
+
+    if (currentRtId) {
+        const r = routinesDb.find(x => x.id === currentRtId);
+        if (r) {
+            r.emoji = emoji;
+            r.title = title;
+            r.duration = currentRtDur;
+            r.theme = currentRtTheme;
+            r.tagId = currentRtTagId;
+            r.microblocks = validMbs;
+        }
+        showToast('Rotina atualizada!');
+    } else {
+        routinesDb.push({
+            id: 'rt_' + Date.now(),
+            title: title, emoji: emoji,
+            duration: currentRtDur, theme: currentRtTheme, tagId: currentRtTagId,
+            microblocks: validMbs, createdAt: Date.now()
+        });
+        showToast('Rotina criada!');
+    }
+    
+    saveRoutinesDb();
+    closeRoutineForm();
+}
+
+let pendingRoutineDeleteId = null;
+
+// V40.3.5-fix: nova função pra apagar rotina direto da lista (sem precisar abrir form).
+// Issue 1 do Gemini: lixeira no card precisava existir.
+window.requestDeleteRoutine = function(id) {
+    pendingRoutineDeleteId = id;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+    // Issue 2 do Gemini: sheet tem z-50, overlay padrão é z-40. Sobe overlay pra z-55 (>sheet, <modal z-60)
+    // pra bloquear cliques na sheet enquanto o modal está aberto.
+    overlay.style.zIndex = '55';
+    document.getElementById('routine-delete-modal').classList.remove('hidden');
+    document.getElementById('routine-delete-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
+}
+
+// V40.3.5-fix: deleteRoutineFromForm agora delega pra requestDeleteRoutine (DRY).
+window.deleteRoutineFromForm = function() {
+    if (!currentRtId) return;
+    requestDeleteRoutine(currentRtId);
+}
+
+window.confirmDeleteRoutine = function() {
+    if (!pendingRoutineDeleteId) return;
+    // Issue 3 do Gemini: limpa ID do Set de expansão pra não vazar memória.
+    expandedRoutineIds.delete(pendingRoutineDeleteId);
+    routinesDb = routinesDb.filter(x => x.id !== pendingRoutineDeleteId);
+    saveRoutinesDb();
+    pendingRoutineDeleteId = null;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = ''; // Issue 2: devolve z-index ao normal (z-40 do CSS)
+    document.getElementById('routine-delete-modal').classList.add('hidden');
+    document.getElementById('routine-delete-modal').classList.remove('flex');
+    // Se o form estiver aberto editando essa rotina, fecha
+    if (typeof closeRoutineForm === 'function') closeRoutineForm();
+    renderRoutinesList();
+    showToast('Rotina apagada.');
+}
+
+window.cancelDeleteRoutine = function() {
+    pendingRoutineDeleteId = null;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = ''; // Issue 2: devolve z-index ao normal
+    document.getElementById('routine-delete-modal').classList.add('hidden');
+    document.getElementById('routine-delete-modal').classList.remove('flex');
+}
+
+// =====================================================
+// V40.3.4 — REDESIGN DA LISTA (Backlog com form + editar + checklist)
+// =====================================================
+// Refatora a aba Lista pra ter o mesmo padrão de Rotinas:
+// - 2 sub-views: lista de tarefas + formulário (criar/editar)
+// - Botão "+ Nova Tarefa" abre form vazio
+// - Toque no card abre form preenchido (editar)
+// - Cards com ✋ + 🗑️ no INÍCIO (decisão visual do usuário)
+// - Suporta checklist (microblocks) — preserva compat com moveToBacklog fix5
+//
+// Armadilhas tratadas (C1-C15):
+//   C1, C12: input 'backlog-input' mantido com mesmo ID (refs antigas continuam funcionando)
+//   C3, C4: scheduleBacklogItem e deleteBacklogItem NÃO TOCADAS
+//   C5: openBacklogForm(id) cria/edita igual openRoutineForm
+//   C7: ícone do botão Nova Tarefa = ph-plus (mesmo do FAB+ grande)
+//   C9: botões ✋ e 🗑️ no INÍCIO do card (flex order)
+//   C10: checklist preview com 3 primeiros + "mais X"
+//   C11: event.stopPropagation() nos botões (toque no card abre edit)
+//   C13: stepper -15/+15 (igual rotinas) em vez de quick buttons
+
+let currentBlId = null;
+let currentBlDur = 30;
+let currentBlTagId = null;
+let currentBlMicroblocks = [];
+
+// V40.3.5-fix2: expandedBacklogIds movida pro topo do arquivo (linha ~36) pra evitar TDZ.
+// Declaração aqui REMOVIDA (era `let expandedBacklogIds = new Set();`).
+
+window.openBacklogForm = function(id = null) {
+    document.getElementById('backlog-list-view').classList.add('hidden');
+    document.getElementById('backlog-form-view').classList.remove('hidden');
+    document.getElementById('backlog-form-view').classList.add('flex');
+    
+    currentBlId = id;
+    
+    if (id) {
+        const item = backlogDb.find(x => x.id === id);
+        if (!item) return;
+        document.getElementById('bl-form-title-label').innerText = 'Editar Tarefa';
+        document.getElementById('backlog-input').value = item.title;
+        currentBlDur = item.duration;
+        currentBlTagId = item.tagId || null;
+        currentBlMicroblocks = JSON.parse(JSON.stringify(item.microblocks || []));
+        document.getElementById('bl-form-delete-btn').classList.remove('hidden');
+        document.getElementById('bl-form-delete-btn').classList.add('flex');
+    } else {
+        document.getElementById('bl-form-title-label').innerText = 'Nova Tarefa';
+        document.getElementById('backlog-input').value = '';
+        currentBlDur = 30;
+        currentBlTagId = null;
+        currentBlMicroblocks = []; // C14: começa vazio
+        document.getElementById('bl-form-delete-btn').classList.add('hidden');
+        document.getElementById('bl-form-delete-btn').classList.remove('flex');
+    }
+    
+    updateBacklogFormVisuals();
+    renderBlFormMicroblocks();
+}
+
+window.closeBacklogForm = function(force = false) {
+    const formView = document.getElementById('backlog-form-view');
+    const listView = document.getElementById('backlog-list-view');
+    if (!formView || !listView) return;
+    formView.classList.add('hidden');
+    formView.classList.remove('flex');
+    listView.classList.remove('hidden');
+    if (!force) renderBacklog();
+}
+
+window.changeBacklogFormDuration = function(delta) {
+    currentBlDur += delta;
+    if (currentBlDur < 15) currentBlDur = 15;
+    if (currentBlDur > 480) currentBlDur = 480;
+    updateBacklogFormVisuals();
+}
+
+window.selectBacklogFormTag = function(tagId) {
+    currentBlTagId = currentBlTagId === tagId ? null : tagId;
+    updateBacklogFormVisuals();
+}
+
+function updateBacklogFormVisuals() {
+    const durLabel = document.getElementById('bl-form-dur-label');
+    if (durLabel) durLabel.innerText = formatDur(currentBlDur);
+    
+    const tagContainer = document.getElementById('bl-form-tag-container');
+    if (tagContainer) {
+        let html = `<button onclick="selectBacklogFormTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-xs font-bold transition whitespace-nowrap ${currentBlTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'}">Sem Tag</button>`;
+        tagsDb.forEach(t => {
+            const isActive = currentBlTagId === t.id;
+            const bgColor = isActive ? t.color : t.color + '15';
+            const textColor = isActive ? '#fff' : t.color;
+            const borderColor = isActive ? t.color : t.color + '40';
+            const dotColor = isActive ? '#fff' : t.color;
+            const extraClass = isActive ? 'shadow-md' : 'opacity-80 hover:opacity-100';
+            html += `<button onclick="selectBacklogFormTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold transition whitespace-nowrap ${extraClass}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid ${borderColor}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${dotColor};"></div>${escapeHtml(t.name)}</button>`;
+        });
+        tagContainer.innerHTML = html;
+    }
+}
+
+function syncBlMicroblocksFromDOM() {
+    currentBlMicroblocks = Array.from(document.querySelectorAll('.bl-mb-input')).map(input => ({ title: input.value }));
+}
+
+window.addBacklogMicroblockForm = function() {
+    syncBlMicroblocksFromDOM();
+    currentBlMicroblocks.push({title: ''});
+    renderBlFormMicroblocks();
+}
+
+window.removeBacklogMicroblockForm = function(index) {
+    syncBlMicroblocksFromDOM();
+    currentBlMicroblocks.splice(index, 1);
+    renderBlFormMicroblocks();
+}
+
+function renderBlFormMicroblocks() {
+    const container = document.getElementById('bl-form-microblocks');
+    if (!container) return;
+    // V40.3.5 Ajuste 1: removido texto "Sem checklist (opcional)" — vazio fica vazio mesmo.
+    // User adiciona via botão "+ Adicionar item" embaixo.
+    container.innerHTML = currentBlMicroblocks.map((mb, i) => `
+        <div class="flex items-center gap-2">
+            <div class="w-5 h-5 rounded-md border border-zinc-300 shrink-0 bg-zinc-50 flex items-center justify-center"><i class="ph ph-check text-[10px] text-zinc-300"></i></div>
+            <input type="text" data-mb-idx="${i}" class="bl-mb-input flex-1 h-10 bg-zinc-50 border border-zinc-200 rounded-lg px-3 text-sm text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: Comprar leite" value="${escapeHtml(mb.title)}">
+            <button onclick="removeBacklogMicroblockForm(${i})" class="w-8 h-10 flex items-center justify-center text-zinc-400 hover:text-red-500 transition shrink-0"><i class="ph ph-x"></i></button>
+        </div>
+    `).join('');
+    
+    // V40.3.8: setup do listener de Enter uma vez (idempotente — flag impede attach duplicado).
+    if (!container.dataset.enterListenerAttached) {
+        container.addEventListener('keypress', (e) => {
+            if (e.key !== 'Enter') return;
+            if (!e.target.classList.contains('bl-mb-input')) return;
+            e.preventDefault();
+            
+            const idx = parseInt(e.target.dataset.mbIdx, 10);
+            const inputs = container.querySelectorAll('.bl-mb-input');
+            const isLast = idx === inputs.length - 1;
+            
+            // Sincroniza o valor atual antes de qualquer ação (senão pode perder o que o user digitou).
+            syncBlMicroblocksFromDOM();
+            
+            if (isLast) {
+                // Último check → cria um novo vazio e foca nele.
+                addBacklogMicroblockForm();
+                setTimeout(() => {
+                    const newInputs = container.querySelectorAll('.bl-mb-input');
+                    const newLast = newInputs[newInputs.length - 1];
+                    if (newLast) {
+                        newLast.focus({ preventScroll: true });
+                        // V40.4.4-fix4: rola o CONTAINER interno (não a página) pro novo check ficar
+                        // visível acima do teclado. preventScroll evita o buraco branco da Regra de Ouro #2.
+                        scrollNewCheckIntoView(newLast);
+                    }
+                }, 50);
+            } else {
+                // Foca o próximo input.
+                const next = inputs[idx + 1];
+                if (next) {
+                    next.focus({ preventScroll: true });
+                    scrollNewCheckIntoView(next);
+                }
+            }
+        });
+        container.dataset.enterListenerAttached = 'true';
+    }
+}
+
+// V40.4.4-fix4: rola APENAS o scroller interno do form pra trazer o check à vista.
+// NÃO usa scrollIntoView (que rola a página/body — causa "buraco branco" no PWA Android).
+function scrollNewCheckIntoView(inputEl) {
+    if (!inputEl) return;
+    // Procura o ancestral scrollável (o div com overflow-y-auto dentro do bl-form-view)
+    let scroller = inputEl.parentElement;
+    while (scroller && scroller !== document.body) {
+        const style = window.getComputedStyle(scroller);
+        if (style.overflowY === 'auto' || style.overflowY === 'scroll') break;
+        scroller = scroller.parentElement;
+    }
+    if (!scroller || scroller === document.body) return;
+    
+    // Calcula offset relativo: posição do input dentro do scroller
+    const inputRect = inputEl.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    const relTop = inputRect.top - scrollerRect.top + scroller.scrollTop;
+    
+    // Rola pra colocar o input ~no meio da área visível do scroller (não no final perto do teclado)
+    const target = relTop - (scrollerRect.height / 3);
+    scroller.scrollTo({ top: target, behavior: 'smooth' });
+}
+
+window.saveBacklogForm = function() {
+    const title = document.getElementById('backlog-input').value.trim();
+    if (!title) return showToast('A tarefa precisa de um nome.');
+
+    syncBlMicroblocksFromDOM();
+    const validMbs = currentBlMicroblocks.filter(mb => mb.title.trim() !== '').map(mb => ({ title: mb.title.trim(), done: false }));
+
+    if (currentBlId) {
+        const item = backlogDb.find(x => x.id === currentBlId);
+        if (item) {
+            item.title = title;
+            item.duration = currentBlDur;
+            item.tagId = currentBlTagId;
+            item.microblocks = validMbs;
+        }
+        showToast('Tarefa atualizada!');
+    } else {
+        backlogDb.push({
+            id: 'bl_' + Date.now(),
+            title: title,
+            duration: currentBlDur,
+            tagId: currentBlTagId,
+            microblocks: validMbs,
+            columnId: activeColumnId || 'col_geral'  // V40.5.0: nova tarefa nasce na coluna ativa
+        });
+        showToast('Tarefa adicionada!');
+    }
+    
+    saveBacklog();
+    closeBacklogForm();
+}
+
+// V40.3.5: deletar tarefa com modal de confirmação (igual Rotinas).
+// Caminhos: requestDeleteBacklog(id) abre modal → confirmDeleteBacklog() apaga / cancelDeleteBacklog() fecha.
+let pendingBacklogDeleteId = null;
+
+window.requestDeleteBacklog = function(id) {
+    pendingBacklogDeleteId = id;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+    // Issue 2 do Gemini: sheet (z-50) ficaria clicável atrás do modal (z-60). 
+    // Sobe overlay pra z-55 (entre sheet e modal) pra bloquear cliques na sheet.
+    overlay.style.zIndex = '55';
+    document.getElementById('backlog-delete-modal').classList.remove('hidden');
+    document.getElementById('backlog-delete-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
+}
+
+window.confirmDeleteBacklog = function() {
+    if (!pendingBacklogDeleteId) return;
+    // Issue 3 do Gemini: limpa ID do Set de expansão pra não vazar memória.
+    expandedBacklogIds.delete(pendingBacklogDeleteId);
+    backlogDb = backlogDb.filter(x => x.id !== pendingBacklogDeleteId);
+    saveBacklog();
+    pendingBacklogDeleteId = null;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = ''; // Issue 2: devolve z-index ao normal (z-40 do CSS)
+    document.getElementById('backlog-delete-modal').classList.add('hidden');
+    document.getElementById('backlog-delete-modal').classList.remove('flex');
+    // Se o form estiver aberto editando esse item, fecha
+    if (typeof closeBacklogForm === 'function') closeBacklogForm();
+    renderBacklog();
+    showToast('Tarefa apagada.');
+}
+
+window.cancelDeleteBacklog = function() {
+    pendingBacklogDeleteId = null;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = ''; // Issue 2: devolve z-index ao normal
+    document.getElementById('backlog-delete-modal').classList.add('hidden');
+    document.getElementById('backlog-delete-modal').classList.remove('flex');
+}
+
+window.deleteBacklogFromForm = function() {
+    if (!currentBlId) return;
+    // V40.3.5: agora com confirmação via modal (igual delete de Rotina)
+    requestDeleteBacklog(currentBlId);
+}
+
+
+// =====================================================
+// V40.5.0 — KANBAN: gerenciamento de colunas (listas)
+// =====================================================
+// Schema: { id, name, isDefault, createdAt }
+// Coluna padrão: id='col_geral', isDefault: true, não pode ser apagada.
+
+// Estado do modal de nome (criar vs renomear)
+let columnNameMode = null; // 'create' | 'rename'
+let columnNameTargetId = null; // id da coluna sendo renomeada (se mode='rename')
+
+window.promptCreateColumn = function() {
+    columnNameMode = 'create';
+    columnNameTargetId = null;
+    document.getElementById('column-name-title').innerText = 'Nova Lista';
+    const input = document.getElementById('column-name-input');
+    input.value = '';
+    
+    showColumnNameModal();
+};
+
+window.openColumnMenuFromHeader = function() {
+    // Abre o menu da coluna ATIVA atual
+    const col = backlogColumnsDb.find(c => c.id === activeColumnId);
+    if (!col) return;
+    
+    document.getElementById('column-menu-title').innerText = col.name;
+    
+    // K8: coluna padrão NÃO mostra botão Apagar
+    const deleteBtn = document.getElementById('column-menu-delete-btn');
+    if (col.isDefault) {
+        deleteBtn.classList.add('hidden');
+    } else {
+        deleteBtn.classList.remove('hidden');
+    }
+    
+    showColumnMenuModal();
+};
+
+window.closeColumnMenu = function() {
+    hideModal('column-menu-modal');
+};
+
+window.openRenameColumn = function() {
+    const col = backlogColumnsDb.find(c => c.id === activeColumnId);
+    if (!col) return;
+    
+    hideModal('column-menu-modal');
+    
+    columnNameMode = 'rename';
+    columnNameTargetId = col.id;
+    document.getElementById('column-name-title').innerText = 'Renomear Lista';
+    document.getElementById('column-name-input').value = col.name;
+    
+    showColumnNameModal();
+};
+
+window.confirmColumnName = function() {
+    const input = document.getElementById('column-name-input');
+    const name = input.value.trim();
+    if (!name) return showToast('Dê um nome pra lista.');
+    if (name.length > 30) return showToast('Nome muito longo (máx 30).');
+    
+    if (columnNameMode === 'create') {
+        const newCol = {
+            id: 'col_' + Date.now(),
+            name: name,
+            isDefault: false,
+            createdAt: Date.now()
+        };
+        backlogColumnsDb.push(newCol);
+        saveBacklogColumns();
+        hideModal('column-name-modal');
+        // Vai pra coluna recém-criada
+        activeColumnId = newCol.id;
+        renderBacklog();
+        // Após render, scroll pra coluna nova
+        setTimeout(() => scrollToColumn(newCol.id), 100);
+        showToast('Lista criada!');
+    } else if (columnNameMode === 'rename') {
+        const col = backlogColumnsDb.find(c => c.id === columnNameTargetId);
+        if (col) {
+            col.name = name;
+            saveBacklogColumns();
+        }
+        hideModal('column-name-modal');
+        renderBacklog();
+        showToast('Lista renomeada!');
+    }
+};
+
+window.cancelColumnName = function() {
+    hideModal('column-name-modal');
+};
+
+window.openDeleteColumn = function() {
+    const col = backlogColumnsDb.find(c => c.id === activeColumnId);
+    if (!col) return;
+    if (col.isDefault) return showToast('A lista padrão não pode ser apagada.');
+    
+    hideModal('column-menu-modal');
+    
+    const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
+    document.getElementById('column-delete-title').innerText = `Apagar "${col.name}"?`;
+    
+    let subtitle;
+    if (colItems.length === 0) {
+        subtitle = 'Esta lista está vazia. Esta ação não pode ser desfeita.';
+    } else {
+        subtitle = `${colItems.length} ${colItems.length === 1 ? 'tarefa será apagada' : 'tarefas serão apagadas'} junto. Esta ação não pode ser desfeita.`;
+    }
+    document.getElementById('column-delete-subtitle').innerText = subtitle;
+    
+    showModal('column-delete-modal');
+};
+
+window.confirmDeleteColumn = function() {
+    const colId = activeColumnId;
+    const col = backlogColumnsDb.find(c => c.id === colId);
+    if (!col || col.isDefault) {
+        hideModal('column-delete-modal');
+        return;
+    }
+    
+    // Apaga TODOS os cards dessa coluna
+    backlogDb = backlogDb.filter(item => getItemColumn(item) !== colId);
+    
+    // Apaga a coluna
+    backlogColumnsDb = backlogColumnsDb.filter(c => c.id !== colId);
+    
+    saveBacklog();
+    saveBacklogColumns();
+    
+    // Volta pra coluna Geral
+    activeColumnId = 'col_geral';
+    
+    hideModal('column-delete-modal');
+    renderBacklog();
+    showToast('Lista apagada!');
+};
+
+window.cancelDeleteColumn = function() {
+    hideModal('column-delete-modal');
+};
+
+// =====================================================
+// V40.5.1 — MOVER CARD PRA OUTRA LISTA
+// =====================================================
+let _moveCardPendingId = null;
+
+window.openMoveCardModal = function(cardId) {
+    const card = backlogDb.find(c => c.id === cardId);
+    if (!card) return;
+    
+    _moveCardPendingId = cardId;
+    const currentColId = getItemColumn(card);
+    
+    // M2: opções = todas colunas EXCETO a atual
+    const others = backlogColumnsDb.filter(c => c.id !== currentColId);
+    if (others.length === 0) {
+        showToast('Não há outras listas pra mover.');
+        return;
+    }
+    
+    document.getElementById('column-move-subtitle').innerText = `"${card.title}" pra qual lista?`;
+    
+    const optionsEl = document.getElementById('column-move-options');
+    optionsEl.innerHTML = others.map(col => `
+        <button onclick="confirmMoveCard('${col.id}')" class="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-sm hover:bg-zinc-100 active:scale-[0.98] transition">
+            <i class="ph-fill ph-list-dashes text-lg text-app-focus"></i>
+            <span class="truncate">${escapeHtml(col.name)}</span>
+        </button>
+    `).join('');
+    
+    showModal('column-move-modal');
+};
+
+window.confirmMoveCard = function(destColId) {
+    if (!_moveCardPendingId) return;
+    const card = backlogDb.find(c => c.id === _moveCardPendingId);
+    if (card) {
+        card.columnId = destColId;
+        saveBacklog();
+        const destCol = backlogColumnsDb.find(c => c.id === destColId);
+        showToast(`Movido pra ${destCol ? destCol.name : 'lista'}!`);
+    }
+    _moveCardPendingId = null;
+    hideModal('column-move-modal');
+    renderBacklog();
+};
+
+window.cancelMoveCard = function() {
+    _moveCardPendingId = null;
+    hideModal('column-move-modal');
+};
+
+// Helpers de modal (centraliza show/hide com overlay)
+function showColumnNameModal() {
+    showModal('column-name-modal');
+    // Foco diferido pra evitar buraco branco (Regra de Ouro #2)
+    setTimeout(() => {
+        const input = document.getElementById('column-name-input');
+        if (input) input.focus({ preventScroll: true });
+    }, 100);
+}
+
+function showColumnMenuModal() {
+    showModal('column-menu-modal');
+}
+
+function showModal(id) {
+    const overlay = document.getElementById('overlay');
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '55';
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+    pushNavState(); // V40.5.0-fix7
+}
+
+function hideModal(id) {
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '';
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+
+// =====================================================
+// V40.4.1 — ABA FINANCEIRO (MVP — despesa avulsa + mês atual)
+// =====================================================
+// Schema do financialDb (no topo, linha ~37):
+//   { id, title, amount, month: 'YYYY-MM', type: 'oneshot', tagId: null, createdAt }
+// V40.4.2 adicionará: durationMonths, isRecurring, startMonth, currentInstallment
+// V40.4.3 adicionará: navegação entre meses (currentFinanceMonth já existe)
+//
+// Helpers de formatação:
+function formatBRL(amount) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount || 0);
+}
+
+function formatMonthLabel(monthStr) {
+    // 'YYYY-MM' → 'Maio 2026'
+    const [y, m] = monthStr.split('-');
+    const names = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    return `${names[parseInt(m) - 1]} ${y}`;
+}
+
+// Estado do form
+let currentFinId = null;
+let currentFinType = 'oneshot'; // V40.4.2 vai adicionar 'recurring' e 'parceled'
+
+// V40.4.3: detecta se despesa está atrasada (3 casos da armadilha mapeada)
+// - Mês selecionado < mês atual: SEMPRE atrasada (se não paga)
+// - Mês selecionado === mês atual + dueDay < dia atual: atrasada (se não paga)
+// - Mês selecionado > mês atual: nunca atrasada (futuro)
+// V40.4.3-fix (Gemini): usar horário LOCAL, não UTC.
+// V40.4.4 (G12): recebe monthStr — pra recorrentes/parceladas que ocupam vários meses.
+function isFinancialOverdue(item, monthStr) {
+    if (isPaidInMonth(item, monthStr)) return false;
+    if (!item.dueDay) return false; // sem vencimento, nunca marca atrasada
+    
+    const today = new Date();
+    const todayMonth = getLocalMonthStr();
+    const todayDay = today.getDate();
+    
+    if (monthStr < todayMonth) return true;
+    if (monthStr > todayMonth) return false;
+    return item.dueDay < todayDay;
+}
+
+// V40.4.2: helper de card de despesa (reusado pelas 2 seções A Pagar / Pagas)
+// V40.4.3: mostra vencimento + destaque visual se atrasada.
+// V40.4.4 (decisão 5α): subtítulo diferente por tipo (Avulsa / Recorrente / Parcela X/N).
+function renderFinancialCard(item, monthStr) {
+    const isPaid = isPaidInMonth(item, monthStr);
+    const isOverdue = isFinancialOverdue(item, monthStr);
+    const tagColor = item.tagId ? getTagColor(item.tagId) : null;
+    const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
+    const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
+    
+    // Decisão 2(I): valor riscado + opacidade 60% quando pago
+    const opacityClass = isPaid ? 'opacity-60' : '';
+    const valueClass = isPaid ? 'line-through text-zinc-500' : (isOverdue ? 'text-red-600' : 'text-zinc-800');
+    const titleClass = isPaid ? 'text-zinc-500' : 'text-zinc-800';
+    
+    // V40.4.3: borda vermelha sutil quando vencida
+    const cardBorderClass = isOverdue ? 'border-red-300 bg-red-50/30' : 'border-zinc-200';
+    
+    // Decisão 1(B): checkbox redondo à esquerda. Marcado = preenchido com app-focus.
+    const checkboxBg = isPaid ? 'bg-app-focus border-app-focus' : 'bg-white border-zinc-300';
+    const checkIconClass = isPaid ? '' : 'hidden';
+    
+    // V40.4.4 (decisão 5α): texto do tipo
+    let typeText = 'Avulsa';
+    const duration = item.durationMonths || 1;
+    if (duration > 1) {
+        if (item.isRecurring) {
+            typeText = 'Recorrente';
+        } else {
+            const label = getInstallmentLabel(item, monthStr); // ex "3/10"
+            typeText = label ? `Parcela ${label}` : 'Parcelada';
+        }
+    }
+    
+    // Subtítulo: junta tipo + venc/atrasada
+    let subtitleText = typeText;
+    let subtitleClass = 'text-zinc-400';
+    if (isOverdue && item.dueDay) {
+        subtitleText = `Atrasada · venceu dia ${item.dueDay}`;
+        subtitleClass = 'text-red-600';
+    } else if (item.dueDay) {
+        subtitleText = `${typeText} · venc. dia ${item.dueDay}`;
+    }
+    
+    return `
+    <div onclick="openFinancialForm('${item.id}')" class="bg-white border rounded-xl p-3.5 shadow-sm mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition ${opacityClass} ${cardBorderClass}">
+        <div class="flex justify-between items-center gap-3">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+                <!-- V40.4.4 (G6): togglePaidFinancial agora recebe id + mês -->
+                <button onclick="event.stopPropagation(); togglePaidFinancial('${item.id}', '${monthStr}')" aria-label="Marcar como paga" class="w-6 h-6 rounded-full border-2 ${checkboxBg} flex items-center justify-center shrink-0 transition active:scale-90">
+                    <i class="ph-bold ph-check text-xs text-white ${checkIconClass}"></i>
+                </button>
+                <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 shadow-inner" style="${iconBgStyle}">
+                    <i class="ph-fill ph-currency-circle-dollar text-lg" style="${iconColorStyle}"></i>
+                </div>
+                <div class="min-w-0">
+                    <h4 class="font-bold text-sm leading-tight truncate ${titleClass}">${escapeHtml(item.title)}</h4>
+                    <p class="text-[11px] font-bold mt-0.5 ${subtitleClass}">${subtitleText}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="text-sm font-bold ${valueClass}">${formatBRL(item.amount)}</span>
+                <button onclick="event.stopPropagation(); requestDeleteFinancial('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
+                    <i class="ph ph-trash text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </div>`;
+}
+
+window.renderFinancial = function() {
+    const container = document.getElementById('financial-container');
+    const monthLabel = document.getElementById('financial-month-label');
+    const totalEl = document.getElementById('financial-total');
+    const paidEl = document.getElementById('financial-paid');
+    const openEl = document.getElementById('financial-open');
+    const todayBtn = document.getElementById('financial-today-btn');
+    if (!container) return;
+    
+    if (monthLabel) monthLabel.innerText = formatMonthLabel(currentFinanceMonth);
+    
+    // V40.4.2: botão "Hoje" só aparece se NÃO está no mês atual (decisão δ)
+    // V40.4.3-fix (Gemini): horário local em vez de UTC.
+    if (todayBtn) {
+        const currentRealMonth = getLocalMonthStr();
+        if (currentFinanceMonth === currentRealMonth) {
+            todayBtn.classList.add('hidden');
+            todayBtn.classList.remove('flex');
+        } else {
+            todayBtn.classList.remove('hidden');
+            todayBtn.classList.add('flex');
+        }
+    }
+    
+    // V40.4.4 (G11): em vez de filtrar por item.month === current, usa isItemInMonth
+    // que conta avulsa, recorrente e parcelada.
+    const monthItems = financialDb.filter(item => isItemInMonth(item, currentFinanceMonth));
+    
+    // V40.4.4 (G13): 3 totais usando isPaidInMonth pra retrocompat + paidMonths
+    const totals = monthItems.reduce((acc, item) => {
+        const amt = item.amount || 0;
+        acc.total += amt;
+        if (isPaidInMonth(item, currentFinanceMonth)) acc.paid += amt;
+        else acc.open += amt;
+        return acc;
+    }, { total: 0, paid: 0, open: 0 });
+    
+    if (totalEl) totalEl.innerText = formatBRL(totals.total);
+    if (paidEl) paidEl.innerText = formatBRL(totals.paid);
+    if (openEl) openEl.innerText = formatBRL(totals.open);
+    
+    if (monthItems.length === 0) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center text-center opacity-50 py-12">
+                <i class="ph ph-receipt text-4xl mb-2 text-zinc-400"></i>
+                <p class="text-sm font-medium text-zinc-500">Nenhuma despesa em ${formatMonthLabel(currentFinanceMonth)}.</p>
+                <p class="text-[11px] text-zinc-400 mt-1">Toque em + Nova Despesa pra começar</p>
+            </div>`;
+        return;
+    }
+
+    // V40.4.2: separar em 2 seções (decisão X) — A Pagar e Pagas
+    // V40.4.3: ordenação por dia de vencimento crescente. Sem dueDay vai pro fim (ordenado por createdAt DESC).
+    function sortByDueDay(a, b) {
+        const aHas = !!a.dueDay;
+        const bHas = !!b.dueDay;
+        if (aHas && bHas) return a.dueDay - b.dueDay;
+        if (aHas) return -1;
+        if (bHas) return 1;
+        return b.createdAt - a.createdAt;
+    }
+    const sorted = monthItems.slice().sort(sortByDueDay);
+    // V40.4.4: agora usa isPaidInMonth, não item.paid direto
+    const unpaid = sorted.filter(i => !isPaidInMonth(i, currentFinanceMonth));
+    const paid = sorted.filter(i => isPaidInMonth(i, currentFinanceMonth));
+    
+    let html = '';
+    
+    if (unpaid.length > 0) {
+        html += `<div class="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-2 mt-1 px-1">A Pagar (${unpaid.length})</div>`;
+        html += unpaid.map(item => renderFinancialCard(item, currentFinanceMonth)).join('');
+    }
+    
+    if (paid.length > 0) {
+        html += `<div class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2 mt-4 px-1">Pagas (${paid.length})</div>`;
+        html += paid.map(item => renderFinancialCard(item, currentFinanceMonth)).join('');
+    }
+    
+    container.innerHTML = html;
+}
+
+// V40.4.2: toggle paid (decisão 1B)
+// V40.4.4 (G6): agora recebe id + mês — pra recorrentes/parceladas, marca paga só naquele mês.
+window.togglePaidFinancial = function(id, monthStr) {
+    const item = financialDb.find(x => x.id === id);
+    if (!item) return;
+    const month = monthStr || currentFinanceMonth; // fallback
+    const wasPaid = isPaidInMonth(item, month);
+    setPaidInMonth(item, month, !wasPaid);
+    saveFinancial();
+    renderFinancial();
+}
+
+// V40.4.2: navegação entre meses (decisão α)
+window.changeFinanceMonth = function(delta) {
+    const [y, m] = currentFinanceMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    const newY = d.getFullYear();
+    const newM = String(d.getMonth() + 1).padStart(2, '0');
+    currentFinanceMonth = `${newY}-${newM}`;
+    renderFinancial();
+}
+
+// V40.4.2: voltar pro mês atual (decisão δ)
+// V40.4.3-fix (Gemini): horário local.
+window.goToFinanceToday = function() {
+    currentFinanceMonth = getLocalMonthStr();
+    renderFinancial();
+}
+
+// V40.4.2: toggle pago no form (estado in-memory antes de salvar)
+let currentFinPaid = false;
+
+window.toggleFinancialFormPaid = function() {
+    currentFinPaid = !currentFinPaid;
+    updateFinancialFormPaidUI();
+}
+
+function updateFinancialFormPaidUI() {
+    const checkBox = document.getElementById('fin-form-paid-check');
+    const icon = document.getElementById('fin-form-paid-icon');
+    if (!checkBox || !icon) return;
+    if (currentFinPaid) {
+        checkBox.className = 'w-6 h-6 rounded-full border-2 border-app-focus bg-app-focus flex items-center justify-center shrink-0 transition';
+        icon.classList.remove('hidden');
+    } else {
+        checkBox.className = 'w-6 h-6 rounded-full border-2 border-zinc-300 bg-white flex items-center justify-center shrink-0 transition';
+        icon.classList.add('hidden');
+    }
+}
+
+window.openFinancialForm = function(id = null) {
+    document.getElementById('financial-list-view').classList.add('hidden');
+    document.getElementById('financial-form-view').classList.remove('hidden');
+    document.getElementById('financial-form-view').classList.add('flex');
+    
+    currentFinId = id;
+    currentFinType = 'oneshot';
+    
+    if (id) {
+        const item = financialDb.find(x => x.id === id);
+        if (!item) return;
+        document.getElementById('fin-form-title-label').innerText = 'Editar Despesa';
+        document.getElementById('financial-input').value = item.title;
+        document.getElementById('financial-amount-input').value = item.amount || '';
+        document.getElementById('financial-dueday-input').value = item.dueDay || '';
+        // V40.4.4: deduz tipo a partir do schema (retrocompat com itens antigos)
+        const duration = item.durationMonths || 1;
+        if (duration === 1) {
+            currentFinType = 'oneshot';
+        } else if (item.isRecurring) {
+            currentFinType = 'recurring';
+        } else {
+            currentFinType = 'installment';
+            document.getElementById('financial-installments-input').value = duration;
+        }
+        // V40.4.4: paid usa isPaidInMonth com retrocompat (item.paid bool antigo)
+        currentFinPaid = isPaidInMonth(item, currentFinanceMonth);
+        document.getElementById('fin-form-delete-btn').classList.remove('hidden');
+        document.getElementById('fin-form-delete-btn').classList.add('flex');
+    } else {
+        document.getElementById('fin-form-title-label').innerText = 'Nova Despesa';
+        document.getElementById('financial-input').value = '';
+        document.getElementById('financial-amount-input').value = '';
+        document.getElementById('financial-dueday-input').value = '';
+        document.getElementById('financial-installments-input').value = '2';
+        currentFinPaid = false;
+        document.getElementById('fin-form-delete-btn').classList.add('hidden');
+        document.getElementById('fin-form-delete-btn').classList.remove('flex');
+    }
+    
+    updateFinancialFormPaidUI();
+    updateFinancialTypeButtonsUI(); // V40.4.4: sincroniza visual dos 3 botões de tipo
+}
+
+window.closeFinancialForm = function(force = false) {
+    const formView = document.getElementById('financial-form-view');
+    const listView = document.getElementById('financial-list-view');
+    if (!formView || !listView) return;
+    formView.classList.add('hidden');
+    formView.classList.remove('flex');
+    listView.classList.remove('hidden');
+    if (!force) renderFinancial();
+}
+
+// V40.4.4: atualiza visual dos 3 botões + mostra/esconde inputs auxiliares.
+function updateFinancialTypeButtonsUI() {
+    const types = ['oneshot', 'recurring', 'installment'];
+    types.forEach(t => {
+        const btn = document.getElementById(`fin-type-${t}`);
+        if (!btn) return;
+        if (t === currentFinType) {
+            btn.className = 'flex-1 py-2.5 rounded-lg bg-app-focus text-white border border-app-focus text-xs font-bold transition active:scale-95';
+        } else {
+            btn.className = 'flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-600 border border-zinc-200 text-xs font-bold transition active:scale-95 hover:bg-zinc-100';
+        }
+    });
+    
+    // Input "Quantas parcelas?" só aparece em Parcelada
+    const wrapInst = document.getElementById('fin-installments-wrapper');
+    if (wrapInst) wrapInst.classList.toggle('hidden', currentFinType !== 'installment');
+    
+    // Aviso pra Recorrente
+    const infoRec = document.getElementById('fin-recurring-info');
+    if (infoRec) infoRec.classList.toggle('hidden', currentFinType !== 'recurring');
+}
+
+window.selectFinancialType = function(type) {
+    currentFinType = type;
+    updateFinancialTypeButtonsUI();
+}
+
+window.saveFinancialForm = function() {
+    const title = document.getElementById('financial-input').value.trim();
+    if (!title) return showToast('A despesa precisa de um nome.');
+    
+    const amountRaw = document.getElementById('financial-amount-input').value;
+    const amount = parseFloat(amountRaw);
+    if (isNaN(amount) || amount <= 0) return showToast('Informe um valor maior que zero.');
+
+    // V40.4.3: parse do dia do vencimento (opcional, 1-31)
+    const dueDayRaw = document.getElementById('financial-dueday-input').value.trim();
+    let dueDay = null;
+    if (dueDayRaw) {
+        const parsed = parseInt(dueDayRaw, 10);
+        if (isNaN(parsed) || parsed < 1 || parsed > 31) {
+            return showToast('Dia do vencimento deve ser entre 1 e 31.');
+        }
+        dueDay = parsed;
+    }
+
+    // V40.4.4 (decisões 2I, 3α): calcula durationMonths e isRecurring a partir do tipo selecionado
+    let durationMonths = 1;
+    let isRecurring = false;
+    if (currentFinType === 'recurring') {
+        durationMonths = 12;
+        isRecurring = true;
+    } else if (currentFinType === 'installment') {
+        const instRaw = document.getElementById('financial-installments-input').value.trim();
+        const inst = parseInt(instRaw, 10);
+        // G9: validação 2-60
+        if (isNaN(inst) || inst < 2 || inst > 60) {
+            return showToast('Parcelas devem ser entre 2 e 60.');
+        }
+        durationMonths = inst;
+        isRecurring = false;
+    }
+
+    if (currentFinId) {
+        const item = financialDb.find(x => x.id === currentFinId);
+        if (item) {
+            // G10: se tipo mudou, resetar paidMonths
+            const prevDuration = item.durationMonths || 1;
+            const prevRecurring = item.isRecurring === true;
+            const typeChanged = (prevDuration !== durationMonths) || (prevRecurring !== isRecurring);
+            
+            item.title = title;
+            item.amount = amount;
+            item.dueDay = dueDay;
+            item.durationMonths = durationMonths;
+            item.isRecurring = isRecurring;
+            
+            // V40.4.4: migra/normaliza paidMonths
+            if (!Array.isArray(item.paidMonths)) item.paidMonths = [];
+            if (typeChanged) {
+                item.paidMonths = []; // reset ao trocar tipo
+            }
+            // Aplica o toggle "Marcar como paga" do form ao mês atual
+            setPaidInMonth(item, currentFinanceMonth, currentFinPaid);
+            
+            // Garante startMonth (retrocompat com item.month antigo)
+            if (!item.startMonth) {
+                item.startMonth = item.month || currentFinanceMonth;
+            }
+        }
+        showToast('Despesa atualizada!');
+    } else {
+        // V40.4.4: schema novo
+        const newItem = {
+            id: 'fin_' + Date.now(),
+            title: title,
+            amount: amount,
+            startMonth: currentFinanceMonth, // decisão 8: mês onde está navegando
+            durationMonths: durationMonths,
+            isRecurring: isRecurring,
+            dueDay: dueDay,
+            tagId: null,
+            paidMonths: [],
+            createdAt: Date.now()
+        };
+        if (currentFinPaid) {
+            newItem.paidMonths.push(currentFinanceMonth);
+        }
+        financialDb.push(newItem);
+        showToast('Despesa adicionada!');
+    }
+    
+    saveFinancial();
+    closeFinancialForm();
+}
+
+// V40.4.1: delete com modal de confirmação (padrão V40.3.5)
+let pendingFinancialDeleteId = null;
+
+window.requestDeleteFinancial = function(id) {
+    pendingFinancialDeleteId = id;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '55'; // sobre a sheet (z-50), abaixo do modal (z-60)
+    document.getElementById('financial-delete-modal').classList.remove('hidden');
+    document.getElementById('financial-delete-modal').classList.add('flex');
+    pushNavState(); // V40.5.0-fix7
+}
+
+window.confirmDeleteFinancial = function() {
+    if (!pendingFinancialDeleteId) return;
+    financialDb = financialDb.filter(x => x.id !== pendingFinancialDeleteId);
+    saveFinancial();
+    pendingFinancialDeleteId = null;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '';
+    document.getElementById('financial-delete-modal').classList.add('hidden');
+    document.getElementById('financial-delete-modal').classList.remove('flex');
+    if (typeof closeFinancialForm === 'function') closeFinancialForm();
+    renderFinancial();
+    showToast('Despesa apagada.');
+}
+
+window.cancelDeleteFinancial = function() {
+    pendingFinancialDeleteId = null;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '';
+    document.getElementById('financial-delete-modal').classList.add('hidden');
+    document.getElementById('financial-delete-modal').classList.remove('flex');
+}
+
+window.deleteFinancialFromForm = function() {
+    if (!currentFinId) return;
+    requestDeleteFinancial(currentFinId);
+}
+
+
+// =====================================================
+// V40.3.3 — CARIMBAR ROTINA (Fase 2)
+// =====================================================
+// Quando user toca em ✋ no card de rotina:
+// 1. Calcula maior gap disponível no dia ativo (replica lógica do renderTimeline)
+// 2. Se duração da rotina > maior gap → toast "Sem espaço suficiente" + return
+// 3. Senão: clona rotina pra pendingIntent (com microblocks)
+// 4. Fecha sheets, mostra floating-task, renderTimeline (blocos pulsantes ativam)
+// 5. Card carimbado vira block normal (retraído por default — decisão 3b do usuário)
+//
+// Armadilhas tratadas (B1-B15):
+//   B1: sobrescreve pendingIntent silenciosamente (igual scheduleBacklogItem)
+//   B2: microblocks sempre array (|| [])
+//   B3: getMaxGapForDay calcula, toast se não couber
+//   B4: theme propagado corretamente via pendingIntent
+//   B5: tagId pode apontar pra tag deletada — getTagColor lida
+//   B6: closeAllSheets antes de setar pendingIntent
+//   B8: stampRoutine não chama renderTimeline diretamente (renderFloatingTask faz)
+//   B13: emoji prefixado no title (visual igual aos outros cartões)
+//   B14: container flex com gap-1.5, botões w-8 h-8
+
+function getMaxGapForDay() {
+    // Replica a lógica de gap-detection do renderTimeline (linhas 656-674).
+    // Retorna a maior duração de gap (em minutos) no dia ativo.
+    const activeDate = getActiveDateStr();
+    let dailyDb = db.filter(b => b.date === activeDate || (!b.date && activeDate === getTodayStr()));
+    dailyDb = dailyDb.filter(b => b.startMin < END_HOUR * 60 && (b.startMin + b.duration) > START_HOUR * 60);
+    dailyDb.sort((a, b) => a.startMin - b.startMin);
+    
+    let cursorMin = START_HOUR * 60;
+    let maxGap = 0;
+    
+    dailyDb.forEach(fb => {
+        if (fb.startMin > cursorMin) {
+            maxGap = Math.max(maxGap, fb.startMin - cursorMin);
+        }
+        cursorMin = Math.max(cursorMin, fb.startMin + fb.duration);
+    });
+    
+    const endOfDay = END_HOUR * 60;
+    if (cursorMin < endOfDay) {
+        maxGap = Math.max(maxGap, endOfDay - cursorMin);
+    }
+    
+    return maxGap;
+}
+
+window.stampRoutine = function(routineId) {
+    const r = routinesDb.find(x => x.id === routineId);
+    if (!r) return;
+    
+    // B3: verifica se cabe no dia
+    const maxGap = getMaxGapForDay();
+    if (r.duration > maxGap) {
+        showToast(`Sem espaço suficiente hoje (livre: ${formatDur(maxGap)})`);
+        return;
+    }
+    
+    // B13: emoji prefixado no title pra visual consistente nos cartões existentes
+    const cardTitle = r.emoji ? `${r.emoji} ${r.title}` : r.title;
+    
+    // B1, B2: sobrescreve pendingIntent silenciosamente, microblocks sempre array
+    pendingIntent = {
+        title: cardTitle,
+        duration: r.duration,
+        theme: r.theme || 'focus',
+        tagId: r.tagId || null,
+        microblocks: (r.microblocks || []).map(mb => ({ title: mb.title, done: false }))
+    };
+    selectedDur = r.duration;
+    syncDurButtons(selectedDur);
+    
+    document.getElementById('floating-title').innerText = cardTitle;
+    document.getElementById('floating-task').classList.remove('hidden');
+    document.getElementById('floating-task').classList.add('flex');
+    
+    closeAllSheets(); // B6
+    renderTimeline(); // ativa blocos pulsantes via performEncaixe
+    showToast('Toque num Tempo Livre pra encaixar 👇');
+}
+
+// =====================================================
+// V40.3.2 — DRAG DE MICROBLOCKS (reorder dentro do card expandido)
+// =====================================================
+// Gesto: long-press 400ms em qualquer parte do microbloc → escala 1.05 → arrastar pra reorder
+// Discovery: tooltip "Segure pra reordenar" nas primeiras 3 vezes que user expande card com >=2 microblocks
+//
+// Armadilhas tratadas (do dossiê A1-A20):
+//   A1: tocar em x<40 cai no drag-handle do card. Mitigação: microblocks ficam em ml-10 (x>=40)
+//   A2/A3/A7: touchmove com preventDefault impede scroll vazar (browser respeita após gesto consolidado)
+//   A4/A5: tap rápido (<400ms) → click padrão (toggle/delete); long-press → drag (cancela click)
+//   A6: setamos isPhysicsBusy=true durante drag de microbloc também (impede auto-retrair)
+//   A8: limitamos Y do dedo ao container microblocksSection (clamp)
+//   A9: getBoundingClientRect calculado UMA vez no longpress fire (cache pra performance)
+//   A11/A12: durante drag ativo, mbDragActive=true bloqueia renderTimeline reentrante
+//   A18: CSS touch-callout:none + user-select:none nos microblocks
+//   A19: só processa e.touches[0]
+//   A20: touchend sempre é capturado, mesmo fora do elemento
+// NOTA: mbDragActive declarado no TOPO do arquivo (linha ~30) pra evitar TDZ.
+let mbDragLongPressTimer = null;
+let mbDragInitialY = 0;
+let mbDragInitialX = 0;
+let mbDragBlockId = null;
+let mbDragFromIndex = -1;
+let mbDragToIndex = -1;
+let mbDragRects = [];
+let mbDragSourceEl = null;
+let mbDragDropLineEl = null;
+let mbDragClickSuppress = false;
+
+const MB_DRAG_LONGPRESS_MS = 400;
+const MB_DRAG_MOVE_CANCEL_PX = 8; // se mover >8px antes do timer, cancela longpress (= scroll)
+
+// Discovery tooltip (V40.3.2)
+function maybeShowMbDragTooltip(blockEl, block) {
+    if (!block.expanded) return;
+    if (!block.microblocks || block.microblocks.length < 2) return;
+    
+    const shownCount = parseInt(localStorage.getItem('tb_mb_drag_tooltip_count') || '0', 10);
+    if (shownCount >= 3) return;
+    
+    // Verifica se já tem tooltip nesse card (evita duplicar)
+    if (blockEl.querySelector('.mb-drag-tooltip')) return;
+    
+    const tooltip = document.createElement('div');
+    tooltip.className = 'mb-drag-tooltip absolute top-12 left-12 right-3 z-[55] px-3 py-1.5 bg-zinc-900/90 backdrop-blur-sm text-white text-[10px] font-medium rounded-lg shadow-lg pointer-events-none flex items-center gap-1.5 transition-opacity duration-500';
+    tooltip.innerHTML = '<i class="ph ph-hand-tap text-xs"></i> Segure num check pra reordenar';
+    blockEl.appendChild(tooltip);
+    
+    localStorage.setItem('tb_mb_drag_tooltip_count', String(shownCount + 1));
+    
+    setTimeout(() => {
+        tooltip.style.opacity = '0';
+        setTimeout(() => tooltip.remove(), 500);
+    }, 3000);
+}
+
+// Setup do drag em cada microbloc — chamado de drawBlock (ao final, junto com enablePhysics)
+function setupMicroblockDrag(cardEl, block) {
+    if (!block.expanded) return;
+    if (!block.microblocks || block.microblocks.length < 2) return; // 1 item só não tem o que reordenar
+    
+    const mbItems = cardEl.querySelectorAll('.mb-item');
+    mbItems.forEach((mbEl, idx) => {
+        mbEl.addEventListener('touchstart', (e) => onMbDragTouchStart(e, block, idx, mbEl), {passive: false});
+        mbEl.addEventListener('mousedown', (e) => onMbDragTouchStart(e, block, idx, mbEl));
+    });
+}
+
+function onMbDragTouchStart(e, block, idx, mbEl) {
+    // Multi-touch: só processa o primeiro dedo
+    if (e.touches && e.touches.length > 1) return;
+    
+    const point = e.touches ? e.touches[0] : e;
+    mbDragInitialY = point.clientY;
+    mbDragInitialX = point.clientX;
+    mbDragBlockId = block.id;
+    mbDragFromIndex = idx;
+    mbDragSourceEl = mbEl;
+    mbDragClickSuppress = false;
+    
+    // Inicia timer de long-press
+    mbDragLongPressTimer = setTimeout(() => {
+        activateMbDrag(block, idx, mbEl);
+    }, MB_DRAG_LONGPRESS_MS);
+    
+    // Listener de movimento — se mover >8px ANTES do timer disparar, cancela longpress (= scroll)
+    const onTouchMovePre = (ev) => {
+        const p = ev.touches ? ev.touches[0] : ev;
+        const dy = Math.abs(p.clientY - mbDragInitialY);
+        const dx = Math.abs(p.clientX - mbDragInitialX);
+        if ((dy > MB_DRAG_MOVE_CANCEL_PX || dx > MB_DRAG_MOVE_CANCEL_PX) && !mbDragActive) {
+            // cancela longpress — usuário tava tentando scroll/swipe normal
+            cancelMbDragLongPress();
+        }
+    };
+    
+    const onTouchEndPre = () => {
+        cancelMbDragLongPress();
+        document.removeEventListener('touchmove', onTouchMovePre);
+        document.removeEventListener('touchend', onTouchEndPre);
+        document.removeEventListener('mousemove', onTouchMovePre);
+        document.removeEventListener('mouseup', onTouchEndPre);
+    };
+    
+    document.addEventListener('touchmove', onTouchMovePre, {passive: true});
+    document.addEventListener('touchend', onTouchEndPre);
+    document.addEventListener('mousemove', onTouchMovePre);
+    document.addEventListener('mouseup', onTouchEndPre);
+}
+
+function cancelMbDragLongPress() {
+    if (mbDragLongPressTimer) {
+        clearTimeout(mbDragLongPressTimer);
+        mbDragLongPressTimer = null;
+    }
+}
+
+function activateMbDrag(block, idx, mbEl) {
+    mbDragLongPressTimer = null;
+    mbDragActive = true;
+    mbDragClickSuppress = true;
+    isPhysicsBusy = true; // A6/A11: impede card auto-retrair durante drag
+    
+    // Feedback visual no microbloc arrastado
+    mbEl.classList.add('mb-dragging');
+    
+    // Cache dos rects dos outros microblocks (A9/A17 — uma vez só)
+    const cardEl = document.querySelector(`[data-block-id="${block.id}"]`);
+    if (!cardEl) return;
+    const allMbs = cardEl.querySelectorAll('.mb-item');
+    mbDragRects = Array.from(allMbs).map((el, i) => ({
+        el: el,
+        idx: i,
+        rect: el.getBoundingClientRect()
+    }));
+    
+    // Cria linha de drop visual (drop indicator)
+    mbDragDropLineEl = document.createElement('div');
+    mbDragDropLineEl.className = 'mb-drop-line';
+    
+    // Vibração leve no Android pra confirmar pegou (se suportado)
+    if (navigator.vibrate) navigator.vibrate(20);
+    
+    // Agora registra os handlers de move/end (substitui os pre-handlers)
+    document.addEventListener('touchmove', onMbDragMove, {passive: false});
+    document.addEventListener('touchend', onMbDragEnd);
+    document.addEventListener('touchcancel', onMbDragEnd);
+    document.addEventListener('mousemove', onMbDragMove);
+    document.addEventListener('mouseup', onMbDragEnd);
+}
+
+function onMbDragMove(e) {
+    if (!mbDragActive) return;
+    e.preventDefault(); // A2/A3/A7: impede scroll vazar
+    
+    const point = e.touches ? e.touches[0] : e;
+    const y = point.clientY;
+    
+    // Calcula sobre qual microbloc o dedo está
+    let newIdx = mbDragFromIndex;
+    for (let i = 0; i < mbDragRects.length; i++) {
+        const r = mbDragRects[i].rect;
+        const midY = r.top + r.height / 2;
+        if (i === mbDragFromIndex) continue; // pula o próprio item arrastado
+        if (i < mbDragFromIndex && y < midY) {
+            newIdx = i;
+            break;
+        }
+        if (i > mbDragFromIndex && y > midY) {
+            newIdx = i;
+        }
+    }
+    
+    if (newIdx !== mbDragToIndex) {
+        mbDragToIndex = newIdx;
+        // Posiciona drop-line antes do mbDragRects[newIdx]
+        positionDropLine(newIdx);
+    }
+}
+
+function positionDropLine(targetIdx) {
+    if (!mbDragDropLineEl || !mbDragRects[targetIdx]) return;
+    const targetEl = mbDragRects[targetIdx].el;
+    
+    // Se newIdx > fromIndex, drop-line vai DEPOIS do target. Se <, vai ANTES.
+    if (targetIdx > mbDragFromIndex) {
+        targetEl.parentNode.insertBefore(mbDragDropLineEl, targetEl.nextSibling);
+    } else {
+        targetEl.parentNode.insertBefore(mbDragDropLineEl, targetEl);
+    }
+}
+
+function onMbDragEnd(e) {
+    document.removeEventListener('touchmove', onMbDragMove);
+    document.removeEventListener('touchend', onMbDragEnd);
+    document.removeEventListener('touchcancel', onMbDragEnd);
+    document.removeEventListener('mousemove', onMbDragMove);
+    document.removeEventListener('mouseup', onMbDragEnd);
+    
+    if (!mbDragActive) return;
+    mbDragActive = false;
+    
+    // Aplica reorder se mudou de posição
+    if (mbDragToIndex !== -1 && mbDragToIndex !== mbDragFromIndex && mbDragBlockId) {
+        const block = db.find(b => b.id === mbDragBlockId);
+        if (block && block.microblocks) {
+            const [moved] = block.microblocks.splice(mbDragFromIndex, 1);
+            block.microblocks.splice(mbDragToIndex, 0, moved);
+            saveDb();
+        }
+    }
+    
+    // Cleanup visual
+    if (mbDragSourceEl) mbDragSourceEl.classList.remove('mb-dragging');
+    if (mbDragDropLineEl) mbDragDropLineEl.remove();
+    
+    // Reset estado
+    mbDragSourceEl = null;
+    mbDragDropLineEl = null;
+    mbDragFromIndex = -1;
+    mbDragToIndex = -1;
+    mbDragRects = [];
+    mbDragBlockId = null;
+    
+    // Libera card pra retrair de novo, mas dá uma folga
+    setTimeout(() => { isPhysicsBusy = false; }, 200);
+    
+    // Re-render pra refletir nova ordem
+    renderTimeline();
+    
+    // Suprime o "click" sintético que vem após touchend (evita disparar toggle/delete)
+    setTimeout(() => { mbDragClickSuppress = false; }, 100);
+}
+
+// Interceptador de clicks: se mbDragClickSuppress true, cancela o click pra não disparar
+// toggleMicroblock/deleteMicroblock após um drag.
+document.addEventListener('click', (e) => {
+    if (mbDragClickSuppress) {
+        e.stopPropagation();
+        e.preventDefault();
+    }
+}, true);
+

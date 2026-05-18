@@ -15,16 +15,18 @@ body { touch-action: pan-y; background-color: #e2e8f0; overscroll-behavior-x: no
    - pb-4 (16px) → 4px (botões quase encostam no border-bottom)
    - mb-4 do flex interno (16px) → 0px (sem espaço residual depois do cluster)
    Economia total: ~36px de tela útil visíveis a mais. */
-/* V40.5.1-fix4: padding-top inteligente que respeita notch/buraco da câmera.
-   max() escolhe o MAIOR entre safe-area-inset-top (calculado pelo OS) e o valor fixo.
-   - Telas SEM notch: usa 16px (expandido) ou 12px (retraído) — visual compacto.
-   - Telas COM notch grande: respeita o tamanho real do notch — sem cortar conteúdo.
-   Funciona porque viewport-fit=cover está setado no <meta viewport> (line 5 index.html). */
+/* V40.5.1-fix5: padding-top inteligente igual em AMBOS estados (expandido e retraído).
+   Anteriormente o expandido tinha 16px e retraído 12px — diferença visualmente perceptível.
+   Agora: 12px nos 2, máxima compactação. max() respeita notch automaticamente.
+   - Telas SEM notch: 12px (compacto, bom UX).
+   - Telas COM notch: respeita o notch (env() retorna o valor real). */
 .compact-header-padding {
-    padding-top: max(env(safe-area-inset-top), 16px);
+    padding-top: max(env(safe-area-inset-top), 12px);
 }
 
-/* V40.5.1-fix3 + fix4: padding-top 12px no retraído com proteção de notch também. */
+/* Retraído mantém padding-top igual ao expandido. !important garante prioridade sobre
+   outras regras herdadas. padding-bottom continua 4px (vs 16px do expandido) — economia
+   no estado retraído. */
 header.header-collapsed {
     padding-top: max(env(safe-area-inset-top), 12px) !important;
     padding-bottom: 4px !important;

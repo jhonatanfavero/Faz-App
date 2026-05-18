@@ -1,5 +1,5 @@
-// V9.3 - v40.5.1-fix4 (Espaço header reduzido em AMBOS os estados, com proteção pra notch/câmera: EXPANDIDO pt-12 (48px) → 16px (ganho 32px). RETRAÍDO 16px (fix3) → 12px (ganho 4px extra). Usa max(env(safe-area-inset-top), 16/12px) — em telas SEM notch fica compacto (16/12), em telas COM notch (iPhone 14 Pro Dynamic Island, Samsung S22 com câmera, Moto G) respeita automaticamente o tamanho real do notch. viewport-fit=cover já estava setado no meta. adjustTimelinePadding (50ms setTimeout) recalcula timeline padding dinamicamente em ambos estados via header.offsetHeight. 7/7 riscos mitigados.)
-const CACHE_NAME = 'timeblock-v40-5-1-fix4';
+// V9.4 - v40.5.1-fix5 (UNIFICAÇÃO do padding-top: expandido e retraído agora têm padding-top IDÊNTICO (12px). Antes era 16px expandido / 12px retraído — diferença visualmente perceptível. Agora 'Segunda, 18 mai' fica na MESMA distância da linha vermelha em ambos os estados, respeitando notch automaticamente via max(env(safe-area-inset-top), 12px). A única diferença visual entre expandido/retraído continua sendo: mb-4 do div interno (que cria o espaço pra mostrar TAGs/Relatórios/PLANEJADO), e padding-bottom (16px expandido vs 4px retraído).)
+const CACHE_NAME = 'timeblock-v40-5-1-fix5';
 const ASSETS = [
   './',
   './index.html',

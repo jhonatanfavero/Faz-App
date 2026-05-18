@@ -173,7 +173,7 @@
 
         <div id="overlay" onclick="onOverlayClick()" class="absolute inset-0 bg-black/40 backdrop-blur-sm z-40 opacity-0 pointer-events-none transition-opacity duration-300"></div>
 
-        <div id="bottom-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
+        <div id="bottom-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col overflow-y-auto no-scrollbar">
             <!-- V40.3.7: barra superior com botão X pra fechar. Cor do tema, sem fundo. -->
             <div class="flex justify-end -mt-2 mb-4">
                 <button onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
@@ -621,7 +621,7 @@
         </div>
 
         <!-- V40.2: Sheet "Adicionar nota" (escolha entre criar nova ou vincular existente) -->
-        <div id="link-note-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+        <div id="link-note-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
             <!-- V40.3.7-fix: X global removido (Gemini fix #1). As 2 sub-views já têm header próprio com X que chama closeLinkNoteSheet() (função específica). -->
             
             <!-- View 1: opções iniciais -->
@@ -702,7 +702,7 @@
             <p id="thought-text" class="text-base font-medium text-zinc-800 leading-relaxed text-center px-2 py-4 break-words">…</p>
         </div>
 
-        <div id="period-select-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+        <div id="period-select-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
             <!-- V40.3.7-fix: header fundido com X (Gemini fix #2) -->
             <div class="flex items-center justify-between mb-4 shrink-0">
                 <div class="flex items-center gap-3">
@@ -717,7 +717,7 @@
             </div>
         </div>
 
-        <div id="config-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+        <div id="config-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
             <!-- V40.3.7-fix: header fundido com X (Gemini fix #2) — botão voltar à esquerda, título, X à direita -->
             <div class="flex items-center justify-between mb-4 shrink-0">
                 <div class="flex items-center gap-3">
@@ -835,7 +835,7 @@
 
         </div>
 
-        <div id="tags-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+        <div id="tags-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
             <!-- V40.3.7-fix: header fundido com X colorido (Gemini fix #1) — removido X cinza antigo da esquerda -->
             <div class="flex items-center justify-between mb-4 shrink-0">
                 <h2 class="text-lg font-bold text-zinc-900">Gerenciar Tags</h2>
@@ -868,7 +868,7 @@
         </div>
 
         <!-- ABA: CLONAR TAREFA -->
-        <div id="clone-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+        <div id="clone-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
             <!-- V40.3.7-fix: header fundido com X pra fechar (Gemini fix #1) -->
             <div class="flex items-center justify-between mb-6 shrink-0">
                 <h2 class="text-lg font-bold text-zinc-900">Repetir Tarefa</h2>
@@ -1048,7 +1048,7 @@
         </div>
 
         <!-- V3.0 - COMBO E: Relatórios -->
-        <div id="reports-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[85%] flex flex-col">
+        <div id="reports-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
             <!-- V40.3.7-fix: header fundido com X colorido (Gemini fix #1) — removido X cinza antigo da esquerda -->
             <div class="flex items-center justify-between mb-6 shrink-0">
                 <h2 class="text-lg font-bold text-zinc-900">Produtividade</h2>
@@ -1070,7 +1070,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.5.1-fix9</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.5.1-fix10</div>
 
     </div>
 

@@ -1663,11 +1663,55 @@ function closeTopmostModal() {
 }
 
 // Handler do overlay (substitui o antigo closeAllSheets direto).
-// Se tem modal aberto, fecha APENAS o modal. Senão, fecha tudo.
+// V40.5.1-fix8: REVERTIDA fix7 ultra-defensiva (estava complicando). Volta ao simples
+// + SALVAGUARDA REAL: 350ms depois de QUALQUER fechamento, verifica se overlay está
+// realmente fechado. Se não, FORÇA. Garante que overlay NUNCA fica travado.
 window.onOverlayClick = function() {
-    if (closeTopmostModal()) return;
+    if (closeTopmostModal()) {
+        scheduleOverlayForceCheck();
+        return;
+    }
     closeAllSheets();
+    scheduleOverlayForceCheck();
 };
+
+// V40.5.1-fix8: salvaguarda contra overlay travado. 350ms (após transition 300ms),
+// verifica se há algo legitimamente aberto. Se não, força limpeza completa do overlay.
+let _overlayForceTimer = null;
+function scheduleOverlayForceCheck() {
+    if (_overlayForceTimer) clearTimeout(_overlayForceTimer);
+    _overlayForceTimer = setTimeout(() => {
+        const ov = document.getElementById('overlay');
+        if (!ov) return;
+        
+        const sheetAberta = 
+            document.querySelector('#list-sheet:not(.translate-y-full)') ||
+            document.querySelector('#bottom-sheet:not(.translate-y-full)') ||
+            document.querySelector('#config-sheet:not(.translate-y-full)') ||
+            document.querySelector('#tags-sheet:not(.translate-y-full)') ||
+            document.querySelector('#reports-sheet:not(.translate-y-full)') ||
+            document.querySelector('#period-select-sheet:not(.translate-y-full)') ||
+            document.querySelector('#clone-sheet:not(.translate-y-full)') ||
+            document.querySelector('#link-note-sheet:not(.translate-y-full)');
+        
+        let modalAberto = false;
+        document.querySelectorAll('.z-\\[60\\]').forEach(m => {
+            if (modalAberto) return;
+            if (m.classList.contains('hidden')) return;
+            const cs = window.getComputedStyle(m);
+            if (cs.display !== 'none' && parseFloat(cs.opacity) > 0.1) modalAberto = true;
+        });
+        
+        if (!sheetAberta && !modalAberto) {
+            // Nada legitimamente aberto — força limpeza completa
+            ov.classList.add('opacity-0', 'pointer-events-none');
+            ov.style.zIndex = '';
+            ov.style.opacity = '';
+            ov.style.pointerEvents = '';
+        }
+        _overlayForceTimer = null;
+    }, 350);
+}
 
 // =====================================================
 // V40.5.0-fix7 — HISTORY API (botão voltar do Android)
@@ -1826,6 +1870,12 @@ window.closeAllSheets = () => {
     if(!pendingIntent) {
         fab.style.transform = 'scale(1)';
         if(listBtn) listBtn.style.transform = 'scale(1)';
+    }
+    
+    // V40.5.1-fix8: salvaguarda — agenda check forçado em 350ms pra garantir
+    // que overlay vai estar realmente fechado mesmo se transition travar.
+    if (typeof scheduleOverlayForceCheck === 'function') {
+        scheduleOverlayForceCheck();
     }
 }
 

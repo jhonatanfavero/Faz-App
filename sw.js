@@ -1,5 +1,5 @@
-// V9.5 - v40.5.1-fix6 (Padding-top do EXPANDIDO 12px → 20px (+8px) — visualmente igual ao retraído sem mexer no retraído. User reportou que no expandido o texto 'Segunda' parecia encostado na linha vermelha (provavelmente devido ao conteúdo abaixo TAGs/Progress 'puxar' visualmente). Solução: 2 regras CSS com :not(.header-collapsed) e .header-collapsed pra aplicar valor diferente conforme presença da classe. RETRAÍDO 12px INTOCADO. !important garante prioridade absoluta no retraído. max(env(), 20px) respeita notch automaticamente.)
-const CACHE_NAME = 'timeblock-v40-5-1-fix6';
+// V9.7 - v40.5.1-fix8 (REVERTI fix7 ultra-defensiva que não resolveu + nova abordagem com SALVAGUARDA REAL: scheduleOverlayForceCheck() agendado em onOverlayClick E closeAllSheets. 350ms depois (> transition 300ms), verifica se há algo legitimamente aberto; se não, FORÇA limpeza completa do overlay (opacity-0 + pointer-events-none + reseta zIndex/opacity/pointerEvents inline). Bug reportado: clicar fora de Config/Aparência travava tela toda fosca + deslocava botões inferiores. Causa raiz incerta mas agora IMPOSSÍVEL travar: máximo 350ms e overlay é forçado. Idempotente via clearTimeout. 5/5 cenários cobertos.)
+const CACHE_NAME = 'timeblock-v40-5-1-fix8';
 const ASSETS = [
   './',
   './index.html',

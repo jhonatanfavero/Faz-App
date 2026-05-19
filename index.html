@@ -286,7 +286,7 @@
                 </div>
 
                 <!-- Sub-view 2: Formulário criar/editar (igual padrão Rotinas) -->
-                <div id="backlog-form-view" class="hidden flex-1 flex-col min-h-0 relative bg-white">
+                <div id="backlog-form-view" class="hidden flex-1 flex-col min-h-0 bg-white">
                     <div class="shrink-0 px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <button onclick="closeBacklogForm()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-full hover:bg-zinc-200 transition active:scale-90">
@@ -299,7 +299,7 @@
                         </button>
                     </div>
 
-                    <div class="flex-1 overflow-y-auto no-scrollbar p-4 pb-24">
+                    <div class="flex-1 overflow-y-auto no-scrollbar p-4 pb-4">
                         
                         <!-- Nome (sem emoji — decisão 1=c) -->
                         <div class="mb-5">
@@ -338,7 +338,8 @@
                         </div>
                     </div>
 
-                    <div class="absolute bottom-0 left-0 right-0 bg-white border-t border-zinc-100 p-4 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+                    <!-- V40.5.1-fix13: footer shrink-0 em vez de absolute bottom-0 (fix de teclado cobrindo input ativo) -->
+                    <div class="shrink-0 bg-white border-t border-zinc-100 p-4 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
                         <button onclick="saveBacklogForm()" class="w-full h-12 flex items-center justify-center bg-app-focus text-white rounded-xl font-bold hover:shadow-lg transition active:scale-95 text-sm">
                             Salvar na Lista
                         </button>
@@ -1070,7 +1071,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.5.1-fix12</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.5.1-fix13</div>
 
     </div>
 

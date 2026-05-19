@@ -1,5 +1,5 @@
-// V10.0 - v40.5.1-fix11 (Opção A: DESLIGADA a Navigation Hardening (popstate handler do V40.5.0-fix7) que estava causando bug de 'tela fosca presa' ao apertar botão voltar do Android em sub-views (Aparência, Períodos, Kanban Lista). Causa raiz: closeTopmostLayer não detectava sub-views de config-sheet (config-appearance-view, config-periods-view, config-hours-view) — só conhecia backlog/routines/financial forms. + condição quebrada com closeTopmostModal === null que sempre era false. + ID 'sheet' não existia (deveria ser 'bottom-sheet'). Solução pragmática: comentar listener inteiro + transformar pushNavState em no-op. Botão voltar Android volta ao comportamento padrão do PWA (fecha app). User usa X das sheets pra fechar.)
-const CACHE_NAME = 'timeblock-v40-5-1-fix11';
+// V10.1 - v40.5.1-fix12 (Resolve teclado cobrindo input via meta tag viewport interactive-widget=resizes-content. Side-effect da fix10 (sheets h-full) era que viewport não tinha pra onde empurrar a view ao abrir teclado, então input ficava coberto. Solução cirúrgica de 1 palavra na meta tag — Chrome 108+ resize Layout Viewport quando teclado abre. Zero JS, preserva viewport-fit=cover (fix6), preserva bala de prata V40.2.17, zero impacto em drag de microblocks. Antes: V10.0 - v40.5.1-fix11 — desligado popstate handler que causava 'tela fosca presa' ao apertar voltar Android em sub-views.)
+const CACHE_NAME = 'timeblock-v40-5-1-fix12';
 const ASSETS = [
   './',
   './index.html',

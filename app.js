@@ -156,6 +156,23 @@ function setAmountAllMonths(item, amount) {
     item.amount = amount;
     delete item.paidMonthsOverrides;
 }
+
+// G20 (fix15): remove overrides FORA do range [startMonth, endMonth] do item.
+// Útil ao reduzir durationMonths (parcelada 10→5) ou trocar tipo. Evita lixo no localStorage.
+function cleanupOverridesOutsideRange(item) {
+    if (!item.paidMonthsOverrides) return;
+    const start = getItemStartMonth(item);
+    const duration = item.durationMonths || 1;
+    const endMonth = addMonths(start, duration - 1);
+    const validKeys = Object.keys(item.paidMonthsOverrides).filter(k => k >= start && k <= endMonth);
+    if (validKeys.length === 0) {
+        delete item.paidMonthsOverrides;
+        return;
+    }
+    const newOverrides = {};
+    validKeys.forEach(k => { newOverrides[k] = item.paidMonthsOverrides[k]; });
+    item.paidMonthsOverrides = newOverrides;
+}
 // V2.0 - Estado do header
 // V40.2.28: persistido em localStorage. Default false (1ª vez = expandido pra Descoberta).
 //   Depois que o usuário escolhe (toggleHeader), a escolha vira a nova default.
@@ -4825,6 +4842,10 @@ window.selectFinancialType = function(type) {
     updateFinancialTypeButtonsUI();
 }
 
+// V40.4.5 (fix15): estado temporário do save pausado pelo modal de escopo.
+// Quando user edita valor de Recorrente/Parcelada, o save é pausado aqui e retomado em confirmEditScope.
+let _pendingFinSave = null;
+
 window.saveFinancialForm = function() {
     const title = document.getElementById('financial-input').value.trim();
     if (!title) return showToast('A despesa precisa de um nome.');
@@ -4863,39 +4884,44 @@ window.saveFinancialForm = function() {
 
     if (currentFinId) {
         const item = financialDb.find(x => x.id === currentFinId);
-        if (item) {
-            // G10: se tipo mudou, resetar paidMonths
-            const prevDuration = item.durationMonths || 1;
-            const prevRecurring = item.isRecurring === true;
-            const typeChanged = (prevDuration !== durationMonths) || (prevRecurring !== isRecurring);
-            
-            item.title = title;
-            item.amount = amount;
-            item.dueDay = dueDay;
-            item.durationMonths = durationMonths;
-            item.isRecurring = isRecurring;
-            
-            // V40.4.4: migra/normaliza paidMonths
-            if (!Array.isArray(item.paidMonths)) item.paidMonths = [];
-            if (typeChanged) {
-                item.paidMonths = []; // reset ao trocar tipo
-            }
-            // Aplica o toggle "Marcar como paga" do form ao mês atual
-            setPaidInMonth(item, currentFinanceMonth, currentFinPaid);
-            
-            // Garante startMonth (retrocompat com item.month antigo)
-            if (!item.startMonth) {
-                item.startMonth = item.month || currentFinanceMonth;
-            }
+        if (!item) return;
+        
+        // V40.4.5 (fix15): detecta mudança de valor em multi-mês ANTES de aplicar
+        const prevDuration = item.durationMonths || 1;
+        const prevRecurring = item.isRecurring === true;
+        const typeChanged = (prevDuration !== durationMonths) || (prevRecurring !== isRecurring);
+        const isMultiMonthAfter = durationMonths > 1;
+        const oldAmount = getAmountInMonth(item, currentFinanceMonth);
+        const valueChanged = oldAmount !== amount;
+        // Modal só faz sentido se: continuar multi-mês + valor mudou + tipo NÃO mudou
+        // (se trocou tipo, paidMonthsOverrides será deletado de qualquer forma)
+        const shouldOpenScopeModal = isMultiMonthAfter && valueChanged && !typeChanged;
+        
+        if (shouldOpenScopeModal) {
+            // V40.4.5 (fix15): pausa o save, guarda estado e abre modal de escopo
+            _pendingFinSave = {
+                itemId: item.id,
+                newAmount: amount,
+                otherFields: { title, dueDay, durationMonths, isRecurring, currentFinPaid }
+            };
+            openEditScopeModal(item.title);
+            return; // ESPERA escolha do user em confirmEditScope
         }
+        
+        // Caminho normal: avulsa, valor não mudou, ou tipo mudou
+        applyFinancialItemUpdate(item, {
+            title, amount, dueDay, durationMonths, isRecurring,
+            typeChanged, scopeForAmount: 'all', // se chegou aqui, atualiza o item.amount diretamente
+            paidNow: currentFinPaid
+        });
         showToast('Despesa atualizada!');
     } else {
-        // V40.4.4: schema novo
+        // V40.4.4: schema novo (criação)
         const newItem = {
             id: 'fin_' + Date.now(),
             title: title,
             amount: amount,
-            startMonth: currentFinanceMonth, // decisão 8: mês onde está navegando
+            startMonth: currentFinanceMonth,
             durationMonths: durationMonths,
             isRecurring: isRecurring,
             dueDay: dueDay,
@@ -4912,6 +4938,106 @@ window.saveFinancialForm = function() {
     
     saveFinancial();
     closeFinancialForm();
+}
+
+// V40.4.5 (fix15): aplica atualização no item financeiro, respeitando escopo de valor.
+// scopeForAmount: 'this' | 'future' | 'all' — controla como item.amount/paidMonthsOverrides são atualizados.
+function applyFinancialItemUpdate(item, payload) {
+    const { title, amount, dueDay, durationMonths, isRecurring, typeChanged, scopeForAmount, paidNow } = payload;
+    
+    item.title = title;
+    item.dueDay = dueDay;
+    item.durationMonths = durationMonths;
+    item.isRecurring = isRecurring;
+    
+    // V40.4.4: migra/normaliza paidMonths
+    if (!Array.isArray(item.paidMonths)) item.paidMonths = [];
+    
+    if (typeChanged) {
+        // F2: ao trocar tipo, resetar paidMonths E overrides + setar item.amount global
+        item.paidMonths = [];
+        delete item.paidMonthsOverrides;
+        item.amount = amount;
+    } else {
+        // V40.4.5: aplica valor conforme escopo
+        if (scopeForAmount === 'this') {
+            setOverrideForMonth(item, currentFinanceMonth, amount);
+        } else if (scopeForAmount === 'future') {
+            setOverrideThisAndFuture(item, currentFinanceMonth, amount);
+        } else { // 'all'
+            setAmountAllMonths(item, amount);
+        }
+    }
+    
+    // F3/F10: limpa overrides fora do range (se durationMonths reduziu)
+    cleanupOverridesOutsideRange(item);
+    
+    // Aplica o toggle "Marcar como paga" do form ao mês atual
+    setPaidInMonth(item, currentFinanceMonth, paidNow);
+    
+    // Garante startMonth (retrocompat com item.month antigo)
+    if (!item.startMonth) {
+        item.startMonth = item.month || currentFinanceMonth;
+    }
+}
+
+// V40.4.5 (fix15): abre modal de escopo (3 opções). Default: "Apenas este mês".
+window.openEditScopeModal = function(itemTitle) {
+    const subtitle = document.getElementById('fin-scope-subtitle');
+    if (subtitle) subtitle.innerText = `Atualizar valor de "${itemTitle}" em:`;
+    const overlay = document.getElementById('overlay');
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '55';
+    const modal = document.getElementById('financial-edit-scope-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+// V40.4.5 (fix15): user escolheu escopo → aplica + salva + fecha modal e form.
+window.confirmEditScope = function(scope) {
+    if (!_pendingFinSave) {
+        closeEditScopeModal();
+        return;
+    }
+    const { itemId, newAmount, otherFields } = _pendingFinSave;
+    const item = financialDb.find(x => x.id === itemId);
+    if (!item) {
+        _pendingFinSave = null;
+        closeEditScopeModal();
+        return;
+    }
+    
+    applyFinancialItemUpdate(item, {
+        title: otherFields.title,
+        amount: newAmount,
+        dueDay: otherFields.dueDay,
+        durationMonths: otherFields.durationMonths,
+        isRecurring: otherFields.isRecurring,
+        typeChanged: false, // se chegou no modal, tipo NÃO mudou (validado em saveFinancialForm)
+        scopeForAmount: scope,
+        paidNow: otherFields.currentFinPaid
+    });
+    
+    saveFinancial();
+    _pendingFinSave = null;
+    closeEditScopeModal();
+    closeFinancialForm();
+    showToast('Despesa atualizada!');
+}
+
+// V40.4.5 (fix15): user cancelou modal → mantém form aberto, nada salvo.
+window.cancelEditScope = function() {
+    _pendingFinSave = null;
+    closeEditScopeModal();
+}
+
+function closeEditScopeModal() {
+    const overlay = document.getElementById('overlay');
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    overlay.style.zIndex = '';
+    const modal = document.getElementById('financial-edit-scope-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
 }
 
 // V40.4.1: delete com modal de confirmação (padrão V40.3.5)

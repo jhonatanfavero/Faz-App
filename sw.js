@@ -1,5 +1,5 @@
-// V10.2 - v40.5.1-fix13 (POC: refatora backlog-form-view de absolute bottom-0 + pb-24 pra layout flex shrink-0 honesto. Resolve teclado cobrindo input ativo dentro da Editar Tarefa após meta tag da fix12 fazer viewport encolher. Mudanças no index.html: 1) remove relative do container pai (não tem mais absolute filho); 2) pb-24 → pb-4 no scroll middle; 3) absolute bottom-0 left-0 right-0 → shrink-0 no footer Salvar. Mantém pb-6 (safe-area). Se POC funcionar, replicar em routines-form-view, financial-form-view e notes-form na fix14. Antes: V10.1 - v40.5.1-fix12 — meta tag interactive-widget=resizes-content.)
-const CACHE_NAME = 'timeblock-v40-5-1-fix13';
+// V10.3 - v40.5.1-fix14 (V40.4.5 Fase 1 — Helpers de override de valor por mês para despesas Recorrente/Parcelada. Schema novo: item.paidMonthsOverrides = {'YYYY-MM': {amount}}. 4 helpers adicionados ao app.js: getAmountInMonth (lê valor com fallback ao item.amount), setOverrideForMonth (1 mês), setOverrideThisAndFuture (este+futuros respeitando endMonth), setAmountAllMonths (limpa overrides). 39 assertions Node passaram com TZ='America/Sao_Paulo'. Read paths atualizados: renderFinancialCard, totais do renderFinancial, openFinancialForm. ZERO mudança visual/funcional pro user — helpers dormentes esperando fix15 (modal + saveFinancialForm refatorado). Retrocompat total com despesas antigas sem paidMonthsOverrides. Antes: V10.2 - v40.5.1-fix13 — POC backlog-form-view flex shrink-0.)
+const CACHE_NAME = 'timeblock-v40-5-1-fix14';
 const ASSETS = [
   './',
   './index.html',

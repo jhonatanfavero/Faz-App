@@ -115,6 +115,47 @@ function setPaidInMonth(item, monthStr, paid) {
         item.paidMonths = item.paidMonths.filter(m => m !== monthStr);
     }
 }
+
+// ===== V40.4.5 (fix14): HELPERS DE OVERRIDE DE VALOR POR MÊS =====
+// Schema: item.paidMonthsOverrides = { 'YYYY-MM': { amount: number } }
+// Retrocompat: itens antigos sem paidMonthsOverrides → getAmountInMonth retorna item.amount (fallback natural).
+// fix14 entrega apenas os helpers; modal + saveFinancialForm refatorado vêm na fix15.
+
+// G16: retorna valor do item num mês específico. Se houver override, usa ele; senão, item.amount.
+function getAmountInMonth(item, monthStr) {
+    if (item.paidMonthsOverrides && item.paidMonthsOverrides[monthStr]) {
+        return item.paidMonthsOverrides[monthStr].amount;
+    }
+    return item.amount;
+}
+
+// G17: aplica override em UM mês específico (cria paidMonthsOverrides se não existir).
+function setOverrideForMonth(item, monthStr, amount) {
+    if (!item.paidMonthsOverrides) item.paidMonthsOverrides = {};
+    item.paidMonthsOverrides[monthStr] = { amount: amount };
+}
+
+// G18: aplica override em ESTE mês e todos os futuros (até endMonth do item, respeitando durationMonths).
+// PRESERVA overrides de meses ANTERIORES a fromMonthStr (lição T8 da simulação).
+function setOverrideThisAndFuture(item, fromMonthStr, amount) {
+    if (!item.paidMonthsOverrides) item.paidMonthsOverrides = {};
+    const start = getItemStartMonth(item);
+    const duration = item.durationMonths || 1;
+    const endMonth = addMonths(start, duration - 1);
+    let cursor = fromMonthStr;
+    let guard = 0; // proteção contra loop infinito (F9)
+    while (cursor <= endMonth && guard < 120) {
+        item.paidMonthsOverrides[cursor] = { amount: amount };
+        cursor = addMonths(cursor, 1);
+        guard++;
+    }
+}
+
+// G19: limpa TODOS overrides e altera item.amount global ("Todos os meses").
+function setAmountAllMonths(item, amount) {
+    item.amount = amount;
+    delete item.paidMonthsOverrides;
+}
 // V2.0 - Estado do header
 // V40.2.28: persistido em localStorage. Default false (1ª vez = expandido pra Descoberta).
 //   Depois que o usuário escolhe (toggleHeader), a escolha vira a nova default.
@@ -4561,7 +4602,7 @@ function renderFinancialCard(item, monthStr) {
                 </div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-                <span class="text-sm font-bold ${valueClass}">${formatBRL(item.amount)}</span>
+                <span class="text-sm font-bold ${valueClass}">${formatBRL(getAmountInMonth(item, monthStr))}</span>
                 <button onclick="event.stopPropagation(); requestDeleteFinancial('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
                     <i class="ph ph-trash text-sm"></i>
                 </button>
@@ -4599,8 +4640,9 @@ window.renderFinancial = function() {
     const monthItems = financialDb.filter(item => isItemInMonth(item, currentFinanceMonth));
     
     // V40.4.4 (G13): 3 totais usando isPaidInMonth pra retrocompat + paidMonths
+    // V40.4.5 (fix14): usa getAmountInMonth pra respeitar overrides de valor por mês
     const totals = monthItems.reduce((acc, item) => {
-        const amt = item.amount || 0;
+        const amt = getAmountInMonth(item, currentFinanceMonth);
         acc.total += amt;
         if (isPaidInMonth(item, currentFinanceMonth)) acc.paid += amt;
         else acc.open += amt;
@@ -4714,7 +4756,8 @@ window.openFinancialForm = function(id = null) {
         if (!item) return;
         document.getElementById('fin-form-title-label').innerText = 'Editar Despesa';
         document.getElementById('financial-input').value = item.title;
-        document.getElementById('financial-amount-input').value = item.amount || '';
+        // V40.4.5 (fix14): mostra o valor do mês atual (com override se houver) em vez do item.amount global
+        document.getElementById('financial-amount-input').value = getAmountInMonth(item, currentFinanceMonth) || '';
         document.getElementById('financial-dueday-input').value = item.dueDay || '';
         // V40.4.4: deduz tipo a partir do schema (retrocompat com itens antigos)
         const duration = item.durationMonths || 1;

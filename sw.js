@@ -1,5 +1,5 @@
-// V10.5 - v40.5.1-fix16 (Cards de Finanças compactos. renderFinancialCard refatorado: layout vira linha única alinhada [check] [título truncate] [pílula R/parcela 28px] [dia numeral 28px] [valor R$ 82px] [lixeira]. Altura ~150px → ~50px (~60% mais cards na tela). Pílula R lilás só em Recorrentes; pílula X/N amarela só em Parceladas; Avulsa sem pílula. Dia numeral muda pra vermelho se vencido. Tag colorida vira borda-esquerda 4px (em vez de colorir ícone $ que foi removido). Preserva opacity-60+line-through ao pagar, borda vermelha ao vencer. ZERO mudança em lógica financeira ou storage. Antes: V10.4 - v40.5.1-fix15 — Modal escopo de edição de valor.)
-const CACHE_NAME = 'timeblock-v40-5-1-fix16';
+// V10.6 - v40.5.1-fix17 (Header de Finanças reformulado. Mês + Total inline central (Total text-lg destaque), botão Hoje vira link discreto (era card botão). Pago + Em aberto viram 2 colunas inline (label esquerda + valor direita, text-base, py-2 px-2.5). Header de coluna acima dos cards (Despesa | Tipo | Dia | Valor) com text-[9px] zinc-400. Tudo em renderFinancial + index.html. ZERO mudança em renderFinancialCard ou lógica financeira. Antes: V10.5 - v40.5.1-fix16 — Cards compactos.)
+const CACHE_NAME = 'timeblock-v40-5-1-fix17';
 const ASSETS = [
   './',
   './index.html',

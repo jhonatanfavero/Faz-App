@@ -4688,13 +4688,25 @@ window.renderFinancial = function() {
     
     let html = '';
     
+    // V40.5.1-fix17: header de coluna pra orientar visualmente (Despesa | Tipo | Dia | Valor)
+    const columnHeaderHtml = `<div class="flex items-center gap-1.5 px-2 mb-1.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400">
+        <div class="w-5 flex-shrink-0"></div>
+        <div class="flex-1">Despesa</div>
+        <div class="w-7 text-center flex-shrink-0">Tipo</div>
+        <div class="w-7 text-center flex-shrink-0">Dia</div>
+        <div class="min-w-[82px] text-right flex-shrink-0">Valor</div>
+        <div class="w-6 flex-shrink-0"></div>
+    </div>`;
+    
     if (unpaid.length > 0) {
         html += `<div class="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-2 mt-1 px-1">A Pagar (${unpaid.length})</div>`;
+        html += columnHeaderHtml;
         html += unpaid.map(item => renderFinancialCard(item, currentFinanceMonth)).join('');
     }
     
     if (paid.length > 0) {
         html += `<div class="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2 mt-4 px-1">Pagas (${paid.length})</div>`;
+        html += columnHeaderHtml;
         html += paid.map(item => renderFinancialCard(item, currentFinanceMonth)).join('');
     }
     

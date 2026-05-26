@@ -4565,8 +4565,6 @@ function renderFinancialCard(item, monthStr) {
     const isPaid = isPaidInMonth(item, monthStr);
     const isOverdue = isFinancialOverdue(item, monthStr);
     const tagColor = item.tagId ? getTagColor(item.tagId) : null;
-    const iconBgStyle = tagColor ? `background-color: ${tagColor}15; border-color: ${tagColor}40;` : '';
-    const iconColorStyle = tagColor ? `color: ${tagColor};` : 'color: #71717a;';
     
     // Decisão 2(I): valor riscado + opacidade 60% quando pago
     const opacityClass = isPaid ? 'opacity-60' : '';
@@ -4576,54 +4574,47 @@ function renderFinancialCard(item, monthStr) {
     // V40.4.3: borda vermelha sutil quando vencida
     const cardBorderClass = isOverdue ? 'border-red-300 bg-red-50/30' : 'border-zinc-200';
     
-    // Decisão 1(B): checkbox redondo à esquerda. Marcado = preenchido com app-focus.
+    // V40.5.1-fix16: tag colorida vira borda esquerda (substitui o ícone $ colorido)
+    const tagBorderStyle = tagColor ? `border-left: 4px solid ${tagColor};` : '';
+    
+    // Decisão 1(B): checkbox redondo à esquerda
     const checkboxBg = isPaid ? 'bg-app-focus border-app-focus' : 'bg-white border-zinc-300';
     const checkIconClass = isPaid ? '' : 'hidden';
     
-    // V40.4.4 (decisão 5α): texto do tipo
-    let typeText = 'Avulsa';
+    // V40.5.1-fix16: pílula de tipo (R = Recorrente, X/N = Parcela, vazio = Avulsa)
+    let typePillHtml = '';
     const duration = item.durationMonths || 1;
     if (duration > 1) {
         if (item.isRecurring) {
-            typeText = 'Recorrente';
+            typePillHtml = `<span class="inline-flex items-center justify-center w-5 h-[18px] rounded bg-app-focus-soft text-app-focus text-[10px] font-extrabold leading-none" title="Recorrente">R</span>`;
         } else {
             const label = getInstallmentLabel(item, monthStr); // ex "3/10"
-            typeText = label ? `Parcela ${label}` : 'Parcelada';
+            if (label) {
+                typePillHtml = `<span class="inline-flex items-center justify-center h-[18px] px-1.5 rounded bg-amber-100 text-amber-800 text-[10px] font-extrabold leading-none whitespace-nowrap" title="Parcela ${label}">${label}</span>`;
+            }
         }
     }
     
-    // Subtítulo: junta tipo + venc/atrasada
-    let subtitleText = typeText;
-    let subtitleClass = 'text-zinc-400';
-    if (isOverdue && item.dueDay) {
-        subtitleText = `Atrasada · venceu dia ${item.dueDay}`;
-        subtitleClass = 'text-red-600';
-    } else if (item.dueDay) {
-        subtitleText = `${typeText} · venc. dia ${item.dueDay}`;
-    }
+    // V40.5.1-fix16: coluna do dia (só numeral). Vermelho se vencido.
+    const dayBgClass = isOverdue ? 'bg-red-100 text-red-700' : 'bg-zinc-100 text-zinc-600';
+    const dayCellHtml = item.dueDay 
+        ? `<span class="inline-block w-7 text-center text-xs font-bold py-1 rounded ${dayBgClass}">${item.dueDay}</span>`
+        : `<span class="inline-block w-7 text-center text-[10px] text-zinc-300">—</span>`;
     
     return `
-    <div onclick="openFinancialForm('${item.id}')" class="bg-white border rounded-xl p-3.5 shadow-sm mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition ${opacityClass} ${cardBorderClass}">
-        <div class="flex justify-between items-center gap-3">
-            <div class="flex items-center gap-3 min-w-0 flex-1">
-                <!-- V40.4.4 (G6): togglePaidFinancial agora recebe id + mês -->
-                <button onclick="event.stopPropagation(); togglePaidFinancial('${item.id}', '${monthStr}')" aria-label="Marcar como paga" class="w-6 h-6 rounded-full border-2 ${checkboxBg} flex items-center justify-center shrink-0 transition active:scale-90">
-                    <i class="ph-bold ph-check text-xs text-white ${checkIconClass}"></i>
-                </button>
-                <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 shadow-inner" style="${iconBgStyle}">
-                    <i class="ph-fill ph-currency-circle-dollar text-lg" style="${iconColorStyle}"></i>
-                </div>
-                <div class="min-w-0">
-                    <h4 class="font-bold text-sm leading-tight truncate ${titleClass}">${escapeHtml(item.title)}</h4>
-                    <p class="text-[11px] font-bold mt-0.5 ${subtitleClass}">${subtitleText}</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-                <span class="text-sm font-bold ${valueClass}">${formatBRL(getAmountInMonth(item, monthStr))}</span>
-                <button onclick="event.stopPropagation(); requestDeleteFinancial('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-100 active:scale-95 transition" title="Apagar">
-                    <i class="ph ph-trash text-sm"></i>
-                </button>
-            </div>
+    <div onclick="openFinancialForm('${item.id}')" style="${tagBorderStyle}" class="bg-white border rounded-lg p-2 shadow-sm mb-1.5 cursor-pointer hover:shadow active:scale-[0.99] transition ${opacityClass} ${cardBorderClass}">
+        <div class="flex justify-between items-center gap-1.5">
+            <!-- V40.4.4 (G6): togglePaidFinancial agora recebe id + mês -->
+            <button onclick="event.stopPropagation(); togglePaidFinancial('${item.id}', '${monthStr}')" aria-label="Marcar como paga" class="w-5 h-5 rounded-full border-2 ${checkboxBg} flex items-center justify-center shrink-0 transition active:scale-90">
+                <i class="ph-bold ph-check text-[10px] text-white ${checkIconClass}"></i>
+            </button>
+            <h4 class="font-bold text-sm leading-tight truncate min-w-0 flex-1 ${titleClass}">${escapeHtml(item.title)}</h4>
+            <div class="w-7 flex justify-center shrink-0">${typePillHtml}</div>
+            ${dayCellHtml}
+            <span class="text-sm font-bold min-w-[82px] text-right shrink-0 ${valueClass}">${formatBRL(getAmountInMonth(item, monthStr))}</span>
+            <button onclick="event.stopPropagation(); requestDeleteFinancial('${item.id}')" class="w-6 h-6 flex items-center justify-center bg-red-50 text-red-500 rounded hover:bg-red-100 active:scale-95 transition shrink-0" title="Apagar">
+                <i class="ph ph-trash text-xs"></i>
+            </button>
         </div>
     </div>`;
 }

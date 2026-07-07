@@ -1946,6 +1946,7 @@ window.openConfigSheet = () => {
     document.getElementById('config-periods-view').classList.add('hidden');
     document.getElementById('config-hours-view').classList.add('hidden');
     document.getElementById('config-appearance-view').classList.add('hidden');
+    document.getElementById('config-backup-view').classList.add('hidden'); // V40.6.0: nova sub-view Backup
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
     document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
@@ -2007,6 +2008,252 @@ window.closeConfigPeriods = () => {
     document.getElementById('config-title').innerText = 'Configurações';
     document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
 }
+
+// ============================================================================
+// V40.6.0 — BACKUP & RESTAURAÇÃO (Fase 1 do roadmap: Export/Import)
+// ----------------------------------------------------------------------------
+// Exporta TODAS as chaves de dados (tb_*, exceto internas tb__*) num arquivo JSON.
+//   Mobile: Web Share API → manda o arquivo pro Drive / email / WhatsApp / etc.
+//   Fallback (desktop ou sem suporte): download normal do arquivo.
+// Importa: valida assinatura → confirma → salva ROLLBACK do estado atual →
+//   substitui os dados → recarrega a página (garante que todas as variáveis em
+//   memória releiam do localStorage). "Desfazer" reverte 1 nível.
+// DADOS SÃO SAGRADOS: nunca sobrescreve sem confirmação + cópia de segurança.
+// Round-trip usa strings CRUAS (100% fiel, zero risco de corromper tipos).
+// ============================================================================
+
+const FAZ_BACKUP_SIGNATURE = 'faz-timeblock-backup';
+const FAZ_ROLLBACK_KEY = 'tb__rollback'; // interna: dupla underline (tb__) → nunca exportada nem limpa
+
+// Só chaves de dados reais (tb_algo). Ignora internas (tb__algo) e não-tb.
+function isFazDataKey(k) {
+    return typeof k === 'string' && k.indexOf('tb_') === 0 && k.indexOf('tb__') !== 0;
+}
+
+// Coleta { chave: valorStringCru } de todas as chaves de dados.
+function collectFazData() {
+    const out = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (isFazDataKey(k)) out[k] = localStorage.getItem(k);
+    }
+    return out;
+}
+
+// Contagem leve pra dar confiança ao usuário (quantos itens tem em cada coisa).
+function fazDataSummary(dataObj) {
+    const countArr = (key) => {
+        try { const v = JSON.parse(dataObj[key] || '[]'); return Array.isArray(v) ? v.length : 0; }
+        catch (e) { return 0; }
+    };
+    return {
+        tarefas: countArr('tb_backlog_db'),
+        blocos: countArr('tb_master_db'),
+        rotinas: countArr('tb_routines_db'),
+        notas: countArr('tb_notes_db'),
+        despesas: countArr('tb_financial_db'),
+        tags: countArr('tb_tags_db'),
+    };
+}
+
+function fazTimestampLabel() {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+// Atualiza o textinho de resumo dentro da tela de Backup.
+window.renderBackupSummary = function() {
+    const el = document.getElementById('backup-summary');
+    if (!el) return;
+    const s = fazDataSummary(collectFazData());
+    el.innerHTML =
+        `<b>${s.tarefas}</b> tarefas · <b>${s.despesas}</b> despesas · ` +
+        `<b>${s.rotinas}</b> rotinas · <b>${s.notas}</b> notas · ` +
+        `<b>${s.blocos}</b> blocos · <b>${s.tags}</b> tags`;
+};
+
+window.openConfigBackup = function() {
+    document.getElementById('config-main-menu').classList.add('hidden');
+    document.getElementById('config-backup-view').classList.remove('hidden');
+    document.getElementById('config-title').innerText = 'Backup e Restauração';
+    document.getElementById('config-back-btn').setAttribute('onclick', 'closeConfigBackup()');
+    renderBackupSummary();
+};
+
+window.closeConfigBackup = function() {
+    document.getElementById('config-backup-view').classList.add('hidden');
+    document.getElementById('config-main-menu').classList.remove('hidden');
+    document.getElementById('config-title').innerText = 'Configurações';
+    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+};
+
+// ----- EXPORTAR (salvar backup) -----
+window.exportFazBackup = async function() {
+    let payload;
+    try {
+        const data = collectFazData();
+        payload = JSON.stringify({
+            signature: FAZ_BACKUP_SIGNATURE,
+            app: 'Faz / TimeBlock',
+            version: 'v40.6.0',
+            exportedAt: new Date().toISOString(),
+            summary: fazDataSummary(data),
+            data: data
+        }, null, 2);
+    } catch (e) {
+        showToast('Erro ao gerar o backup 😕');
+        return;
+    }
+
+    const filename = `faz-backup-${fazTimestampLabel()}.json`;
+    const blob = new Blob([payload], { type: 'application/json' });
+
+    // Mobile: tenta compartilhar o ARQUIVO (Drive, email, WhatsApp Salvo...).
+    try {
+        if (navigator.canShare) {
+            const file = new File([blob], filename, { type: 'application/json' });
+            if (navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'Backup do Faz',
+                    text: 'Guarde este arquivo em local seguro (Google Drive, email...).'
+                });
+                showToast('Backup enviado! ✅');
+                return;
+            }
+        }
+    } catch (e) {
+        if (e && e.name === 'AbortError') return; // usuário cancelou o compartilhamento de propósito
+        // qualquer outro erro no share → cai no download abaixo
+    }
+
+    // Fallback universal: download do arquivo.
+    try {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+        showToast('Backup baixado! ✅');
+    } catch (e) {
+        showToast('Não consegui salvar o arquivo 😕');
+    }
+};
+
+// ----- IMPORTAR (restaurar backup) -----
+// Botão "Restaurar" → abre o seletor de arquivo (input escondido).
+window.triggerFazImport = function() {
+    const input = document.getElementById('backup-import-input');
+    if (input) { input.value = ''; input.click(); } // zera value pra permitir reimportar o mesmo arquivo
+};
+
+// onchange do input de arquivo.
+window.handleFazImportFile = function(inputEl) {
+    const file = inputEl.files && inputEl.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        let parsed;
+        try { parsed = JSON.parse(ev.target.result); }
+        catch (e) { showToast('Arquivo inválido (não é um backup) 😕'); return; }
+        applyFazImport(parsed);
+    };
+    reader.onerror = function() { showToast('Erro ao ler o arquivo 😕'); };
+    reader.readAsText(file);
+};
+
+function applyFazImport(parsed) {
+    // Valida assinatura + estrutura.
+    if (!parsed || parsed.signature !== FAZ_BACKUP_SIGNATURE || typeof parsed.data !== 'object' || parsed.data === null) {
+        showToast('Isso não parece um backup do Faz 😕');
+        return;
+    }
+
+    // Aceita só chaves de dados válidas (strings).
+    const incoming = {};
+    let count = 0;
+    for (const k in parsed.data) {
+        if (isFazDataKey(k) && typeof parsed.data[k] === 'string') { incoming[k] = parsed.data[k]; count++; }
+    }
+    if (count === 0) { showToast('Backup vazio ou sem dados reconhecidos 🤔'); return; }
+
+    const s = parsed.summary || fazDataSummary(incoming);
+    const quando = parsed.exportedAt ? new Date(parsed.exportedAt).toLocaleString('pt-BR') : 'data desconhecida';
+    const ok = confirm(
+        '⚠️ RESTAURAR BACKUP\n\n' +
+        'Backup de: ' + quando + '\n' +
+        'Contém: ' + (s.tarefas || 0) + ' tarefas, ' + (s.despesas || 0) + ' despesas, ' +
+        (s.rotinas || 0) + ' rotinas, ' + (s.notas || 0) + ' notas.\n\n' +
+        'Isso vai SUBSTITUIR todos os dados atuais deste aparelho pelos do backup.\n' +
+        'Os dados atuais serão guardados pra você poder desfazer (1 nível).\n\n' +
+        'Continuar?'
+    );
+    if (!ok) return;
+
+    // 1) Snapshot de ROLLBACK do estado atual (dados são sagrados).
+    try {
+        localStorage.setItem(FAZ_ROLLBACK_KEY, JSON.stringify({
+            signature: FAZ_BACKUP_SIGNATURE,
+            savedAt: new Date().toISOString(),
+            data: collectFazData()
+        }));
+    } catch (e) {
+        const proceed = confirm('Não consegui salvar a cópia de segurança do estado atual (memória cheia?).\n\nQuer continuar a restauração MESMO ASSIM? (não haverá opção de desfazer)');
+        if (!proceed) return;
+    }
+
+    // 2) Limpa chaves de dados atuais (tb_ mas não tb__) e grava as do backup.
+    try {
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (isFazDataKey(k)) toRemove.push(k);
+        }
+        toRemove.forEach(k => localStorage.removeItem(k));
+        for (const k in incoming) { localStorage.setItem(k, incoming[k]); }
+    } catch (e) {
+        showToast('Erro ao gravar 😕 Revertendo...');
+        try {
+            const rb = JSON.parse(localStorage.getItem(FAZ_ROLLBACK_KEY) || 'null');
+            if (rb && rb.data) { for (const k in rb.data) localStorage.setItem(k, rb.data[k]); }
+        } catch (e2) {}
+        return;
+    }
+
+    // 3) Reload — garante que TODAS as variáveis em memória releiam do localStorage.
+    showToast('Backup restaurado! Recarregando... ✅');
+    setTimeout(() => location.reload(), 900);
+}
+
+// ----- DESFAZER última restauração (rollback 1 nível) -----
+window.undoFazImport = function() {
+    let rb;
+    try { rb = JSON.parse(localStorage.getItem(FAZ_ROLLBACK_KEY) || 'null'); }
+    catch (e) { rb = null; }
+
+    if (!rb || !rb.data) { showToast('Não há restauração pra desfazer 🤔'); return; }
+
+    const quando = rb.savedAt ? new Date(rb.savedAt).toLocaleString('pt-BR') : '';
+    if (!confirm('Desfazer a última restauração e voltar ao estado de ' + quando + '?')) return;
+
+    try {
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (isFazDataKey(k)) toRemove.push(k);
+        }
+        toRemove.forEach(k => localStorage.removeItem(k));
+        for (const k in rb.data) { localStorage.setItem(k, rb.data[k]); }
+        localStorage.removeItem(FAZ_ROLLBACK_KEY);
+        showToast('Estado anterior restaurado! Recarregando... ✅');
+        setTimeout(() => location.reload(), 900);
+    } catch (e) {
+        showToast('Erro ao desfazer 😕');
+    }
+};
 
 function timeToMins(timeStr) {
     if(!timeStr) return 0;

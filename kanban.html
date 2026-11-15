@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- V40.7.0: Listas do Faz no computador (kanban). Lê e grava no Supabase, sincronizado com o app do celular. -->
+<title>Listas do Faz</title>
+<meta name="theme-color" content="#4f46e5">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } } };
+</script>
+<style>
+    :root { --focus: #4f46e5; --canvas: #eef0f3; }
+    html, body { height: 100%; }
+    body { background: var(--canvas); }
+    .bg-focus { background-color: var(--focus); }
+    .text-focus { color: var(--focus); }
+    .bg-focus-soft { background-color: color-mix(in srgb, var(--focus) 10%, white); }
+    .chip-on { box-shadow: 0 0 0 2px var(--focus); background-color: color-mix(in srgb, var(--focus) 8%, white); }
+    input:focus, select:focus, textarea.field:focus { border-color: var(--focus) !important; }
+    :focus-visible:not(.outline-none) { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .thin-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+    .thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+    .thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    .thin-scroll::-webkit-scrollbar-track { background: transparent; }
+    .card { -webkit-user-select: none; user-select: none; }
+    .card.dragging { opacity: .35; }
+    .col.drag-over { border-color: var(--focus); }
+    .drop-line { height: 3px; border-radius: 3px; background: var(--focus); flex-shrink: 0; }
+    #toast { transition: opacity .2s, transform .2s; }
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+</style>
+</head>
+<body class="font-sans text-zinc-900 antialiased">
+
+<!-- Carregando -->
+<div id="view-loading" class="h-full flex flex-col items-center justify-center gap-3 text-zinc-500">
+    <i class="ph ph-circle-notch animate-spin text-3xl text-focus"></i>
+    <p class="text-sm font-medium">Abrindo suas Listas…</p>
+</div>
+
+<!-- Erro de carregamento / configuração -->
+<div id="view-error" class="hidden h-full flex items-center justify-center p-6">
+    <div class="max-w-sm text-center">
+        <i class="ph ph-cloud-slash text-4xl text-zinc-400"></i>
+        <p id="error-text" class="mt-3 text-sm text-zinc-700 leading-relaxed"></p>
+        <button onclick="location.reload()" class="mt-5 bg-focus text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:opacity-90">Tentar de novo</button>
+    </div>
+</div>
+
+<!-- Login -->
+<div id="view-login" class="hidden min-h-full flex items-center justify-center p-4">
+    <form id="login-form" class="w-full max-w-sm bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm" novalidate>
+        <img src="icon-192.png" alt="" class="w-12 h-12 rounded-xl">
+        <h1 class="mt-4 text-xl font-bold text-zinc-900">Suas Listas no computador</h1>
+        <p class="mt-1.5 text-sm text-zinc-600 leading-relaxed">Entre com a mesma conta que você usa no Faz do celular.</p>
+        <label class="block mt-5">
+            <span class="text-xs font-semibold text-zinc-600">E-mail</span>
+            <input id="login-email" type="email" autocomplete="email" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2.5 text-sm outline-none">
+        </label>
+        <label class="block mt-3">
+            <span class="text-xs font-semibold text-zinc-600">Senha</span>
+            <input id="login-pass" type="password" autocomplete="current-password" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2.5 text-sm outline-none">
+        </label>
+        <p id="login-msg" class="hidden mt-3 text-[13px] leading-relaxed"></p>
+        <button id="login-btn" type="submit" class="mt-5 w-full bg-focus text-white font-semibold text-sm py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60">Entrar</button>
+        <button id="signup-btn" type="button" class="mt-2 w-full text-sm font-semibold text-zinc-600 py-2.5 rounded-lg hover:bg-zinc-100 disabled:opacity-60">Criar conta</button>
+        <p class="mt-5 text-xs text-zinc-500 leading-relaxed">Pra trazer as Listas do celular: no Faz, abra <b>Configurações</b> e toque em <b>Sincronizar com a nuvem</b>.</p>
+    </form>
+</div>
+
+<!-- Quadro -->
+<div id="view-board" class="hidden h-full flex flex-col">
+    <header class="h-14 shrink-0 bg-white border-b border-zinc-200 flex items-center gap-3 px-4 sm:px-5">
+        <img src="icon-192.png" alt="" class="w-8 h-8 rounded-lg">
+        <div class="min-w-0">
+            <h1 class="text-[15px] font-bold leading-tight">Listas</h1>
+            <p id="board-summary" class="text-xs text-zinc-500 leading-tight truncate"></p>
+        </div>
+        <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
+            <span id="sync-pill" class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 px-2.5 py-1 rounded-full bg-zinc-100" title="Mudanças do celular aparecem aqui sozinhas">
+                <span id="sync-dot" class="w-2 h-2 rounded-full bg-amber-400"></span><span id="sync-label">Conectando</span>
+            </span>
+            <button id="btn-refresh" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Atualizar agora" aria-label="Atualizar agora">
+                <i class="ph ph-arrows-clockwise text-lg"></i>
+            </button>
+            <span class="hidden sm:block h-6 w-px bg-zinc-200"></span>
+            <span id="user-email" class="hidden md:block text-xs text-zinc-500 max-w-[220px] truncate"></span>
+            <button id="btn-logout" class="text-xs font-semibold text-zinc-600 hover:text-zinc-900 px-2.5 py-2 rounded-lg hover:bg-zinc-100">Sair</button>
+        </div>
+    </header>
+    <main id="board" class="relative flex-1 min-h-0 overflow-x-auto overflow-y-hidden thin-scroll">
+        <div id="columns" class="h-full inline-flex items-start gap-4 p-4 sm:p-5"></div>
+        <div id="board-empty" class="hidden absolute inset-0 flex items-center justify-center p-6">
+            <div class="max-w-md text-center">
+                <div class="mx-auto w-14 h-14 rounded-2xl bg-white border border-zinc-200 flex items-center justify-center">
+                    <i class="ph ph-device-mobile text-2xl text-focus"></i>
+                </div>
+                <h2 class="mt-4 text-lg font-bold">Suas Listas ainda não estão na nuvem</h2>
+                <p class="mt-2 text-sm text-zinc-600 leading-relaxed">No Faz do celular, abra <b>Configurações</b>, toque em <b>Sincronizar com a nuvem</b> e entre com <b id="empty-email"></b>. As listas aparecem aqui na hora.</p>
+                <button id="btn-start-empty" class="mt-5 text-[13px] font-semibold text-zinc-500 hover:text-zinc-800 underline underline-offset-4">Prefiro começar do zero no computador</button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Editar tarefa -->
+<div id="modal-task" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="f-title">
+    <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div class="p-5 pb-3 overflow-y-auto thin-scroll">
+            <textarea id="f-title" rows="1" maxlength="500" placeholder="Nome da tarefa" class="w-full resize-none text-lg font-bold text-zinc-900 leading-snug outline-none placeholder-zinc-300"></textarea>
+            <div class="grid grid-cols-2 gap-3 mt-4">
+                <label class="block">
+                    <span class="text-xs font-semibold text-zinc-500">Lista</span>
+                    <select id="f-col" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
+                </label>
+                <label class="block">
+                    <span class="text-xs font-semibold text-zinc-500">Duração</span>
+                    <select id="f-dur" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
+                </label>
+            </div>
+            <div class="mt-4">
+                <span class="text-xs font-semibold text-zinc-500">Tag</span>
+                <div id="f-tags" class="mt-1.5 flex flex-wrap gap-1.5"></div>
+            </div>
+            <div class="mt-4">
+                <span class="text-xs font-semibold text-zinc-500">Checklist</span>
+                <div id="f-mbs" class="mt-1 flex flex-col"></div>
+                <div class="mt-1 flex items-center gap-2 px-1">
+                    <i class="ph ph-plus text-zinc-400"></i>
+                    <input id="f-mb-new" maxlength="200" placeholder="Novo item (Enter)" class="flex-1 text-sm outline-none py-1.5 bg-transparent">
+                </div>
+            </div>
+        </div>
+        <div class="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
+            <button id="f-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar tarefa</button>
+            <div class="ml-auto flex gap-2">
+                <button id="f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
+                <button id="f-save" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Diálogo genérico (confirmar / nome) -->
+<div id="dialog" class="hidden fixed inset-0 z-[60] items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+    <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-5">
+        <h3 id="dlg-title" class="text-base font-bold text-zinc-900"></h3>
+        <p id="dlg-text" class="mt-1.5 text-sm text-zinc-600 leading-relaxed"></p>
+        <input id="dlg-input" class="hidden mt-3 w-full border border-zinc-300 rounded-lg px-3 py-2.5 text-sm outline-none">
+        <div class="mt-5 flex justify-end gap-2">
+            <button id="dlg-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
+            <button id="dlg-ok" class="text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90"></button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
+
+<script src="faz-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+    'use strict';
+
+    var CFG = window.FAZ_SUPABASE || {};
+    var DEFAULT_COL = 'col_geral';
+    var STEP = 1024;
+    var DURATIONS = [15, 30, 45, 60, 75, 90, 120, 150, 180, 240];
+    var KINDS = ['listas', 'tags', 'tarefas'];
+    var SELECT = {
+        tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,deleted',
+        listas: 'id,name,is_default,position,created_ms,deleted',
+        tags: 'id,name,color,position,deleted'
+    };
+    var S = {
+        sb: null, uid: null, email: '', listas: {}, tags: {}, tarefas: {},
+        channel: null, live: 'connecting', lastLoad: 0, loading: false,
+        dragId: null, pendingRender: false, composer: null, editing: null
+    };
+
+    // ---------- utilitários ----------
+    function $(id) { return document.getElementById(id); }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function safeColor(c) { return /^#[0-9a-fA-F]{3,8}$/.test(String(c || '')) ? c : '#d4d4d8'; }
+    function fmtDur(m) { // igual ao formatDur do app
+        m = Math.max(0, Math.round(Number(m) || 0));
+        var h = Math.floor(m / 60), r = m % 60;
+        return h > 0 && r > 0 ? h + 'h ' + r + 'm' : (h > 0 ? h + 'h' : r + 'm');
+    }
+    function byPos(a, b) { return (a.position - b.position) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); }
+    function alive(kind) {
+        return Object.keys(S[kind]).map(function (k) { return S[kind][k]; }).filter(function (r) { return !r.deleted; }).sort(byPos);
+    }
+    function aliveListIds() { var s = {}; alive('listas').forEach(function (c) { s[c.id] = true; }); return s; }
+    function colOf(t, ids) { ids = ids || aliveListIds(); return ids[t.column_id] ? t.column_id : DEFAULT_COL; } // órfã → lista padrão (igual ao app)
+    function tasksInCol(colId) { var ids = aliveListIds(); return alive('tarefas').filter(function (t) { return colOf(t, ids) === colId; }); }
+    function maxPos(kind) { return Object.keys(S[kind]).reduce(function (m, k) { return Math.max(m, Number(S[kind][k].position) || 0); }, 0); }
+    function newId(prefix, kind) { var n = Date.now(); while (S[kind][prefix + n]) n++; return prefix + n; }
+    function tagOf(id) { var t = id && S.tags[id]; return t && !t.deleted ? t : null; }
+    function normMbs(a) { return (Array.isArray(a) ? a : []).map(function (m) { return { title: String((m && m.title) || '').trim(), done: !!(m && m.done) }; }).filter(function (m) { return m.title; }); }
+    function show(view) {
+        ['view-loading', 'view-error', 'view-login', 'view-board'].forEach(function (v) { $(v).classList.toggle('hidden', v !== view); });
+    }
+    function showError(text) { $('error-text').textContent = text; show('view-error'); }
+
+    var toastT = null;
+    function toast(msg) {
+        var t = $('toast');
+        t.textContent = msg;
+        t.classList.remove('opacity-0', 'translate-y-2');
+        clearTimeout(toastT);
+        toastT = setTimeout(function () { t.classList.add('opacity-0', 'translate-y-2'); }, 2600);
+    }
+    function fail(err) {
+        console.error('[Faz kanban]', err);
+        toast(navigator.onLine === false ? 'Sem internet. A mudança não foi salva.' : 'Não foi possível salvar. Confira a internet e tente de novo.');
+    }
+
+    function applyTheme(user) {
+        var c = user && user.user_metadata && user.user_metadata.faz_theme;
+        if (/^#[0-9a-fA-F]{6}$/.test(String(c || ''))) {
+            document.documentElement.style.setProperty('--focus', c);
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', c);
+        }
+    }
+
+    function setLive(state) {
+        S.live = state;
+        var dot = $('sync-dot'), label = $('sync-label');
+        dot.className = 'w-2 h-2 rounded-full ' + (state === 'live' ? 'bg-emerald-500' : state === 'connecting' ? 'bg-amber-400' : 'bg-zinc-400');
+        label.textContent = state === 'live' ? 'Ao vivo' : state === 'connecting' ? 'Conectando' : (navigator.onLine === false ? 'Sem internet' : 'Reconectando');
+    }
+
+    // ---------- dados ----------
+    async function fetchKind(kind) {
+        var out = [];
+        for (var from = 0; ; from += 1000) {
+            var res = await S.sb.from(kind).select(SELECT[kind]).eq('user_id', S.uid).order('id').range(from, from + 999);
+            if (res.error) throw res.error;
+            out = out.concat(res.data || []);
+            if (!res.data || res.data.length < 1000) break;
+        }
+        return out;
+    }
+
+    async function loadAll() {
+        if (!S.uid || S.loading) return;
+        S.loading = true;
+        try {
+            var results = await Promise.all(KINDS.map(fetchKind));
+            KINDS.forEach(function (k, i) {
+                var map = {};
+                results[i].forEach(function (r) { map[r.id] = r; });
+                S[k] = map;
+            });
+            S.lastLoad = Date.now();
+            render();
+        } catch (e) {
+            console.error('[Faz kanban] load', e);
+            if (!S.lastLoad) toast('Não consegui carregar suas Listas. Confira a internet.');
+        } finally {
+            S.loading = false;
+        }
+    }
+
+    function subscribe() {
+        unsubscribe();
+        var filter = 'user_id=eq.' + S.uid;
+        var ch = S.sb.channel('faz-listas-' + S.uid);
+        KINDS.forEach(function (k) {
+            ch.on('postgres_changes', { event: '*', schema: 'public', table: k, filter: filter }, function (p) {
+                if (p.eventType === 'DELETE') { if (p.old && p.old.id) delete S[k][p.old.id]; }
+                else if (p.new && p.new.id) S[k][p.new.id] = p.new;
+                scheduleRender();
+            });
+        });
+        ch.subscribe(function (status) {
+            if (status === 'SUBSCRIBED') { setLive('live'); loadAll(); } // cobre o intervalo entre carregar e assinar
+            else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') setLive('off');
+        });
+        S.channel = ch;
+        setLive('connecting');
+    }
+    function unsubscribe() {
+        if (S.channel) { try { S.sb.removeChannel(S.channel); } catch (e) {} S.channel = null; }
+    }
+
+    async function insertRow(kind, row, okMsg) {
+        S[kind][row.id] = row;
+        render();
+        var res = await S.sb.from(kind).upsert(row, { onConflict: 'user_id,id' });
+        if (res.error) { delete S[kind][row.id]; render(); fail(res.error); return false; }
+        if (okMsg) toast(okMsg);
+        return true;
+    }
+
+    // Atualiza só os campos alterados (não pisa no que o celular mudou em outros campos).
+    async function patchRow(kind, id, fields, okMsg) {
+        var row = S[kind][id];
+        if (!row) return false;
+        var prev = Object.assign({}, row);
+        Object.assign(row, fields);
+        render();
+        var res = await S.sb.from(kind).update(fields).eq('user_id', S.uid).eq('id', id);
+        if (res.error) { S[kind][id] = prev; render(); fail(res.error); return false; }
+        if (okMsg) toast(okMsg);
+        return true;
+    }
+
+    // ---------- render ----------
+    var renderT = null;
+    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(render, 60); }
+
+    function cardHtml(t) {
+        var tag = tagOf(t.tag_id);
+        var mbs = Array.isArray(t.microblocks) ? t.microblocks : [];
+        var done = mbs.filter(function (m) { return m && m.done; }).length;
+        var all = mbs.length > 0 && done === mbs.length;
+        return '<article class="card bg-white border border-zinc-200 border-l-4 rounded-xl px-3 py-2.5 cursor-pointer hover:border-zinc-300 hover:shadow-sm transition-shadow" ' +
+            'style="border-left-color:' + esc(safeColor(tag ? tag.color : '#d4d4d8')) + '" draggable="true" tabindex="0" data-id="' + esc(t.id) + '">' +
+            '<p class="text-[13.5px] font-semibold text-zinc-800 leading-snug break-words">' + (esc(t.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
+            '<div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">' +
+            (tag ? '<span class="inline-flex items-center gap-1.5 font-medium text-zinc-600"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
+            '<span class="inline-flex items-center gap-1"><i class="ph ph-clock"></i>' + fmtDur(t.duration) + '</span>' +
+            (mbs.length ? '<span class="inline-flex items-center gap-1' + (all ? ' text-emerald-600 font-medium' : '') + '"><i class="ph ' + (all ? 'ph-check-circle' : 'ph-check-square') + '"></i>' + done + '/' + mbs.length + '</span>' : '') +
+            '</div></article>';
+    }
+
+    function colHtml(c, tasks) {
+        var mins = tasks.reduce(function (a, t) { return a + (Number(t.duration) || 0); }, 0);
+        return '<section class="col w-[296px] shrink-0 max-h-full flex flex-col bg-zinc-50 border border-zinc-200 rounded-2xl" data-col="' + esc(c.id) + '">' +
+            '<header class="px-3.5 pt-3 pb-2 flex items-start gap-2">' +
+            '<div class="min-w-0 flex-1">' +
+            '<h2 class="text-[13px] font-bold text-zinc-800 truncate" title="' + esc(c.name) + '">' + (esc(c.name) || 'Sem nome') + '</h2>' +
+            '<p class="mt-0.5 text-[11px] font-medium text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i>' + (tasks.length ? fmtDur(mins) + ' planejados' : 'Vazia') + '</p>' +
+            '</div>' +
+            '<span class="mt-0.5 text-[11px] font-semibold text-zinc-600 bg-white border border-zinc-200 rounded-full px-2 py-0.5" title="Tarefas nesta lista">' + tasks.length + '</span>' +
+            '<button class="col-menu-btn w-7 h-7 -mr-1 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800" data-col="' + esc(c.id) + '" aria-label="Opções da lista ' + esc(c.name) + '"><i class="ph-bold ph-dots-three text-base"></i></button>' +
+            '</header>' +
+            '<div class="col-list thin-scroll flex-1 min-h-[52px] overflow-y-auto px-2.5 pb-1 flex flex-col gap-2" data-col="' + esc(c.id) + '">' + tasks.map(cardHtml).join('') + '</div>' +
+            '<footer class="p-2.5 pt-1.5" data-composer="' + esc(c.id) + '">' +
+            '<button class="add-btn w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-[13px] font-medium text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-800" data-col="' + esc(c.id) + '"><i class="ph ph-plus"></i>Adicionar tarefa</button>' +
+            '</footer></section>';
+    }
+
+    function render() {
+        if (!S.uid) return;
+        if (S.dragId) { S.pendingRender = true; return; } // não mexe no DOM no meio de um arraste
+        S.pendingRender = false;
+        var board = $('board'), wrap = $('columns');
+        var scrollLeft = board.scrollLeft, colScroll = {};
+        wrap.querySelectorAll('.col-list').forEach(function (el) { colScroll[el.dataset.col] = el.scrollTop; });
+        var composerFocused = !!(document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('composer-input'));
+
+        var cols = alive('listas'), ids = {}, byCol = {};
+        cols.forEach(function (c) { ids[c.id] = true; byCol[c.id] = []; });
+        var tasks = alive('tarefas');
+        tasks.forEach(function (t) { var c = colOf(t, ids); (byCol[c] = byCol[c] || []).push(t); });
+
+        $('board-summary').textContent = tasks.length + (tasks.length === 1 ? ' tarefa em ' : ' tarefas em ') + cols.length + (cols.length === 1 ? ' lista' : ' listas');
+        if (!cols.length) {
+            wrap.innerHTML = '';
+            $('empty-email').textContent = S.email;
+            $('board-empty').classList.toggle('hidden', !S.lastLoad);
+            return;
+        }
+        $('board-empty').classList.add('hidden');
+        wrap.innerHTML = cols.map(function (c) { return colHtml(c, byCol[c.id] || []); }).join('') +
+            '<button id="btn-new-list" class="w-[296px] shrink-0 flex items-center gap-2 px-4 py-3 rounded-2xl border-2 border-dashed border-zinc-300 text-[13px] font-semibold text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 hover:bg-white/60"><i class="ph ph-plus"></i>Nova lista</button>';
+
+        board.scrollLeft = scrollLeft;
+        wrap.querySelectorAll('.col-list').forEach(function (el) { if (colScroll[el.dataset.col] != null) el.scrollTop = colScroll[el.dataset.col]; });
+        if (S.composer) openComposer(S.composer.col, S.composer.text, composerFocused);
+    }
+
+    // ---------- adicionar tarefa (direto na coluna) ----------
+    function footerOf(colId) {
+        var els = document.querySelectorAll('footer[data-composer]');
+        for (var i = 0; i < els.length; i++) if (els[i].dataset.composer === colId) return els[i];
+        return null;
+    }
+    function openComposer(colId, text, focus) {
+        if (S.composer && S.composer.col !== colId) { var old = S.composer.col; S.composer = null; resetFooter(old); }
+        var footer = footerOf(colId);
+        if (!footer) { S.composer = null; return; }
+        S.composer = { col: colId, text: text || '' };
+        footer.innerHTML = '<div class="bg-white border border-zinc-200 rounded-xl p-2 shadow-sm">' +
+            '<textarea class="composer-input w-full resize-none text-[13.5px] font-medium outline-none px-1 py-1 placeholder-zinc-400" rows="2" maxlength="500" placeholder="Nome da tarefa"></textarea>' +
+            '<div class="flex items-center gap-2 mt-1">' +
+            '<button class="composer-add bg-focus text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:opacity-90">Adicionar</button>' +
+            '<button class="composer-cancel text-xs font-semibold text-zinc-500 px-2 py-1.5 rounded-lg hover:bg-zinc-100">Cancelar</button>' +
+            '<span class="ml-auto text-[10.5px] text-zinc-400">Enter adiciona</span>' +
+            '</div></div>';
+        var ta = footer.querySelector('textarea');
+        ta.value = S.composer.text;
+        ta.addEventListener('input', function () { if (S.composer) S.composer.text = ta.value; });
+        ta.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComposer(); }
+            else if (e.key === 'Escape') { e.stopPropagation(); closeComposer(); }
+        });
+        footer.querySelector('.composer-add').addEventListener('click', submitComposer);
+        footer.querySelector('.composer-cancel').addEventListener('click', closeComposer);
+        if (focus !== false) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    }
+    function resetFooter(colId) {
+        var footer = footerOf(colId);
+        if (footer) footer.innerHTML = '<button class="add-btn w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-[13px] font-medium text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-800" data-col="' + esc(colId) + '"><i class="ph ph-plus"></i>Adicionar tarefa</button>';
+    }
+    function closeComposer() { if (!S.composer) return; var c = S.composer.col; S.composer = null; resetFooter(c); }
+    function submitComposer() {
+        if (!S.composer) return;
+        var title = S.composer.text.trim();
+        if (!title) return;
+        var colId = S.composer.col;
+        S.composer.text = '';
+        insertRow('tarefas', {
+            user_id: S.uid, id: newId('bl_', 'tarefas'), column_id: colId, title: title, duration: 30,
+            tag_id: null, microblocks: [], position: maxPos('tarefas') + STEP, deleted: false
+        }, 'Tarefa adicionada');
+        var list = document.querySelector('.col-list[data-col="' + CSS.escape(colId) + '"]');
+        if (list) list.scrollTop = list.scrollHeight;
+    }
+
+    // ---------- listas ----------
+    async function createList() {
+        var name = await dialog({ title: 'Nova lista', input: { placeholder: 'Nome da lista', max: 30 }, okLabel: 'Criar lista' });
+        if (!name) return;
+        insertRow('listas', { user_id: S.uid, id: newId('col_', 'listas'), name: name, is_default: false, position: maxPos('listas') + STEP, created_ms: Date.now(), deleted: false }, 'Lista criada');
+    }
+    async function renameList(colId) {
+        var c = S.listas[colId];
+        if (!c) return;
+        var name = await dialog({ title: 'Renomear lista', input: { value: c.name, placeholder: 'Nome da lista', max: 30 }, okLabel: 'Renomear' });
+        if (!name || name === c.name) return;
+        patchRow('listas', colId, { name: name }, 'Lista renomeada');
+    }
+    async function deleteList(colId) {
+        var c = S.listas[colId];
+        if (!c || c.is_default || colId === DEFAULT_COL) return toast('A lista padrão não pode ser apagada.');
+        var tasks = tasksInCol(colId);
+        var ok = await dialog({
+            title: 'Apagar a lista ' + c.name + '?',
+            text: tasks.length ? (tasks.length === 1 ? 'A tarefa dela também será apagada' : 'As ' + tasks.length + ' tarefas dela também serão apagadas') + ', aqui e no celular. Não dá pra desfazer.' : 'A lista está vazia. Não dá pra desfazer.',
+            okLabel: 'Apagar lista', danger: true
+        });
+        if (!ok) return;
+        var prevTasks = tasks.map(function (t) { return Object.assign({}, t); }), prevCol = Object.assign({}, c);
+        tasks.forEach(function (t) { t.deleted = true; });
+        c.deleted = true;
+        render();
+        // tarefas primeiro: se cair no meio, nunca sobra tarefa numa lista apagada
+        var r1 = tasks.length ? await S.sb.from('tarefas').update({ deleted: true }).eq('user_id', S.uid).in('id', tasks.map(function (t) { return t.id; })) : { error: null };
+        var r2 = r1.error ? r1 : await S.sb.from('listas').update({ deleted: true }).eq('user_id', S.uid).eq('id', colId);
+        if (r1.error || r2.error) {
+            prevTasks.forEach(function (t) { S.tarefas[t.id] = t; });
+            S.listas[colId] = prevCol;
+            render();
+            fail(r1.error || r2.error);
+            loadAll();
+            return;
+        }
+        toast('Lista apagada');
+    }
+    function startFromScratch() {
+        insertRow('listas', { user_id: S.uid, id: DEFAULT_COL, name: 'Geral', is_default: true, position: STEP, created_ms: Date.now(), deleted: false }, 'Lista criada');
+    }
+
+    var menuEl = null;
+    function closeColMenu() {
+        if (menuEl) { menuEl.remove(); menuEl = null; document.removeEventListener('mousedown', outsideMenu, true); }
+    }
+    function outsideMenu(e) { if (menuEl && !menuEl.contains(e.target)) closeColMenu(); }
+    function openColMenu(colId, btn) {
+        closeColMenu();
+        var c = S.listas[colId];
+        if (!c) return;
+        var isDefault = c.is_default || colId === DEFAULT_COL;
+        var r = btn.getBoundingClientRect();
+        menuEl = document.createElement('div');
+        menuEl.className = 'fixed z-40 w-52 bg-white border border-zinc-200 rounded-xl shadow-lg p-1';
+        menuEl.style.top = Math.round(r.bottom + 6) + 'px';
+        menuEl.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 216, r.right - 208))) + 'px';
+        menuEl.innerHTML = '<button data-act="rename" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-pencil-simple"></i>Renomear lista</button>' +
+            (isDefault ? '<p class="px-3 py-2 text-[11.5px] text-zinc-400 leading-snug">A lista padrão não pode ser apagada.</p>'
+                : '<button data-act="delete" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-red-600 hover:bg-red-50"><i class="ph ph-trash"></i>Apagar lista</button>');
+        menuEl.addEventListener('click', function (e) {
+            var b = e.target.closest('button');
+            if (!b) return;
+            closeColMenu();
+            if (b.dataset.act === 'rename') renameList(colId); else deleteList(colId);
+        });
+        document.body.appendChild(menuEl);
+        setTimeout(function () { document.addEventListener('mousedown', outsideMenu, true); }, 0);
+    }
+
+    // ---------- diálogo genérico ----------
+    function dialog(o) {
+        return new Promise(function (resolve) {
+            var d = $('dialog'), inp = $('dlg-input'), okB = $('dlg-ok'), cancelB = $('dlg-cancel');
+            $('dlg-title').textContent = o.title;
+            $('dlg-text').textContent = o.text || '';
+            $('dlg-text').classList.toggle('hidden', !o.text);
+            inp.classList.toggle('hidden', !o.input);
+            if (o.input) { inp.value = o.input.value || ''; inp.placeholder = o.input.placeholder || ''; inp.maxLength = o.input.max || 100; }
+            okB.textContent = o.okLabel || 'OK';
+            okB.className = 'text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90 ' + (o.danger ? 'bg-red-600' : 'bg-focus');
+            d.classList.remove('hidden');
+            d.classList.add('flex');
+            var prevFocus = document.activeElement;
+            if (o.input) { inp.focus(); inp.select(); } else okB.focus();
+            function finish(v) {
+                d.classList.add('hidden');
+                d.classList.remove('flex');
+                okB.removeEventListener('click', onOk);
+                cancelB.removeEventListener('click', onCancel);
+                d.removeEventListener('keydown', onKey);
+                d.removeEventListener('mousedown', onBackdrop);
+                try { if (prevFocus && prevFocus.focus) prevFocus.focus(); } catch (e) {}
+                resolve(v);
+            }
+            function onOk() {
+                if (o.input) { var v = inp.value.trim(); if (!v) { inp.focus(); return; } finish(v); }
+                else finish(true);
+            }
+            function onCancel() { finish(o.input ? null : false); }
+            function onKey(e) {
+                if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
+                else if (e.key === 'Enter' && (o.input || document.activeElement === okB)) { e.preventDefault(); onOk(); }
+            }
+            function onBackdrop(e) { if (e.target === d) onCancel(); }
+            okB.addEventListener('click', onOk);
+            cancelB.addEventListener('click', onCancel);
+            d.addEventListener('keydown', onKey);
+            d.addEventListener('mousedown', onBackdrop);
+        });
+    }
+
+    // ---------- editar tarefa ----------
+    function autoGrow(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+    function openTask(id) {
+        var t = S.tarefas[id];
+        if (!t || t.deleted) return;
+        closeComposer();
+        S.editing = { id: id, orig: JSON.parse(JSON.stringify(t)), tag: tagOf(t.tag_id) ? t.tag_id : null, mbs: normMbs(t.microblocks) };
+        $('f-title').value = t.title || '';
+        $('f-col').innerHTML = alive('listas').map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('');
+        $('f-col').value = colOf(t);
+        var d = Number(t.duration) || 30;
+        var durs = DURATIONS.indexOf(d) >= 0 ? DURATIONS : DURATIONS.concat([d]).sort(function (a, b) { return a - b; });
+        $('f-dur').innerHTML = durs.map(function (m) { return '<option value="' + m + '">' + fmtDur(m) + '</option>'; }).join('');
+        $('f-dur').value = String(d);
+        $('f-mb-new').value = '';
+        renderTagChips();
+        renderMbs();
+        var m = $('modal-task');
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+        autoGrow($('f-title'));
+        $('f-title').focus();
+    }
+    function closeTask() {
+        var m = $('modal-task');
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+        S.editing = null;
+    }
+    function renderTagChips() {
+        var ed = S.editing;
+        var chip = function (id, label, color) {
+            var on = (ed.tag || null) === id;
+            return '<button type="button" data-tag="' + esc(id || '') + '" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50' + (on ? ' chip-on' : '') + '">' +
+                (color ? '<span class="w-2.5 h-2.5 rounded-full" style="background:' + esc(safeColor(color)) + '"></span>' : '<i class="ph ph-prohibit text-zinc-400"></i>') + esc(label) + '</button>';
+        };
+        $('f-tags').innerHTML = chip(null, 'Sem tag', null) + alive('tags').map(function (t) { return chip(t.id, t.name, t.color); }).join('');
+    }
+    function renderMbs() {
+        $('f-mbs').innerHTML = S.editing.mbs.map(function (m, i) {
+            return '<div class="group flex items-center gap-2 px-1 py-0.5 rounded-lg hover:bg-zinc-50">' +
+                '<input type="checkbox" data-mb-done="' + i + '" class="w-4 h-4 rounded accent-[var(--focus)]"' + (m.done ? ' checked' : '') + '>' +
+                '<input data-mb-title="' + i + '" value="' + esc(m.title) + '" maxlength="200" class="flex-1 text-sm py-1.5 outline-none bg-transparent' + (m.done ? ' line-through text-zinc-400' : '') + '">' +
+                '<button type="button" data-mb-del="' + i + '" class="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus:opacity-100" aria-label="Remover item"><i class="ph ph-x"></i></button>' +
+                '</div>';
+        }).join('');
+    }
+    async function saveTask() {
+        var ed = S.editing;
+        if (!ed) return;
+        var t = S.tarefas[ed.id];
+        if (!t || t.deleted) { closeTask(); return toast('Essa tarefa foi apagada em outro aparelho.'); }
+        var title = $('f-title').value.trim();
+        if (!title) { $('f-title').focus(); return toast('Dê um nome pra tarefa.'); }
+        var fields = {};
+        if (title !== (ed.orig.title || '')) fields.title = title;
+        var col = $('f-col').value;
+        if (col && col !== colOf(ed.orig)) { fields.column_id = col; fields.position = maxPos('tarefas') + STEP; }
+        var dur = parseInt($('f-dur').value, 10);
+        if (Number.isFinite(dur) && dur !== Number(ed.orig.duration)) fields.duration = dur;
+        if ((ed.tag || null) !== (ed.orig.tag_id || null)) fields.tag_id = ed.tag || null;
+        var mbs = normMbs(ed.mbs);
+        if (JSON.stringify(mbs) !== JSON.stringify(normMbs(ed.orig.microblocks))) fields.microblocks = mbs;
+        closeTask();
+        if (Object.keys(fields).length) patchRow('tarefas', ed.id, fields, 'Tarefa salva');
+    }
+    async function deleteTask() {
+        var ed = S.editing;
+        if (!ed) return;
+        var ok = await dialog({ title: 'Apagar esta tarefa?', text: 'Ela some daqui e do celular.', okLabel: 'Apagar tarefa', danger: true });
+        if (!ok) return;
+        closeTask();
+        patchRow('tarefas', ed.id, { deleted: true }, 'Tarefa apagada');
+    }
+
+    // ---------- arrastar e soltar ----------
+    function dropIndex(list, y) {
+        var cards = list.querySelectorAll('.card:not(.dragging)');
+        for (var i = 0; i < cards.length; i++) {
+            var r = cards[i].getBoundingClientRect();
+            if (y < r.top + r.height / 2) return i;
+        }
+        return cards.length;
+    }
+    function clearDropMarks() {
+        document.querySelectorAll('.drop-line').forEach(function (el) { el.remove(); });
+        document.querySelectorAll('.col.drag-over').forEach(function (el) { el.classList.remove('drag-over'); });
+    }
+    function placeLine(col, list, idx) {
+        clearDropMarks();
+        col.classList.add('drag-over');
+        var line = document.createElement('div');
+        line.className = 'drop-line';
+        var cards = list.querySelectorAll('.card:not(.dragging)');
+        if (idx < cards.length) list.insertBefore(line, cards[idx]); else list.appendChild(line);
+    }
+    function endDrag(skipRender) {
+        clearDropMarks();
+        document.querySelectorAll('.card.dragging').forEach(function (el) { el.classList.remove('dragging'); });
+        S.dragId = null;
+        if (S.pendingRender && !skipRender) render();
+    }
+    async function renormalize(colId, movingId, index) {
+        var sibs = tasksInCol(colId).filter(function (x) { return x.id !== movingId; });
+        sibs.splice(index, 0, S.tarefas[movingId]);
+        var base = sibs.length && Number.isFinite(sibs[0].position) ? sibs[0].position : STEP;
+        for (var i = 0; i < sibs.length; i++) {
+            var f = { position: base + i * STEP };
+            if (sibs[i].id === movingId) f.column_id = colId;
+            if (sibs[i].position !== f.position || f.column_id) await patchRow('tarefas', sibs[i].id, f);
+        }
+    }
+    function moveTo(id, colId, index) {
+        var t = S.tarefas[id];
+        if (!t || t.deleted) return;
+        var cur = colOf(t);
+        var sibs = tasksInCol(colId).filter(function (x) { return x.id !== id; });
+        var prev = sibs[index - 1] || null, next = sibs[index] || null;
+        if (cur === colId) {
+            var list = tasksInCol(colId), ci = list.indexOf(t);
+            if ((list[ci - 1] || null) === prev && (list[ci + 1] || null) === next) return; // soltou no mesmo lugar
+        }
+        var pos;
+        if (prev && next) {
+            if (!(next.position - prev.position > 1e-6)) { renormalize(colId, id, index); return; }
+            pos = (prev.position + next.position) / 2;
+        } else if (prev) pos = prev.position + STEP;
+        else if (next) pos = next.position - STEP;
+        else pos = maxPos('tarefas') + STEP;
+        var fields = { position: pos };
+        if (t.column_id !== colId) fields.column_id = colId;
+        patchRow('tarefas', id, fields);
+    }
+
+    // ---------- eventos ----------
+    function bindEvents() {
+        var wrap = $('columns');
+        wrap.addEventListener('click', function (e) {
+            var b;
+            if ((b = e.target.closest('.col-menu-btn'))) return openColMenu(b.dataset.col, b);
+            if ((b = e.target.closest('.add-btn'))) return openComposer(b.dataset.col, '', true);
+            if (e.target.closest('#btn-new-list')) return createList();
+            var card = e.target.closest('.card');
+            if (card) openTask(card.dataset.id);
+        });
+        wrap.addEventListener('keydown', function (e) {
+            var card = e.target.closest && e.target.closest('.card');
+            if (card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openTask(card.dataset.id); }
+        });
+        wrap.addEventListener('dragstart', function (e) {
+            var card = e.target.closest('.card');
+            if (!card) return;
+            S.dragId = card.dataset.id;
+            closeColMenu();
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', S.dragId); } catch (err) {}
+            requestAnimationFrame(function () { card.classList.add('dragging'); });
+        });
+        wrap.addEventListener('dragover', function (e) {
+            if (!S.dragId) return;
+            var col = e.target.closest('.col');
+            if (!col) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            var list = col.querySelector('.col-list');
+            placeLine(col, list, dropIndex(list, e.clientY));
+        });
+        wrap.addEventListener('drop', function (e) {
+            if (!S.dragId) return;
+            var col = e.target.closest('.col');
+            if (!col) return;
+            e.preventDefault();
+            var list = col.querySelector('.col-list');
+            var idx = dropIndex(list, e.clientY), id = S.dragId;
+            endDrag(true);
+            moveTo(id, list.dataset.col, idx);
+            if (S.pendingRender) render();
+        });
+        wrap.addEventListener('dragend', function () { endDrag(false); });
+
+        $('btn-start-empty').addEventListener('click', startFromScratch);
+        $('btn-refresh').addEventListener('click', function () { loadAll().then(function () { toast('Listas atualizadas'); }); });
+        $('btn-logout').addEventListener('click', async function () {
+            var ok = await dialog({ title: 'Sair da conta?', text: 'Neste computador você volta pra tela de entrada. Nada é apagado.', okLabel: 'Sair' });
+            if (ok) { try { await S.sb.auth.signOut(); } catch (err) {} }
+        });
+
+        // modal da tarefa
+        $('f-title').addEventListener('input', function () { autoGrow(this); });
+        $('f-title').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveTask(); } });
+        $('f-save').addEventListener('click', saveTask);
+        $('f-cancel').addEventListener('click', closeTask);
+        $('f-delete').addEventListener('click', deleteTask);
+        $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this) closeTask(); });
+        $('f-tags').addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-tag]');
+            if (!b || !S.editing) return;
+            S.editing.tag = b.dataset.tag || null;
+            renderTagChips();
+        });
+        $('f-mbs').addEventListener('change', function (e) {
+            if (!S.editing) return;
+            var i = e.target.dataset.mbDone;
+            if (i != null) { S.editing.mbs[i].done = e.target.checked; renderMbs(); }
+        });
+        $('f-mbs').addEventListener('input', function (e) {
+            if (!S.editing) return;
+            var i = e.target.dataset.mbTitle;
+            if (i != null) S.editing.mbs[i].title = e.target.value;
+        });
+        $('f-mbs').addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-mb-del]');
+            if (!b || !S.editing) return;
+            S.editing.mbs.splice(Number(b.dataset.mbDel), 1);
+            renderMbs();
+        });
+        $('f-mb-new').addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' || !S.editing) return;
+            e.preventDefault();
+            var v = this.value.trim();
+            if (!v) return;
+            S.editing.mbs.push({ title: v, done: false });
+            this.value = '';
+            renderMbs();
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            if (!$('dialog').classList.contains('hidden')) return;
+            if (menuEl) return closeColMenu();
+            if (S.editing) return closeTask();
+            if (S.composer) closeComposer();
+        });
+
+        // login
+        $('login-form').addEventListener('submit', function (e) { e.preventDefault(); doLogin(); });
+        $('signup-btn').addEventListener('click', doSignup);
+
+        // rede / foco: garante que nada fica velho mesmo se o tempo real cair
+        window.addEventListener('online', function () { if (S.uid) { setLive('connecting'); subscribe(); loadAll(); } });
+        window.addEventListener('offline', function () { if (S.uid) setLive('off'); });
+        window.addEventListener('focus', function () { if (S.uid && Date.now() - S.lastLoad > 15000) loadAll(); });
+        setInterval(function () {
+            if (S.uid && document.visibilityState === 'visible' && (S.live !== 'live' || Date.now() - S.lastLoad > 300000)) loadAll();
+        }, 30000);
+    }
+
+    // ---------- login ----------
+    function loginMsg(text, isError) {
+        var p = $('login-msg');
+        p.textContent = text;
+        p.className = 'mt-3 text-[13px] leading-relaxed ' + (isError ? 'text-red-600' : 'text-emerald-700');
+        p.classList.toggle('hidden', !text);
+    }
+    function authError(e) {
+        var m = String((e && e.message) || e || '');
+        if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos.';
+        if (/Email not confirmed/i.test(m)) return 'Confirme seu e-mail primeiro: abra o link que enviamos e tente de novo.';
+        if (/already registered|already exists/i.test(m)) return 'Esse e-mail já tem conta. Use Entrar.';
+        if (/at least 6|Password should/i.test(m)) return 'A senha precisa ter pelo menos 6 caracteres.';
+        if (/rate limit|too many/i.test(m)) return 'Muitas tentativas. Espere alguns minutos e tente de novo.';
+        if (/Failed to fetch|NetworkError/i.test(m)) return 'Sem conexão com a nuvem. Confira a internet.';
+        return 'Não foi possível entrar agora. Tente de novo.';
+    }
+    function creds() { return { email: $('login-email').value.trim(), password: $('login-pass').value }; }
+    function lockLogin(on) { $('login-btn').disabled = on; $('signup-btn').disabled = on; }
+    async function doLogin() {
+        var c = creds();
+        if (!c.email || !c.password) return loginMsg('Preencha e-mail e senha.', true);
+        lockLogin(true);
+        loginMsg('', false);
+        try {
+            var res = await S.sb.auth.signInWithPassword(c);
+            if (res.error) throw res.error;
+            $('login-pass').value = '';
+        } catch (e) { loginMsg(authError(e), true); }
+        finally { lockLogin(false); }
+    }
+    async function doSignup() {
+        var c = creds();
+        if (!c.email || !c.password) return loginMsg('Preencha e-mail e senha pra criar a conta.', true);
+        if (c.password.length < 6) return loginMsg('A senha precisa ter pelo menos 6 caracteres.', true);
+        lockLogin(true);
+        loginMsg('', false);
+        try {
+            var res = await S.sb.auth.signUp({ email: c.email, password: c.password, options: { emailRedirectTo: location.href.split('#')[0].split('?')[0] } });
+            if (res.error) throw res.error;
+            if (!res.data || !res.data.session) loginMsg('Se este e-mail ainda não tinha conta, mandamos um link de confirmação. Abra o link e depois toque em Entrar.', false);
+        } catch (e) { loginMsg(authError(e), true); }
+        finally { lockLogin(false); }
+    }
+
+    // ---------- sessão ----------
+    var currentUid;
+    function onSession(session) {
+        var uid = session ? session.user.id : null;
+        if (session) applyTheme(session.user);
+        if (uid === currentUid) return;
+        currentUid = uid;
+        if (!session) {
+            unsubscribe();
+            S.uid = null; S.listas = {}; S.tags = {}; S.tarefas = {}; S.lastLoad = 0; S.composer = null;
+            closeTask();
+            closeColMenu();
+            show('view-login');
+            return;
+        }
+        S.uid = uid;
+        S.email = session.user.email || '';
+        $('user-email').textContent = S.email;
+        $('board-summary').textContent = 'Carregando…';
+        $('columns').innerHTML = '';
+        show('view-board');
+        loadAll();
+        subscribe();
+    }
+
+    async function init() {
+        if (!CFG.url || !CFG.key) return showError('Não encontrei a configuração da nuvem (faz-config.js).');
+        if (!window.supabase || !window.supabase.createClient) return showError('Não consegui carregar a conexão com a nuvem. Confira a internet e tente de novo.');
+        S.sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+        bindEvents();
+        S.sb.auth.onAuthStateChange(function (event, session) { setTimeout(function () { onSession(session); }, 0); });
+        try {
+            var r = await S.sb.auth.getSession();
+            onSession(r && r.data ? r.data.session : null);
+        } catch (e) {
+            show('view-login');
+        }
+    }
+
+    init();
+})();
+</script>
+</body>
+</html>

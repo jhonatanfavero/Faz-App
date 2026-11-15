@@ -208,6 +208,7 @@ let activeColumnId = 'col_geral'; // coluna que está sendo visualizada (pra cri
 
 function saveBacklogColumns() {
     localStorage.setItem('tb_backlog_columns', JSON.stringify(backlogColumnsDb));
+    if (window.fazSyncNotify) window.fazSyncNotify(); // V40.7.0: avisa o sync (só age se logado)
 }
 
 // K3: garante que coluna padrão Geral sempre existe (executa no init e antes de operações).
@@ -309,9 +310,9 @@ if (!db || db.length === 0) {
 }
 
 function saveDb() { localStorage.setItem('tb_master_db', JSON.stringify(db)); }
-function saveBacklog() { localStorage.setItem('tb_backlog_db', JSON.stringify(backlogDb)); }
+function saveBacklog() { localStorage.setItem('tb_backlog_db', JSON.stringify(backlogDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.7.0: + aviso ao sync
 function savePeriods() { localStorage.setItem('tb_periods_db', JSON.stringify(periodsDb)); }
-function saveTags() { localStorage.setItem('tb_tags_db', JSON.stringify(tagsDb)); }
+function saveTags() { localStorage.setItem('tb_tags_db', JSON.stringify(tagsDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.7.0: + aviso ao sync
 
 // --- FUNÇÕES DE TAGS ---
 window.addTag = function(name, color) {
@@ -1947,6 +1948,7 @@ window.openConfigSheet = () => {
     document.getElementById('config-hours-view').classList.add('hidden');
     document.getElementById('config-appearance-view').classList.add('hidden');
     document.getElementById('config-backup-view').classList.add('hidden'); // V40.6.0: nova sub-view Backup
+    document.getElementById('config-sync-view').classList.add('hidden'); // V40.7.0: nova sub-view Sincronizar
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
     document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
@@ -2096,7 +2098,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.6.0',
+            version: 'v40.7.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

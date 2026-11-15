@@ -781,6 +781,20 @@
                     </div>
                     <i class="ph ph-caret-right text-zinc-400"></i>
                 </button>
+
+                <!-- V40.7.0: Sincronizar com a nuvem (Fase 2 MVP — só as Listas, opcional) -->
+                <button onclick="openConfigSync()" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+                            <i class="ph ph-cloud-arrow-up text-xl"></i>
+                        </div>
+                        <div class="flex flex-col min-w-0">
+                            <span class="font-bold text-zinc-800 text-sm">Sincronizar com a nuvem</span>
+                            <span class="text-[11px] text-zinc-500 font-medium truncate" id="sync-menu-status">Ver suas Listas no computador</span>
+                        </div>
+                    </div>
+                    <i class="ph ph-caret-right text-zinc-400 shrink-0"></i>
+                </button>
             </div>
 
             <div class="flex-1 overflow-y-auto no-scrollbar hidden" id="config-hours-view">
@@ -884,6 +898,66 @@
                 <p class="text-[11px] text-zinc-400 text-center leading-relaxed px-4 mt-1">
                     Dica: faça backup de vez em quando e guarde no Google Drive. Se trocar de celular, é só instalar o app e restaurar.
                 </p>
+            </div>
+
+            <!-- V40.7.0: Sincronizar com a nuvem (lógica em sync.js) -->
+            <div class="flex-1 overflow-y-auto no-scrollbar hidden" id="config-sync-view">
+                <div id="sync-not-configured" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+                    <p class="text-[12px] text-amber-700 leading-relaxed">A sincronização ainda não está disponível nesta versão.</p>
+                </div>
+
+                <!-- Desconectado -->
+                <div id="sync-logged-out">
+                    <p class="text-[13px] text-zinc-600 leading-relaxed mb-4">
+                        Entre com uma conta pra ver e editar suas <b>Listas</b> no computador. Tudo continua salvo neste aparelho também, funcionando sem internet.
+                    </p>
+                    <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-4 mb-3">
+                        <label class="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-1" for="sync-email">E-mail</label>
+                        <input type="email" id="sync-email" autocomplete="email" inputmode="email" placeholder="voce@email.com" class="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-app-focus mb-3">
+                        <label class="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-1" for="sync-password">Senha</label>
+                        <input type="password" id="sync-password" autocomplete="current-password" placeholder="Mínimo 6 caracteres" class="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-app-focus mb-4">
+                        <button id="sync-login-btn" onclick="fazSyncLogin()" class="w-full bg-app-focus text-white rounded-lg px-3 py-3 text-sm font-bold shadow-md hover:opacity-90 transition flex items-center justify-center gap-2 mb-2">
+                            <i class="ph ph-sign-in text-lg"></i> Entrar
+                        </button>
+                        <button id="sync-signup-btn" onclick="fazSyncSignup()" class="w-full bg-white border-2 border-app-focus text-app-focus rounded-lg px-3 py-2.5 text-sm font-bold hover:bg-zinc-50 transition">
+                            Criar conta
+                        </button>
+                    </div>
+                    <p class="text-[11px] text-zinc-400 text-center leading-relaxed px-4">
+                        Por enquanto sincroniza só as Listas (tarefas, listas e tags). Agenda, rotinas, notas e finanças continuam só neste aparelho.
+                    </p>
+                </div>
+
+                <!-- Conectado -->
+                <div id="sync-logged-in" class="hidden">
+                    <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-4 mb-3 flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                            <i class="ph ph-cloud-check text-xl"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="font-bold text-zinc-800 text-sm">Conectado</p>
+                            <p class="text-[12px] text-zinc-600 truncate" id="sync-user-email"></p>
+                            <p class="text-[11px] text-zinc-500 mt-1" id="sync-last"></p>
+                        </div>
+                    </div>
+                    <button onclick="fazSyncNow()" class="w-full bg-app-focus text-white rounded-xl px-3 py-3 text-sm font-bold shadow-md hover:opacity-90 transition flex items-center justify-center gap-2 mb-3">
+                        <i class="ph ph-arrows-clockwise text-lg"></i> Sincronizar agora
+                    </button>
+                    <div class="bg-white border border-zinc-200 rounded-xl p-4 mb-3">
+                        <p class="font-bold text-zinc-800 text-sm mb-1">No computador</p>
+                        <p class="text-[12px] text-zinc-600 leading-relaxed mb-2">Abra este endereço no Chrome e entre com a mesma conta:</p>
+                        <p class="text-[13px] font-semibold text-app-focus break-all mb-3" id="sync-kanban-url"></p>
+                        <button onclick="fazSyncCopyKanbanLink()" class="w-full bg-zinc-50 border border-zinc-200 text-zinc-700 rounded-lg px-3 py-2.5 text-sm font-bold hover:bg-zinc-100 transition flex items-center justify-center gap-2">
+                            <i class="ph ph-copy text-base"></i> Copiar link
+                        </button>
+                    </div>
+                    <button onclick="fazSyncLogout()" class="w-full text-center text-[12px] text-zinc-400 font-medium py-2 hover:text-zinc-600 transition">
+                        Sair desta conta
+                    </button>
+                    <p class="text-[11px] text-zinc-400 text-center leading-relaxed px-4 mt-1">
+                        Sincroniza sozinho ao abrir o app, ao voltar pra ele e logo depois de cada mudança nas Listas.
+                    </p>
+                </div>
             </div>
 
         </div>
@@ -1156,10 +1230,13 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.6.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.7.0</div>
 
     </div>
 
     <script src="app.js"></script>
+    <!-- V40.7.0: sincronização opcional das Listas. Só baixa a biblioteca do Supabase pra quem fizer login. -->
+    <script src="faz-config.js"></script>
+    <script src="sync.js"></script>
 </body>
 </html>

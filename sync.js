@@ -21,6 +21,11 @@
  *   edições feitas no PC ao mesmo tempo.
  * Órfãos: tarefa numa lista apagada vai pra lista padrão; tag apagada vira null.
  *
+ * V40.8.0 — AGENDA (tb_master_db) SÓ IDA: o celular envia blocos novos/alterados
+ *   (comparando uma impressão digital de cada bloco com a do último envio) e
+ *   marca como apagados os que sumiram. NUNCA altera a timeline do celular.
+ *   O PC só lê. 'expanded' (estado de tela) não vai pra nuvem.
+ *
  * Estado interno em 'tb__sync' (prefixo tb__ = interno: fica FORA do backup e
  * o Restaurar não apaga). Sessão do Supabase fica em 'sb-<ref>-auth-token'.
  *
@@ -345,6 +350,61 @@
             .map(function (r) { return MAP[kind].item(r, prevById[r.id]); });
     }
 
+    // ---------- V40.8.0: AGENDA, só ida (celular → nuvem) ----------
+    var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    function validDate(s) { // data de calendário real (2026-02-30 não passa)
+        if (!DATE_RE.test(s)) return false;
+        var y = +s.slice(0, 4), m = +s.slice(5, 7), d = +s.slice(8, 10);
+        if (y < 1900 || y > 2999 || m < 1 || m > 12 || d < 1) return false;
+        return d <= new Date(Date.UTC(y, m, 0)).getUTCDate();
+    }
+    function blockRow(b) {
+        if (!b || b.id == null) return null;
+        var id = String(b.id), date = String(b.date || '');
+        if (!id.length || id.length > 64 || !validDate(date)) return null;
+        return {
+            id: id,
+            date: date,
+            start_min: clampInt(b.startMin, 0, 0, 1440),
+            duration: clampInt(b.duration, 15, 0, 1440),
+            title: str(b.title, 2000),
+            type: str(b.type || 'focus', 32),
+            theme: str(b.theme || 'focus', 32),
+            tag_id: b.tagId && String(b.tagId).length <= 64 ? String(b.tagId) : null,
+            microblocks: Array.isArray(b.microblocks) ? clone(b.microblocks) : [],
+            completed: !!b.completed,
+            was_delayed: !!b.wasDelayed,
+            linked_note_ids: Array.isArray(b.linkedNoteIds) ? clone(b.linkedNoteIds) : []
+        };
+    }
+    function hash53(s) { // cyrb53: impressão digital de 53 bits
+        var h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+        for (var i = 0, ch; i < s.length; i++) {
+            ch = s.charCodeAt(i);
+            h1 = Math.imul(h1 ^ ch, 2654435761);
+            h2 = Math.imul(h2 ^ ch, 1597334677);
+        }
+        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+    }
+    // Diferença entre a agenda local e o último envio (baseHashes = {id: impressão}).
+    function planBlocks(blocks, baseHashes) {
+        baseHashes = baseHashes || {};
+        var seen = {}, upserts = [], hashes = {}, skipped = 0;
+        (blocks || []).forEach(function (b) {
+            var r = blockRow(b);
+            if (!r) { if (b && b.id != null) skipped++; return; }
+            if (seen[r.id]) return; // id repetido: vale o primeiro
+            seen[r.id] = true;
+            var h = hash53(stable(r));
+            hashes[r.id] = h;
+            if (baseHashes[r.id] !== h) { r.deleted = false; upserts.push(r); }
+        });
+        var tombstones = Object.keys(baseHashes).filter(function (id) { return !seen[id]; });
+        return { upserts: upserts, tombstones: tombstones, hashes: hashes, skipped: skipped };
+    }
+
     function baseFrom(merged) {
         var b = {};
         KINDS.forEach(function (k) {
@@ -358,7 +418,8 @@
         DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS,
         stable: stable, same: same, assignPositions: assignPositions, fixTies: fixTies, buildLocal: buildLocal,
         indexRows: indexRows, cleanRow: cleanRow, merge3: merge3, mergeKind: mergeKind,
-        plan: plan, materialize: materialize, baseFrom: baseFrom, aliveCount: aliveCount, MAP: MAP
+        plan: plan, materialize: materialize, baseFrom: baseFrom, aliveCount: aliveCount, MAP: MAP,
+        validDate: validDate, blockRow: blockRow, hash53: hash53, planBlocks: planBlocks
     };
 });
 
@@ -499,6 +560,23 @@
         }
     }
 
+    // V40.8.0: agenda só ida. Novos/alterados em lotes de 500; apagados viram tombstone
+    // por UPDATE (o upsert exigiria data/horário de um bloco que já não existe aqui).
+    async function pushBlocks(uid, pb) {
+        for (var j = 0; j < pb.upserts.length; j += 500) {
+            var chunk = pb.upserts.slice(j, j + 500).map(function (r) { return Object.assign({ user_id: uid }, r); });
+            var res = await sb.from('blocos').upsert(chunk, { onConflict: 'user_id,id' });
+            if (res.error) throw res.error;
+        }
+        for (var k = 0; k < pb.tombstones.length; k += 100) {
+            var r2 = await sb.from('blocos').update({ deleted: true }).eq('user_id', uid).in('id', pb.tombstones.slice(k, k + 100));
+            if (r2.error) throw r2.error;
+        }
+    }
+    function localBlocks() {
+        try { return (typeof db !== 'undefined' && Array.isArray(db)) ? db : []; } catch (e) { return []; }
+    }
+
     function firstSyncText(remote) {
         var email = (session && session.user && session.user.email) || '';
         return '☁️ PRIMEIRA SINCRONIZAÇÃO DESTE APARELHO\n\n' +
@@ -507,6 +585,7 @@
             'Na nuvem: ' + CORE.aliveCount(remote.tarefas) + ' tarefas, ' + CORE.aliveCount(remote.listas) + ' listas, ' +
             CORE.aliveCount(remote.tags) + ' tags\n\n' +
             'Vou JUNTAR os dois lados. Se o mesmo item existir nos dois, vale a versão da nuvem.\n' +
+            'Tua agenda (' + localBlocks().length + ' blocos) também vai, só pra ver no computador.\n' +
             'Dica: se quiser segurança extra, faça um backup antes (Config → Backup).\n\n' +
             'Continuar?';
     }
@@ -556,6 +635,8 @@
                 firstSync: firstSync,
                 usedTagIds: usedTagIds()
             });
+            // V40.8.0: agenda (só ida) — fotografa a diferença no mesmo instante do plano.
+            var pb = CORE.planBlocks(localBlocks(), (st && st.userId === uid && st.blocos) || {});
             if (firstSync && !confirm(firstSyncText(remote))) {
                 await window.fazSyncLogout(true);
                 toast('Sincronização cancelada');
@@ -564,7 +645,8 @@
             if (KINDS.some(function (k) { return p.changed[k]; })) applyLocal(p);
 
             await pushAll(uid, p.push);
-            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), lastSyncAt: Date.now() });
+            await pushBlocks(uid, pb);
+            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), blocos: pb.hashes, lastSyncAt: Date.now() });
             lastError = null;
             if (manual || firstSync) toast('Sincronizado ✅');
             pushTheme();

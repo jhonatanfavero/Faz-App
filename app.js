@@ -309,7 +309,7 @@ if (!db || db.length === 0) {
     if(modified) saveDb();
 }
 
-function saveDb() { localStorage.setItem('tb_master_db', JSON.stringify(db)); }
+function saveDb() { localStorage.setItem('tb_master_db', JSON.stringify(db)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.8.0: agenda vai pra nuvem (só ida)
 function saveBacklog() { localStorage.setItem('tb_backlog_db', JSON.stringify(backlogDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.7.0: + aviso ao sync
 function savePeriods() { localStorage.setItem('tb_periods_db', JSON.stringify(periodsDb)); }
 function saveTags() { localStorage.setItem('tb_tags_db', JSON.stringify(tagsDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.7.0: + aviso ao sync

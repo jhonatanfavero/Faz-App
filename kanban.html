@@ -81,10 +81,12 @@
 <div id="view-board" class="hidden h-full flex flex-col">
     <header class="h-14 shrink-0 bg-white border-b border-zinc-200 flex items-center gap-3 px-4 sm:px-5">
         <img src="icon-192.png" alt="" class="w-8 h-8 rounded-lg">
-        <div class="min-w-0">
-            <h1 class="text-[15px] font-bold leading-tight">Listas</h1>
-            <p id="board-summary" class="text-xs text-zinc-500 leading-tight truncate"></p>
-        </div>
+        <!-- V40.8.0: abas Listas | Agenda -->
+        <nav class="inline-flex p-1 bg-zinc-100 rounded-xl shrink-0" role="tablist" aria-label="Seções">
+            <button id="tab-listas" role="tab" data-tab="listas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Listas</button>
+            <button id="tab-agenda" role="tab" data-tab="agenda" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Agenda</button>
+        </nav>
+        <p id="board-summary" class="hidden sm:block min-w-0 text-xs text-zinc-500 leading-tight truncate"></p>
         <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
             <span id="sync-pill" class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 px-2.5 py-1 rounded-full bg-zinc-100" title="Mudanças do celular aparecem aqui sozinhas">
                 <span id="sync-dot" class="w-2 h-2 rounded-full bg-amber-400"></span><span id="sync-label">Conectando</span>
@@ -110,6 +112,45 @@
             </div>
         </div>
     </main>
+
+    <!-- V40.8.0: Agenda (só leitura — quem manda é o celular) -->
+    <main id="agenda" class="hidden relative flex-1 min-h-0 flex flex-col">
+        <div class="shrink-0 flex flex-wrap items-center gap-2 px-4 sm:px-5 pt-4">
+            <button id="ag-prev" class="w-9 h-9 rounded-lg flex items-center justify-center bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50" aria-label="Anterior"><i class="ph-bold ph-caret-left"></i></button>
+            <button id="ag-today" class="h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50">Hoje</button>
+            <button id="ag-next" class="w-9 h-9 rounded-lg flex items-center justify-center bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50" aria-label="Próximo"><i class="ph-bold ph-caret-right"></i></button>
+            <h2 id="ag-label" class="ml-1 text-[15px] font-bold text-zinc-900"></h2>
+            <div class="ml-auto inline-flex p-1 bg-white border border-zinc-200 rounded-xl" role="tablist" aria-label="Visualização">
+                <button data-view="week" class="ag-view px-3 py-1.5 rounded-lg text-[13px] font-semibold">Semana</button>
+                <button data-view="day" class="ag-view px-3 py-1.5 rounded-lg text-[13px] font-semibold">Dia</button>
+            </div>
+        </div>
+        <div id="ag-banner" class="hidden mx-4 sm:mx-5 mt-3 px-4 py-3 bg-white border border-zinc-200 rounded-xl text-[13px] text-zinc-600 leading-relaxed">
+            <i class="ph ph-device-mobile text-focus mr-1"></i>Tua agenda ainda não chegou na nuvem. Abra o Faz no celular (versão <b>v40.8.0</b>) com internet: ele envia sozinho.
+        </div>
+        <div id="ag-week" class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden thin-scroll">
+            <div id="ag-cols" class="h-full inline-flex items-start gap-3 p-4 sm:p-5"></div>
+        </div>
+        <div id="ag-day" class="hidden flex-1 min-h-0 overflow-y-auto thin-scroll">
+            <div id="ag-timeline" class="relative mx-auto max-w-3xl my-4 px-4"></div>
+        </div>
+    </main>
+</div>
+
+<!-- V40.8.0: detalhe do bloco da agenda (só leitura) -->
+<div id="modal-block" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="b-title">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div class="p-5 overflow-y-auto thin-scroll">
+            <p id="b-when" class="text-xs font-semibold text-zinc-500 tabular-nums"></p>
+            <h3 id="b-title" class="mt-1 text-lg font-bold text-zinc-900 leading-snug break-words"></h3>
+            <div id="b-meta" class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-zinc-600"></div>
+            <div id="b-mbs" class="mt-4 flex flex-col gap-1.5"></div>
+        </div>
+        <div class="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
+            <p class="text-[11.5px] text-zinc-400">Pra editar, use o app no celular.</p>
+            <button id="b-close" class="ml-auto text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Fechar</button>
+        </div>
+    </div>
 </div>
 
 <!-- Editar tarefa -->

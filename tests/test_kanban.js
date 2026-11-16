@@ -380,6 +380,78 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   click($('tab-listas'));
   }
 
+  console.log('\nQ) V40.12.0 — calendário em português, hora em 24h e tarefa "na mão" (PC):');
+  {
+    const visible = (id) => !$(id).classList.contains('hidden');
+    const T = (id) => server.get('tarefas', UID, id);
+    const sel = (id, cls) => d.querySelector(`[data-time-for="${id}"] .${cls}`);
+    const pickSel = (el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', { bubbles: true })); };
+    const lbl = (id) => d.querySelector(`[data-date-for="${id}"] .date-label`).textContent;
+    const liveTasks = () => server.alive('tarefas', UID).filter((t) => !t.archived);
+    const overlap = (day, st, dur) => server.alive('blocos', UID).some((b) => b.date === day && !b.archived && st < b.start_min + b.duration && b.start_min < st + dur);
+    const gaps = () => [...d.querySelectorAll('#ag-cols [data-gap-day]')];
+    ok(d.querySelectorAll('input[type="date"], input[type="time"]').length === 0, 'a tela não usa mais o calendário nem o relógio do navegador (que saíam no idioma do Chrome)');
+    const q1 = liveTasks()[0];
+    click(d.querySelector(`.card[data-id="${q1.id}"] [data-sched]`));
+    ok(lbl('f-sched-date') === 'Seg, 16/11/2026 (hoje)' && sel('f-sched-time', 'time-h').options.length === 24 && sel('f-sched-time', 'time-m').options.length >= 12 && sel('f-sched-time', 'time-h').value !== '', 'o dia aparece como "Seg, 16/11/2026 (hoje)" e a hora em dois seletores (00 a 23; de 5 em 5 min)');
+    click(d.querySelector('[data-date-for="f-sched-date"]'));
+    const pop = $('cal-pop'), grids = () => pop.querySelectorAll('.grid');
+    ok(visible('cal-pop') && $('cal-title').textContent === 'Novembro de 2026' && [...grids()[0].children].map((x) => x.textContent).join('') === 'DSTQQSS' && grids()[1].querySelectorAll('[data-cal-day]').length === 30 && /Hoje/.test(pop.textContent) && /Fechar/.test(pop.textContent), 'calendário próprio em português: "Novembro de 2026", D S T Q Q S S, Hoje e Fechar');
+    ok(pop.querySelector('[aria-current="date"]').textContent === '16' && grids()[1].querySelectorAll('span').length === 0, 'dia escolhido destacado; novembro de 2026 começa num domingo');
+    click(pop.querySelector('[data-cal-nav="1"]'));
+    ok($('cal-title').textContent === 'Dezembro de 2026' && grids()[1].querySelectorAll('span').length === 2 && grids()[1].querySelectorAll('[data-cal-day]').length === 31, 'seta vai pro mês seguinte (dezembro: 31 dias, começa numa terça)');
+    click(pop.querySelector('[data-cal-nav="1"]'));
+    ok($('cal-title').textContent === 'Janeiro de 2027', 'e vira o ano: Janeiro de 2027');
+    click(pop.querySelector('[data-cal-nav="-1"]')); click(pop.querySelector('[data-cal-nav="-1"]'));
+    click(pop.querySelector('[data-cal-day="2026-11-21"]'));
+    ok(!visible('cal-pop') && $('f-sched-date').value === '2026-11-21' && lbl('f-sched-date') === 'Sáb, 21/11/2026' && $('f-sched-time').value === '07:00' && sel('f-sched-time', 'time-h').value === '7' && sel('f-sched-time', 'time-m').value === '0', 'clicar no dia escolhe, fecha o calendário e sugere o horário');
+    pickSel(sel('f-sched-time', 'time-h'), '15'); pickSel(sel('f-sched-time', 'time-m'), '35');
+    ok($('f-sched-time').value === '15:35' && /das 15:35 às/.test($('f-sched-info').textContent), 'hora e minuto em 24h: "' + $('f-sched-info').textContent + '"');
+    click(d.querySelector('[data-date-for="f-sched-date"]')); key(d.body, 'Escape');
+    ok(!visible('cal-pop') && visible('modal-task'), 'Esc fecha só o calendário; o cartão continua aberto');
+    // a mão, pelo painel de agendar
+    click($('f-sched-hand'));
+    ok(!visible('modal-task') && $('tab-agenda').classList.contains('on') && visible('ag-place') && $('ag-place-title').textContent === q1.title && /espaço tracejado/.test($('ag-place-hint').textContent), 'a mão fecha o cartão, abre a aba Agenda e mostra a tarefa "na mão"');
+    const g16 = gaps().filter((g) => g.dataset.gapDay === '2026-11-16').map((g) => +g.dataset.gapStart);
+    ok(new Set(gaps().map((g) => g.dataset.gapDay)).size === 7 && g16.length >= 1 && g16.every((st) => st >= 440 && !overlap('2026-11-16', st, q1.duration)), `os 7 dias mostram os espaços livres onde a tarefa cabe; hoje só a partir de agora (${g16.map(hhmm).join(', ')})`);
+    click(d.querySelector('#ag-cols [data-block]'));
+    ok(!visible('modal-task') && /espaço livre/.test($('toast').textContent), 'com a tarefa na mão, clicar num bloco não abre o cartão');
+    const gq = gaps().find((g) => g.dataset.gapDay === '2026-11-19'), gst = +gq.dataset.gapStart;
+    click(gq); await waitFor(() => T(q1.id).deleted === true);
+    const nbq = server.alive('blocos', UID).find((b) => b.title === q1.title && b.date === '2026-11-19');
+    ok(!!nbq && nbq.start_min === gst && nbq.duration === q1.duration && /^f_\d+$/.test(nbq.id) && !visible('ag-place') && gaps().length === 0 && /Agendado para Qui 19\/11 às/.test($('toast').textContent), `clicar em "${gq.textContent.trim()}" coloca o bloco ali, tira a tarefa da lista e solta a mão`);
+    // a mão direto no cartão + visão Dia
+    click($('tab-listas')); await sleep(40);
+    const q2 = liveTasks()[0];
+    click(d.querySelector(`.card[data-id="${q2.id}"] [data-hand]`));
+    ok(!visible('modal-task') && visible('ag-place') && $('ag-place-title').textContent === q2.title, 'mão do cartão das Listas: um clique e a tarefa já está na mão, na aba Agenda');
+    click(d.querySelector('#ag-cols .ag-day-btn[data-day="2026-11-22"]')); await sleep(40);
+    ok(visible('ag-place') && /Clique no horário/.test($('ag-place-hint').textContent) && $('ag-timeline').classList.contains('placing'), 'clicar no nome do dia abre a visão Dia, ainda com a tarefa na mão');
+    $('ag-timeline').dispatchEvent(new w.MouseEvent('click', { bubbles: true, clientY: 3.2 * 150 })); // 150 min abaixo do começo da régua (07:00)
+    await waitFor(() => T(q2.id).deleted === true);
+    const nb2 = server.alive('blocos', UID).find((b) => b.title === q2.title && b.date === '2026-11-22');
+    ok(!!nb2 && nb2.start_min === 570 && !visible('ag-place') && !$('ag-timeline').classList.contains('placing'), 'na visão Dia, clicar na régua coloca no horário clicado (09:30)');
+    // cancelar, Esc, trocar de aba, falha de rede
+    click(d.querySelector('.ag-view[data-view="week"]')); click($('tab-listas')); await sleep(40);
+    const q3 = liveTasks()[0];
+    click(d.querySelector(`.card[data-id="${q3.id}"]`)); click($('f-hand'));
+    ok(visible('ag-place') && $('ag-place-title').textContent === q3.title, 'mão no rodapé do cartão aberto');
+    click($('ag-place-cancel'));
+    ok(!visible('ag-place') && gaps().length === 0 && T(q3.id).deleted === false && /continua na lista/.test($('toast').textContent), 'Cancelar: nada é agendado e a tarefa continua na lista');
+    click($('tab-listas')); click(d.querySelector(`.card[data-id="${q3.id}"] [data-hand]`)); key(d.body, 'Escape');
+    ok(!visible('ag-place') && T(q3.id).deleted === false, 'Esc também solta a tarefa');
+    click($('tab-listas')); click(d.querySelector(`.card[data-id="${q3.id}"] [data-hand]`)); click($('tab-listas'));
+    ok(!visible('ag-place') && !!d.querySelector(`.card[data-id="${q3.id}"]`), 'voltar pra aba Listas com a tarefa na mão: ela continua lá');
+    click(d.querySelector(`.card[data-id="${q3.id}"] [data-hand]`));
+    const nBl = server.alive('blocos', UID).length;
+    server.failNext = 1; click(gaps()[0]); await sleep(250);
+    ok(T(q3.id).deleted === false && server.alive('blocos', UID).length === nBl && visible('ag-place') && /Não foi possível salvar/.test($('toast').textContent), 'sem internet ao colocar: nada muda e a tarefa volta pra mão');
+    click($('ag-place-cancel'));
+    click(d.querySelector('#ag-cols [data-block]'));
+    ok(visible('modal-task') && /^.{3}, \d{2}\/\d{2}\/\d{4}/.test(lbl('f-date')) && sel('f-start', 'time-h').value !== '' && sel('f-start', 'time-m').value !== '', 'o cartão do bloco usa os mesmos controles de dia e hora: ' + lbl('f-date') + ' ' + $('f-start').value);
+    click($('f-cancel')); click($('tab-listas'));
+  }
+
   console.log('\nJ) Sair e entrar:');
   click($('btn-logout'));
   await sleep(20);

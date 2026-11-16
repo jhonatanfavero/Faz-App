@@ -40,6 +40,12 @@
     .ag-done:hover, .ag-done:focus-visible { color: #059669; }
     .ag-done.on { color: #059669; }
     .painted.dark .ag-done i { color: rgba(255,255,255,.8) !important; }
+    /* V40.12.0: espaço livre clicável (tarefa "na mão") */
+    .ag-gap { border: 1.5px dashed var(--focus); color: var(--focus); border-radius: 8px; padding: 5px 8px; font-size: 12px; font-weight: 600; text-align: left; background: #fff; }
+    .ag-gap:hover, .ag-gap:focus-visible { background: color-mix(in srgb, var(--focus) 10%, white); }
+    .ag-gap.first { position: sticky; top: 0; z-index: 1; box-shadow: 0 3px 8px rgba(0,0,0,.10); } /* dia cheio: o primeiro horário livre fica sempre à vista */
+    #ag-timeline.placing { cursor: copy; }
+    #ag-timeline.placing .ag-card { cursor: not-allowed; }
     .card .card-sched { opacity: 0; }
     .card:hover .card-sched, .card:focus-within .card-sched { opacity: 1; }
     .swatch.on { box-shadow: 0 0 0 2px #18181b; }
@@ -169,6 +175,11 @@
         <div id="ag-banner" class="hidden mx-4 sm:mx-5 mt-3 px-4 py-3 bg-white border border-zinc-200 rounded-xl text-[13px] text-zinc-600 leading-relaxed">
             <i class="ph ph-device-mobile text-focus mr-1"></i>Tua agenda ainda não chegou na nuvem. Abra o Faz no celular, com internet, e espere alguns segundos: ele envia sozinho e os compromissos aparecem aqui na hora. Se o selo no canto do app mostrar uma versão anterior à <b>v40.8.0</b>, feche e abra o app de novo.
         </div>
+        <div id="ag-place" class="hidden mx-4 sm:mx-5 mt-3 px-4 py-2.5 bg-white border-2 border-dashed rounded-xl text-[13px] text-zinc-700 items-center gap-3" style="border-color:var(--focus)" role="status">
+            <i class="ph ph-hand-pointing text-2xl text-focus shrink-0"></i>
+            <p class="min-w-0 flex-1 leading-snug"><b id="ag-place-title" class="text-zinc-900"></b><span id="ag-place-meta" class="text-zinc-500"></span><br><span id="ag-place-hint" class="text-zinc-600"></span></p>
+            <button id="ag-place-cancel" class="shrink-0 text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3 py-2 rounded-lg">Cancelar</button>
+        </div>
         <div id="ag-week" class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden thin-scroll">
             <div id="ag-cols" class="h-full flex items-start gap-3 p-4 sm:p-5"></div>
         </div>
@@ -193,14 +204,21 @@
                     <span class="text-xs font-semibold text-zinc-500">Lista</span>
                     <select id="f-col" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
                 </label>
-                <label id="f-date-wrap" class="hidden">
+                <!-- V40.12.0: calendário e hora próprios, sempre em português e 24h (os nativos seguem o idioma do navegador) -->
+                <div id="f-date-wrap" class="hidden">
                     <span class="text-xs font-semibold text-zinc-500">Dia</span>
-                    <input id="f-date" type="date" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-[7px] text-sm outline-none">
-                </label>
-                <label id="f-start-wrap" class="hidden">
+                    <input id="f-date" type="hidden">
+                    <button type="button" class="date-btn mt-1 w-full flex items-center gap-2 bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm text-left outline-none hover:border-zinc-400" data-date-for="f-date" aria-haspopup="dialog"><i class="ph ph-calendar-blank text-zinc-500"></i><span class="date-label truncate"></span></button>
+                </div>
+                <div id="f-start-wrap" class="hidden">
                     <span class="text-xs font-semibold text-zinc-500">Início</span>
-                    <input id="f-start" type="time" step="300" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-[7px] text-sm outline-none">
-                </label>
+                    <input id="f-start" type="hidden">
+                    <div class="mt-1 flex items-center gap-1" data-time-for="f-start">
+                        <select class="time-h min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Hora"></select>
+                        <span class="text-zinc-400 font-semibold">:</span>
+                        <select class="time-m min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Minuto"></select>
+                    </div>
+                </div>
                 <label class="block">
                     <span class="text-xs font-semibold text-zinc-500">Duração</span>
                     <select id="f-dur" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
@@ -226,19 +244,28 @@
             <div id="f-sched" class="hidden mt-4 p-3.5 rounded-xl border border-zinc-200 bg-zinc-50">
                 <p class="text-[13px] font-semibold text-zinc-800">Agendar esta tarefa</p>
                 <div class="mt-2 grid grid-cols-2 gap-3">
-                    <label class="block">
+                    <div>
                         <span class="text-xs font-semibold text-zinc-500">Dia</span>
-                        <input id="f-sched-date" type="date" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-[7px] text-sm outline-none">
-                    </label>
-                    <label class="block">
+                        <input id="f-sched-date" type="hidden">
+                        <button type="button" class="date-btn mt-1 w-full flex items-center gap-2 bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm text-left outline-none hover:border-zinc-400" data-date-for="f-sched-date" aria-haspopup="dialog"><i class="ph ph-calendar-blank text-zinc-500"></i><span class="date-label truncate"></span></button>
+                    </div>
+                    <div>
                         <span class="text-xs font-semibold text-zinc-500">Início</span>
-                        <input id="f-sched-time" type="time" step="300" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-[7px] text-sm outline-none">
-                    </label>
+                        <input id="f-sched-time" type="hidden">
+                        <div class="mt-1 flex items-center gap-1" data-time-for="f-sched-time">
+                            <select class="time-h min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Hora"></select>
+                            <span class="text-zinc-400 font-semibold">:</span>
+                            <select class="time-m min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Minuto"></select>
+                        </div>
+                    </div>
                 </div>
                 <p id="f-sched-info" class="mt-2 text-[12px] text-zinc-600 leading-snug"></p>
-                <div class="mt-3 flex justify-end gap-2">
-                    <button id="f-sched-cancel" type="button" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-200 px-3.5 py-2 rounded-lg">Agora não</button>
-                    <button id="f-sched-ok" type="button" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Colocar na agenda</button>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <button id="f-sched-hand" type="button" class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-200 px-3 py-2 rounded-lg" title="Vai pra aba Agenda com a tarefa na mão: é só clicar onde quer colocar"><i class="ph ph-hand-pointing text-lg"></i>Escolher na Agenda</button>
+                    <div class="ml-auto flex gap-2">
+                        <button id="f-sched-cancel" type="button" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-200 px-3.5 py-2 rounded-lg">Agora não</button>
+                        <button id="f-sched-ok" type="button" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Colocar na agenda</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -246,6 +273,7 @@
             <button id="f-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar tarefa</button>
             <button id="f-archive" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3 py-2 rounded-lg">Arquivar</button>
             <button id="f-schedule" class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-100 px-3 py-2 rounded-lg"><i class="ph ph-calendar-plus text-base"></i>Agendar</button>
+            <button id="f-hand" class="inline-flex items-center justify-center w-9 h-9 text-zinc-700 hover:bg-zinc-100 rounded-lg" title="Levar pra Agenda e clicar onde quer colocar" aria-label="Levar pra Agenda e clicar onde quer colocar"><i class="ph ph-hand-pointing text-lg"></i></button>
             <button id="f-tolist" class="hidden items-center gap-1.5 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-100 px-3 py-2 rounded-lg"><i class="ph ph-list-checks text-base"></i>Voltar pra lista</button>
             <div class="ml-auto flex gap-2">
                 <button id="f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
@@ -280,8 +308,10 @@
     </div>
 </div>
 
+<!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
+<div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.11.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.12.0</div>
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
@@ -305,7 +335,7 @@
         sb: null, uid: null, email: '', listas: {}, tags: {}, tarefas: {}, blocos: {},
         tab: 'listas', agView: 'week', agAnchor: null, agScrolled: null, hours: [7, 24], recovery: false,
         channel: null, live: 'connecting', lastLoad: 0, loading: false,
-        dragId: null, pendingRender: false, composer: null, editing: null
+        dragId: null, pendingRender: false, composer: null, editing: null, placing: null, agH0: 7
     };
 
     // ---------- utilitários ----------
@@ -465,7 +495,8 @@
             'style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" draggable="true" tabindex="0" data-id="' + esc(t.id) + '">' +
             '<div class="flex items-start gap-1">' +
             '<p class="min-w-0 flex-1 text-[13.5px] font-semibold text-zinc-800 leading-snug break-words">' + (esc(t.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
-            '<button type="button" class="card-sched shrink-0 -mr-1.5 -mt-1 w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-sched="' + esc(t.id) + '" title="Agendar" aria-label="Agendar esta tarefa"><i class="ph ph-calendar-plus text-base"></i></button>' +
+            '<button type="button" class="card-sched shrink-0 -mt-1 w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-sched="' + esc(t.id) + '" title="Agendar" aria-label="Agendar esta tarefa"><i class="ph ph-calendar-plus text-base"></i></button>' +
+            '<button type="button" class="card-sched shrink-0 -mr-1.5 -mt-1 w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-hand="' + esc(t.id) + '" title="Levar pra Agenda e clicar onde quer colocar" aria-label="Levar esta tarefa pra Agenda"><i class="ph ph-hand-pointing text-base"></i></button>' +
             '</div>' +
             '<div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">' +
             (tag ? '<span class="inline-flex items-center gap-1.5 font-medium text-zinc-600"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
@@ -570,6 +601,30 @@
             '</div></div></article>';
     }
 
+    // V40.12.0 — tarefa "na mão": espaços livres do dia onde cabe o bloco (os "buracos" da agenda, como no app).
+    // Hoje começa de agora; os outros dias, do começo do dia configurado no celular.
+    function gapsOf(list, day, dur) {
+        var cur = S.hours[0] * 60, out = [];
+        if (day === todayStr()) cur = Math.max(cur, Math.ceil(nowMin() / 5) * 5);
+        list.forEach(function (b) { if (b.start_min - cur >= dur) out.push(cur); cur = Math.max(cur, b.start_min + b.duration); });
+        if (1440 - cur >= dur) out.push(cur);
+        return out;
+    }
+    function gapHtml(day, st, first) {
+        return '<button type="button" class="ag-gap' + (first ? ' first' : '') + '" data-gap-day="' + day + '" data-gap-start="' + st + '"><i class="ph ph-plus mr-1"></i>Colocar às ' + clock(st) + (first ? ' (primeiro livre)' : '') + '</button>';
+    }
+    function weekListHtml(list, day, today, nm) {
+        if (!S.placing) return list.map(function (b) { return agCardHtml(b, day, today, nm); }).join('');
+        var gaps = gapsOf(list, day, S.placing.dur), gi = 0, html = '';
+        // Dia cheio: o primeiro espaço livre pode estar lá embaixo, depois de vários blocos. Um atalho fixo no topo resolve.
+        if (gaps.length && list.length && gaps[0] > list[0].start_min) html += gapHtml(day, gaps[0], true);
+        list.forEach(function (b) {
+            while (gi < gaps.length && gaps[gi] <= b.start_min) html += gapHtml(day, gaps[gi++]);
+            html += agCardHtml(b, day, today, nm);
+        });
+        while (gi < gaps.length) html += gapHtml(day, gaps[gi++]);
+        return html;
+    }
     function renderWeek(anchor, map, today, nm) {
         var wrap = $('ag-cols'), scroll = {}, html = '', total = 0, mins = 0;
         wrap.querySelectorAll('.ag-list').forEach(function (el) { scroll[el.dataset.day] = el.scrollTop; });
@@ -584,7 +639,7 @@
                 (day === today ? '<span class="ml-auto text-[10.5px] font-semibold text-white bg-focus rounded-full px-1.5 py-0.5">Hoje</span>' : '') + '</span>' +
                 '<span class="block mt-0.5 text-[11px] font-medium text-zinc-500">' + (list.length ? countLabel(list.length) + ' · ' + fmtDur(sumMin(list)) : 'Livre') + '</span></button>' +
                 '<div class="ag-list thin-scroll flex-1 min-h-[44px] overflow-y-auto px-2 pb-2 flex flex-col gap-1.5" data-day="' + day + '">' +
-                list.map(function (b) { return agCardHtml(b, day, today, nm); }).join('') + '</div></section>';
+                weekListHtml(list, day, today, nm) + '</div></section>';
         }
         wrap.innerHTML = html;
         wrap.querySelectorAll('.ag-list').forEach(function (el) { if (scroll[el.dataset.day] != null) el.scrollTop = scroll[el.dataset.day]; });
@@ -627,6 +682,8 @@
         if (!list.length) html += '<p class="absolute left-14 right-0 top-10 text-center text-sm text-zinc-500">Nada agendado neste dia.</p>';
         box.style.height = ((h1 - h0) * 60 * PXM + 12) + 'px';
         box.innerHTML = html;
+        box.classList.toggle('placing', !!S.placing);
+        S.agH0 = h0;
         $('ag-label').textContent = WD[d.getDay()] + ', ' + d.getDate() + ' de ' + MES[d.getMonth()] + (day === today ? ' (hoje)' : '');
         if (S.agScrolled !== day) { // ao abrir o dia: rola pro horário atual ou pro primeiro bloco
             S.agScrolled = day;
@@ -664,6 +721,15 @@
         var today = todayStr(), map = blocksByDay();
         if (!S.agAnchor) S.agAnchor = today;
         $('ag-banner').classList.toggle('hidden', Object.keys(map).length > 0 || !S.lastLoad);
+        var pl = S.placing, pb = $('ag-place');
+        if (pl && (!S.tarefas[pl.id] || S.tarefas[pl.id].deleted)) pl = S.placing = null; // a tarefa saiu da lista em outro aparelho
+        pb.classList.toggle('hidden', !pl);
+        pb.classList.toggle('flex', !!pl);
+        if (pl) {
+            $('ag-place-title').textContent = pl.title || 'Sem nome';
+            $('ag-place-meta').textContent = ' · ' + fmtDur(pl.dur);
+            $('ag-place-hint').textContent = S.agView === 'day' ? 'Clique no horário onde quer colocar.' : 'Clique num espaço tracejado pra colocar. Pra escolher o horário exato, clique no nome do dia.';
+        }
         document.querySelectorAll('.ag-view').forEach(function (b) { b.classList.toggle('on', b.dataset.view === S.agView); });
         $('ag-week').classList.toggle('hidden', S.agView !== 'week');
         $('ag-day').classList.toggle('hidden', S.agView !== 'day');
@@ -681,6 +747,7 @@
             b.setAttribute('aria-selected', b.dataset.tab === S.tab ? 'true' : 'false');
         });
         if (S.tab === 'agenda') { closeComposer(); closeColMenu(); S.agScrolled = null; renderAgenda(); }
+        else if (S.placing) cancelPlacing(); // voltou pras Listas com a tarefa na mão: ela continua lá
         else render();
     }
 
@@ -882,13 +949,15 @@
         $('f-done').classList.toggle('hidden', !isB);
         $('f-schedule').classList.toggle('hidden', isB);
         $('f-schedule').classList.toggle('inline-flex', !isB);
+        $('f-hand').classList.toggle('hidden', isB);
+        $('f-hand').classList.toggle('inline-flex', !isB);
         $('f-tolist').classList.toggle('hidden', !isB);
         $('f-tolist').classList.toggle('inline-flex', isB);
         $('f-delete').textContent = isB ? 'Apagar bloco' : 'Apagar tarefa';
         $('f-sched').classList.add('hidden');
         if (isB) {
-            $('f-date').value = String(r.date).slice(0, 10);
-            $('f-start').value = clock(r.start_min);
+            setDateVal('f-date', String(r.date).slice(0, 10));
+            setTimeVal('f-start', clock(r.start_min));
         } else {
             $('f-col').innerHTML = alive('listas').map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('');
             $('f-col').value = colOf(r);
@@ -911,6 +980,7 @@
     function openTask(id) { openCard('tarefas', id); }
     function openBlock(id) { openCard('blocos', id); }
     function closeTask() {
+        closeCal();
         var m = $('modal-task');
         m.classList.add('hidden');
         m.classList.remove('flex');
@@ -1037,37 +1107,132 @@
         var ed = S.editing;
         if (!ed || ed.kind !== 'tarefas') return;
         var day = todayStr();
-        $('f-sched-date').value = day;
-        $('f-sched-date').min = '';
-        $('f-sched-time').value = clock(suggestStart(day));
+        setDateVal('f-sched-date', day);
+        setTimeVal('f-sched-time', clock(suggestStart(day)));
         $('f-sched').classList.remove('hidden');
         renderSchedInfo();
         $('f-sched').scrollIntoView && $('f-sched').scrollIntoView({ block: 'nearest' });
-        $('f-sched-time').focus();
+        document.querySelector('[data-date-for="f-sched-date"]').focus();
     }
-    async function scheduleTask() {
-        var ed = S.editing;
-        if (!ed || ed.kind !== 'tarefas') return;
-        var t = S.tarefas[ed.id];
-        if (!t || t.deleted) { closeTask(); return toast('Essa tarefa foi apagada em outro aparelho.'); }
-        var title = $('f-title').value.trim();
-        if (!title) { $('f-title').focus(); return toast('Dê um nome pra tarefa.'); }
-        var day = $('f-sched-date').value, st = parseClock($('f-sched-time').value), dur = schedDur();
-        if (!isYmd(day) || st === null) return toast('Escolha o dia e o horário de início.');
-        var slot = freeSlot(day, st, dur);
-        if (slot === null) return toast('Esse dia não tem um espaço livre de ' + fmtDur(dur) + '.');
+    // Cria o bloco a partir da tarefa e só depois tira a tarefa da lista (se o bloco não entrar, nada muda).
+    async function createBlockFromTask(src, day, slot, asked) {
+        var t = S.tarefas[src.id];
+        if (!t || t.deleted) { toast('Essa tarefa foi apagada em outro aparelho.'); return false; }
         var n = Date.now();
         var block = {
-            user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: slot, duration: dur, title: title,
-            type: blockType(day, slot, dur), theme: 'focus', tag_id: ed.tag || null,
-            microblocks: normMbs(ed.mbs).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: false }; }),
-            completed: false, was_delayed: false, linked_note_ids: [], color: ed.color || null, archived: false, deleted: false
+            user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: slot, duration: src.dur, title: src.title,
+            type: blockType(day, slot, src.dur), theme: 'focus', tag_id: src.tag || null,
+            microblocks: normMbs(src.mbs).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: false }; }),
+            completed: false, was_delayed: false, linked_note_ids: [], color: src.color || null, archived: false, deleted: false
         };
-        closeTask();
-        if (!(await insertRow('blocos', block))) return; // não entrou na agenda: a tarefa continua na lista
-        await patchRow('tarefas', ed.id, { deleted: true },
-            'Agendado para ' + dayLabel(day) + ' às ' + clock(slot) + (slot !== st ? ' (às ' + clock(st) + ' já tinha bloco)' : ''));
+        if (!(await insertRow('blocos', block))) return false;
+        await patchRow('tarefas', src.id, { deleted: true },
+            'Agendado para ' + dayLabel(day) + ' às ' + clock(slot) + (asked != null && slot !== asked ? ' (às ' + clock(asked) + ' já tinha bloco)' : ''));
+        return true;
     }
+    function formAsSource() { // o que está escrito no cartão aberto, mesmo sem salvar
+        var ed = S.editing;
+        if (!ed || ed.kind !== 'tarefas') return null;
+        var t = S.tarefas[ed.id];
+        if (!t || t.deleted) { closeTask(); toast('Essa tarefa foi apagada em outro aparelho.'); return null; }
+        var title = $('f-title').value.trim();
+        if (!title) { $('f-title').focus(); toast('Dê um nome pra tarefa.'); return null; }
+        return { id: ed.id, title: title, dur: schedDur(), tag: ed.tag || null, color: ed.color || null, mbs: normMbs(ed.mbs) };
+    }
+    async function scheduleTask() {
+        var src = formAsSource();
+        if (!src) return;
+        var day = $('f-sched-date').value, st = parseClock($('f-sched-time').value);
+        if (!isYmd(day) || st === null) return toast('Escolha o dia e o horário de início.');
+        var slot = freeSlot(day, st, src.dur);
+        if (slot === null) return toast('Esse dia não tem um espaço livre de ' + fmtDur(src.dur) + '.');
+        closeTask();
+        await createBlockFromTask(src, day, slot, st);
+    }
+    // V40.12.0 — tarefa "na mão" (como o Agendar do app): vai pra Agenda e clica onde quer colocar.
+    function startPlacing(src) {
+        if (!src) return;
+        S.placing = src;
+        closeTask();
+        setTab('agenda');
+    }
+    function startPlacingFromTask(id) {
+        var t = S.tarefas[id];
+        if (!t || t.deleted) return;
+        startPlacing({ id: id, title: t.title || '', dur: Number(t.duration) > 0 ? Number(t.duration) : 30, tag: tagOf(t.tag_id) ? t.tag_id : null, color: hex6(t.color), mbs: normMbs(t.microblocks) });
+    }
+    function cancelPlacing() {
+        if (!S.placing) return;
+        S.placing = null;
+        $('ag-place').classList.add('hidden'); // (a Agenda pode não estar na tela: renderAgenda não roda nesse caso)
+        $('ag-place').classList.remove('flex');
+        renderAgenda();
+        toast('Nada foi agendado. A tarefa continua na lista.');
+    }
+    async function placeHere(day, st) {
+        var p = S.placing;
+        if (!p || !isYmd(day)) return;
+        st = Math.max(0, Math.min(Math.round(Number(st) || 0), 1440 - p.dur));
+        var slot = freeSlot(day, st, p.dur);
+        if (slot === null) return toast('Esse dia não tem um espaço livre de ' + fmtDur(p.dur) + '.');
+        S.placing = null;
+        renderAgenda();
+        if (!(await createBlockFromTask(p, day, slot, st)) && S.tarefas[p.id] && !S.tarefas[p.id].deleted) { S.placing = p; renderAgenda(); } // não deu: a tarefa volta pra mão
+    }
+
+    // ---------- V40.12.0: calendário e hora próprios, sempre em português e em 24h ----------
+    // (os campos nativos do navegador seguem o idioma do navegador: num Chrome em inglês saía "November" e "AM")
+    var CAL = { input: null, y: 0, m: 0 };
+    function fireChange(el) { el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
+    function fmtDateBtn(v) {
+        if (!isYmd(v)) return 'Escolher o dia';
+        var d = parseYmd(v);
+        return WD3[d.getDay()] + ', ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + (v === todayStr() ? ' (hoje)' : '');
+    }
+    function syncDate(id) { var l = document.querySelector('[data-date-for="' + id + '"] .date-label'); if (l) l.textContent = fmtDateBtn($(id).value); }
+    function setDateVal(id, v) { $(id).value = v; syncDate(id); }
+    function fillTime(id) { // "HH:MM" do campo escondido → seletores de hora e minuto
+        var box = document.querySelector('[data-time-for="' + id + '"]');
+        if (!box) return;
+        var v = parseClock($(id).value), hs = box.querySelector('.time-h'), ms = box.querySelector('.time-m'), blank = v === null ? '<option value="">--</option>' : '', o = '', mins = [];
+        for (var h = 0; h < 24; h++) o += '<option value="' + h + '">' + pad(h) + '</option>';
+        for (var m = 0; m < 60; m += 5) mins.push(m);
+        if (v !== null && mins.indexOf(v % 60) < 0) { mins.push(v % 60); mins.sort(function (a, b) { return a - b; }); } // horário "quebrado" vindo do celular
+        hs.innerHTML = blank + o;
+        ms.innerHTML = blank + mins.map(function (x) { return '<option value="' + x + '">' + pad(x) + '</option>'; }).join('');
+        hs.value = v === null ? '' : String(Math.floor(v / 60));
+        ms.value = v === null ? '' : String(v % 60);
+    }
+    function setTimeVal(id, v) { $(id).value = v; fillTime(id); }
+    function renderCal() {
+        var sel = CAL.input ? $(CAL.input).value : '', today = todayStr();
+        var dow = new Date(CAL.y, CAL.m, 1, 12).getDay(), days = new Date(CAL.y, CAL.m + 1, 0, 12).getDate();
+        var nav = function (dir, icon, label) { return '<button type="button" data-cal-nav="' + dir + '" class="w-8 h-8 rounded-lg hover:bg-zinc-100 flex items-center justify-center text-zinc-600" aria-label="' + label + '"><i class="ph ' + icon + '"></i></button>'; };
+        var html = '<div class="flex items-center gap-1 mb-2">' + nav(-1, 'ph-caret-left', 'Mês anterior') +
+            '<p id="cal-title" class="flex-1 text-center text-[13.5px] font-bold text-zinc-800">' + MES[CAL.m].charAt(0).toUpperCase() + MES[CAL.m].slice(1) + ' de ' + CAL.y + '</p>' + nav(1, 'ph-caret-right', 'Mês seguinte') + '</div>' +
+            '<div class="grid grid-cols-7 text-center text-[11px] font-semibold text-zinc-400 mb-1">' + ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(function (x, i) { return '<span title="' + WD[i] + '">' + x + '</span>'; }).join('') + '</div>' +
+            '<div class="grid grid-cols-7 gap-y-0.5">';
+        for (var i = 0; i < dow; i++) html += '<span></span>';
+        for (var d = 1; d <= days; d++) {
+            var v = CAL.y + '-' + pad(CAL.m + 1) + '-' + pad(d);
+            html += '<button type="button" data-cal-day="' + v + '" class="h-8 rounded-lg text-[13px] tabular-nums ' +
+                (v === sel ? 'bg-focus text-white font-bold' : (v === today ? 'font-bold text-focus ring-1 ring-inset ring-zinc-300 hover:bg-zinc-100' : 'text-zinc-700 hover:bg-zinc-100')) + '"' + (v === sel ? ' aria-current="date"' : '') + '>' + d + '</button>';
+        }
+        $('cal-pop').innerHTML = html + '</div><div class="mt-2 pt-2 border-t border-zinc-100 flex justify-between">' +
+            '<button type="button" data-cal-day="' + today + '" class="text-[12.5px] font-semibold text-focus hover:bg-zinc-100 px-2 py-1 rounded-md">Hoje</button>' +
+            '<button type="button" data-cal-close class="text-[12.5px] font-semibold text-zinc-600 hover:bg-zinc-100 px-2 py-1 rounded-md">Fechar</button></div>';
+    }
+    function openCal(id, btn) {
+        var v = $(id).value, d = isYmd(v) ? parseYmd(v) : new Date(), pop = $('cal-pop');
+        CAL.input = id; CAL.y = d.getFullYear(); CAL.m = d.getMonth();
+        renderCal();
+        pop.classList.remove('hidden');
+        var r = btn.getBoundingClientRect(), h = pop.offsetHeight || 320, top = r.bottom + 6;
+        if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6); // sem espaço embaixo: abre pra cima
+        pop.style.top = top + 'px';
+        pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 264)) + 'px';
+    }
+    function closeCal() { var pop = $('cal-pop'); if (pop) pop.classList.add('hidden'); CAL.input = null; }
     async function blockToList() {
         var ed = S.editing;
         if (!ed || ed.kind !== 'blocos') return;
@@ -1206,12 +1371,13 @@
             if ((b = e.target.closest('.col-menu-btn'))) return openColMenu(b.dataset.col, b);
             if ((b = e.target.closest('.add-btn'))) return openComposer(b.dataset.col, '', true);
             if (e.target.closest('#btn-new-list')) return createList();
+            if ((b = e.target.closest('[data-hand]'))) return startPlacingFromTask(b.dataset.hand); // V40.12.0
             if ((b = e.target.closest('[data-sched]'))) { openTask(b.dataset.sched); return openSched(); } // V40.11.0
             var card = e.target.closest('.card');
             if (card) openTask(card.dataset.id);
         });
         wrap.addEventListener('keydown', function (e) {
-            if (e.target.closest && e.target.closest('[data-sched]')) return; // o botão de agendar cuida do próprio Enter
+            if (e.target.closest && e.target.closest('[data-sched], [data-hand]')) return; // os botões do cartão cuidam do próprio Enter
             var card = e.target.closest && e.target.closest('.card');
             if (card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openTask(card.dataset.id); }
         });
@@ -1262,14 +1428,43 @@
         $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this) closeTask(); });
         // V40.11.0: concluir, agendar e voltar pra lista
         $('f-done').addEventListener('click', function () { if (S.editing && S.editing.kind === 'blocos') toggleDone(S.editing.id); });
-        $('f-schedule').addEventListener('click', function () { if ($('f-sched').classList.contains('hidden')) openSched(); else $('f-sched-time').focus(); });
+        $('f-schedule').addEventListener('click', function () { if ($('f-sched').classList.contains('hidden')) openSched(); else document.querySelector('[data-date-for="f-sched-date"]').focus(); });
+        $('f-hand').addEventListener('click', function () { startPlacing(formAsSource()); });
+        $('f-sched-hand').addEventListener('click', function () { startPlacing(formAsSource()); });
+        $('ag-place-cancel').addEventListener('click', cancelPlacing);
         $('f-sched-cancel').addEventListener('click', function () { $('f-sched').classList.add('hidden'); });
         $('f-sched-ok').addEventListener('click', scheduleTask);
         $('f-tolist').addEventListener('click', blockToList);
-        $('f-sched-date').addEventListener('change', function () { if (isYmd(this.value)) $('f-sched-time').value = clock(suggestStart(this.value)); renderSchedInfo(); });
+        $('f-sched-date').addEventListener('change', function () { if (isYmd(this.value)) setTimeVal('f-sched-time', clock(suggestStart(this.value))); renderSchedInfo(); });
         $('f-sched-time').addEventListener('input', renderSchedInfo);
         $('f-dur').addEventListener('change', function () { if (!$('f-sched').classList.contains('hidden')) renderSchedInfo(); });
-        ['f-sched-date', 'f-sched-time'].forEach(function (id) { $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); scheduleTask(); } }); });
+        $('f-sched').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.tagName === 'SELECT') { e.preventDefault(); scheduleTask(); } });
+        // calendário e hora próprios
+        document.addEventListener('click', function (e) {
+            var pop = $('cal-pop'), b;
+            if ((b = e.target.closest('.date-btn'))) { var id = b.dataset.dateFor; if (CAL.input === id && !pop.classList.contains('hidden')) closeCal(); else openCal(id, b); return; }
+            if (pop.contains(e.target)) {
+                if ((b = e.target.closest('[data-cal-nav]'))) { var mm = CAL.m + Number(b.dataset.calNav); CAL.y += Math.floor(mm / 12); CAL.m = ((mm % 12) + 12) % 12; renderCal(); }
+                else if ((b = e.target.closest('[data-cal-day]'))) { var inp = $(CAL.input); if (inp) { setDateVal(inp.id, b.dataset.calDay); closeCal(); fireChange(inp); document.querySelector('[data-date-for="' + inp.id + '"]').focus(); } }
+                else if (e.target.closest('[data-cal-close]')) closeCal();
+                return;
+            }
+            if (!pop.classList.contains('hidden')) closeCal();
+        });
+        document.addEventListener('change', function (e) {
+            var box = e.target.closest && e.target.closest('[data-time-for]');
+            if (box) { // mexeu na hora ou no minuto → grava "HH:MM" no campo escondido
+                var id = box.dataset.timeFor, h = box.querySelector('.time-h').value, m = box.querySelector('.time-m').value;
+                if (h === '' && m === '') return;
+                $(id).value = pad(Number(h || 0)) + ':' + pad(Number(m || 0));
+                fillTime(id);
+                return fireChange($(id));
+            }
+            if (e.target.id === 'f-date' || e.target.id === 'f-sched-date') syncDate(e.target.id);        // valor trocado por fora:
+            if (e.target.id === 'f-start' || e.target.id === 'f-sched-time') fillTime(e.target.id);       // atualiza o que aparece
+        });
+        $('modal-task').querySelector('.overflow-y-auto').addEventListener('scroll', closeCal);
+        window.addEventListener('resize', closeCal);
         $('f-tags').addEventListener('click', function (e) {
             var b = e.target.closest('button[data-tag]');
             if (!b || !S.editing) return;
@@ -1305,9 +1500,11 @@
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             if (!$('dialog').classList.contains('hidden')) return;
+            if (!$('cal-pop').classList.contains('hidden')) return closeCal();
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
             if (menuEl) return closeColMenu();
             if (S.editing) return closeTask();
+            if (S.placing) return cancelPlacing();
             if (S.composer) closeComposer();
         });
 
@@ -1328,8 +1525,15 @@
         $('agenda').addEventListener('click', function (e) {
             var dayBtn = e.target.closest('.ag-day-btn');
             if (dayBtn) { S.agAnchor = dayBtn.dataset.day; S.agView = 'day'; S.agScrolled = null; return renderAgenda(); }
+            var gap = e.target.closest('[data-gap-day]');
+            if (gap) return placeHere(gap.dataset.gapDay, gap.dataset.gapStart); // V40.12.0: tarefa na mão → espaço livre
             var dn = e.target.closest('[data-done]');
             if (dn) return toggleDone(dn.dataset.done); // V40.11.0: concluir sem abrir o cartão
+            if (S.placing) { // com a tarefa na mão, clicar num bloco não abre o cartão; na visão Dia, clicar no horário coloca
+                var tl = e.target.closest('#ag-timeline');
+                if (tl && !e.target.closest('[data-block]')) return placeHere(S.agAnchor, (S.agH0 || 0) * 60 + Math.round(((e.clientY - tl.getBoundingClientRect().top) / PXM) / 5) * 5);
+                if (e.target.closest('[data-block]')) return toast('Clique num espaço livre pra colocar a tarefa.');
+            }
             var c = e.target.closest('[data-block]');
             if (c) openBlock(c.dataset.block);
         });
@@ -1492,6 +1696,7 @@
             unsubscribe();
             S.uid = null; S.listas = {}; S.tags = {}; S.tarefas = {}; S.blocos = {}; S.lastLoad = 0; S.composer = null;
             closeTask();
+            S.placing = null;
             closeArchive();
             closeColMenu();
             show('view-login');

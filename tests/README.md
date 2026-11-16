@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 7 suítes (cerca de 1 minuto)
+npm test        # confere o CSS pronto e roda as 8 suítes (cerca de 1 minuto)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -18,6 +18,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_v408.js` | idem | agenda na nuvem, blocos de 5 e 10 min, dado corrompido, iOS, esqueci a senha |
 | `test_v409.js` | idem | cor livre do cartão, arquivar e desarquivar |
 | `test_v4091.js` | idem | listas afastadas, arrastar entre listas, pinça, sync do movimento |
+| `test_atualizacao.js` | idem, partindo do estado gravado pela V40.7.0 | quem já sincronizava numa versão antiga abre a atual: nada se perde, nada é reenviado à toa, nenhuma pergunta aparece |
 | `test_kanban.js` | `kanban.html` de verdade | tela do PC: listas, agenda (semana e dia), arrastar, arquivados, tempo real |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
@@ -30,6 +31,10 @@ usuário e as validações do banco de verdade. Nenhum teste encosta na internet
 `dados-ficticios.json` tem o formato exato de um backup do app (5 listas, 51 tarefas, 554 blocos,
 despesas, notas, rotinas), mas **todo o conteúdo é inventado**: nomes, valores, datas, horários e ids.
 Não coloque backup de verdade nesta pasta: o repositório é público.
+
+`estado-sync-v40-7-0.json` é o que a V40.7.0 gravava em `tb__sync` depois de sincronizar esses mesmos
+dados fictícios. Ao mudar o formato desse estado no futuro, guarde aqui um exemplo da versão anterior
+e teste a passagem, como o `test_atualizacao.js` faz.
 
 O "hoje" desses dados é **15/11/2026**. Os testes travam o relógio do app nesse dia (função
 `travarRelogio` em `boot_app.js`), então o resultado é o mesmo em qualquer dia em que rodarem.

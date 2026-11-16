@@ -23,8 +23,9 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
 1. **Dado do usuário é sagrado.** Nada sobrescreve dados sem confirmação e sem cópia de segurança.
    O service worker nunca apaga o `localStorage`. Dado ilegível é copiado para `tb__corrompido_*`
    antes de qualquer coisa.
-2. **Mudou qualquer arquivo publicado, mude o `CACHE_NAME` do `sw.js`.** Sem isso os aparelhos
-   continuam na versão antiga. Atualize junto o selo de versão no fim do `index.html` e a `version`
+2. **Mudou qualquer arquivo do app, mude o `CACHE_NAME` do `sw.js`.** Vale para tudo que está na lista
+   `ASSETS` do `sw.js`, para o `kanban.html` e para o próprio `sw.js` (testes e documentação não contam).
+   Sem isso os aparelhos continuam na versão antiga. Atualize junto o selo de versão no fim do `index.html` e a `version`
    do backup no `app.js`.
 3. **Texto digitado pelo usuário passa por `escapeHtml` antes de entrar em `innerHTML`.** Ids, cores e
    datas que vêm de backup ou da nuvem são validados na entrada (`sync.js` e importação).
@@ -33,7 +34,10 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
 5. **Mudança cirúrgica.** Altere só o necessário e não reescreva o que está funcionando.
 6. **Mexeu em classe do Tailwind, rode `npm run build:css`** e publique os arquivos gerados. Online o
    script do CDN cobre a classe nova; offline quem vale é o CSS pronto.
-7. **`npm test` verde antes de publicar.** Mexeu em arrasto, rolagem, `sw.js` ou `libs/`? Rode também
+7. **Quem já usa o app não pode perceber a atualização nos dados.** Mudou o formato de algo gravado no
+   aparelho (`tb_*` ou `tb__sync`)? A versão nova tem que abrir o formato antigo sem perguntar nada e
+   sem reenviar tudo para a nuvem. `tests/test_atualizacao.js` é o modelo.
+8. **`npm test` verde antes de publicar.** Mexeu em arrasto, rolagem, `sw.js` ou `libs/`? Rode também
    os testes de navegador.
 
 ## Publicar uma versão

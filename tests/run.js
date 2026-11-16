@@ -11,6 +11,7 @@ const SUITES = [
     ['Agenda na nuvem, blocos de 5 min, segurança, iOS', 'test_v408.js', [ROOT, DADOS]],
     ['Cor do cartão e Arquivados', 'test_v409.js', [ROOT, DADOS]],
     ['Listas afastadas e arrastar entre listas', 'test_v4091.js', [ROOT, DADOS]],
+    ['Atualização de quem já sincronizava numa versão antiga', 'test_atualizacao.js', [ROOT, DADOS]],
     ['Tela do PC (kanban.html)', 'test_kanban.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];

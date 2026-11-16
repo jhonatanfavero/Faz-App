@@ -20,13 +20,15 @@
  *   notes    [{ id, title, content, ms }]                 (ms = última edição ou criação)
  *   expenses [{ id, title, amount, start 'YYYY-MM', months, recurring, dueDay,
  *               paid ['YYYY-MM'...], overrides { 'YYYY-MM': valor } }]
+ *   goals    (V40.21.0) o retrato das metas já calculado pelo metas.js (FazMetas.forAssistant), ou null:
+ *            { level, name, points, stars, toNext, todayDone, todayTotal,
+ *              items: [{ id, title, emoji, list, period, complete, text, left, streak, streakText, stars }] }
  *
  * Resposta: { intent, text, items: [{ label, sub, tone, ref: { kind, id, month? } }], footer }
  *   tone: 'now' (acontecendo), 'next' (próximo), 'late' (atrasado), 'done' (feito) ou ''.
- *   ref.kind: 'bloco', 'tarefa', 'rotina', 'nota' ou 'despesa' (a tela pode abrir o item).
+ *   ref.kind: 'bloco', 'tarefa', 'rotina', 'nota', 'despesa' ou 'meta' (a tela pode abrir o item).
  *
- * Depois: a IA de verdade (com API) entra por cima desta base, e as metas viram
- * mais uma pergunta quando existirem.
+ * Depois: a IA de verdade (com API) entra por cima desta base.
  * ======================================================================== */
 
 (function (root, factory) {
@@ -47,6 +49,7 @@
         { id: 'atrasado', label: 'O que ficou pra trás?' },
         { id: 'contas', label: 'Minhas contas' },
         { id: 'rotinas', label: 'Minhas rotinas' },
+        { id: 'metas', label: 'Minhas metas' },
         { id: 'notas', label: 'Notas recentes' },
         { id: 'listas', label: 'O que tem nas listas?' }
     ];
@@ -144,7 +147,7 @@
             if (tm.length) text += ' Amanhã começa com ' + title(tm[0]) + ' às ' + clock(tm[0].start) + '.';
             var nt = (snap.tasks || []).length;
             if (nt) text += ' Você tem ' + plural(nt, 'tarefa esperando', 'tarefas esperando') + ' nas Listas.';
-            return { text: text, items: [], footer: dueToday(snap) };
+            return { text: text, items: [], footer: [dueToday(snap), goalsToday(snap)].filter(Boolean).join(' ') };
         }
         text += ' Você tem ' + plural(list.length, 'bloco', 'blocos') + ' na agenda (' + dur(total) + ')';
         text += done ? ', ' + plural(done, 'já concluído', 'já concluídos') + '.' : '.';
@@ -162,8 +165,15 @@
         if (more > 0) foot.push('E mais ' + plural(more, 'bloco', 'blocos') + ' depois.');
         var due = dueToday(snap);
         if (due) foot.push(due);
+        var gt = goalsToday(snap);
+        if (gt) foot.push(gt);
         return { text: text, items: items, footer: foot.join(' ') };
     };
+    function goalsToday(snap) { // V40.21.0: as metas diárias no resumo do dia
+        var g = snap.goals;
+        if (!g || !g.todayTotal) return '';
+        return g.todayDone >= g.todayTotal ? 'Metas de hoje: todas cumpridas! ⭐' : 'Metas de hoje: ' + g.todayDone + ' de ' + g.todayTotal + ' cumpridas.';
+    }
     function dueToday(snap) {
         var m = monthOf(snap.now), d = snap.now.getDate();
         var due = monthExpenses(snap, m).filter(function (e) { return !expPaid(e, m) && e.dueDay && Number(expDueDate(e, m).slice(8)) === d; });
@@ -309,24 +319,42 @@
         var items = order.map(function (k) { return { label: k, sub: plural(by[k].n, 'tarefa', 'tarefas') + ' · ' + dur(by[k].m), tone: '', ref: null }; });
         return { text: 'Você tem ' + plural(ts.length, 'tarefa', 'tarefas') + ' nas Listas (' + dur(total) + ' de trabalho).', items: items, footer: 'Pra levar uma tarefa pra agenda: botão de agendar ou a mão, no cartão.' };
     };
-    R.metas = function () {
-        return { text: 'As metas estão chegando: logo você vai poder criar metas pessoais, profissionais e financeiras, e eu acompanho o seu progresso por aqui. 🎯', items: [], footer: '' };
+    // V40.21.0: metas de verdade (o retrato vem pronto do metas.js: progresso, estrelas, sequência e nível)
+    R.metas = function (snap) {
+        var g = snap.goals, list = (g && g.items) || [];
+        if (!list.length) return { text: 'Você ainda não tem metas. Na aba Metas você cria metas pessoais, profissionais e financeiras (beber água, correr, meditar, guardar dinheiro...), toca no + quando fizer e ganha estrelas, pontos e níveis. Eu acompanho o seu progresso por aqui. 🎯', items: [], footer: '' };
+        var text = 'Nível ' + g.level + ' · ' + g.name + ': ' + plural(g.points, 'ponto', 'pontos') + ' e ⭐ ' + plural(g.stars, 'estrela', 'estrelas') + '. Faltam ' + g.toNext + ' pro nível ' + (g.level + 1) + '.';
+        if (g.todayTotal) text += g.todayDone >= g.todayTotal ? ' Hoje você cumpriu todas as metas do dia! 🎉' : ' Hoje: ' + g.todayDone + ' de ' + plural(g.todayTotal, 'meta diária cumprida', 'metas diárias cumpridas') + '.';
+        var order = { dia: 0, semana: 1, mes: 2 };
+        var sorted = list.map(function (x, i) { return { x: x, i: i }; }).sort(function (a, b) {
+            return (a.x.complete - b.x.complete) || ((order[a.x.period] || 0) - (order[b.x.period] || 0)) || (a.i - b.i);
+        }).map(function (o) { return o.x; });
+        var items = sorted.slice(0, 8).map(function (x) {
+            var sub = [x.text, x.complete ? 'cumprida ✓' : 'falta ' + x.left];
+            if (x.streakText) sub.push('🔥 ' + x.streakText);
+            if (x.list) sub.push(x.list);
+            return { label: ((x.emoji || '') + ' ' + title(x)).trim(), sub: sub.join(' · '), tone: x.complete ? 'done' : 'next', ref: { kind: 'meta', id: x.id } };
+        });
+        var foot = [];
+        if (list.length > items.length) foot.push('E mais ' + plural(list.length - items.length, 'meta', 'metas') + '.');
+        foot.push('Fez? Toque no + da meta, na aba Metas.');
+        return { text: text, items: items, footer: foot.join(' ') };
     };
     R.ajuda = function () {
         return {
-            text: 'Por enquanto eu leio a sua agenda, listas, rotinas, notas e finanças e respondo sobre: o seu dia, o que vem agora, amanhã, a semana, o que ficou pra trás, contas, rotinas, notas e listas. Toque numa sugestão ou escreva do seu jeito (ex.: "o que vence esta semana?").',
-            items: [], footer: 'Em breve: conversa com IA de verdade, metas e lembretes.'
+            text: 'Por enquanto eu leio a sua agenda, listas, rotinas, notas, finanças e metas e respondo sobre: o seu dia, o que vem agora, amanhã, a semana, o que ficou pra trás, contas, rotinas, metas, notas e listas. Toque numa sugestão ou escreva do seu jeito (ex.: "o que vence esta semana?").',
+            items: [], footer: 'Em breve: conversa com IA de verdade e lembretes.'
         };
     };
     R.obrigado = function () { return { text: 'De nada! 😊 Se precisar, é só perguntar.', items: [], footer: '' }; };
     R.naoentendi = function () {
-        return { text: 'Ainda não sei responder isso. 😅 Por enquanto eu entendo perguntas sobre: hoje, agora, amanhã, a semana, o que ficou pra trás, contas, rotinas, notas e listas.', items: [], footer: 'A conversa com IA de verdade vem numa próxima versão.' };
+        return { text: 'Ainda não sei responder isso. 😅 Por enquanto eu entendo perguntas sobre: hoje, agora, amanhã, a semana, o que ficou pra trás, contas, rotinas, metas, notas e listas.', items: [], footer: 'A conversa com IA de verdade vem numa próxima versão.' };
     };
 
     // ---------- entender o que foi escrito ----------
     var RULES = [
         ['obrigado', /\b(obrigad|valeu|vlw|brigad)/],
-        ['metas', /\bmeta/],
+        ['metas', /\b(meta|nivel|estrela|pontos|pontuacao)/],
         ['ajuda', /\b(ajuda|o que voce (sabe|faz|pode)|como (funciona|te uso|usar))/],
         ['contas', /\b(contas?|pagar|pago|paga|boletos?|faturas?|dinheiro)\b|\b(venc|financ|despes|gast)/],
         ['rotinas', /\brotina/],

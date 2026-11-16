@@ -10,6 +10,10 @@ const COLUMNS = {
   rotinas: ['user_id', 'id', 'title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms', 'deleted', 'updated_at'],
   notas: ['user_id', 'id', 'title', 'content', 'created_ms', 'updated_ms', 'deleted', 'updated_at'],
   financas: ['user_id', 'id', 'title', 'amount', 'start_month', 'duration_months', 'is_recurring', 'due_day', 'tag_id', 'paid_months', 'amount_overrides', 'created_ms', 'deleted', 'updated_at'],
+  // V40.21.0
+  metas_listas: ['user_id', 'id', 'name', 'is_default', 'position', 'created_ms', 'deleted', 'updated_at'],
+  metas: ['user_id', 'id', 'list_id', 'title', 'emoji', 'period', 'unit', 'target', 'step', 'position', 'created_ms', 'deleted', 'updated_at'],
+  metas_dias: ['user_id', 'id', 'goal_id', 'date', 'amount', 'target', 'deleted', 'updated_at'],
 };
 const DEFAULTS = {
   tarefas: { column_id: 'col_geral', title: '', duration: 30, tag_id: null, microblocks: [], position: 0, color: null, archived: false, deleted: false },
@@ -19,6 +23,9 @@ const DEFAULTS = {
   rotinas: { title: '', emoji: '', duration: 60, theme: 'focus', tag_id: null, microblocks: [], created_ms: null, deleted: false },
   notas: { title: '', content: '', created_ms: null, updated_ms: null, deleted: false },
   financas: { title: '', amount: 0, duration_months: 1, is_recurring: false, due_day: null, tag_id: null, paid_months: [], amount_overrides: {}, created_ms: null, deleted: false },
+  metas_listas: { name: '', is_default: false, position: 0, created_ms: null, deleted: false },
+  metas: { list_id: null, title: '', emoji: '', period: 'dia', unit: 'vezes', target: 1, step: 1, position: 0, created_ms: null, deleted: false },
+  metas_dias: { amount: 0, target: null, deleted: false },
 };
 
 function check(table, r) { // mesmas CHECKs da migration
@@ -63,6 +70,30 @@ function check(table, r) { // mesmas CHECKs da migration
     if ('amount_overrides' in r && (!r.amount_overrides || typeof r.amount_overrides !== 'object' || Array.isArray(r.amount_overrides))) return bad('amount_overrides');
     return null;
   }
+  // V40.21.0: mesmos CHECKs da migration faz_v40_21_0_metas
+  const pos = (k) => k in r && (typeof r[k] !== 'number' || !Number.isFinite(r[k]));
+  const goalNum = (k, nullable) => k in r && !(nullable && r[k] === null) && (typeof r[k] !== 'number' || !Number.isFinite(r[k]) || r[k] <= 0 || r[k] > 1e9);
+  const ref = (k, nullable) => k in r && !(nullable && r[k] === null) && (typeof r[k] !== 'string' || r[k].length < 1 || r[k].length > 64);
+  if (table === 'metas_listas') {
+    if (txt('name', 100)) return bad('name'); if ('is_default' in r && typeof r.is_default !== 'boolean') return bad('is_default');
+    if (pos('position')) return bad('position'); if (ms('created_ms')) return bad('created_ms');
+    return null;
+  }
+  if (table === 'metas') {
+    if (ref('list_id', true)) return bad('list_id'); if (txt('title', 200)) return bad('title'); if (txt('emoji', 16)) return bad('emoji');
+    if ('period' in r && !['dia', 'semana', 'mes'].includes(r.period)) return bad('period');
+    if ('unit' in r && !['vezes', 'minutos', 'reais'].includes(r.unit)) return bad('unit');
+    if (goalNum('target')) return bad('target'); if (goalNum('step')) return bad('step');
+    if (pos('position')) return bad('position'); if (ms('created_ms')) return bad('created_ms');
+    return null;
+  }
+  if (table === 'metas_dias') {
+    if (ref('goal_id')) return bad('goal_id');
+    if ('date' in r && !/^\d{4}-\d{2}-\d{2}$/.test(String(r.date))) return bad('date');
+    if ('amount' in r && (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || r.amount < 0 || r.amount > 1e9)) return bad('amount');
+    if (goalNum('target', true)) return bad('target');
+    return null;
+  }
   if ('position' in r && (typeof r.position !== 'number' || !Number.isFinite(r.position))) return bad('position');
   if ('deleted' in r && typeof r.deleted !== 'boolean') return bad('deleted');
   if (table === 'tarefas') {
@@ -86,7 +117,7 @@ function check(table, r) { // mesmas CHECKs da migration
 
 function makeServer() {
   const s = {
-    tables: { tarefas: new Map(), listas: new Map(), tags: new Map(), blocos: new Map(), rotinas: new Map(), notas: new Map(), financas: new Map() },
+    tables: { tarefas: new Map(), listas: new Map(), tags: new Map(), blocos: new Map(), rotinas: new Map(), notas: new Map(), financas: new Map(), metas_listas: new Map(), metas: new Map(), metas_dias: new Map() },
     users: new Map(), clock: 0, log: [], channels: [], storedSession: null, createClientCalls: 0, failNext: 0,
   };
   s.emitters = [];
@@ -141,6 +172,7 @@ class Query {
         if (err) return { data: null, error: err };
         if (this.op === 'insert' && tb.has(uid + '|' + r.id)) return { data: null, error: { code: '23505', message: 'duplicate key' } };
         if (this.t === 'financas' && !tb.has(uid + '|' + r.id) && !r.start_month) return { data: null, error: { code: '23502', message: 'null value in column "start_month" violates not-null constraint' } };
+        if (this.t === 'metas_dias' && !tb.has(uid + '|' + r.id) && (!r.goal_id || !r.date)) return { data: null, error: { code: '23502', message: 'null value in column "goal_id"/"date" violates not-null constraint' } };
       }
       for (const r of this.payload) {
         const key = uid + '|' + r.id, prev = tb.get(key);

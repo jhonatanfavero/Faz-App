@@ -52,12 +52,12 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   const today = server.alive('blocos', UID).filter((b) => b.date === '2026-11-16' && !b.archived);
 
   console.log('A) A aba Assistente:');
-  ok([...d.querySelectorAll('.tab')].map((b) => b.textContent.trim()).join(',') === 'Assistente,Listas,Agenda,Rotinas,Notas,Finanças', 'é a primeira aba: Assistente, Listas, Agenda, Rotinas, Notas e Finanças');
+  ok([...d.querySelectorAll('.tab')].map((b) => b.textContent.trim()).join(',') === 'Assistente,Listas,Agenda,Rotinas,Notas,Finanças,Metas', 'é a primeira aba: Assistente, Listas, Agenda, Rotinas, Notas, Finanças (e Metas, desde a V40.21.0)');
   ok(visible('board') && !visible('assistente'), 'quem já usava continua abrindo onde estava (aqui, nas Listas)');
   click($('tab-assistente'));
   ok(visible('assistente') && !visible('board') && $('tab-assistente').classList.contains('on') && w.localStorage.getItem('faz_pc_tab') === 'assistente' && !visible('zoom-ctl'), 'abre, fica lembrada e não tem zoom');
   ok(msgs().length === 1 && lastMsg().textContent.startsWith('Bom dia! Hoje é segunda, 16 de novembro. Você tem ' + today.length + ' blocos na agenda'), 'começa com o resumo do dia, com os dados da nuvem (' + today.length + ' blocos hoje)');
-  ok(d.querySelectorAll('#as-chips [data-as-chip]').length === 9 && $('as-name').textContent === 'Assistente', 'as 9 sugestões e o nome (provisório) aparecem');
+  ok(d.querySelectorAll('#as-chips [data-as-chip]').length === 10 && $('as-name').textContent === 'Assistente', 'as 10 sugestões e o nome (provisório) aparecem');
   // o resumo acompanha os dados enquanto ninguém perguntou nada
   server.insert('blocos', UID, { id: 'f_novo_hoje', date: '2026-11-16', start_min: 23 * 60, duration: 30, title: 'Bloco criado no celular', type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, archived: false });
   await waitFor(() => lastMsg().textContent.includes('Você tem ' + (today.length + 1) + ' blocos'));

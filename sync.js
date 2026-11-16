@@ -33,6 +33,11 @@
  *   mais antigas (como o app mostra); finanças mantêm a ordem do aparelho (o app ordena por
  *   vencimento). Quem já sincronizava sobe essas três na primeira rodada, sem reenviar o resto.
  *
+ * V40.21.0 — METAS: listas de metas (tb_goal_lists), metas (tb_goals_db) e o que foi feito em cada dia
+ *   (tb_goal_days, uma linha por meta por dia) entram no mesmo merge. Listas e metas têm "position" (ordem
+ *   própria, como as Listas). Os dias são lidos de forma incremental, igual à agenda (cursorMetasDias).
+ *   Meta numa lista apagada vai pra primeira lista; dia de meta apagada é apagado junto.
+ *
  * Estado interno em 'tb__sync' (prefixo tb__ = interno: fica FORA do backup e
  * o Restaurar não apaga). Sessão do Supabase fica em 'sb-<ref>-auth-token'.
  *
@@ -48,10 +53,11 @@
 
     var DEFAULT_COL = 'col_geral';
     var STEP = 1024;
-    var KINDS = ['listas', 'tags', 'tarefas', 'blocos', 'rotinas', 'notas', 'financas'];
+    var KINDS = ['listas', 'tags', 'tarefas', 'blocos', 'rotinas', 'notas', 'financas', 'metas_listas', 'metas', 'metas_dias'];
     // listas/tags/tarefas têm ordem própria (position); blocos se ordenam por dia e horário.
     // V40.17.0: rotinas e notas, das mais novas pras mais antigas; finanças, na ordem do aparelho.
-    var ORDERED = { listas: true, tags: true, tarefas: true, blocos: false, rotinas: false, notas: false, financas: false };
+    // V40.21.0: listas de metas e metas têm ordem própria; os dias das metas, por data.
+    var ORDERED = { listas: true, tags: true, tarefas: true, blocos: false, rotinas: false, notas: false, financas: false, metas_listas: true, metas: true, metas_dias: false };
     var NEWEST_FIRST = { rotinas: true, notas: true };
     var FIELDS = {
         tarefas: ['column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived'],
@@ -60,7 +66,10 @@
         blocos: ['date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived'],
         rotinas: ['title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms'],
         notas: ['title', 'content', 'created_ms', 'updated_ms'],
-        financas: ['title', 'amount', 'start_month', 'duration_months', 'is_recurring', 'due_day', 'tag_id', 'paid_months', 'amount_overrides', 'created_ms']
+        financas: ['title', 'amount', 'start_month', 'duration_months', 'is_recurring', 'due_day', 'tag_id', 'paid_months', 'amount_overrides', 'created_ms'],
+        metas_listas: ['name', 'is_default', 'position', 'created_ms'],
+        metas: ['list_id', 'title', 'emoji', 'period', 'unit', 'target', 'step', 'position', 'created_ms'],
+        metas_dias: ['goal_id', 'date', 'amount', 'target']
     };
     var FIELD_DEFAULTS = { archived: false, completed: false, was_delayed: false, is_default: false, microblocks: [], linked_note_ids: [], is_recurring: false, paid_months: [], amount_overrides: {} };
     // Campos estruturais entram em atributos/handlers do HTML do app: só passam nestes formatos.
@@ -73,6 +82,13 @@
         tag_2: ['Pessoal', '#10b981'],
         tag_3: ['Estudo', '#f59e0b']
     };
+    // V40.21.0: listas de metas que o app e o PC criam sozinhos (mesmos ids dos dois lados) e as regras das metas
+    // (as mesmas do metas.js e dos CHECKs da nuvem).
+    var DEFAULT_GOAL_LISTS = { gl_pessoal: 'Pessoal', gl_profissional: 'Profissional', gl_financeiro: 'Financeiro' };
+    var GOAL_PERIODS = { dia: true, semana: true, mes: true };
+    var GOAL_UNITS = { vezes: [1, 1], minutos: [15, 30], reais: [50, 500] }; // [passo, alvo] padrão
+    var GOAL_MAX = 1e9;
+    function has(o, k) { return k != null && Object.prototype.hasOwnProperty.call(o, String(k)); } // 'constructor' & cia não passam
 
     // ---------- utilitários ----------
     function stable(v) { // JSON com chaves ordenadas (comparação independente da ordem das chaves)
@@ -119,6 +135,12 @@
         return out;
     }
     function hex6(c) { return HEX6.test(String(c || '')) ? String(c) : null; }
+    function goalNum(v, def) { // alvo/passo de meta: > 0, até 1 bilhão, com 2 casas
+        var n = Number(v), r = v != null && v !== '' && Number.isFinite(n) ? Math.min(GOAL_MAX, Math.round(n * 100) / 100) : 0;
+        return r > 0 ? r : def;
+    }
+    function dayAmount(v) { var n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(GOAL_MAX, Math.round(n * 100) / 100)) : 0; }
+    function byDate(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); }
     function byPos(a, b) {
         return (a.position - b.position) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     }
@@ -320,6 +342,64 @@
                 f.createdAt = r.created_ms != null ? Number(r.created_ms) : (prev && prev.createdAt) || 0;
                 return f;
             }
+        },
+        // V40.21.0: listas de metas (tb_goal_lists)
+        metas_listas: {
+            row: function (c) {
+                return { id: String(c.id), name: str(c.name, 100), is_default: !!c.isDefault, created_ms: msOrNull(c.createdAt) };
+            },
+            item: function (r, prev) {
+                var c = prev ? Object.assign({}, prev) : { id: r.id };
+                c.name = r.name;
+                c.isDefault = !!r.is_default;
+                c.createdAt = r.created_ms != null ? Number(r.created_ms) : (prev && prev.createdAt) || 0;
+                return c;
+            }
+        },
+        // V40.21.0: metas (tb_goals_db)
+        metas: {
+            row: function (g) {
+                var unit = has(GOAL_UNITS, g.unit) ? String(g.unit) : 'vezes';
+                return {
+                    id: String(g.id),
+                    list_id: g.listId != null && SAFE_ID.test(String(g.listId)) ? String(g.listId) : null,
+                    title: str(g.title, 200),
+                    emoji: str(g.emoji, 16),
+                    period: has(GOAL_PERIODS, g.period) ? String(g.period) : 'dia',
+                    unit: unit,
+                    target: goalNum(g.target, GOAL_UNITS[unit][1]),
+                    step: goalNum(g.step, GOAL_UNITS[unit][0]),
+                    created_ms: msOrNull(g.createdAt)
+                };
+            },
+            item: function (r, prev) {
+                var g = prev ? Object.assign({}, prev) : { id: r.id };
+                g.listId = r.list_id || null;
+                g.title = r.title;
+                g.emoji = r.emoji;
+                g.period = r.period;
+                g.unit = r.unit;
+                g.target = r.target;
+                g.step = r.step;
+                g.createdAt = r.created_ms != null ? Number(r.created_ms) : (prev && prev.createdAt) || 0;
+                return g;
+            }
+        },
+        // V40.21.0: o que foi feito em cada dia (tb_goal_days). target = alvo da meta quando foi marcado.
+        metas_dias: {
+            row: function (d) {
+                var date = String(d.date || '').slice(0, 10);
+                if (!validDate(date) || d.goalId == null || !SAFE_ID.test(String(d.goalId))) return null; // fica só no aparelho
+                return { id: String(d.id), goal_id: String(d.goalId), date: date, amount: dayAmount(d.amount), target: goalNum(d.target, null) };
+            },
+            item: function (r, prev) {
+                var d = prev ? Object.assign({}, prev) : { id: r.id };
+                d.goalId = r.goal_id;
+                d.date = r.date;
+                d.amount = r.amount;
+                if (r.target != null) d.target = r.target; else delete d.target;
+                return d;
+            }
         }
     };
 
@@ -386,6 +466,27 @@
                 c.paid_months = cleanMonths(c.paid_months);
                 c.amount_overrides = cleanOverrides(c.amount_overrides);
                 c.created_ms = msOrNull(c.created_ms);
+            }
+            if (kind === 'metas_listas') {
+                c.name = str(c.name, 100);
+                c.created_ms = msOrNull(c.created_ms);
+            }
+            if (kind === 'metas') {
+                c.list_id = c.list_id != null && SAFE_ID.test(String(c.list_id)) ? String(c.list_id) : null;
+                c.title = str(c.title, 200);
+                c.emoji = str(c.emoji, 16);
+                if (!has(GOAL_PERIODS, c.period)) c.period = 'dia';
+                if (!has(GOAL_UNITS, c.unit)) c.unit = 'vezes';
+                c.target = goalNum(c.target, GOAL_UNITS[c.unit][1]);
+                c.step = goalNum(c.step, GOAL_UNITS[c.unit][0]);
+                c.created_ms = msOrNull(c.created_ms);
+            }
+            if (kind === 'metas_dias') {
+                c.date = String(c.date || '').slice(0, 10);
+                if (!validDate(c.date) || c.goal_id == null || !SAFE_ID.test(String(c.goal_id))) return;
+                c.goal_id = String(c.goal_id);
+                c.amount = dayAmount(c.amount);
+                c.target = goalNum(c.target, null);
             }
             out[c.id] = c;
         });
@@ -568,6 +669,18 @@
             });
         }
 
+        // V40.21.0: idem pras listas de metas padrão (intactas e sem meta), quando a nuvem já tem listas de metas.
+        var droppedGoalLists = 0;
+        if ((firstSync || !(opts.base && opts.base.metas_listas)) && aliveCount(remote.metas_listas) > 0) {
+            var usedLists = {};
+            local.metas.forEach(function (g) { if (g && g.listId != null) usedLists[String(g.listId)] = true; });
+            local.metas_listas = local.metas_listas.filter(function (c) {
+                var name = c && has(DEFAULT_GOAL_LISTS, c.id) && DEFAULT_GOAL_LISTS[c.id];
+                if (name && c.name === name && !usedLists[c.id] && !remote.metas_listas[c.id]) { droppedGoalLists++; return false; }
+                return true;
+            });
+        }
+
         var L = {}, merged = {}, dups = {}, totalDups = 0, skipped = 0, localOnly = {};
         KINDS.forEach(function (k) {
             var built = buildLocal(k, local[k], base[k]);
@@ -598,6 +711,22 @@
             });
         });
 
+        // V40.21.0: meta numa lista de metas apagada vai pra primeira lista; o dia de uma meta apagada é apagado junto.
+        var goalLists = Object.keys(merged.metas_listas).map(function (id) { return merged.metas_listas[id]; })
+            .filter(function (r) { return !r.deleted; }).sort(byPos);
+        if (goalLists.length) {
+            var aliveGL = {};
+            goalLists.forEach(function (r) { aliveGL[r.id] = true; });
+            Object.keys(merged.metas).forEach(function (id) {
+                var r = merged.metas[id];
+                if (!r.deleted && !aliveGL[r.list_id]) { r.list_id = goalLists[0].id; repaired++; }
+            });
+        }
+        Object.keys(merged.metas_dias).forEach(function (id) {
+            var r = merged.metas_dias[id], g = merged.metas[r.goal_id];
+            if (!r.deleted && g && g.deleted) r.deleted = true;
+        });
+
         // Desempate de posições já nesta rodada (não deixa pra próxima).
         KINDS.forEach(function (k) { if (ORDERED[k]) fixTies(merged[k]); });
 
@@ -613,8 +742,9 @@
         });
         if (droppedDefaults.length) changed.tags = true;
         if (droppedSeeds) changed.blocos = true;
+        if (droppedGoalLists) changed.metas_listas = true;
 
-        return { merged: merged, push: push, changed: changed, droppedDefaults: droppedDefaults, droppedSeeds: droppedSeeds, repaired: repaired, dups: totalDups, skipped: skipped, localOnly: localOnly };
+        return { merged: merged, push: push, changed: changed, droppedDefaults: droppedDefaults, droppedSeeds: droppedSeeds, droppedGoalLists: droppedGoalLists, repaired: repaired, dups: totalDups, skipped: skipped, localOnly: localOnly };
     }
 
     // Lista do app a partir das linhas mescladas (preserva campos extras de cada item).
@@ -640,7 +770,7 @@
                 var id = it && it.id != null ? String(it.id) : null, r = id && mergedRows[id];
                 if (r && !r.deleted && !r.archived && !done[id]) { done[id] = true; out.push(MAP[kind].item(r, prevById[id])); }
             });
-            alive.filter(function (r) { return !done[r.id]; }).sort(kind === 'blocos' ? byDay : byCreated)
+            alive.filter(function (r) { return !done[r.id]; }).sort(kind === 'blocos' ? byDay : kind === 'metas_dias' ? byDate : byCreated)
                 .forEach(function (r) { out.push(MAP[kind].item(r, null)); });
         }
         return out.concat(extras);
@@ -665,7 +795,7 @@
     }
 
     return {
-        DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS, MONTH: MONTH,
+        DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS, MONTH: MONTH, DEFAULT_GOAL_LISTS: DEFAULT_GOAL_LISTS,
         cleanOverrides: cleanOverrides, cleanMonths: cleanMonths,
         stable: stable, same: same, validDate: validDate, assignPositions: assignPositions, fixTies: fixTies,
         buildLocal: buildLocal, indexRows: indexRows, cleanRow: cleanRow, merge3: merge3, mergeKind: mergeKind,
@@ -693,8 +823,15 @@
         blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,deleted,updated_at',
         rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,deleted',
         notas: 'id,title,content,created_ms,updated_ms,deleted',
-        financas: 'id,title,amount,start_month,duration_months,is_recurring,due_day,tag_id,paid_months,amount_overrides,created_ms,deleted'
+        financas: 'id,title,amount,start_month,duration_months,is_recurring,due_day,tag_id,paid_months,amount_overrides,created_ms,deleted',
+        // V40.21.0: metas
+        metas_listas: 'id,name,is_default,position,created_ms,deleted',
+        metas: 'id,list_id,title,emoji,period,unit,target,step,position,created_ms,deleted',
+        metas_dias: 'id,goal_id,date,amount,target,deleted,updated_at'
     };
+    var GOAL_KINDS = ['metas_listas', 'metas', 'metas_dias'];
+    // Lidos de forma incremental (só o que mudou desde a última rodada): o nome do cursor guardado em tb__sync.
+    var INCREMENTAL = { blocos: 'cursorBlocos', metas_dias: 'cursorMetasDias' };
     var configured = !!(CFG.url && CFG.key && !/COLE_AQUI/i.test(CFG.url + CFG.key));
 
     var sb = null, session = null, libPromise = null;
@@ -750,7 +887,7 @@
             // travar, senão o celular pararia de sincronizar até alguém voltar naquela aba.
             var sheet = $('list-sheet');
             if (sheet && !sheet.classList.contains('translate-y-full')) {
-                var forms = ['routines-form-view', 'financial-form-view', 'notes-form'];
+                var forms = ['routines-form-view', 'financial-form-view', 'notes-form', 'goals-form-view']; // V40.21.0: + metas
                 for (var f = 0; f < forms.length; f++) if (shownEl($(forms[f]))) return true;
             }
             // V40.8.0: NÃO usar getOpenModal() do app aqui. Ele procura qualquer elemento com a classe
@@ -824,22 +961,26 @@
         return out;
     }
 
-    // Listas, tags e tarefas: lê tudo (são pequenas). Agenda: só o que mudou desde a última
-    // rodada (30s de folga); o restante da nuvem é igual à base guardada neste aparelho.
+    // Listas, tags, tarefas, rotinas...: lê tudo (são pequenas). Agenda e dias das metas (V40.21.0): só o que mudou
+    // desde a última rodada (30s de folga); o restante da nuvem é igual à base guardada neste aparelho.
     async function fetchAll(uid, st) {
-        var out = {}, cursor = (st && st.cursorBlocos) || 0;
-        for (var i = 0; i < KINDS.length; i++) if (KINDS[i] !== 'blocos') out[KINDS[i]] = await fetchRows(KINDS[i], uid, 0);
-        var incremental = !!(st && st.base && st.base.blocos && cursor);
-        var rows = await fetchRows('blocos', uid, incremental ? cursor - 30000 : 0);
-        rows.forEach(function (r) { var t = Date.parse(r.updated_at); if (t > cursor) cursor = t; });
-        if (incremental) {
-            var byId = {};
-            Object.keys(st.base.blocos).forEach(function (id) { byId[id] = Object.assign({}, st.base.blocos[id], { id: id }); });
-            rows.forEach(function (r) { byId[r.id] = r; });
-            rows = Object.keys(byId).map(function (id) { return byId[id]; });
+        var out = {}, cursors = {};
+        for (var i = 0; i < KINDS.length; i++) if (!INCREMENTAL[KINDS[i]]) out[KINDS[i]] = await fetchRows(KINDS[i], uid, 0);
+        for (var k in INCREMENTAL) {
+            var cursor = (st && st[INCREMENTAL[k]]) || 0;
+            var incremental = !!(st && st.base && st.base[k] && cursor);
+            var rows = await fetchRows(k, uid, incremental ? cursor - 30000 : 0);
+            rows.forEach(function (r) { var t = Date.parse(r.updated_at); if (t > cursor) cursor = t; });
+            if (incremental) {
+                var byId = {}, base = st.base[k];
+                Object.keys(base).forEach(function (id) { byId[id] = Object.assign({}, base[id], { id: id }); });
+                rows.forEach(function (r) { byId[r.id] = r; });
+                rows = Object.keys(byId).map(function (id) { return byId[id]; });
+            }
+            out[k] = rows;
+            cursors[k] = cursor;
         }
-        out.blocos = rows;
-        return { remote: out, cursor: cursor };
+        return { remote: out, cursors: cursors };
     }
 
     async function pushAll(uid, push) {
@@ -859,9 +1000,15 @@
     // V40.17.0: rotinas, notas e finanças do aparelho (o app guarda em routinesDb, notesDb e financialDb)
     function localList(kind) {
         try {
-            var a = kind === 'rotinas' ? routinesDb : kind === 'notas' ? notesDb : financialDb;
+            var a = kind === 'rotinas' ? routinesDb : kind === 'notas' ? notesDb : kind === 'financas' ? financialDb
+                : kind === 'metas_listas' ? goalListsDb : kind === 'metas' ? goalsDb : kind === 'metas_dias' ? goalDaysDb : null;
             return Array.isArray(a) ? a : [];
         } catch (e) { return []; }
+    }
+    // V40.21.0: este app.js tem metas? (sempre tem: o cache troca os arquivos juntos). Se não tivesse, as metas da
+    // nuvem não podem parecer "apagadas aqui": o aparelho fica com a base, sem subir nem aplicar nada delas.
+    function hasGoals() {
+        try { return Array.isArray(goalListsDb) && Array.isArray(goalsDb) && Array.isArray(goalDaysDb); } catch (e) { return false; }
     }
     // V40.9.0: arquivados (tb_archive_db) entram no sync como linhas com archived = true.
     function archList() {
@@ -901,6 +1048,7 @@
             'Agenda: ' + localBlocks().length + ' blocos neste aparelho, ' + CORE.aliveCount(remote.blocos) + ' na nuvem.\n' +
             'Rotinas, notas e finanças também vão juntas (' + localList('rotinas').length + ', ' + localList('notas').length + ' e ' +
             localList('financas').length + ' neste aparelho).\n' +
+            (localList('metas').length ? 'Metas também (' + localList('metas').length + ' neste aparelho).\n' : '') +
             'Dica: se quiser segurança extra, faça um backup antes (Config → Backup).\n\n' +
             'Continuar?';
     }
@@ -932,12 +1080,19 @@
             if (p.changed.rotinas) { routinesDb = CORE.materialize('rotinas', p.merged.rotinas, localList('rotinas'), p.localOnly.rotinas); saveRoutinesDb(); }
             if (p.changed.notas) { notesDb = CORE.materialize('notas', p.merged.notas, localList('notas'), p.localOnly.notas); saveNotes(); }
             if (p.changed.financas) { financialDb = CORE.materialize('financas', p.merged.financas, localList('financas'), p.localOnly.financas); saveFinancial(); }
+            // V40.21.0: metas
+            if (!p.noGoals) {
+                if (p.changed.metas_listas) { goalListsDb = CORE.materialize('metas_listas', p.merged.metas_listas, localList('metas_listas'), p.localOnly.metas_listas); saveGoalLists(); }
+                if (p.changed.metas) { goalsDb = CORE.materialize('metas', p.merged.metas, localList('metas'), p.localOnly.metas); saveGoals(); }
+                if (p.changed.metas_dias) { goalDaysDb = CORE.materialize('metas_dias', p.merged.metas_dias, localList('metas_dias'), p.localOnly.metas_dias); saveGoalDays(); }
+            }
         } finally {
             applying = false;
         }
         if (p.changed.rotinas) { try { if (typeof renderRoutinesList === 'function') renderRoutinesList(); } catch (e) { console.warn('[FazSync] rotinas', e); } }
         if (p.changed.notas) { try { if (typeof renderNotes === 'function') renderNotes(); } catch (e) { console.warn('[FazSync] notas', e); } }
         if (p.changed.financas) { try { if (typeof renderFinancial === 'function') renderFinancial(); } catch (e) { console.warn('[FazSync] finanças', e); } }
+        if (!p.noGoals && (p.changed.metas_listas || p.changed.metas || p.changed.metas_dias)) { try { if (typeof renderGoals === 'function') renderGoals(); } catch (e) { console.warn('[FazSync] metas', e); } }
         try { if (typeof ensureDefaultColumn === 'function') ensureDefaultColumn(); } catch (e) {}
         try {
             if (typeof activeColumnId !== 'undefined' && !backlogColumnsDb.some(function (c) { return c.id === activeColumnId; })) {
@@ -971,16 +1126,22 @@
             // Daqui até applyLocal é tudo síncrono: nenhuma ação do usuário entra no meio.
             if (appBusy()) { again = true; return; }
             var novosTipos = !firstSync && !st.base.rotinas; // V40.17.0: 1ª rodada com rotinas, notas e finanças
+            var local = {
+                tarefas: backlogDb.concat(archItems('tarefa')), listas: backlogColumnsDb, tags: tagsDb, blocos: localBlocks().concat(archItems('bloco')),
+                rotinas: localList('rotinas'), notas: localList('notas'), financas: localList('financas')
+            };
+            var noGoals = !hasGoals();
+            GOAL_KINDS.forEach(function (k) { // V40.21.0
+                local[k] = !noGoals ? localList(k) : CORE.materialize(k, (!firstSync && st.base[k]) || {}, [], {});
+            });
             var p = CORE.plan({
-                local: {
-                    tarefas: backlogDb.concat(archItems('tarefa')), listas: backlogColumnsDb, tags: tagsDb, blocos: localBlocks().concat(archItems('bloco')),
-                    rotinas: localList('rotinas'), notas: localList('notas'), financas: localList('financas')
-                },
+                local: local,
                 base: firstSync ? null : st.base,
                 remote: remote,
                 firstSync: firstSync,
                 usedTagIds: usedTagIds()
             });
+            p.noGoals = noGoals;
             if (firstSync && !confirm(firstSyncText(remote))) {
                 await window.fazSyncLogout(true);
                 toast('Sincronização cancelada');
@@ -989,7 +1150,7 @@
             if (KINDS.some(function (k) { return p.changed[k]; })) applyLocal(p);
 
             await pushAll(uid, p.push);
-            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), cursorBlocos: fetched.cursor, arch: 1, lastSyncAt: Date.now() });
+            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), cursorBlocos: fetched.cursors.blocos, cursorMetasDias: fetched.cursors.metas_dias, arch: 1, lastSyncAt: Date.now() });
             lastError = null;
             if (manual || firstSync) toast('Sincronizado ✅');
             else if (novosTipos) toast('☁️ Rotinas, notas e finanças agora também vão pro computador');

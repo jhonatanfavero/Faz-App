@@ -777,7 +777,15 @@ function renderGrid() {
 
 function formatClock(m) { return `${Math.floor(m/60).toString().padStart(2,'0')}:${(m%60).toString().padStart(2,'0')}`; }
 function formatDur(m) { const h = Math.floor(m/60), min = m%60; return h > 0 && min > 0 ? `${h}h ${min}m` : (h > 0 ? `${h}h` : `${min}m`); }
-function showToast(msg) { const t = document.getElementById('toast'); document.getElementById('toast-msg').innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => t.classList.add('opacity-0'), 2500); }
+function showToast(msg, kind) {
+    const t = document.getElementById('toast'), win = kind === 'win'; // V40.21.0: 'win' = conquista (estrela, nível): amarelo, sem o ícone de aviso
+    document.getElementById('toast-msg').innerText = msg;
+    t.classList.toggle('toast-win', win);
+    const ico = t.querySelector('i');
+    if (ico) ico.classList.toggle('hidden', win);
+    t.classList.remove('opacity-0');
+    setTimeout(() => t.classList.add('opacity-0'), 2500);
+}
 
 function renderTimeline() {
     // V40.3.2: bloqueia re-render durante drag de microbloc pra não invalidar mbDragRects/mbDragSourceEl.
@@ -2094,6 +2102,7 @@ function fazDataSummary(dataObj) {
         notas: countArr('tb_notes_db'),
         despesas: countArr('tb_financial_db'),
         tags: countArr('tb_tags_db'),
+        metas: countArr('tb_goals_db'), // V40.21.0
     };
 }
 
@@ -2111,7 +2120,7 @@ window.renderBackupSummary = function() {
     el.innerHTML =
         `<b>${s.tarefas}</b> tarefas · <b>${s.despesas}</b> despesas · ` +
         `<b>${s.rotinas}</b> rotinas · <b>${s.notas}</b> notas · ` +
-        `<b>${s.blocos}</b> blocos · <b>${s.tags}</b> tags`;
+        `<b>${s.blocos}</b> blocos · <b>${s.tags}</b> tags · <b>${s.metas}</b> metas`;
 };
 
 window.openConfigBackup = function() {
@@ -2137,7 +2146,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.20.0',
+            version: 'v40.21.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -2210,7 +2219,7 @@ window.handleFazImportFile = function(inputEl) {
 // handlers do HTML. Um backup só é aceito se todos estiverem no formato esperado.
 function fazBackupLooksSafe(incoming) {
     const ID = /^[\w.\-]{1,64}$/, HEX = /^#[0-9a-fA-F]{3,8}$/, DATE = /^\d{4}-\d{2}-\d{2}$/, MONTH = /^\d{4}-\d{2}$/, TIME = /^\d{1,2}:\d{2}$/, NUMSTR = /^-?\d+(\.\d+)?$/;
-    const NUM = { startMin: 1, duration: 1, amount: 1, dueDay: 1, durationMonths: 1, createdAt: 1 };
+    const NUM = { startMin: 1, duration: 1, amount: 1, dueDay: 1, durationMonths: 1, createdAt: 1, target: 1, step: 1 }; // V40.21.0: + alvo e passo das metas
     const isNum = (v) => (typeof v === 'number' && isFinite(v)) || (typeof v === 'string' && NUMSTR.test(v));
     const okVal = (k, v) => {
         if (v === null || v === undefined) return true;
@@ -2229,7 +2238,7 @@ function fazBackupLooksSafe(incoming) {
         if (v && typeof v === 'object') return Object.keys(v).every(k => okVal(k, v[k]) && walk(v[k], depth + 1));
         return true;
     };
-    const LISTS = ['tb_master_db', 'tb_backlog_db', 'tb_backlog_columns', 'tb_tags_db', 'tb_periods_db', 'tb_notes_db', 'tb_routines_db', 'tb_financial_db', 'tb_archive_db'];
+    const LISTS = ['tb_master_db', 'tb_backlog_db', 'tb_backlog_columns', 'tb_tags_db', 'tb_periods_db', 'tb_notes_db', 'tb_routines_db', 'tb_financial_db', 'tb_archive_db', 'tb_goal_lists', 'tb_goals_db', 'tb_goal_days'];
     for (const key of LISTS) {
         if (!(key in incoming)) continue;
         let v;
@@ -2262,7 +2271,7 @@ function applyFazImport(parsed) {
         '⚠️ RESTAURAR BACKUP\n\n' +
         'Backup de: ' + quando + '\n' +
         'Contém: ' + (s.tarefas || 0) + ' tarefas, ' + (s.despesas || 0) + ' despesas, ' +
-        (s.rotinas || 0) + ' rotinas, ' + (s.notas || 0) + ' notas.\n\n' +
+        (s.rotinas || 0) + ' rotinas, ' + (s.notas || 0) + ' notas' + (s.metas ? ', ' + s.metas + ' metas' : '') + '.\n\n' +
         'Isso vai SUBSTITUIR todos os dados atuais deste aparelho pelos do backup.\n' +
         'Os dados atuais serão guardados pra você poder desfazer (1 nível).\n\n' +
         'Continuar?'
@@ -3511,14 +3520,15 @@ let editingNoteId = null;
 window.switchListTab = function(tabName) {
     activeListTab = tabName;
     
-    // V40.4.1: tabs agora inclui 'financial'. V40.20.0: + 'assistant' na frente (pílula só com o ícone, mais estreita)
-    const TABS = ['assistant', 'backlog', 'routines', 'notes', 'financial'];
+    // V40.4.1: tabs agora inclui 'financial'. V40.20.0: + 'assistant' na frente (pílula só com o ícone, mais estreita).
+    // V40.21.0: + 'goals' (Metas) no fim, também só com o ícone.
+    const TABS = ['assistant', 'backlog', 'routines', 'notes', 'financial', 'goals'];
     
     // Atualizar pills
     TABS.forEach(t => {
         const btn = document.getElementById(`btn-list-${t}`);
         if (!btn) return;
-        const size = t === 'assistant' ? 'flex-none w-9' : 'flex-1';
+        const size = t === 'assistant' || t === 'goals' ? 'flex-none w-9' : 'flex-1';
         if (t === tabName) {
             btn.className = size + ' py-1.5 rounded-lg bg-white shadow-sm text-zinc-800 text-xs font-bold transition border border-black/5 flex items-center justify-center gap-1';
         } else {
@@ -3560,6 +3570,11 @@ window.switchListTab = function(tabName) {
         if (typeof renderFinancial === 'function') renderFinancial();
         notesFormOpen = false;
         editingNoteId = null;
+    } else if (tabName === 'goals') {
+        // V40.21.0: sempre começa na lista de metas (não no formulário)
+        closeGoalForm(true);
+        notesFormOpen = false;
+        editingNoteId = null;
     } else {
         notesFormOpen = false; // ao sair da aba, garante que form fica fechado da próxima vez
         editingNoteId = null;  // V40.1.2: limpar modo edição ao sair
@@ -3592,7 +3607,9 @@ function assistantSnap() {
             Object.keys(f.paidMonthsOverrides || {}).forEach(m => { const v = f.paidMonthsOverrides[m]; ov[m] = v && typeof v === 'object' ? v.amount : v; });
             return { id: f.id, title: f.title, amount: Number(f.amount) || 0, start: getItemStartMonth(f), months: f.durationMonths || 1, recurring: !!f.isRecurring, dueDay: f.dueDay || null,
                 paid: Array.isArray(f.paidMonths) ? f.paidMonths : (f.paid === true ? [getItemStartMonth(f)] : []), overrides: ov };
-        })
+        }),
+        // V40.21.0: as metas já chegam prontas (progresso, estrelas, nível), calculadas pelo metas.js
+        goals: window.FazMetas ? window.FazMetas.forAssistant(goalListsDb, goalsDb, goalDaysDb, new Date()) : null
     };
 }
 function assistantMsgHtml(m) {
@@ -3644,6 +3661,345 @@ window.assistantRestart = function() {
     assistantMsgs = [];
     assistantAuto = true;
     renderAssistant();
+};
+
+// =====================================================
+// V40.21.0 — METAS (etapa 1). As regras ficam no metas.js (as mesmas do PC e do Assistente): listas (Pessoal,
+// Profissional, Financeiro e as que a pessoa criar), metas por dia, semana ou mês contadas em vezes, minutos ou
+// reais, o botão "+" de cada meta, ⭐ estrelas, 🔥 sequência, pontos e níveis.
+//   tb_goal_lists [{ id, name, isDefault, createdAt }]
+//   tb_goals_db   [{ id, listId, title, emoji, period, unit, target, step, createdAt }]
+//   tb_goal_days  [{ id: <meta>_<AAAAMMDD>, goalId, date, amount, target }]   (o quanto foi feito em cada dia)
+// Etapa 2 (depois): cartões da agenda e das Listas ligados a uma meta, e gráficos.
+// =====================================================
+let goalListsDb = fazLoadList('tb_goal_lists', []);
+let goalsDb = fazLoadList('tb_goals_db', []);
+let goalDaysDb = fazLoadList('tb_goal_days', []);
+let activeGoalListId = null; // lista aberta na aba Metas
+let goalEditId = null;       // meta aberta no formulário (null = nova)
+let goalForm = null;         // { listId, period, unit, stepTouched, targetTouched }
+let goalListNameMode = null; // 'create' | 'rename'
+let _goalConfirmAction = null;
+function saveGoalLists() { localStorage.setItem('tb_goal_lists', JSON.stringify(goalListsDb)); if (window.fazSyncNotify) window.fazSyncNotify(); }
+function saveGoals() { localStorage.setItem('tb_goals_db', JSON.stringify(goalsDb)); if (window.fazSyncNotify) window.fazSyncNotify(); }
+function saveGoalDays() { localStorage.setItem('tb_goal_days', JSON.stringify(goalDaysDb)); if (window.fazSyncNotify) window.fazSyncNotify(); }
+const GOAL_SAFE_ID = /^[\w.\-]{1,64}$/;
+function goalJsId(id) { return GOAL_SAFE_ID.test(String(id)) ? String(id) : ''; } // id que entra num onclick
+// Sem nenhuma lista (primeira vez): cria Pessoal, Profissional e Financeiro (os mesmos ids do PC: nunca duplicam).
+function ensureGoalLists() {
+    const M = window.FazMetas;
+    if (!M || goalListsDb.length) return false;
+    const now = Date.now();
+    goalListsDb = M.DEFAULT_LISTS.map(l => ({ id: l.id, name: l.name, isDefault: true, createdAt: now }));
+    saveGoalLists();
+    return true;
+}
+function newGoalId(prefix, list) { let n = Date.now(); while (list.some(x => x.id === prefix + n)) n++; return prefix + n; }
+function parseGoalNumber(v) { // "1,5", "1.5", "R$ 1.234,56" → número com 2 casas (ou NaN)
+    let t = String(v == null ? '' : v).replace(/R\$|\s/g, '');
+    if (!t) return NaN;
+    if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
+    if (!/^\d+(\.\d+)?$/.test(t)) return NaN;
+    return Math.round(Number(t) * 100) / 100;
+}
+function goalNumField(n) { return String(Math.round((Number(n) || 0) * 100) / 100).replace('.', ','); }
+function goalTodayAmount(goalId) {
+    const M = window.FazMetas, d = goalDaysDb.find(x => x.id === M.dayId(goalId, M.ymd(new Date())));
+    return d ? Number(d.amount) || 0 : 0;
+}
+
+window.renderGoals = function() {
+    const wrap = document.getElementById('goals-container');
+    if (!wrap) return;
+    const M = window.FazMetas;
+    if (!M) { wrap.innerHTML = '<p class="text-sm text-zinc-500 py-6 text-center">Não consegui abrir as metas. Feche e abra o app de novo.</p>'; return; }
+    ensureGoalLists();
+    if (!goalListsDb.some(l => l.id === activeGoalListId)) activeGoalListId = goalListsDb[0].id;
+    const now = new Date(), sum = M.summary(goalsDb, goalDaysDb, now), st = {};
+    sum.statuses.forEach(x => { st[x.goal.id] = x; });
+
+    // nível
+    document.getElementById('goals-level-n').textContent = sum.level;
+    document.getElementById('goals-level-name').textContent = sum.name;
+    document.getElementById('goals-points').textContent = sum.points + (sum.points === 1 ? ' ponto' : ' pontos');
+    document.getElementById('goals-level-bar').style.width = Math.round(sum.pct * 100) + '%';
+    const sub = ['⭐ ' + sum.stars];
+    if (sum.todayTotal) sub.push('hoje ' + sum.todayDone + ' de ' + sum.todayTotal);
+    sub.push('faltam ' + sum.toNext + ' pro nível ' + (sum.level + 1));
+    document.getElementById('goals-level-sub').textContent = sub.join(' · ');
+
+    // listas (tocar na lista aberta abre o menu dela)
+    const count = {};
+    goalsDb.forEach(g => { const l = M.listOf(g, goalListsDb); count[l] = (count[l] || 0) + 1; });
+    document.getElementById('goals-lists').innerHTML = goalListsDb.map(l => {
+        const on = l.id === activeGoalListId, id = goalJsId(l.id);
+        return `<button type="button" onclick="selectGoalList('${id}')" class="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border transition active:scale-95 ${on ? 'bg-app-focus text-white border-app-focus' : 'bg-white text-zinc-600 border-zinc-200'}">${escapeHtml(l.name || 'Sem nome')}<span class="${on ? 'text-white/80' : 'text-zinc-400'}">${count[l.id] || 0}</span>${on ? '<i class="ph-bold ph-dots-three text-sm"></i>' : ''}</button>`;
+    }).join('') + `<button type="button" onclick="openCreateGoalList()" class="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border border-dashed border-zinc-300 text-zinc-500 active:scale-95 transition"><i class="ph ph-plus"></i> Lista</button>`;
+
+    // metas da lista aberta
+    const list = goalListsDb.find(l => l.id === activeGoalListId);
+    const goals = goalsDb.filter(g => M.listOf(g, goalListsDb) === activeGoalListId);
+    if (!goals.length) {
+        wrap.innerHTML = `<div class="text-center py-10 px-4"><div class="w-14 h-14 rounded-2xl bg-zinc-100 text-zinc-400 flex items-center justify-center mx-auto mb-3"><i class="ph ph-target text-3xl"></i></div>` +
+            `<p class="text-sm font-bold text-zinc-600">Nenhuma meta em ${escapeHtml(list ? list.name : '')} ainda</p>` +
+            `<p class="text-xs text-zinc-500 mt-1 leading-relaxed">Toque em <b>Nova meta</b>. Ex.: beber água, correr, meditar, ler, guardar dinheiro...</p></div>`;
+        return;
+    }
+    wrap.innerHTML = goals.map(g => {
+        const x = st[g.id], done = x.complete, id = goalJsId(g.id), badges = [];
+        if (x.streak) badges.push('🔥 ' + x.streak);
+        if (x.stars) badges.push('⭐ ' + x.stars);
+        const minus = goalTodayAmount(g.id) > 0
+            ? `<button type="button" onclick="goalBump('${id}', -1)" aria-label="Desfazer o último +" class="w-8 h-9 rounded-xl text-zinc-400 hover:bg-zinc-100 flex items-center justify-center active:scale-90 transition"><i class="ph-bold ph-minus text-sm"></i></button>` : '';
+        return `<div class="bg-white border ${done ? 'border-emerald-200' : 'border-zinc-200'} rounded-2xl p-3 mb-2.5 shadow-sm flex items-center gap-2" data-goal="${escapeHtml(g.id)}">` +
+            `<button type="button" onclick="openGoalForm('${id}')" class="flex-1 min-w-0 flex items-center gap-3 text-left">` +
+            `<span class="w-10 h-10 rounded-xl ${done ? 'bg-emerald-50' : 'bg-zinc-100'} flex items-center justify-center text-xl shrink-0">${escapeHtml(g.emoji || '🎯')}</span>` +
+            `<span class="min-w-0 flex-1"><span class="block text-sm font-bold text-zinc-800 truncate">${escapeHtml(g.title || 'Sem nome')}</span>` +
+            `<span class="goal-status block text-[11px] ${done ? 'text-emerald-600 font-bold' : 'text-zinc-500'} truncate">${done ? '✓ ' : ''}${escapeHtml(x.text)}${badges.length ? ' · ' + badges.join(' · ') : ''}</span>` +
+            `<span class="block mt-1.5 h-1.5 rounded-full bg-zinc-100 overflow-hidden"><span class="block h-full rounded-full ${done ? 'bg-emerald-500' : 'bg-app-focus'}" style="width:${Math.round(x.pct * 100)}%"></span></span></span></button>` +
+            `<div class="flex items-center gap-0.5 shrink-0">${minus}<button type="button" onclick="goalBump('${id}', 1)" class="goal-plus h-9 min-w-[44px] px-2.5 rounded-xl ${done ? 'bg-emerald-500' : 'bg-app-focus'} text-white text-xs font-bold active:scale-95 transition">${escapeHtml(M.addLabel(g))}</button></div></div>`;
+    }).join('');
+};
+window.selectGoalList = function(id) {
+    if (id === activeGoalListId) return openGoalListMenu();
+    activeGoalListId = id;
+    renderGoals();
+};
+// "+" (ou "−") na meta: soma no dia de hoje. Cumpriu? Estrela e pontos (e às vezes um nível novo).
+window.goalBump = function(id, dir) {
+    const M = window.FazMetas, g = goalsDb.find(x => x.id === id);
+    if (!M || !g) return;
+    const now = new Date(), before = M.summary(goalsDb, goalDaysDb, now);
+    const r = M.bump(goalDaysDb, g, M.ymd(now), (dir < 0 ? -1 : 1) * M.normalize(g).step);
+    if (!r.changed) return;
+    goalDaysDb = r.days;
+    saveGoalDays();
+    const msg = dir > 0 ? M.gainText(M.gain(before, M.summary(goalsDb, goalDaysDb, now))) : '';
+    renderGoals();
+    if (msg) {
+        showToast(msg, 'win');
+        try { if (navigator.vibrate) navigator.vibrate([25, 40, 25]); } catch (e) {}
+    }
+};
+
+// ---------- formulário (criar / editar meta) ----------
+function goalFormUi() {
+    const M = window.FazMetas, f = goalForm;
+    ['dia', 'semana', 'mes'].forEach(p => {
+        const b = document.getElementById('goal-period-' + p), on = f.period === p;
+        b.className = 'flex-1 py-2.5 rounded-lg border text-xs font-bold transition active:scale-95 ' + (on ? 'bg-app-focus text-white border-app-focus' : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100');
+    });
+    ['vezes', 'minutos', 'reais'].forEach(u => {
+        const b = document.getElementById('goal-unit-' + u), on = f.unit === u;
+        b.className = 'flex-1 py-2.5 rounded-lg border text-xs font-bold transition active:scale-95 ' + (on ? 'bg-app-focus text-white border-app-focus' : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100');
+    });
+    document.getElementById('goal-list-options').innerHTML = goalListsDb.map(l => {
+        const on = l.id === f.listId;
+        return `<button type="button" onclick="selectGoalFormList('${goalJsId(l.id)}')" class="px-3 py-2 rounded-lg border text-xs font-bold transition active:scale-95 ${on ? 'bg-app-focus text-white border-app-focus' : 'bg-zinc-50 text-zinc-600 border-zinc-200'}">${escapeHtml(l.name || 'Sem nome')}</button>`;
+    }).join('');
+    const per = M.PERIODS[f.period].per, unit = f.unit;
+    document.getElementById('goal-target-suffix').textContent = (unit === 'vezes' ? 'vezes ' : unit === 'minutos' ? 'minutos ' : 'reais ') + per;
+    document.getElementById('goal-step-suffix').textContent = unit === 'vezes' ? 'vez(es) por toque' : unit === 'minutos' ? 'minutos por toque' : 'reais por toque';
+    const pts = M.PERIODS[f.period].points;
+    document.getElementById('goal-points-info').innerHTML = `<i class="ph-fill ph-star text-amber-400"></i> Cada ${f.period === 'dia' ? 'dia' : f.period === 'semana' ? 'semana' : 'mês'} cumprido vale uma estrela e <b>${pts} pontos</b>.`;
+}
+window.openGoalForm = function(id) {
+    const M = window.FazMetas;
+    if (!M) return;
+    ensureGoalLists();
+    const g = id ? goalsDb.find(x => x.id === id) : null;
+    if (id && !g) return;
+    goalEditId = g ? g.id : null;
+    const n = g ? M.normalize(g) : null;
+    goalForm = {
+        listId: g ? M.listOf(g, goalListsDb) : (goalListsDb.some(l => l.id === activeGoalListId) ? activeGoalListId : goalListsDb[0].id),
+        period: n ? n.period : 'dia', unit: n ? n.unit : 'vezes', stepTouched: !!g, targetTouched: !!g
+    }; // "touched": alvo/passo que a pessoa já escolheu (editando, sugestão ou digitando) não mudam ao trocar a medida
+    document.getElementById('goal-form-title').textContent = g ? 'Editar meta' : 'Nova meta';
+    document.getElementById('goal-title-input').value = g ? (g.title || '') : '';
+    document.getElementById('goal-emoji-input').value = g ? (g.emoji || '') : '';
+    document.getElementById('goal-target-input').value = goalNumField(n ? n.target : M.UNITS.vezes.target);
+    document.getElementById('goal-step-input').value = goalNumField(n ? n.step : M.UNITS.vezes.step);
+    const del = document.getElementById('goal-form-delete-btn');
+    del.classList.toggle('hidden', !g);
+    del.classList.toggle('flex', !!g);
+    document.getElementById('goal-templates-wrap').classList.toggle('hidden', !!g);
+    if (!g) document.getElementById('goal-templates').innerHTML = M.TEMPLATES.map((t, i) =>
+        `<button type="button" onclick="applyGoalTemplate(${i})" class="shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-xs font-bold text-zinc-700 active:scale-95 transition"><span class="text-base leading-none">${t.emoji}</span>${escapeHtml(t.title)}</button>`).join('');
+    goalFormUi();
+    document.getElementById('goals-list-view').classList.add('hidden');
+    const form = document.getElementById('goals-form-view');
+    form.classList.remove('hidden');
+    form.classList.add('flex');
+    // Regra de Ouro: sem .focus() programático (o teclado do Android empurra a tela)
+};
+window.closeGoalForm = function(silent) {
+    const form = document.getElementById('goals-form-view');
+    if (form) { form.classList.add('hidden'); form.classList.remove('flex'); }
+    const list = document.getElementById('goals-list-view');
+    if (list) list.classList.remove('hidden');
+    goalEditId = null;
+    goalForm = null;
+    renderGoals();
+};
+window.selectGoalFormList = function(id) { if (!goalForm) return; goalForm.listId = id; goalFormUi(); };
+window.goalFieldTouched = function() { if (goalForm) goalForm.targetTouched = goalForm.stepTouched = true; }; // digitou: trocar a medida não apaga
+window.selectGoalPeriod = function(p) { if (!goalForm || !Object.prototype.hasOwnProperty.call(window.FazMetas.PERIODS, p)) return; goalForm.period = p; goalFormUi(); };
+window.selectGoalUnit = function(u) {
+    const M = window.FazMetas;
+    if (!goalForm || !Object.prototype.hasOwnProperty.call(M.UNITS, u) || goalForm.unit === u) return;
+    goalForm.unit = u;
+    // trocou a medida: alvo e passo que a pessoa não mexeu vão pro padrão da medida nova (ex.: 30 minutos, +15)
+    if (!goalForm.targetTouched) document.getElementById('goal-target-input').value = goalNumField(M.UNITS[u].target);
+    if (!goalForm.stepTouched) document.getElementById('goal-step-input').value = goalNumField(M.UNITS[u].step);
+    goalFormUi();
+};
+window.applyGoalTemplate = function(i) {
+    const M = window.FazMetas, t = M && M.TEMPLATES[i];
+    if (!t || !goalForm) return;
+    document.getElementById('goal-title-input').value = t.title;
+    document.getElementById('goal-emoji-input').value = t.emoji;
+    document.getElementById('goal-target-input').value = goalNumField(t.target);
+    document.getElementById('goal-step-input').value = goalNumField(t.step);
+    goalForm.period = t.period;
+    goalForm.unit = t.unit;
+    goalForm.targetTouched = goalForm.stepTouched = true;
+    if (goalListsDb.some(l => l.id === t.listId)) goalForm.listId = t.listId;
+    goalFormUi();
+};
+window.saveGoalForm = function() {
+    const M = window.FazMetas;
+    if (!M || !goalForm) return;
+    const title = document.getElementById('goal-title-input').value.trim();
+    if (!title) return showToast('Dê um nome pra meta.');
+    const target = parseGoalNumber(document.getElementById('goal-target-input').value);
+    if (!(target > 0) || target > M.MAX) return showToast('Informe a meta: um número maior que zero.');
+    const step = parseGoalNumber(document.getElementById('goal-step-input').value);
+    if (!(step > 0) || step > M.MAX) return showToast('Informe quanto cada + soma: um número maior que zero.');
+    const data = { listId: goalListsDb.some(l => l.id === goalForm.listId) ? goalForm.listId : goalListsDb[0].id, title: title.slice(0, 60),
+        emoji: M.firstGrapheme(document.getElementById('goal-emoji-input').value), period: goalForm.period, unit: goalForm.unit, target: target, step: step };
+    if (!goalEditId) {
+        goalsDb.push(Object.assign({ id: newGoalId('meta_', goalsDb) }, data, { createdAt: Date.now() }));
+        saveGoals();
+        activeGoalListId = data.listId;
+        closeGoalForm(true);
+        return showToast('Meta criada! 🎯');
+    }
+    const g = goalsDb.find(x => x.id === goalEditId);
+    if (!g) { closeGoalForm(true); return showToast('Essa meta foi apagada em outro aparelho.'); }
+    const n = M.normalize(g), restart = n.period !== data.period || n.unit !== data.unit;
+    const apply = () => {
+        const cur = goalsDb.find(x => x.id === g.id);
+        if (!cur) return;
+        if (cur.listId !== data.listId) goalsDb = goalsDb.filter(x => x !== cur).concat([cur]); // mudou de lista: vai pro fim dela (igual ao PC)
+        Object.assign(cur, data);
+        saveGoals();
+        if (restart) { goalDaysDb = goalDaysDb.filter(d => d.goalId !== cur.id); saveGoalDays(); }
+        activeGoalListId = data.listId;
+        closeGoalForm(true);
+        showToast(restart ? 'Meta salva. A contagem recomeçou.' : 'Meta salva!');
+    };
+    if (!restart || !goalDaysDb.some(d => d.goalId === g.id && Number(d.amount) > 0)) return apply();
+    askGoalConfirm('Mudar a frequência ou a medida?', 'A contagem desta meta recomeça do zero: o que já foi marcado e as estrelas dela saem da pontuação.', 'Mudar e recomeçar', apply);
+};
+window.deleteGoalFromForm = function() {
+    const M = window.FazMetas, g = goalEditId && goalsDb.find(x => x.id === goalEditId);
+    if (!M || !g) return;
+    const x = M.status(g, goalDaysDb, new Date());
+    askGoalConfirm('Apagar a meta "' + (g.title || 'Sem nome') + '"?',
+        x.stars ? 'Ela tem ⭐ ' + x.stars + (x.stars === 1 ? ' estrela' : ' estrelas') + ' (' + x.points + ' pontos), que saem da sua pontuação. Some aqui e no computador.' : 'Ela some aqui e no computador.',
+        'Apagar meta', () => {
+            goalsDb = goalsDb.filter(m => m.id !== g.id);
+            goalDaysDb = goalDaysDb.filter(d => d.goalId !== g.id);
+            saveGoals();
+            saveGoalDays();
+            closeGoalForm(true);
+            showToast('Meta apagada');
+        });
+};
+
+// ---------- listas de metas ----------
+function openGoalListMenu() {
+    const l = goalListsDb.find(x => x.id === activeGoalListId);
+    if (!l) return;
+    document.getElementById('goal-list-menu-title').textContent = l.name || 'Lista';
+    showModal('goal-list-menu-modal');
+}
+window.openCreateGoalList = function() {
+    goalListNameMode = 'create';
+    document.getElementById('goal-list-name-title').textContent = 'Nova lista de metas';
+    document.getElementById('goal-list-name-input').value = '';
+    showModal('goal-list-name-modal');
+};
+window.openRenameGoalList = function() {
+    const l = goalListsDb.find(x => x.id === activeGoalListId);
+    if (!l) return;
+    hideModal('goal-list-menu-modal');
+    goalListNameMode = 'rename';
+    document.getElementById('goal-list-name-title').textContent = 'Renomear lista';
+    document.getElementById('goal-list-name-input').value = l.name || '';
+    showModal('goal-list-name-modal');
+};
+window.confirmGoalListName = function() {
+    const name = document.getElementById('goal-list-name-input').value.trim();
+    if (!name) return showToast('Dê um nome pra lista.');
+    if (name.length > 30) return showToast('Nome muito longo (máx 30).');
+    if (goalListNameMode === 'create') {
+        const l = { id: newGoalId('gl_', goalListsDb), name: name, isDefault: false, createdAt: Date.now() };
+        goalListsDb.push(l);
+        activeGoalListId = l.id;
+        showToast('Lista criada!');
+    } else {
+        const l = goalListsDb.find(x => x.id === activeGoalListId);
+        if (l) l.name = name;
+        showToast('Lista renomeada!');
+    }
+    saveGoalLists();
+    hideModal('goal-list-name-modal');
+    renderGoals();
+};
+window.openDeleteGoalList = function() {
+    const M = window.FazMetas, l = goalListsDb.find(x => x.id === activeGoalListId);
+    hideModal('goal-list-menu-modal');
+    if (!M || !l) return;
+    if (goalListsDb.length <= 1) return showToast('Precisa ter pelo menos uma lista de metas.');
+    const goals = goalsDb.filter(g => M.listOf(g, goalListsDb) === l.id);
+    const stars = goals.reduce((a, g) => a + M.status(g, goalDaysDb, new Date()).stars, 0);
+    askGoalConfirm('Apagar a lista "' + (l.name || 'Sem nome') + '"?',
+        !goals.length ? 'A lista está vazia. Ela some aqui e no computador.'
+            : (goals.length === 1 ? 'A meta dela também será apagada' : 'As ' + goals.length + ' metas dela também serão apagadas') + (stars ? ' (e as ⭐ ' + stars + ' saem da pontuação)' : '') + ', aqui e no computador.',
+        'Apagar lista', () => {
+            const ids = {};
+            goals.forEach(g => { ids[g.id] = true; });
+            goalsDb = goalsDb.filter(g => !ids[g.id]);
+            goalDaysDb = goalDaysDb.filter(d => !ids[d.goalId]);
+            goalListsDb = goalListsDb.filter(x => x.id !== l.id);
+            saveGoals();
+            saveGoalDays();
+            saveGoalLists();
+            activeGoalListId = goalListsDb[0].id;
+            renderGoals();
+            showToast('Lista apagada');
+        });
+};
+
+// ---------- confirmação ----------
+function askGoalConfirm(title, text, okLabel, action) {
+    _goalConfirmAction = action;
+    document.getElementById('goal-confirm-title').textContent = title;
+    document.getElementById('goal-confirm-text').textContent = text;
+    document.getElementById('goal-confirm-btn').textContent = okLabel;
+    showModal('goal-confirm-modal');
+}
+window.confirmGoalAction = function() {
+    const a = _goalConfirmAction;
+    _goalConfirmAction = null;
+    hideModal('goal-confirm-modal');
+    if (a) a();
+};
+window.cancelGoalAction = function() {
+    _goalConfirmAction = null;
+    hideModal('goal-confirm-modal');
 };
 
 // V40.1.1: abre o form (Estado B) — modo criar
@@ -6280,7 +6636,7 @@ document.addEventListener('click', (e) => {
 
 // V40.8.0 — avisa (uma vez por abertura) se algum dado salvo estava ilegível.
 if (window.fazCorruptKeys && window.fazCorruptKeys.length) {
-    const nomes = { tb_master_db: 'agenda', tb_backlog_db: 'listas', tb_backlog_columns: 'listas', tb_tags_db: 'tags', tb_notes_db: 'notas', tb_routines_db: 'rotinas', tb_periods_db: 'períodos', tb_financial_db: 'finanças' };
+    const nomes = { tb_master_db: 'agenda', tb_backlog_db: 'listas', tb_backlog_columns: 'listas', tb_tags_db: 'tags', tb_notes_db: 'notas', tb_routines_db: 'rotinas', tb_periods_db: 'períodos', tb_financial_db: 'finanças', tb_goal_lists: 'metas', tb_goals_db: 'metas', tb_goal_days: 'metas' };
     const quais = Array.from(new Set(window.fazCorruptKeys.map(k => nomes[k] || k))).join(', ');
     setTimeout(() => alert('⚠️ Parte dos dados deste aparelho estava ilegível (' + quais + ') e voltou ao padrão.\n\nGuardei uma cópia do que havia. Se você tem um backup, restaure em Config → Backup e Restauração.'), 800);
 }

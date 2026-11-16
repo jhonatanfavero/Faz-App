@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 15 suítes (cerca de 1 minuto)
+npm test        # confere o CSS pronto e roda as 17 suítes (cerca de 1 minuto)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -13,7 +13,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 
 | Arquivo | O que roda | O que confere |
 |---|---|---|
-| `sim_sync.js` | só o motor do `sync.js` | mesclagem celular × nuvem: conflitos, apagados, ordem, lista órfã, primeiro sync, duplicados |
+| `sim_sync.js` | só o motor do `sync.js` | mesclagem celular × nuvem: conflitos, apagados, ordem, lista órfã, primeiro sync, duplicados, metas (listas padrão, órfãs, dias de meta apagada, linhas estranhas) |
 | `test_app.js` | `index.html` + `app.js` + `sync.js` de verdade | app sem login, login, ida e volta com a nuvem, backup e restauração |
 | `test_v408.js` | idem | agenda na nuvem, blocos de 5 e 10 min, dado corrompido, iOS, esqueci a senha |
 | `test_v409.js` | idem | cor livre do cartão, arquivar e desarquivar |
@@ -27,6 +27,8 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_v4019.js` | `index.html` + `app.js` de verdade | finanças do celular: editar só o nome de uma recorrente num mês com valor próprio não estraga os valores dos outros meses |
 | `test_assistente.js` | `assistente.js` sozinho + `index.html` + `app.js` de verdade | o "cérebro" do Assistente (cada pergunta, frases escritas do jeito de cada um, sem dados) e a aba dele no celular |
 | `test_kanban_v4020.js` | `kanban.html` de verdade | aba Assistente no PC: resumo do dia com os dados da nuvem, sugestões, perguntar, abrir o item da resposta, tempo real |
+| `test_metas.js` | `metas.js` sozinho + `index.html` + `app.js` + `sync.js` de verdade | as regras das metas (período, estrelas, sequência, pontos, níveis, alvo da época), a aba Metas no celular (criar, +/−, editar, apagar, listas), a ida e volta pela nuvem e o Assistente falando das metas |
+| `test_kanban_v4021.js` | `kanban.html` de verdade | aba Metas no PC: listas padrão, meta nova com sugestões, +/− (cliques seguidos = um envio), editar, recomeçar a contagem, apagar, listas de metas, tempo real e o Assistente abrindo a meta |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)

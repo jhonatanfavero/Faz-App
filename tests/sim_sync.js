@@ -23,18 +23,20 @@ class Cloud {
 // ---------- "celular" falso ----------
 class Phone {
   constructor(data) { this.tarefas = clone(data.tarefas); this.listas = clone(data.listas); this.tags = clone(data.tags); this.blocos = clone(data.blocos || []); this.base = null; this.used = data.used || [];
-    this.rotinas = clone(data.rotinas || []); this.notas = clone(data.notas || []); this.financas = clone(data.financas || []); } // V40.17.0
+    this.rotinas = clone(data.rotinas || []); this.notas = clone(data.notas || []); this.financas = clone(data.financas || []); // V40.17.0
+    this.metas_listas = clone(data.metas_listas || []); this.metas = clone(data.metas || []); this.metas_dias = clone(data.metas_dias || []); } // V40.21.0
   sync(cloud, { firstSync } = {}) {
     const A = this.arch || (this.arch = { tarefas: [], blocos: [] });
     const fl = (k) => this[k].concat(A[k].map((x) => ({ ...x, __archived: true })));
-    const p = CORE.plan({ local: { tarefas: fl('tarefas'), listas: this.listas, tags: this.tags, blocos: fl('blocos'), rotinas: this.rotinas, notas: this.notas, financas: this.financas },
+    const p = CORE.plan({ local: { tarefas: fl('tarefas'), listas: this.listas, tags: this.tags, blocos: fl('blocos'), rotinas: this.rotinas, notas: this.notas, financas: this.financas,
+      metas_listas: this.metas_listas, metas: this.metas, metas_dias: this.metas_dias },
       base: this.base, remote: cloud.fetch(), firstSync: firstSync ?? !this.base, usedTagIds: this.used });
     for (const k of ['tarefas', 'blocos']) if (p.changed[k]) A[k] = CORE.materializeArchived(k, p.merged[k], A[k].concat(this[k]));
     if (p.changed.tarefas) this.tarefas = CORE.materialize('tarefas', p.merged.tarefas, this.tarefas, p.localOnly.tarefas);
     if (p.changed.listas) this.listas = CORE.materialize('listas', p.merged.listas, this.listas, p.localOnly.listas);
     if (p.changed.tags) this.tags = CORE.materialize('tags', p.merged.tags, this.tags, p.localOnly.tags);
     if (p.changed.blocos) this.blocos = CORE.materialize('blocos', p.merged.blocos, this.blocos, p.localOnly.blocos);
-    for (const k of ['rotinas', 'notas', 'financas']) if (p.changed[k]) this[k] = CORE.materialize(k, p.merged[k], this[k], p.localOnly[k]); // V40.17.0
+    for (const k of ['rotinas', 'notas', 'financas', 'metas_listas', 'metas', 'metas_dias']) if (p.changed[k]) this[k] = CORE.materialize(k, p.merged[k], this[k], p.localOnly[k]); // V40.17.0 e V40.21.0
     for (const k of CORE.KINDS) cloud.upsert(k, p.push[k]);
     this.base = CORE.baseFrom(p.merged);
     return p;
@@ -437,6 +439,98 @@ ok(JSON.stringify(CORE.cleanOverrides({ '2026-01': 5, '2026-02': { amount: '7.5'
 ok(JSON.stringify(CORE.cleanMonths(['2026-01', '2026-1', '2026-00', '2026-12', '2026-01', 5])) === '["2026-01","2026-12"]', 'cleanMonths: só YYYY-MM válido, sem repetir');
 const longo = 'a'.repeat(199) + '😀';
 ok(CORE.MAP.rotinas.row({ id: 'r', title: longo }).title.length === 199, 'corte no limite não parte um emoji ao meio');
+
+console.log('\n37) Metas: sobem do celular, voltam do PC e a ordem fica estável:');
+const GL = () => [{ id: 'gl_pessoal', name: 'Pessoal', isDefault: true, createdAt: 1 }, { id: 'gl_profissional', name: 'Profissional', isDefault: true, createdAt: 1 }, { id: 'gl_financeiro', name: 'Financeiro', isDefault: true, createdAt: 1 }];
+const G1 = { id: 'meta_1', listId: 'gl_pessoal', title: 'Beber água', emoji: '💧', period: 'dia', unit: 'vezes', target: 8, step: 1, createdAt: 10 };
+const G2 = { id: 'meta_2', listId: 'gl_pessoal', title: 'Correr', emoji: '🏃', period: 'semana', unit: 'vezes', target: 3, step: 1, createdAt: 11 };
+const G3 = { id: 'meta_3', listId: 'gl_financeiro', title: 'Guardar', emoji: '💰', period: 'mes', unit: 'reais', target: 500, step: 50, createdAt: 12 };
+const D1 = { id: 'meta_1_20261116', goalId: 'meta_1', date: '2026-11-16', amount: 6, target: 8 };
+const mc = new Cloud(), mp = new Phone({ tarefas: [], listas: [{ id: 'col_geral', name: 'G', isDefault: true, createdAt: 1 }], tags: [],
+  metas_listas: GL(), metas: [clone(G1), clone(G2), clone(G3)], metas_dias: [clone(D1)] });
+const mBefore = JSON.stringify([mp.metas_listas, mp.metas, mp.metas_dias]);
+p = mp.sync(mc);
+ok(mc.alive('metas_listas').length === 3 && mc.alive('metas').length === 3 && mc.alive('metas_dias').length === 1, 'nuvem recebeu 3 listas de metas, 3 metas e 1 dia');
+ok(mc.t.metas.meta_1.list_id === 'gl_pessoal' && mc.t.metas.meta_3.unit === 'reais' && mc.t.metas.meta_3.target === 500 && mc.t.metas_dias.meta_1_20261116.amount === 6 && mc.t.metas_dias.meta_1_20261116.target === 8, 'formato da nuvem: list_id, unit, target; o dia com amount e o alvo da época');
+ok(JSON.stringify([mp.metas_listas, mp.metas, mp.metas_dias]) === mBefore && pushes(mp.sync(mc)) === 0, 'celular continua byte a byte igual e a 2ª rodada não envia nada');
+const po = mc.t.metas;
+ok(po.meta_1.position < po.meta_2.position && po.meta_2.position < po.meta_3.position && mc.t.metas_listas.gl_pessoal.position < mc.t.metas_listas.gl_financeiro.position, 'ordem das metas e das listas de metas guardada em "position"');
+// o PC: renomeia a lista, muda o alvo, soma no dia e cria uma meta
+mc.patch('metas_listas', 'gl_profissional', { name: 'Trabalho' });
+mc.patch('metas', 'meta_2', { target: 4 });
+mc.patch('metas_dias', 'meta_1_20261116', { amount: 7 });
+mc.insert('metas', { id: 'meta_pc', list_id: 'gl_profissional', title: 'Ler', emoji: '📚', period: 'dia', unit: 'minutos', target: 30, step: 15, position: po.meta_3.position + 1024, created_ms: 20 });
+mc.insert('metas_dias', { id: 'meta_pc_20261116', goal_id: 'meta_pc', date: '2026-11-16', amount: 15, target: 30 });
+p = mp.sync(mc);
+ok(mp.metas_listas.find((l) => l.id === 'gl_profissional').name === 'Trabalho' && mp.metas.find((g) => g.id === 'meta_2').target === 4, 'lista renomeada e alvo mudado no PC chegaram');
+ok(mp.metas_dias.find((d) => d.id === 'meta_1_20261116').amount === 7, '+1 marcado no PC chegou');
+const npc = mp.metas[mp.metas.length - 1];
+ok(npc.id === 'meta_pc' && npc.listId === 'gl_profissional' && npc.unit === 'minutos' && npc.step === 15 && mp.metas_dias.some((d) => d.id === 'meta_pc_20261116' && d.goalId === 'meta_pc' && d.amount === 15), 'meta criada no PC entra no fim, no formato do app (com o dia dela)');
+ok(pushes(p) === 0, 'celular não reenviou nada (só recebeu)');
+// os dois somaram no mesmo dia ao mesmo tempo: vale o deste aparelho (regra de sempre)
+mc.patch('metas_dias', 'meta_1_20261116', { amount: 8 });
+mp.metas_dias.find((d) => d.id === 'meta_1_20261116').amount = 9;
+p = mp.sync(mc);
+ok(mc.t.metas_dias.meta_1_20261116.amount === 9 && mp.metas_dias.find((d) => d.id === 'meta_1_20261116').amount === 9, 'conflito no mesmo dia: vale o deste aparelho, e os dois lados ficam iguais');
+
+console.log('\n38) Listas de metas padrão: nunca duplicam:');
+const dc2 = new Cloud(), d1 = new Phone({ tarefas: [], listas: [], tags: [], metas_listas: GL() }), d2 = new Phone({ tarefas: [], listas: [], tags: [], metas_listas: GL() });
+d1.sync(dc2);
+p = d2.sync(dc2);
+ok(dc2.alive('metas_listas').length === 3 && d2.metas_listas.length === 3, 'dois aparelhos criaram as 3 padrão: continuam 3 (mesmos ids)');
+const cc = new Cloud();
+cc.insert('metas_listas', { id: 'gl_saude', name: 'Saúde', position: 1024, created_ms: 5 });
+const novo = new Phone({ tarefas: [], listas: [], tags: [], metas_listas: GL() });
+p = novo.sync(cc);
+ok(p.droppedGoalLists === 3 && !cc.t.metas_listas.gl_pessoal && novo.metas_listas.map((l) => l.id).join() === 'gl_saude', 'conta que já tem listas de metas (só "Saúde"): as 3 padrão intactas do aparelho novo não sobem');
+const cc2 = new Cloud();
+cc2.insert('metas_listas', { id: 'gl_saude', name: 'Saúde', position: 1024, created_ms: 5 });
+const comMeta = new Phone({ tarefas: [], listas: [], tags: [], metas_listas: GL(), metas: [clone(G1)] });
+p = comMeta.sync(cc2);
+ok(p.droppedGoalLists === 2 && cc2.t.metas_listas.gl_pessoal && cc2.t.metas.meta_1.list_id === 'gl_pessoal', 'a padrão que já tem meta sobe junto (só as vazias ficam de fora)');
+const ja = new Cloud(), jp = new Phone({ tarefas: [], listas: [], tags: [] });
+jp.sync(ja); // já sincronizava antes das metas (base sem metas)
+ja.insert('metas_listas', { id: 'gl_pessoal', name: 'Pessoal', is_default: true, position: 1024, created_ms: 3 });
+ja.insert('metas_listas', { id: 'gl_profissional', name: 'Profissional', is_default: true, position: 2048, created_ms: 3 });
+ja.insert('metas_listas', { id: 'gl_financeiro', name: 'Financeiro', is_default: true, deleted: true, position: 3072, created_ms: 3 });
+jp.metas_listas = GL();
+p = jp.sync(ja);
+ok(jp.metas_listas.map((l) => l.id).join() === 'gl_pessoal,gl_profissional' && ja.t.metas_listas.gl_financeiro.deleted === true, 'quem já sincronizava abre as Metas: a padrão apagada no PC continua apagada (vale a nuvem)');
+
+console.log('\n39) Órfãos: lista apagada num lado, meta do outro; meta apagada leva os dias junto:');
+mc.patch('metas_listas', 'gl_financeiro', { deleted: true });
+mp.metas.find((g) => g.id === 'meta_3').title = 'Guardar dinheiro'; // o celular mexeu na meta da lista que o PC apagou
+p = mp.sync(mc);
+ok(mp.metas_listas.every((l) => l.id !== 'gl_financeiro') && mp.metas.find((g) => g.id === 'meta_3').listId === 'gl_pessoal' && mc.t.metas.meta_3.list_id === 'gl_pessoal' && mc.t.metas.meta_3.title === 'Guardar dinheiro', 'a meta foi pra primeira lista (Pessoal), com a edição, nos dois lados');
+mc.patch('metas', 'meta_pc', { deleted: true });
+mp.metas_dias.find((d) => d.id === 'meta_pc_20261116').amount = 30; // o celular marcou na meta que o PC apagou
+p = mp.sync(mc);
+ok(!mp.metas.some((g) => g.id === 'meta_pc') && !mp.metas_dias.some((d) => d.goalId === 'meta_pc') && mc.t.metas_dias.meta_pc_20261116.deleted === true, 'meta apagada no PC: some do celular e o dia dela é apagado junto (nos dois lados)');
+mp.metas = mp.metas.filter((g) => g.id !== 'meta_1');
+mp.metas_dias = mp.metas_dias.filter((d) => d.goalId !== 'meta_1');
+p = mp.sync(mc);
+ok(mc.t.metas.meta_1.deleted === true && mc.t.metas_dias.meta_1_20261116.deleted === true, 'meta apagada no celular: meta e dias viram "apagados" na nuvem');
+
+console.log('\n40) Linhas estranhas ou maliciosas nas tabelas das metas são neutralizadas:');
+mc.insert('metas', { id: 'meta_evil', list_id: "x');alert(1);('", title: null, emoji: '😀😀😀😀😀😀😀😀😀', period: 'ano', unit: 'kg', target: -5, step: 'abc', position: 5e9, created_ms: 'x' });
+mc.insert('metas', { id: 'meta_proto', list_id: 'gl_pessoal', title: 'p', period: 'constructor', unit: '__proto__', target: 1, step: 1, position: 5e9 + 1 });
+mc.insert('metas', { id: "m');alert(1);('", title: 'id ruim', period: 'dia', unit: 'vezes', target: 1, step: 1, position: 1 });
+mc.insert('metas_dias', { id: 'dia_evil', goal_id: 'meta_2', date: '2026-02-30', amount: 1 });
+mc.insert('metas_dias', { id: 'dia_evil2', goal_id: "a'b", date: '2026-11-16', amount: 1 });
+mc.insert('metas_dias', { id: 'meta_2_20261117', goal_id: 'meta_2', date: '2026-11-17', amount: 5e12, target: 0 });
+mc.insert('metas_dias', { id: 'meta_2_20261118', goal_id: 'meta_2', date: '2026-11-18', amount: -3, target: 'x' });
+mc.insert('metas_listas', { id: 'gl_null', name: null, position: 9e9, created_ms: null });
+crashed = false; try { p = mp.sync(mc); } catch (e) { crashed = e; }
+ok(!crashed, 'não quebrou');
+const evg = mp.metas.find((g) => g.id === 'meta_evil');
+ok(evg && evg.listId === 'gl_pessoal' && evg.title === '' && evg.period === 'dia' && evg.unit === 'vezes' && evg.target === 1 && evg.step === 1, 'meta estranha: lista inválida → primeira lista; período, medida, alvo e passo inválidos → padrão');
+ok(!mp.metas.some((g) => /alert/.test(g.id)) && !mp.metas_dias.some((d) => d.id === 'dia_evil' || d.id === 'dia_evil2'), 'meta com id malicioso, dia com data inexistente (30/02) e dia de meta com id ruim: ignorados');
+const pr = mp.metas.find((g) => g.id === 'meta_proto');
+ok(pr && pr.period === 'dia' && pr.unit === 'vezes' && CORE.MAP.metas.row({ id: 'x', period: 'toString', unit: 'hasOwnProperty' }).period === 'dia', 'período/medida com nome de coisa interna do JavaScript ("constructor", "__proto__") também vira o padrão');
+const big = mp.metas_dias.find((d) => d.id === 'meta_2_20261117'), neg = mp.metas_dias.find((d) => d.id === 'meta_2_20261118');
+ok(big && big.amount === 1e9 && !('target' in big) && neg && neg.amount === 0 && !('target' in neg), 'valor do dia limitado (0 a 1 bilhão) e alvo inválido descartado');
+ok(mp.metas_listas.some((l) => l.id === 'gl_null' && l.name === ''), 'lista de metas com nome nulo vira nome vazio');
+ok(CORE.MAP.metas_dias.row({ id: 'x', goalId: 'meta_1', date: '16/11/2026', amount: 1 }) === null && CORE.MAP.metas_dias.row({ id: 'x', goalId: "a b", date: '2026-11-16', amount: 1 }) === null, 'dia com data ou meta fora do formato fica só no aparelho');
 
 console.log(`\n==== RESULTADO: ${pass} passaram, ${fail} falharam ====`);
 process.exit(fail ? 1 : 0);

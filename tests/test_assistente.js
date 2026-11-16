@@ -35,7 +35,7 @@ const base = () => ({
 (async () => {
   console.log('A) O cérebro (assistente.js):');
   let s = base(), r;
-  ok(A.NAME === 'Assistente' && A.CHIPS.length === 9, 'nome provisório "Assistente" e 9 sugestões');
+  ok(A.NAME === 'Assistente' && A.CHIPS.length === 10, 'nome provisório "Assistente" e 10 sugestões (V40.21.0: + "Minhas metas")');
   r = A.briefing(s);
   ok(r.intent === 'dia' && r.text === 'Bom dia! Hoje é segunda, 16 de novembro. Você tem 4 blocos na agenda (4h), 1 já concluído. Agora: Projeto X, até 11:30. Próximo: Almoço às 12:00 (daqui a 1h 40m). Ficou pra trás: 1 bloco que já passou sem concluir.', 'resumo do dia: "' + r.text + '"');
   ok(r.items.map((i) => i.label + '|' + i.tone).join() === '10:00 Projeto X|now,12:00 Almoço|next' && r.items[0].ref.kind === 'bloco' && r.items[0].ref.id === 'b2', 'lista o que falta hoje: o de agora (verde) e o próximo, com o bloco ligado');
@@ -96,7 +96,7 @@ const base = () => ({
   const B = await boot(REPO, data), { w, $ } = B, d = w.document;
   w.openListSheet();
   const pills = [...d.querySelectorAll('[id^="btn-list-"]')].map((b) => b.id.replace('btn-list-', ''));
-  ok(pills.join() === 'assistant,backlog,routines,notes,financial' && $('btn-list-assistant').getAttribute('aria-label') === 'Assistente' && $('btn-list-assistant').className.includes('w-9'), 'a primeira pílula é a do Assistente (só o ícone, estreita, pra caber as 5)');
+  ok(pills.join() === 'assistant,backlog,routines,notes,financial,goals' && $('btn-list-assistant').getAttribute('aria-label') === 'Assistente' && $('btn-list-assistant').className.includes('w-9'), 'a primeira pílula é a do Assistente (só o ícone, estreita); V40.21.0: Metas na última, também só o ícone');
   ok(!$('view-backlog').classList.contains('hidden') && $('view-assistant').classList.contains('hidden'), 'o botão das listas continua abrindo nas Listas');
   w.switchListTab('assistant');
   const feedTxt = () => $('assistant-feed').textContent;
@@ -104,7 +104,7 @@ const base = () => ({
   ok(!$('view-assistant').classList.contains('hidden') && $('view-backlog').classList.contains('hidden') && $('btn-list-assistant').className.includes('bg-white'), 'tocar na pílula abre o Assistente');
   ok(feedTxt().startsWith('Boa noite! Hoje é domingo, 15 de novembro. Você tem ' + today.length + ' blocos na agenda'), 'abre com o resumo do dia, com os dados do aparelho (' + today.length + ' blocos hoje)');
   ok(!d.querySelector('#assistant-feed img') && feedTxt().includes('<img src=x onerror=alert(1)>'), 'nome com HTML aparece como texto');
-  ok(d.querySelectorAll('#assistant-chips button').length === 9, 'as 9 sugestões aparecem embaixo');
+  ok(d.querySelectorAll('#assistant-chips button').length === 10, 'as 10 sugestões aparecem embaixo');
   [...d.querySelectorAll('#assistant-chips button')].find((b) => b.textContent === 'Minhas contas').click();
   const fin = JSON.parse(data.tb_financial_db);
   ok(d.querySelectorAll('#assistant-feed > div').length === 3 && /^Em novembro: \d+ despesas/.test(d.querySelectorAll('#assistant-feed > div')[2].textContent), 'tocar numa sugestão: a pergunta aparece e a resposta vem embaixo');

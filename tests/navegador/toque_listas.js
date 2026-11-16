@@ -222,7 +222,7 @@ const { abrir } = require('./apoio');
   for (const largura of [390, 360]) {
     await m.setViewportSize({ width: largura, height: 844 }); await m.waitForTimeout(250);
     const ab = await abas();
-    ok(ab.length === 5 && ab[0].id === 'btn-list-assistant' && ab.every((a) => a.dentro && a.cabe && a.alto === ab[1].alto), `tela de ${largura} px: as 5 abas cabem, sem cortar o texto (Assistente primeiro, só o ícone)`);
+    ok(ab.length === 6 && ab[0].id === 'btn-list-assistant' && ab[5].id === 'btn-list-goals' && ab.every((a) => a.dentro && a.cabe && a.alto === ab[1].alto), `tela de ${largura} px: as 6 abas cabem, sem cortar o texto (Assistente primeiro e Metas no fim, só os ícones)`);
   }
   await m.setViewportSize({ width: 390, height: 844 }); await m.waitForTimeout(200);
   await m.tap('#btn-list-assistant'); await m.waitForTimeout(300);
@@ -237,5 +237,35 @@ const { abrir } = require('./apoio');
   const depois = await m.evaluate(() => { const f = document.getElementById('assistant-feed'); return { n: f.querySelectorAll(':scope > div').length, fim: f.scrollHeight - f.scrollTop - f.clientHeight < 4 }; });
   ok(depois.n === 3 && depois.fim, 'tocar em "Minhas contas": pergunta e resposta aparecem e a conversa rola até o fim');
   await foto(m, 'cel-assistente-contas.png');
+
+  console.log('\nH) Aba Metas (V40.21.0):');
+  await m.tap('#btn-list-goals'); await m.waitForTimeout(350);
+  const mt0 = await m.evaluate(() => {
+    const v = document.getElementById('view-goals'), lv = document.getElementById('goals-level').getBoundingClientRect(), nb = [...v.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Nova meta').getBoundingClientRect();
+    return { aberta: !v.classList.contains('hidden'), listas: [...document.querySelectorAll('#goals-lists button')].map((b) => b.textContent.trim()), nivel: document.getElementById('goals-level-name').textContent, nivelNaTela: lv.top >= 0 && lv.bottom < innerHeight, botao: nb.bottom <= innerHeight && nb.top > lv.bottom };
+  });
+  ok(mt0.aberta && mt0.listas.join('|') === 'Pessoal0|Profissional0|Financeiro0|Lista' && mt0.nivel === 'Iniciante' && mt0.nivelNaTela && mt0.botao, 'abre com o nível em cima, as listas Pessoal, Profissional e Financeiro e o "Nova meta" embaixo, à vista');
+  await m.tap('#goals-list-view > button'); await m.waitForTimeout(300);
+  await m.tap('#goal-templates button:has-text("Beber água")'); await m.waitForTimeout(150);
+  const form = await m.evaluate(() => { const b = document.querySelector('#goals-form-view .ios-safe-bottom button').getBoundingClientRect(); return { nome: document.getElementById('goal-title-input').value, salvarNaTela: b.bottom <= innerHeight && b.top > 0, sugestoesRolam: document.getElementById('goal-templates').scrollWidth > document.getElementById('goal-templates').clientWidth }; });
+  ok(form.nome === 'Beber água' && form.salvarNaTela && form.sugestoesRolam, 'Nova meta: as sugestões rolam pro lado, tocar em "Beber água" preenche, e o Salvar fica à vista');
+  await foto(m, 'cel-metas-form.png');
+  await m.tap('#goals-form-view .ios-safe-bottom button'); await m.waitForTimeout(300);
+  await m.tap('#goals-list-view > button'); await m.waitForTimeout(250);
+  await m.tap('#goal-templates button:has-text("Correr")'); await m.waitForTimeout(100);
+  await m.tap('#goals-form-view .ios-safe-bottom button'); await m.waitForTimeout(300);
+  const plus = () => m.evaluate(() => { const b = document.querySelector('#goals-container .goal-plus').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+  for (let i = 0; i < 8; i++) { const pt = await plus(); await m.touchscreen.tap(pt.x, pt.y); await m.waitForTimeout(90); }
+  const mt1 = await m.evaluate(() => {
+    const c = document.querySelector('#goals-container [data-goal]'), r = c.getBoundingClientRect(), pb = c.querySelector('.goal-plus').getBoundingClientRect();
+    return { status: c.querySelector('.goal-status').textContent, toast: document.getElementById('toast-msg').textContent, pontos: document.getElementById('goals-points').textContent, cabe: r.left >= 0 && r.right <= innerWidth && pb.right <= r.right, n: document.querySelectorAll('#goals-container [data-goal]').length };
+  });
+  ok(mt1.n === 2 && mt1.status.startsWith('✓ 8 de 8 hoje') && mt1.toast === '⭐ Meta cumprida! +10 pontos' && mt1.pontos === '10 pontos' && mt1.cabe, '8 toques no +1: "✓ 8 de 8 hoje", aviso "⭐ Meta cumprida! +10 pontos" e 10 pontos; o cartão cabe na tela');
+  await m.waitForTimeout(200);
+  await foto(m, 'cel-metas.png');
+  await m.setViewportSize({ width: 360, height: 740 }); await m.waitForTimeout(250);
+  const mt2 = await m.evaluate(() => [...document.querySelectorAll('#goals-container [data-goal]')].every((c) => { const r = c.getBoundingClientRect(), pb = c.querySelector('.goal-plus').getBoundingClientRect(), t = c.querySelector('.truncate').getBoundingClientRect(); return r.right <= innerWidth && pb.right <= r.right && t.right <= pb.left; }));
+  ok(mt2, 'tela de 360 px: nome, progresso e botões cabem no cartão');
+  await m.setViewportSize({ width: 390, height: 844 }); await m.waitForTimeout(150);
   await fim(errs.length ? '\nERROS DE PÁGINA: ' + errs.slice(0, 3).join(' | ') : '');
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

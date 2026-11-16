@@ -87,6 +87,12 @@
     .as-done .as-dot { background: #10b981; }
     .as-chip { border: 1px solid #e4e4e7; background: #fff; color: #3f3f46; }
     .as-chip:hover { background: #f4f4f5; border-color: #d4d4d8; }
+    /* V40.21.0: Metas */
+    .mt-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .mt-card .mt-minus { opacity: .55; }
+    .mt-card:hover .mt-minus, .mt-card:focus-within .mt-minus { opacity: 1; }
+    .mt-tpl { border: 1px solid #e4e4e7; background: #fff; color: #3f3f46; }
+    .mt-tpl:hover { background: #f4f4f5; border-color: #d4d4d8; }
     /* V40.19.0: Finanças */
     .fn-grid { display: grid; grid-template-columns: 28px minmax(0, 1fr) 150px 130px 140px 32px; align-items: center; column-gap: 12px; }
     .fn-row { box-shadow: inset 4px 0 0 var(--fn-tag, transparent); }
@@ -202,6 +208,8 @@
             <button id="tab-notas" role="tab" data-tab="notas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Notas</button>
             <!-- V40.19.0: Finanças, as mesmas do celular -->
             <button id="tab-financas" role="tab" data-tab="financas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Finanças</button>
+            <!-- V40.21.0: Metas, as mesmas do celular -->
+            <button id="tab-metas" role="tab" data-tab="metas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Metas</button>
         </nav>
         <p id="board-summary" class="hidden sm:block min-w-0 text-xs text-zinc-500 leading-tight truncate"></p>
         <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
@@ -382,6 +390,31 @@
             </div>
         </div>
     </main>
+
+    <!-- V40.21.0: Metas (as mesmas do celular): o nível, as listas de metas em colunas e o + de cada meta. -->
+    <main id="metas" class="hidden relative flex-1 min-h-0 flex-col">
+        <div class="shrink-0 flex flex-wrap items-center gap-3 px-4 sm:px-5 pt-4">
+            <div id="mt-level" class="flex items-center gap-3 bg-white border border-zinc-200 rounded-xl px-3 py-2 w-full max-w-md">
+                <div class="w-11 h-11 rounded-lg bg-amber-50 text-amber-600 flex flex-col items-center justify-center shrink-0" title="Seu nível">
+                    <span class="text-[9px] font-bold uppercase tracking-wider leading-none">Nível</span>
+                    <span id="mt-level-n" class="text-lg font-extrabold leading-none mt-0.5">1</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-baseline gap-2">
+                        <h2 id="mt-level-name" class="min-w-0 truncate text-[14px] font-bold text-zinc-900">Iniciante</h2>
+                        <span id="mt-points" class="ml-auto shrink-0 text-[12px] font-semibold text-zinc-600 tabular-nums">0 pontos</span>
+                    </div>
+                    <div class="mt-1.5 h-2 rounded-full bg-zinc-100 overflow-hidden"><div id="mt-level-bar" class="h-full bg-amber-400 rounded-full" style="width:0%"></div></div>
+                    <p id="mt-level-sub" class="mt-1 text-[11.5px] text-zinc-500 truncate"></p>
+                </div>
+            </div>
+            <button id="mt-new" class="inline-flex items-center gap-1.5 bg-focus text-white text-[13px] font-semibold pl-2.5 pr-3 py-1.5 rounded-lg hover:opacity-90"><i class="ph-bold ph-plus"></i>Nova meta</button>
+            <p class="hidden xl:block min-w-0 flex-1 truncate text-[12px] text-zinc-500">Fez? Clique no <b>+</b> da meta. Cada dia, semana ou mês cumprido vale uma ⭐ e pontos.</p>
+        </div>
+        <div id="mt-board" class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden thin-scroll">
+            <div id="mt-cols" class="h-full inline-flex items-start gap-4 p-4 sm:p-5"></div>
+        </div>
+    </main>
 </div>
 
 <!-- V40.18.0: Tags. Fica acima do cartão aberto (z-[55]) porque também abre de dentro dele. -->
@@ -453,6 +486,69 @@
             <div class="ml-auto flex gap-2">
                 <button id="fn-f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
                 <button id="fn-f-save" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- V40.21.0: criar / editar meta -->
+<div id="modal-goal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="mt-f-head">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div class="p-5 pb-3 overflow-y-auto thin-scroll">
+            <h3 id="mt-f-head" class="text-base font-bold text-zinc-900">Nova meta</h3>
+            <div id="mt-f-tpl-wrap" class="mt-3">
+                <span class="text-xs font-semibold text-zinc-500">Sugestões</span>
+                <div id="mt-f-tpl" class="mt-1.5 flex flex-wrap gap-1.5"></div>
+            </div>
+            <div class="mt-4 flex gap-2">
+                <label class="block w-16 shrink-0">
+                    <span class="text-xs font-semibold text-zinc-500">Emoji</span>
+                    <input id="mt-f-emoji" maxlength="16" autocomplete="off" placeholder="🎯" class="mt-1 w-full border border-zinc-300 rounded-lg px-2 py-1.5 text-lg text-center outline-none">
+                </label>
+                <label class="block min-w-0 flex-1">
+                    <span class="text-xs font-semibold text-zinc-500">Nome</span>
+                    <input id="mt-f-title" maxlength="60" autocomplete="off" placeholder="Ex.: Beber água, correr, ler" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-800 outline-none">
+                </label>
+            </div>
+            <label class="block mt-3">
+                <span class="text-xs font-semibold text-zinc-500">Lista</span>
+                <select id="mt-f-list" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-800 bg-white outline-none"></select>
+            </label>
+            <div class="mt-3">
+                <span class="text-xs font-semibold text-zinc-500">Frequência</span>
+                <div id="mt-f-period" class="mt-1 flex p-1 bg-zinc-100 rounded-xl" role="radiogroup" aria-label="Frequência da meta">
+                    <button type="button" data-period="dia" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Diária</button>
+                    <button type="button" data-period="semana" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Semanal</button>
+                    <button type="button" data-period="mes" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Mensal</button>
+                </div>
+            </div>
+            <div class="mt-3">
+                <span class="text-xs font-semibold text-zinc-500">Contar em</span>
+                <div id="mt-f-unit" class="mt-1 flex p-1 bg-zinc-100 rounded-xl" role="radiogroup" aria-label="Como contar a meta">
+                    <button type="button" data-unit="vezes" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Vezes</button>
+                    <button type="button" data-unit="minutos" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Minutos</button>
+                    <button type="button" data-unit="reais" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Reais</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+                <label class="block">
+                    <span class="text-xs font-semibold text-zinc-500">Meta</span>
+                    <input id="mt-f-target" inputmode="decimal" autocomplete="off" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-800 outline-none tabular-nums">
+                    <span id="mt-f-target-suf" class="mt-1 block text-[11.5px] text-zinc-500"></span>
+                </label>
+                <label class="block">
+                    <span class="text-xs font-semibold text-zinc-500">Cada + soma</span>
+                    <input id="mt-f-step" inputmode="decimal" autocomplete="off" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-800 outline-none tabular-nums">
+                    <span id="mt-f-step-suf" class="mt-1 block text-[11.5px] text-zinc-500"></span>
+                </label>
+            </div>
+            <p id="mt-f-info" class="mt-3 text-[12px] text-zinc-500 leading-relaxed"></p>
+        </div>
+        <div class="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
+            <button id="mt-f-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar meta</button>
+            <div class="ml-auto flex gap-2">
+                <button id="mt-f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
+                <button id="mt-f-save" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Salvar</button>
             </div>
         </div>
     </div>
@@ -641,10 +737,11 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.20.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.21.0</div>
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
+<script src="metas.js"></script>
 <script src="assistente.js"></script>
 <script src="libs/supabase-js/supabase.js"></script>
 <script>
@@ -655,7 +752,7 @@
     var DEFAULT_COL = 'col_geral';
     var STEP = 1024;
     var DURATIONS = [5, 10, 15, 30, 45, 60, 75, 90, 120, 150, 180, 240]; // V40.8.0: mínimo 5 min
-    var KINDS = ['listas', 'tags', 'tarefas', 'blocos', 'rotinas', 'notas', 'financas'];
+    var KINDS = ['listas', 'tags', 'tarefas', 'blocos', 'rotinas', 'notas', 'financas', 'metas_listas', 'metas', 'metas_dias']; // V40.21.0: + metas
     var SELECT = {
         tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,deleted',
         listas: 'id,name,is_default,position,created_ms,deleted',
@@ -664,10 +761,15 @@
         // V40.17.0: rotinas, notas e finanças (as mesmas do celular)
         rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,deleted',
         notas: 'id,title,content,created_ms,updated_ms,deleted',
-        financas: 'id,title,amount,start_month,duration_months,is_recurring,due_day,tag_id,paid_months,amount_overrides,created_ms,deleted'
+        financas: 'id,title,amount,start_month,duration_months,is_recurring,due_day,tag_id,paid_months,amount_overrides,created_ms,deleted',
+        // V40.21.0: metas (as mesmas do celular)
+        metas_listas: 'id,name,is_default,position,created_ms,deleted',
+        metas: 'id,list_id,title,emoji,period,unit,target,step,position,created_ms,deleted',
+        metas_dias: 'id,goal_id,date,amount,target,deleted'
     };
     var S = {
         sb: null, uid: null, email: '', listas: {}, tags: {}, tarefas: {}, blocos: {}, rotinas: {}, notas: {}, financas: {},
+        metas_listas: {}, metas: {}, metas_dias: {}, mtEdit: null, mtQueue: {}, mtWant: {}, mtSeedAt: 0,
         rtEdit: null, nt: null, ntQuery: '', agTag: '', agHideDone: false, zoom: { listas: 0, agenda: 0 },
         fnMonth: null, fnEdit: null, fnScope: null, step: null, as: { msgs: [], auto: true },
         tab: 'listas', agView: 'week', agAnchor: null, agScrolled: null, hours: [7, 24], recovery: false,
@@ -745,7 +847,7 @@
         var out = [];
         for (var from = 0; ; from += 1000) {
             var q = S.sb.from(kind).select(SELECT[kind]).eq('user_id', S.uid);
-            if (kind === 'blocos') q = q.eq('deleted', false); // a agenda é grande: não traz o que já foi apagado
+            if (kind === 'blocos' || kind === 'metas_dias') q = q.eq('deleted', false); // a agenda e os dias das metas crescem: não traz o que já foi apagado
             var res = await q.order('id').range(from, from + 999);
             if (res.error) throw res.error;
             out = out.concat(res.data || []);
@@ -784,7 +886,10 @@
         KINDS.forEach(function (k) {
             ch.on('postgres_changes', { event: '*', schema: 'public', table: k, filter: filter }, function (p) {
                 if (p.eventType === 'DELETE') { if (p.old && p.old.id) delete S[k][p.old.id]; }
-                else if (p.new && p.new.id) S[k][p.new.id] = p.new;
+                else if (p.new && p.new.id) {
+                    if (k === 'metas_dias' && S.mtWant[p.new.id]) return; // V40.21.0: "+" ainda indo pra nuvem: vale o clique mais novo
+                    S[k][p.new.id] = p.new;
+                }
                 scheduleRender();
             });
         });
@@ -824,7 +929,7 @@
     // ---------- render ----------
     var renderT = null;
     function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); if (S.editing && S.editing.kind === 'blocos') renderDone(); }, 60); }
-    function renderSide() { renderRotinas(); renderNotas(); renderFinancas(); renderAssistente(); } // V40.17.0 (+ Finanças na V40.19.0): cada uma só desenha se a aba dela estiver aberta
+    function renderSide() { renderRotinas(); renderNotas(); renderFinancas(); renderMetas(); renderAssistente(); } // V40.17.0 (+ Finanças na V40.19.0, Metas na V40.21.0): cada uma só desenha se a aba dela estiver aberta
 
     function cardHtml(t) {
         var tag = tagOf(t.tag_id);
@@ -1279,14 +1384,14 @@
         $('board-summary').textContent = S.agView === 'day' ? renderDay(S.agAnchor, map, today, nowMin()) : renderWeek(S.agAnchor, map, today, nowMin());
     }
 
-    var TABS = ['assistente', 'listas', 'agenda', 'rotinas', 'notas', 'financas']; // V40.17.0: + Rotinas e Notas; V40.19.0: + Finanças; V40.20.0: Assistente na frente
+    var TABS = ['assistente', 'listas', 'agenda', 'rotinas', 'notas', 'financas', 'metas']; // V40.17.0: + Rotinas e Notas; V40.19.0: + Finanças; V40.20.0: Assistente na frente; V40.21.0: + Metas
     function setTab(tab) {
         var prev = S.tab;
         S.tab = TABS.indexOf(tab) >= 0 ? tab : 'listas';
         if (prev === 'notas' && S.tab !== 'notas') ntFlush(); // saindo das Notas: salva o que está escrito
         try { localStorage.setItem('faz_pc_tab', S.tab); } catch (e) {}
         $('board').classList.toggle('hidden', S.tab !== 'listas');
-        ['assistente', 'agenda', 'rotinas', 'notas', 'financas'].forEach(function (t) {
+        ['assistente', 'agenda', 'rotinas', 'notas', 'financas', 'metas'].forEach(function (t) {
             $(t).classList.toggle('hidden', S.tab !== t);
             $(t).classList.toggle('flex', S.tab === t);
         });
@@ -2098,7 +2203,9 @@
             notes: live('notas').map(function (n) { return { id: n.id, title: n.title, content: n.content, ms: Number(n.updated_ms || n.created_ms) || 0 }; }),
             expenses: live('financas').map(function (f) {
                 return { id: f.id, title: f.title, amount: Number(f.amount) || 0, start: f.start_month, months: fnDur(f), recurring: !!f.is_recurring, dueDay: f.due_day || null, paid: Array.isArray(f.paid_months) ? f.paid_months : [], overrides: f.amount_overrides || {} };
-            })
+            }),
+            // V40.21.0: as metas já chegam prontas (progresso, estrelas, nível), calculadas pelo metas.js
+            goals: window.FazMetas ? window.FazMetas.forAssistant(mtLists(), mtGoals(), mtDays(), new Date()) : null
         };
     }
     function asMsgHtml(m) {
@@ -2147,6 +2254,7 @@
         if (kind === 'rotina' && S.rotinas[id] && !S.rotinas[id].deleted) return openRoutine(id);
         if (kind === 'nota' && S.notas[id] && !S.notas[id].deleted) { setTab('notas'); return openNote(id); }
         if (kind === 'despesa' && S.financas[id] && !S.financas[id].deleted) { if (isMonth(month)) S.fnMonth = month; setTab('financas'); return openFin(id); }
+        if (kind === 'meta' && S.metas[id] && !S.metas[id].deleted) { setTab('metas'); return openGoal(id); } // V40.21.0
         toast('Esse item não existe mais.');
     }
 
@@ -2405,6 +2513,264 @@
         if (!yes || !S.financas[id] || S.financas[id].deleted) return;
         if (S.fnEdit && S.fnEdit.id === id) closeFin();
         patchRow('financas', id, { deleted: true }, 'Despesa apagada');
+    }
+
+    // ---------- V40.21.0: METAS (as mesmas do celular). As regras ficam no metas.js (FazMetas): período, progresso,
+    // estrelas, sequência, pontos e nível. Aqui as linhas da nuvem viram o formato das regras (listId, goalId...).
+    // Listas de metas em colunas; cada meta tem o "+" (soma no dia de hoje) e o "−" (desfaz o de hoje). ----------
+    function mtLists() { return alive('metas_listas').map(function (r) { return { id: r.id, name: r.name }; }); }
+    function mtGoal(r) { return { id: r.id, listId: r.list_id, title: r.title, emoji: r.emoji, period: r.period, unit: r.unit, target: Number(r.target), step: Number(r.step) }; }
+    function mtGoals() { return alive('metas').map(mtGoal); }
+    function mtDays(goalId) {
+        return Object.keys(S.metas_dias).map(function (k) { return S.metas_dias[k]; })
+            .filter(function (r) { return !r.deleted && (!goalId || r.goal_id === goalId); })
+            .map(function (r) { return { id: r.id, goalId: r.goal_id, date: r.date, amount: Number(r.amount) || 0, target: r.target }; });
+    }
+    function mtNum(n) { return String(Math.round((Number(n) || 0) * 100) / 100).replace('.', ','); }
+    function mtToday(goalId) { var M = window.FazMetas, r = S.metas_dias[M.dayId(goalId, M.ymd(new Date()))]; return r && !r.deleted ? Number(r.amount) || 0 : 0; }
+    // Sem nenhuma lista de metas na nuvem (nem apagada): cria Pessoal, Profissional e Financeiro (os mesmos ids do celular).
+    function mtEnsureLists() {
+        var M = window.FazMetas;
+        if (!M || Object.keys(S.metas_listas).length || Date.now() - S.mtSeedAt < 30000) return;
+        S.mtSeedAt = Date.now();
+        var now = Date.now(), rows = M.DEFAULT_LISTS.map(function (l, i) { return { user_id: S.uid, id: l.id, name: l.name, is_default: true, position: (i + 1) * STEP, created_ms: now, deleted: false }; });
+        rows.forEach(function (r) { S.metas_listas[r.id] = r; });
+        S.sb.from('metas_listas').upsert(rows, { onConflict: 'user_id,id' }).then(function (res) {
+            if (!res.error) return;
+            rows.forEach(function (r) { if (S.metas_listas[r.id] === r) delete S.metas_listas[r.id]; });
+            renderMetas();
+            fail(res.error);
+        });
+    }
+    function mtCardHtml(g, x) {
+        var M = window.FazMetas, done = x.complete, today = mtToday(g.id);
+        return '<article class="mt-card bg-white border ' + (done ? 'border-emerald-200' : 'border-zinc-200') + ' rounded-xl p-3 shadow-sm cursor-pointer hover:border-zinc-300" data-goal="' + esc(g.id) + '" tabindex="0">' +
+            '<div class="flex items-center gap-2.5">' +
+            '<span class="w-9 h-9 rounded-lg ' + (done ? 'bg-emerald-50' : 'bg-zinc-100') + ' flex items-center justify-center text-lg shrink-0">' + esc(g.emoji || '🎯') + '</span>' +
+            '<div class="min-w-0 flex-1"><p class="text-[13.5px] font-semibold text-zinc-800 truncate" title="' + esc(g.title) + '">' + (esc(g.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
+            '<p class="mt-status text-[11.5px] truncate ' + (done ? 'text-emerald-600 font-semibold' : 'text-zinc-500') + '">' + (done ? '✓ ' : '') + esc(x.text) + '</p></div>' +
+            (today > 0 ? '<button type="button" class="mt-minus w-7 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" data-mt-minus="' + esc(g.id) + '" title="Desfazer o último +" aria-label="Desfazer o último + de ' + esc(g.title) + '"><i class="ph-bold ph-minus"></i></button>' : '') +
+            '<button type="button" class="mt-plus h-8 min-w-[44px] px-2.5 rounded-lg ' + (done ? 'bg-emerald-500' : 'bg-focus') + ' text-white text-[12.5px] font-bold hover:opacity-90" data-mt-plus="' + esc(g.id) + '" title="Marcar que fez" aria-label="Marcar que fez: ' + esc(g.title) + '">' + esc(M.addLabel(g)) + '</button>' +
+            '</div>' +
+            '<div class="mt-2 h-1.5 rounded-full bg-zinc-100 overflow-hidden"><div class="h-full rounded-full ' + (done ? 'bg-emerald-500' : 'bg-focus') + '" style="width:' + Math.round(x.pct * 100) + '%"></div></div>' +
+            '<div class="mt-1.5 flex items-center gap-2.5 text-[11.5px] text-zinc-500"><span>' + esc(M.goalLabel(x.goal)) + '</span>' +
+            (x.streak ? '<span title="' + esc(M.streakLabel(x.goal.period, x.streak)) + '">🔥 ' + x.streak + '</span>' : '') +
+            (x.stars ? '<span title="Estrelas desta meta">⭐ ' + x.stars + '</span>' : '') + '</div>' +
+            '</article>';
+    }
+    function mtColHtml(l, goals, st) {
+        return '<section class="mt-col w-[296px] shrink-0 max-h-full flex flex-col bg-zinc-50 border border-zinc-200 rounded-2xl" data-mt-col="' + esc(l.id) + '">' +
+            '<header class="px-3.5 pt-3 pb-2 flex items-center gap-1.5">' +
+            '<h2 class="min-w-0 flex-1 text-[13px] font-bold text-zinc-800 truncate" title="' + esc(l.name) + '">' + (esc(l.name) || 'Sem nome') + '</h2>' +
+            '<span class="text-[11px] font-semibold text-zinc-600 bg-white border border-zinc-200 rounded-full px-2 py-0.5" title="Metas nesta lista">' + goals.length + '</span>' +
+            '<button class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800" data-mt-rename="' + esc(l.id) + '" title="Renomear lista" aria-label="Renomear a lista ' + esc(l.name) + '"><i class="ph ph-pencil-simple"></i></button>' +
+            '<button class="w-7 h-7 -mr-1 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-red-50 hover:text-red-600" data-mt-dellist="' + esc(l.id) + '" title="Apagar lista" aria-label="Apagar a lista ' + esc(l.name) + '"><i class="ph ph-trash"></i></button>' +
+            '</header>' +
+            '<div class="thin-scroll flex-1 min-h-[52px] overflow-y-auto px-2.5 pb-1 flex flex-col gap-2">' +
+            (goals.length ? goals.map(function (g) { return mtCardHtml(g, st[g.id]); }).join('') : '<p class="px-2 py-3 text-[12.5px] text-zinc-400">Nenhuma meta ainda.</p>') + '</div>' +
+            '<footer class="p-2.5 pt-1.5"><button class="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-[13px] font-medium text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-800" data-mt-add="' + esc(l.id) + '"><i class="ph ph-plus"></i>Nova meta</button></footer>' +
+            '</section>';
+    }
+    function renderMetas() {
+        if (!S.uid || S.tab !== 'metas') return;
+        var M = window.FazMetas, cols = $('mt-cols');
+        if (!M) { cols.innerHTML = '<p class="text-sm text-zinc-500">Não consegui carregar as metas. Recarregue a página.</p>'; return; }
+        if (!S.lastLoad) { cols.innerHTML = '<p class="text-sm text-zinc-500">Carregando suas metas…</p>'; return; }
+        mtEnsureLists();
+        var lists = mtLists(), goals = mtGoals(), now = new Date(), sum = M.summary(goals, mtDays(), now), st = {}, by = {};
+        sum.statuses.forEach(function (x) { st[x.goal.id] = x; });
+        lists.forEach(function (l) { by[l.id] = []; });
+        goals.forEach(function (g) { var l = M.listOf(g, lists); if (l) by[l].push(g); });
+        $('mt-level-n').textContent = sum.level;
+        $('mt-level-name').textContent = sum.name;
+        $('mt-points').textContent = sum.points + (sum.points === 1 ? ' ponto' : ' pontos');
+        $('mt-level-bar').style.width = Math.round(sum.pct * 100) + '%';
+        $('mt-level-sub').textContent = ['⭐ ' + sum.stars + (sum.stars === 1 ? ' estrela' : ' estrelas'), sum.todayTotal ? 'hoje ' + sum.todayDone + ' de ' + sum.todayTotal + (sum.todayTotal === 1 ? ' meta diária' : ' metas diárias') : '', 'faltam ' + sum.toNext + ' pro nível ' + (sum.level + 1)].filter(Boolean).join(' · ');
+        $('board-summary').textContent = goals.length ? goals.length + (goals.length === 1 ? ' meta' : ' metas') + ' em ' + lists.length + (lists.length === 1 ? ' lista' : ' listas') : 'Nenhuma meta ainda';
+        var board = $('mt-board'), sl = board.scrollLeft;
+        cols.innerHTML = lists.map(function (l) { return mtColHtml(l, by[l.id], st); }).join('') +
+            '<button id="mt-new-list" class="w-[296px] shrink-0 flex items-center gap-2 px-4 py-3 rounded-2xl border-2 border-dashed border-zinc-300 text-[13px] font-semibold text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 hover:bg-white/60"><i class="ph ph-plus"></i>Nova lista de metas</button>';
+        board.scrollLeft = sl;
+        if (S.mtEdit && S.mtEdit.id && !(S.metas[S.mtEdit.id] && !S.metas[S.mtEdit.id].deleted)) { closeGoal(); toast('Essa meta foi apagada em outro aparelho.'); }
+    }
+    // "+" (ou "−"): soma no dia de hoje. Cumpriu? Estrela e pontos (e às vezes um nível novo).
+    function mtBump(id, dir) {
+        var M = window.FazMetas, r = S.metas[id];
+        if (!M || !r || r.deleted) return;
+        var g = mtGoal(r), now = new Date(), today = M.ymd(now), before = M.summary(mtGoals(), mtDays(), now);
+        var res = M.bump(mtDays(id), g, today, (dir < 0 ? -1 : 1) * M.normalize(g).step);
+        if (!res.changed) return;
+        var row = { user_id: S.uid, id: res.row.id, goal_id: id, date: today, amount: res.row.amount, target: res.row.target, deleted: false };
+        S.metas_dias[row.id] = row;
+        var msg = dir > 0 ? M.gainText(M.gain(before, M.summary(mtGoals(), mtDays(), now))) : '';
+        renderMetas();
+        if (msg) toast(msg, 3200);
+        mtWrite(row);
+    }
+    // Grava o dia na nuvem em fila: cliques seguidos chegam na ordem, e só o valor mais novo é enviado.
+    function mtWrite(row) {
+        S.mtWant[row.id] = row;
+        var prev = S.mtQueue[row.id] || Promise.resolve();
+        var job = prev.then(async function () {
+            if (S.mtWant[row.id] !== row) return; // já tem um clique mais novo na fila
+            var res = await S.sb.from('metas_dias').upsert(row, { onConflict: 'user_id,id' });
+            if (S.mtWant[row.id] === row) delete S.mtWant[row.id];
+            if (res.error) { fail(res.error); loadAll(); }
+        });
+        S.mtQueue[row.id] = job;
+        job.then(function () { if (S.mtQueue[row.id] === job) delete S.mtQueue[row.id]; });
+    }
+    async function mtClearDays(goalId) { // apaga o que foi marcado numa meta (recomeçar a contagem ou meta apagada)
+        var ids = Object.keys(S.metas_dias).filter(function (k) { return !S.metas_dias[k].deleted && S.metas_dias[k].goal_id === goalId; });
+        if (!ids.length) return true;
+        ids.forEach(function (k) { S.metas_dias[k].deleted = true; });
+        renderMetas();
+        var res = await S.sb.from('metas_dias').update({ deleted: true }).eq('user_id', S.uid).eq('goal_id', goalId);
+        if (res.error) { fail(res.error); loadAll(); return false; }
+        return true;
+    }
+    function mtFormUi() {
+        var M = window.FazMetas, ed = S.mtEdit;
+        document.querySelectorAll('#mt-f-period [data-period]').forEach(function (b) { var on = b.dataset.period === ed.period; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); });
+        document.querySelectorAll('#mt-f-unit [data-unit]').forEach(function (b) { var on = b.dataset.unit === ed.unit; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); });
+        var per = M.PERIODS[ed.period].per;
+        $('mt-f-target-suf').textContent = (ed.unit === 'vezes' ? 'vezes ' : ed.unit === 'minutos' ? 'minutos ' : 'reais ') + per;
+        $('mt-f-step-suf').textContent = ed.unit === 'vezes' ? 'vez(es) por clique' : ed.unit === 'minutos' ? 'minutos por clique' : 'reais por clique';
+        $('mt-f-info').textContent = '⭐ Cada ' + (ed.period === 'dia' ? 'dia' : ed.period === 'semana' ? 'semana' : 'mês') + ' cumprido vale uma estrela e ' + M.PERIODS[ed.period].points + ' pontos.';
+    }
+    function openGoal(id, listId) {
+        var M = window.FazMetas, r = id ? S.metas[id] : null;
+        if (!M || (id && (!r || r.deleted))) return;
+        closeColMenu();
+        var lists = mtLists();
+        if (!lists.length) return toast('Crie uma lista de metas primeiro.');
+        var g = r ? M.normalize(mtGoal(r)) : null;
+        S.mtEdit = { id: id || null, period: g ? g.period : 'dia', unit: g ? g.unit : 'vezes', touched: !!g };
+        $('mt-f-head').textContent = r ? 'Editar meta' : 'Nova meta';
+        $('mt-f-tpl-wrap').classList.toggle('hidden', !!r);
+        $('mt-f-tpl').innerHTML = r ? '' : M.TEMPLATES.map(function (t, i) { return '<button type="button" class="mt-tpl text-[12.5px] font-medium px-2.5 py-1 rounded-full" data-mt-tpl="' + i + '">' + esc(t.emoji + ' ' + t.title) + '</button>'; }).join('');
+        $('mt-f-emoji').value = g ? (g.emoji || '') : '';
+        $('mt-f-title').value = g ? (g.title || '') : '';
+        var lid = g ? M.listOf(g, lists) : (lists.some(function (l) { return l.id === listId; }) ? listId : lists[0].id);
+        $('mt-f-list').innerHTML = lists.map(function (l) { return '<option value="' + esc(l.id) + '"' + (l.id === lid ? ' selected' : '') + '>' + esc(l.name || 'Sem nome') + '</option>'; }).join('');
+        $('mt-f-target').value = mtNum(g ? g.target : M.UNITS.vezes.target);
+        $('mt-f-step').value = mtNum(g ? g.step : M.UNITS.vezes.step);
+        $('mt-f-delete').classList.toggle('hidden', !r);
+        mtFormUi();
+        var box = $('modal-goal');
+        box.classList.remove('hidden');
+        box.classList.add('flex');
+        $('mt-f-title').focus();
+    }
+    function closeGoal() {
+        S.mtEdit = null;
+        $('modal-goal').classList.add('hidden');
+        $('modal-goal').classList.remove('flex');
+    }
+    function mtTemplate(i) {
+        var M = window.FazMetas, t = M && M.TEMPLATES[i], ed = S.mtEdit;
+        if (!t || !ed) return;
+        $('mt-f-title').value = t.title;
+        $('mt-f-emoji').value = t.emoji;
+        $('mt-f-target').value = mtNum(t.target);
+        $('mt-f-step').value = mtNum(t.step);
+        ed.period = t.period;
+        ed.unit = t.unit;
+        ed.touched = true;
+        if (S.metas_listas[t.listId] && !S.metas_listas[t.listId].deleted) $('mt-f-list').value = t.listId;
+        mtFormUi();
+        $('mt-f-title').focus();
+    }
+    async function saveGoal() {
+        var M = window.FazMetas, ed = S.mtEdit;
+        if (!M || !ed || ed.busy) return;
+        var title = $('mt-f-title').value.trim();
+        if (!title) { $('mt-f-title').focus(); return toast('Dê um nome pra meta.'); }
+        var target = parseMoney($('mt-f-target').value);
+        if (target === null || target <= 0 || target > M.MAX) { $('mt-f-target').focus(); return toast('Informe a meta: um número maior que zero.'); }
+        var step = parseMoney($('mt-f-step').value);
+        if (step === null || step <= 0 || step > M.MAX) { $('mt-f-step').focus(); return toast('Informe quanto cada + soma: um número maior que zero.'); }
+        var listId = $('mt-f-list').value, emoji = M.firstGrapheme($('mt-f-emoji').value);
+        if (!(S.metas_listas[listId] && !S.metas_listas[listId].deleted)) return toast('Essa lista foi apagada. Escolha outra.');
+        if (!ed.id) { // nova: mesmo formato do app (id meta_<hora>), no fim da lista
+            var row = { user_id: S.uid, id: newId('meta_', 'metas'), list_id: listId, title: title, emoji: emoji, period: ed.period, unit: ed.unit, target: target, step: step, position: maxPos('metas') + STEP, created_ms: Date.now(), deleted: false };
+            closeGoal();
+            insertRow('metas', row, 'Meta criada 🎯');
+            return;
+        }
+        var r = S.metas[ed.id];
+        if (!r || r.deleted) { closeGoal(); return toast('Essa meta foi apagada em outro aparelho.'); }
+        var restart = r.period !== ed.period || r.unit !== ed.unit;
+        if (restart && mtDays(r.id).some(function (d) { return d.amount > 0; })) {
+            ed.busy = true;
+            var yes = await dialog({ title: 'Mudar a frequência ou a medida?', text: 'A contagem desta meta recomeça do zero: o que já foi marcado e as estrelas dela saem da pontuação.', okLabel: 'Mudar e recomeçar', danger: true });
+            ed.busy = false;
+            if (S.mtEdit !== ed || !yes) return;
+        }
+        var fields = {};
+        if (title !== (r.title || '')) fields.title = title;
+        if (emoji !== (r.emoji || '')) fields.emoji = emoji;
+        if (listId !== r.list_id) { fields.list_id = listId; fields.position = maxPos('metas') + STEP; } // mudou de lista: vai pro fim dela
+        if (ed.period !== r.period) fields.period = ed.period;
+        if (ed.unit !== r.unit) fields.unit = ed.unit;
+        if (target !== Number(r.target)) fields.target = target;
+        if (step !== Number(r.step)) fields.step = step;
+        closeGoal();
+        if (restart) await mtClearDays(r.id);
+        if (Object.keys(fields).length) patchRow('metas', r.id, fields, restart ? 'Meta salva. A contagem recomeçou.' : 'Meta salva');
+    }
+    async function deleteGoal(id) {
+        var M = window.FazMetas, r = S.metas[id];
+        if (!M || !r || r.deleted) return;
+        var x = M.status(mtGoal(r), mtDays(id), new Date());
+        var yes = await dialog({ title: 'Apagar a meta "' + (r.title || 'Sem nome') + '"?', text: (x.stars ? 'Ela tem ⭐ ' + x.stars + (x.stars === 1 ? ' estrela' : ' estrelas') + ' (' + x.points + ' pontos), que saem da sua pontuação. ' : '') + 'Ela sai daqui e do celular.', okLabel: 'Apagar meta', danger: true });
+        if (!yes || !S.metas[id] || S.metas[id].deleted) return;
+        if (S.mtEdit && S.mtEdit.id === id) closeGoal();
+        if (await patchRow('metas', id, { deleted: true }, 'Meta apagada')) mtClearDays(id); // a meta primeiro: nunca sobra meta sem os dias
+    }
+    async function createGoalList() {
+        var name = await dialog({ title: 'Nova lista de metas', input: { placeholder: 'Ex.: Saúde, Estudos, Casa', max: 30 }, okLabel: 'Criar lista' });
+        if (!name) return;
+        insertRow('metas_listas', { user_id: S.uid, id: newId('gl_', 'metas_listas'), name: name, is_default: false, position: maxPos('metas_listas') + STEP, created_ms: Date.now(), deleted: false }, 'Lista criada');
+        setTimeout(function () { var b = $('mt-board'); b.scrollLeft = b.scrollWidth; }, 50);
+    }
+    async function renameGoalList(id) {
+        var l = S.metas_listas[id];
+        if (!l || l.deleted) return;
+        var name = await dialog({ title: 'Renomear lista', input: { value: l.name, placeholder: 'Nome da lista', max: 30 }, okLabel: 'Renomear' });
+        if (!name || name === l.name) return;
+        patchRow('metas_listas', id, { name: name }, 'Lista renomeada');
+    }
+    async function deleteGoalList(id) {
+        var M = window.FazMetas, l = S.metas_listas[id];
+        if (!M || !l || l.deleted) return;
+        var lists = mtLists();
+        if (lists.length <= 1) return toast('Precisa ter pelo menos uma lista de metas.');
+        var goals = mtGoals().filter(function (g) { return M.listOf(g, lists) === id; });
+        var stars = goals.reduce(function (a, g) { return a + M.status(g, mtDays(g.id), new Date()).stars; }, 0);
+        var yes = await dialog({
+            title: 'Apagar a lista "' + (l.name || 'Sem nome') + '"?',
+            text: goals.length ? (goals.length === 1 ? 'A meta dela também será apagada' : 'As ' + goals.length + ' metas dela também serão apagadas') + (stars ? ' (e as ⭐ ' + stars + ' saem da pontuação)' : '') + ', aqui e no celular.' : 'A lista está vazia. Ela sai daqui e do celular.',
+            okLabel: 'Apagar lista', danger: true
+        });
+        if (!yes || !S.metas_listas[id] || S.metas_listas[id].deleted) return;
+        var ids = goals.map(function (g) { return g.id; }), prev = ids.map(function (k) { return Object.assign({}, S.metas[k]); }), prevL = Object.assign({}, l);
+        ids.forEach(function (k) { S.metas[k].deleted = true; });
+        l.deleted = true;
+        renderMetas();
+        // metas primeiro: se cair no meio, nunca sobra meta numa lista apagada
+        var r1 = ids.length ? await S.sb.from('metas').update({ deleted: true }).eq('user_id', S.uid).in('id', ids) : { error: null };
+        var r2 = r1.error ? r1 : await S.sb.from('metas_listas').update({ deleted: true }).eq('user_id', S.uid).eq('id', id);
+        if (r1.error || r2.error) {
+            prev.forEach(function (r) { S.metas[r.id] = r; });
+            S.metas_listas[id] = prevL;
+            renderMetas();
+            fail(r1.error || r2.error);
+            loadAll();
+            return;
+        }
+        toast('Lista apagada');
+        for (var i = 0; i < ids.length; i++) await mtClearDays(ids[i]);
     }
 
     // ---------- V40.18.0: TAGS (as mesmas do celular). O app só cria e apaga; aqui também renomeia e troca a cor. ----------
@@ -3045,6 +3411,7 @@
             if (!$('modal-tags').classList.contains('hidden')) return closeTags(); // V40.18.0: fica por cima do cartão
             if (S.fnScope) return S.fnScope(null); // V40.19.0
             if (S.fnEdit) return closeFin();
+            if (S.mtEdit) return closeGoal(); // V40.21.0
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
             if (S.rtEdit) return closeRoutine(); // V40.17.0
             if (menuEl) return closeColMenu();
@@ -3078,7 +3445,7 @@
         // V40.19.0: setas ← → do teclado. Agenda: semana (ou dia) anterior/seguinte; Listas: uma lista pro lado; Finanças: mês.
         // Não fazem nada com o cursor num campo, com janela, menu ou calendário aberto, no meio de um arraste ou com Alt/Ctrl/Shift.
         function anyLayerOpen() {
-            return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
+            return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'modal-goal', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
         }
         function colStep(sc, cols, dir) { // rola uma coluna (lista ou dia) pro lado; false = já está na beirada
             if (cols.length < 2) return false;
@@ -3109,6 +3476,7 @@
             }
             else if (S.tab === 'listas') { if (S.dragId) return; e.preventDefault(); colStep($('board'), $('columns').querySelectorAll('section.col'), dir); }
             else if (S.tab === 'financas') { e.preventDefault(); fnMove(dir); }
+            else if (S.tab === 'metas') { e.preventDefault(); colStep($('mt-board'), $('mt-cols').querySelectorAll('section.mt-col'), dir); } // V40.21.0: uma lista pro lado
         });
         $('ag-prev').addEventListener('click', function () { agMove(-1); });
         $('ag-next').addEventListener('click', function () { agMove(1); });
@@ -3324,6 +3692,44 @@
         $('fn-f-cancel').addEventListener('click', closeFin);
         $('fn-f-delete').addEventListener('click', function () { if (S.fnEdit && S.fnEdit.id) deleteFin(S.fnEdit.id); });
         $('modal-fin').addEventListener('mousedown', function (e) { if (e.target === this) closeFin(); });
+        // V40.21.0: Metas
+        $('mt-new').addEventListener('click', function () { openGoal(null); });
+        $('mt-cols').addEventListener('click', function (e) {
+            var b;
+            if ((b = e.target.closest('[data-mt-plus]'))) return mtBump(b.dataset.mtPlus, 1);
+            if ((b = e.target.closest('[data-mt-minus]'))) return mtBump(b.dataset.mtMinus, -1);
+            if ((b = e.target.closest('[data-mt-add]'))) return openGoal(null, b.dataset.mtAdd);
+            if ((b = e.target.closest('[data-mt-rename]'))) return void renameGoalList(b.dataset.mtRename);
+            if ((b = e.target.closest('[data-mt-dellist]'))) return void deleteGoalList(b.dataset.mtDellist);
+            if (e.target.closest('#mt-new-list')) return void createGoalList();
+            if ((b = e.target.closest('[data-goal]'))) openGoal(b.dataset.goal);
+        });
+        $('mt-cols').addEventListener('keydown', function (e) {
+            var c = e.target.closest && e.target.closest('[data-goal]');
+            if (c && e.target === c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openGoal(c.dataset.goal); }
+        });
+        $('mt-f-period').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-period]');
+            if (!b || !S.mtEdit) return;
+            S.mtEdit.period = b.dataset.period;
+            mtFormUi();
+        });
+        $('mt-f-unit').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-unit]'), M = window.FazMetas;
+            if (!b || !S.mtEdit || S.mtEdit.unit === b.dataset.unit) return;
+            S.mtEdit.unit = b.dataset.unit;
+            if (!S.mtEdit.touched) { $('mt-f-target').value = mtNum(M.UNITS[b.dataset.unit].target); $('mt-f-step').value = mtNum(M.UNITS[b.dataset.unit].step); } // ainda não mexeu: padrão da medida nova
+            mtFormUi();
+        });
+        $('mt-f-tpl').addEventListener('click', function (e) { var b = e.target.closest('[data-mt-tpl]'); if (b) mtTemplate(Number(b.dataset.mtTpl)); });
+        ['mt-f-target', 'mt-f-step'].forEach(function (id) { $(id).addEventListener('input', function () { if (S.mtEdit) S.mtEdit.touched = true; }); });
+        ['mt-f-emoji', 'mt-f-title', 'mt-f-target', 'mt-f-step'].forEach(function (id) {
+            $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); saveGoal(); } });
+        });
+        $('mt-f-save').addEventListener('click', function () { saveGoal(); });
+        $('mt-f-cancel').addEventListener('click', closeGoal);
+        $('mt-f-delete').addEventListener('click', function () { if (S.mtEdit && S.mtEdit.id) deleteGoal(S.mtEdit.id); });
+        $('modal-goal').addEventListener('mousedown', function (e) { if (e.target === this) closeGoal(); });
         $('ar-close').addEventListener('click', closeArchive);
         $('modal-archive').addEventListener('mousedown', function (e) { if (e.target === this) closeArchive(); });
         $('ar-list').addEventListener('click', function (e) {
@@ -3449,6 +3855,7 @@
             unsubscribe();
             S.uid = null; S.listas = {}; S.tags = {}; S.tarefas = {}; S.blocos = {}; S.lastLoad = 0; S.composer = null;
             S.rotinas = {}; S.notas = {}; S.financas = {}; closeRoutine(); ntClose(); // V40.17.0
+            S.metas_listas = {}; S.metas = {}; S.metas_dias = {}; S.mtWant = {}; S.mtQueue = {}; closeGoal(); // V40.21.0
             closeTags(); // V40.18.0
             closeFin(); // V40.19.0
             closeTask();

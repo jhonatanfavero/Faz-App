@@ -26,7 +26,7 @@ module.exports = async function boot(REPO, storage, opts = {}) {
   w.HTMLElement.prototype.scrollIntoView = function () {}; w.HTMLElement.prototype.scrollTo = function () {};
   const server = opts.server || makeServer();
   w.supabase = { createClient: makeCreateClient(server) };
-  for (const f of ['app.js', 'faz-config.js', 'assistente.js', 'sync.js']) { const s = w.document.createElement('script'); s.textContent = fs.readFileSync(path.join(REPO, f), 'utf8'); w.document.body.appendChild(s); }
+  for (const f of ['app.js', 'faz-config.js', 'metas.js', 'assistente.js', 'sync.js']) { const s = w.document.createElement('script'); s.textContent = fs.readFileSync(path.join(REPO, f), 'utf8'); w.document.body.appendChild(s); }
   w.eval('showToast = function(m){ window.__toasts = (window.__toasts||[]).concat([m]); }');
   await new Promise((r) => setTimeout(r, 300));
   return { w, server, errors, confirms, alerts, L: (k) => w.localStorage.getItem(k), $: (id) => w.document.getElementById(id) };

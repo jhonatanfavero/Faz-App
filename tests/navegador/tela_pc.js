@@ -407,6 +407,31 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(await p.evaluate(() => !document.getElementById('modal-fin').classList.contains('hidden') && !document.getElementById('financas').classList.contains('hidden')), 'clicar numa conta da resposta abre a despesa');
   await p.keyboard.press('Escape');
 
+  console.log('\nM) Aba Metas (V40.21.0):');
+  await p.locator('#tab-metas').click(); await p.waitForTimeout(400);
+  const mg = await p.evaluate(() => {
+    const cols = [...document.querySelectorAll('#mt-cols section.mt-col')], lv = document.getElementById('mt-level').getBoundingClientRect(), t = document.querySelector('.tab[data-tab="metas"]').getBoundingClientRect(), f = document.querySelector('.tab[data-tab="financas"]').getBoundingClientRect();
+    return { nomes: cols.map((c) => c.querySelector('h2').textContent).join(','), larg: cols.map((c) => Math.round(c.getBoundingClientRect().width)), ultima: t.left >= f.right, nivel: lv.top > 0 && lv.width <= 450 };
+  });
+  ok(mg.nomes === 'Pessoal,Profissional,Financeiro' && mg.larg.every((x) => x === 296) && mg.ultima && mg.nivel, 'a aba Metas (depois de Finanças) abre com o nível em cima e as colunas Pessoal, Profissional e Financeiro');
+  await p.locator('#mt-new').click(); await p.waitForTimeout(150);
+  const mod = await p.evaluate(() => { const r = document.querySelector('#modal-goal > div').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && document.activeElement === document.getElementById('mt-f-title'); });
+  await p.locator('#mt-f-tpl [data-mt-tpl="0"]').click();
+  await foto(p, 'pc-metas-nova.png');
+  await p.locator('#mt-f-save').click(); await p.waitForTimeout(250);
+  ok(mod && (await p.evaluate(() => document.querySelectorAll('#mt-cols [data-goal]').length)) === 1, 'Nova meta: a janela cabe na tela, o cursor já está no nome; a sugestão "Beber água" + Salvar cria o cartão');
+  for (const tpl of ['1', '5']) { await p.locator('#mt-new').click(); await p.locator(`#mt-f-tpl [data-mt-tpl="${tpl}"]`).click(); await p.keyboard.press('Enter'); await p.waitForTimeout(250); }
+  for (let i = 0; i < 8; i++) { await p.locator('#mt-cols [data-goal] [data-mt-plus]').first().click(); await p.waitForTimeout(60); }
+  await p.waitForTimeout(350);
+  const mg2 = await p.evaluate(() => {
+    const c = document.querySelector('#mt-cols [data-goal]'), id = c.dataset.goal, M = window.FazMetas, row = window.__nuvem.get('metas_dias', '11111111-2222-3333-4444-555555555555', M.dayId(id, M.ymd(new Date())));
+    return { status: c.querySelector('.mt-status').textContent, pontos: document.getElementById('mt-points').textContent, nuvem: row && row.amount, toast: document.getElementById('toast').textContent, cols: [...document.querySelectorAll('#mt-cols section.mt-col')].map((s) => s.querySelectorAll('[data-goal]').length).join(',') };
+  });
+  ok(mg2.status === '✓ 8 de 8 hoje' && mg2.pontos === '10 pontos' && mg2.nuvem === 8 && mg2.cols === '2,1,0', '8 cliques no +1: "✓ 8 de 8 hoje", 10 pontos e a nuvem com 8 (metas nas colunas certas: ' + mg2.cols + ')');
+  await foto(p, 'pc-metas.png');
+  await p.keyboard.press('ArrowRight'); await p.waitForTimeout(100);
+  ok(await p.evaluate(() => !document.getElementById('metas').classList.contains('hidden')), 'as setas não tiram da aba Metas');
+
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));
   await fim();
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

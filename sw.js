@@ -15,7 +15,8 @@
 // V10.20 - v40.18.0 (Tela do PC: janela de Tags — criar, renomear, trocar a cor e apagar (quem usava a tag fica sem tag), também pelo "Gerenciar tags" de dentro do cartão e da rotina; quem começa pelo computador ganha as tags Trabalho, Pessoal e Estudo, com os mesmos ids do app. Zoom das Listas e da Semana (−, 100%, + e Ctrl + rodinha), cada um guardado no computador. No celular só muda o número da versão.)
 // V10.21 - v40.19.0 (Tela do PC: aba Finanças — mês a mês, total, pago, em aberto e atrasadas; pagar, criar, editar com "só neste mês / neste e nos próximos / em todos", trocar o tipo e apagar, com as regras do app. Setas ← → do teclado: Agenda passa a semana ou o dia, Listas rolam uma lista, Finanças trocam o mês. Celular: editar uma despesa de vários meses sem mudar o valor não apaga mais os valores por mês.)
 // V10.22 - v40.20.0 (Assistente, a primeira aba no celular e no PC: versão padrão, sem IA paga e sem internet — lê agenda, listas, rotinas, notas e finanças e responde sobre o dia, agora, amanhã, a semana, o que ficou pra trás, contas, rotinas, notas e listas; o "cérebro" é o assistente.js, novo no cache. PC: zoom vira "listas por tela" / "dias por tela" (colunas mais largas em vez de tudo maior) e, na Semana com menos dias, as setas andam um dia por vez.)
-const CACHE_NAME = 'timeblock-v40-20-0';
+// V10.23 - v40.21.0 (Metas, etapa 1, no celular e no PC: listas Pessoal, Profissional, Financeiro e as que a pessoa criar; metas por dia, semana ou mês contadas em vezes, minutos ou reais; botão + em cada meta; ⭐ estrelas, 🔥 sequência, pontos e níveis (Iniciante → Lenda). As regras ficam no metas.js, novo no cache. Vão pra nuvem nas tabelas metas_listas, metas e metas_dias. O Assistente passa a falar das metas.)
+const CACHE_NAME = 'timeblock-v40-21-0';
 const ASSETS = [
   './',
   './index.html',
@@ -24,6 +25,7 @@ const ASSETS = [
   './faz-config.js',
   './sync.js',
   './assistente.js',
+  './metas.js',
   './libs/tailwind.css',
   './libs/inter/inter.css',
   './libs/inter/inter-latin-wght-normal.woff2',

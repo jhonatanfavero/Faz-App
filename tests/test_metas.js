@@ -103,10 +103,12 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   w.openListSheet();
   w.switchListTab('goals');
   ok(!$('view-goals').classList.contains('hidden') && $('view-backlog').classList.contains('hidden') && $('btn-list-goals').className.includes('bg-white') && $('btn-list-goals').className.includes('w-9'), 'a pílula do alvo (última, só o ícone) abre as Metas');
-  const pillNames = () => [...d.querySelectorAll('#goals-lists button')].map((b) => b.textContent.trim());
-  ok(pillNames().join('|') === 'Pessoal0|Profissional0|Financeiro0|Lista' && ev('goalListsDb.map((l) => l.id).join()') === 'gl_pessoal,gl_profissional,gl_financeiro', 'primeira vez: listas Pessoal, Profissional e Financeiro (+ Lista pra criar outra)');
+  // V40.23.0: uma lista só, com um título por categoria (sem pílulas nem colunas)
+  const secs = () => [...d.querySelectorAll('#goals-container .goal-section')].map((s) => s.querySelector('h3').textContent + s.querySelector('h3 + span').textContent);
+  const secOf = (id) => d.querySelector('#goals-container .goal-section[data-goal-list="' + id + '"]');
+  ok(!$('goals-lists') && secs().join('|') === 'Pessoal0|Profissional0|Financeiro0' && ev('goalListsDb.map((l) => l.id).join()') === 'gl_pessoal,gl_profissional,gl_financeiro' && !!d.querySelector('#goals-container .goal-new-cat'), 'primeira vez: uma tela só com as categorias Pessoal, Profissional e Financeiro (e "Nova categoria" no fim)');
   ok($('goals-level-n').textContent === '1' && $('goals-level-name').textContent === 'Iniciante' && $('goals-points').textContent === '0 pontos' && $('goals-level-sub').textContent === '⭐ 0 · faltam 100 pro nível 2', 'nível 1 · Iniciante, 0 pontos, faltam 100 pro nível 2');
-  ok(/Nenhuma meta em Pessoal ainda/.test($('goals-container').textContent), 'lista vazia explica o que fazer');
+  ok(/Crie sua primeira meta/.test($('goals-container').textContent) && d.querySelectorAll('#goals-container .goal-section-add').length === 3 && secOf('gl_financeiro').textContent.includes('Meta em Financeiro'), 'sem metas: explica o que fazer e cada categoria tem o atalho "+ Meta em ..."');
 
   // criar pela sugestão "Beber água"
   w.openGoalForm();
@@ -123,7 +125,7 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   const g1 = ev('goalsDb[0]');
   ok(ev('goalsDb.length') === 1 && /^meta_\d+$/.test(g1.id) && g1.listId === 'gl_pessoal' && g1.target === 8 && g1.step === 1 && g1.period === 'dia' && g1.unit === 'vezes' && lastToast() === 'Meta criada! 🎯', 'Salvar: meta criada (id meta_..., lista Pessoal, 8 vezes por dia)');
   ok(!$('goals-list-view').classList.contains('hidden') && /Beber água/.test($('goals-container').textContent) && /0 de 8 hoje/.test($('goals-container').textContent) && d.querySelector('#goals-container .goal-plus').textContent === '+1', 'volta pra lista: cartão "💧 Beber água · 0 de 8 hoje" com o botão +1');
-  ok(pillNames()[0] === 'Pessoal1', 'a pílula da lista conta 1 meta');
+  ok(secs()[0] === 'Pessoal1' && secOf('gl_pessoal').querySelector('[data-goal="' + g1.id + '"]') && !secOf('gl_pessoal').querySelector('.goal-section-add') && !/Crie sua primeira meta/.test($('goals-container').textContent), 'a meta aparece embaixo do título Pessoal (que conta 1)');
 
   for (let i = 0; i < 7; i++) w.goalBump(g1.id, 1);
   ok(/7 de 8 hoje/.test($('goals-container').textContent) && [...d.querySelectorAll('#goals-container button')].some((b) => b.getAttribute('aria-label') === 'Desfazer o último +') && !toasts().some((t) => /Meta cumprida/.test(t)), '+1 sete vezes: "7 de 8 hoje", aparece o − e nada de estrela ainda');
@@ -142,28 +144,39 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   ok(!d.querySelector('#goals-container img') && !d.querySelector('#goals-container b') && $('goals-container').textContent.includes('<img src=x onerror=alert(1)>'), 'nome e emoji com HTML aparecem como texto');
   const gx = ev('goalsDb[1].id');
 
-  // nova lista
+  // nova categoria (pelo fim da tela)
   w.openCreateGoalList();
-  ok(!$('goal-list-name-modal').classList.contains('hidden'), '"+ Lista" abre o nome da lista nova');
+  ok(!$('goal-list-name-modal').classList.contains('hidden') && $('goal-list-name-title').textContent === 'Nova categoria', '"Nova categoria" abre o nome da categoria nova');
   $('goal-list-name-input').value = 'Saúde'; w.confirmGoalListName();
-  ok(ev('goalListsDb.length') === 4 && ev('goalListsDb[3].name') === 'Saúde' && /^gl_\d+$/.test(ev('goalListsDb[3].id')) && ev('activeGoalListId') === ev('goalListsDb[3].id') && pillNames()[3].startsWith('Saúde'), 'lista "Saúde" criada e aberta');
-  w.openGoalForm(); w.applyGoalTemplate(2); // 🧘 Meditar, 15 min por dia, +5 (a sugestão é da Pessoal)
+  ok(ev('goalListsDb.length') === 4 && ev('goalListsDb[3].name') === 'Saúde' && /^gl_\d+$/.test(ev('goalListsDb[3].id')) && secs()[3] === 'Saúde0' && lastToast() === 'Categoria criada!', 'categoria "Saúde" criada, no fim da tela');
+  // "+ Meta em Saúde" já abre a meta nova nessa categoria
+  w.openGoalForm(null, ev('goalListsDb[3].id'));
+  ok([...d.querySelectorAll('#goal-list-options button')].find((b) => b.textContent === 'Saúde').className.includes('bg-app-focus'), '"+ Meta em Saúde" abre a meta nova já na categoria Saúde');
+  w.applyGoalTemplate(2); // 🧘 Meditar, 15 min por dia, +5 (a sugestão é da Pessoal)
   w.selectGoalFormList(ev('goalListsDb[3].id'));
   $('goal-target-input').value = '25'; w.saveGoalForm();
   const med = ev("goalsDb.find((g) => g.title === 'Meditar')");
-  ok(med && med.listId === ev('goalListsDb[3].id') && med.unit === 'minutos' && med.target === 25 && med.step === 5 && /0m de 25m hoje/.test($('goals-container').textContent) && d.querySelector('#goals-container .goal-plus').textContent === '+5m', 'meta em minutos na lista nova, com o botão "+5m"');
+  ok(med && med.listId === ev('goalListsDb[3].id') && med.unit === 'minutos' && med.target === 25 && med.step === 5 && secOf(med.listId).textContent.includes('0m de 25m hoje') && secOf(med.listId).querySelector('.goal-plus').textContent === '+5m', 'meta em minutos na categoria nova, com o botão "+5m"');
+  // "+ Nova" dentro do formulário cria a categoria e já deixa escolhida
+  w.openGoalForm();
+  w.openCreateGoalList(true); $('goal-list-name-input').value = 'Casa'; w.confirmGoalListName();
+  ok(!$('goals-form-view').classList.contains('hidden') && [...d.querySelectorAll('#goal-list-options button')].find((b) => b.textContent === 'Casa').className.includes('bg-app-focus'), '"+ Nova" dentro da meta cria a categoria "Casa" e ela já fica escolhida (o formulário continua aberto)');
+  w.closeGoalForm();
+  w.openGoalListMenu(ev("goalListsDb.find((l) => l.name === 'Casa').id")); w.openDeleteGoalList();
+  ok(/Ela está vazia/.test($('goal-confirm-text').textContent), 'apagar categoria vazia: "Ela está vazia..."');
+  w.confirmGoalAction();
+  ok(!ev("goalListsDb.some((l) => l.name === 'Casa')") && lastToast() === 'Categoria apagada', 'categoria apagada');
   ok(ev("parseGoalNumber('20,5')") === 20.5 && ev("parseGoalNumber('R$ 1.234,56')") === 1234.56 && ev("parseGoalNumber('1.5')") === 1.5 && Number.isNaN(ev("parseGoalNumber('abc')")) && Number.isNaN(ev("parseGoalNumber('')")), 'números: aceita "20,5", "R$ 1.234,56" e "1.5"; recusa texto');
-  // tocar na lista aberta abre o menu; renomear
-  w.selectGoalList(ev('activeGoalListId'));
-  ok(!$('goal-list-menu-modal').classList.contains('hidden') && $('goal-list-menu-title').textContent === 'Saúde', 'tocar na lista aberta abre o menu (Renomear / Apagar)');
+  // o "⋯" do título abre o menu da categoria; renomear
+  secOf(ev('goalListsDb[3].id')).querySelector('.goal-section-menu').click();
+  ok(!$('goal-list-menu-modal').classList.contains('hidden') && $('goal-list-menu-title').textContent === 'Saúde', 'o "⋯" do título abre o menu da categoria (Renomear / Apagar)');
   w.openRenameGoalList(); $('goal-list-name-input').value = 'Saúde e corpo'; w.confirmGoalListName();
-  ok(ev('goalListsDb[3].name') === 'Saúde e corpo' && $('goal-list-menu-modal').classList.contains('hidden'), 'renomear a lista');
+  ok(ev('goalListsDb[3].name') === 'Saúde e corpo' && $('goal-list-menu-modal').classList.contains('hidden') && secs()[3] === 'Saúde e corpo1', 'renomear a categoria');
 
-  // mudar de lista: a meta vai pro fim da outra lista
+  // mudar de categoria: a meta vai pro fim da outra
   w.openGoalForm(gx); w.selectGoalFormList(ev('goalListsDb[3].id')); w.saveGoalForm();
-  ok(ev(`goalsDb[goalsDb.length - 1].id`) === gx && ev(`goalsDb.find((g) => g.id === '${gx}').listId`) === ev('goalListsDb[3].id') && ev('activeGoalListId') === ev('goalListsDb[3].id') && $('goals-container').textContent.indexOf('Meditar') < $('goals-container').textContent.indexOf('<img'), 'mudar de lista leva a meta pro fim da outra lista (e abre essa lista)');
+  ok(ev(`goalsDb[goalsDb.length - 1].id`) === gx && ev(`goalsDb.find((g) => g.id === '${gx}').listId`) === ev('goalListsDb[3].id') && secOf(ev('goalListsDb[3].id')).textContent.indexOf('Meditar') < secOf(ev('goalListsDb[3].id')).textContent.indexOf('<img'), 'mudar de categoria leva a meta pro fim da outra');
   // editar: trocar a frequência recomeça a contagem (com confirmação)
-  w.selectGoalList('gl_pessoal');
   w.openGoalForm(g1.id);
   ok($('goal-form-title').textContent === 'Editar meta' && $('goal-title-input').value === 'Beber água' && !$('goal-form-delete-btn').classList.contains('hidden') && $('goal-templates-wrap').classList.contains('hidden'), 'tocar no cartão abre "Editar meta" (com apagar, sem sugestões)');
   $('goal-target-input').value = '10'; w.saveGoalForm();
@@ -184,7 +197,7 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   ok(ev('fazDataSummary(collectFazData()).metas') === 2 && L('tb_goals_db') && L('tb_goal_lists') && L('tb_goal_days'), 'as metas entram no backup (tb_goal_lists, tb_goals_db e tb_goal_days)');
   ok(ev(`fazBackupLooksSafe({ tb_goals_db: JSON.stringify([{ id: 'meta_1', listId: "x');alert(1);('", title: 'a', target: 1, step: 1 }]) })`) === false && ev(`fazBackupLooksSafe({ tb_goal_days: JSON.stringify([{ id: 'meta_1_20261115', goalId: 'meta_1', date: '15/11', amount: 1 }]) })`) === false && ev(`fazBackupLooksSafe({ tb_goals_db: L_goals = ${JSON.stringify(L('tb_goals_db'))} })`) === true, 'backup com id malicioso ou data fora do formato nas metas é recusado; o de verdade passa');
 
-  w.selectGoalList(med.listId); w.goalBump(med.id, 1); // 5 min de meditação hoje
+  w.goalBump(med.id, 1); // 5 min de meditação hoje
   // ======================================================================================================
   console.log('\nC) Metas na nuvem (celular <-> PC):');
   server.addUser('j@t.com', 'senha123', UID);
@@ -200,10 +213,10 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   server.insert('metas', UID, { id: 'meta_pc', list_id: 'gl_profissional', title: 'Ler 📚', emoji: '📚', period: 'dia', unit: 'vezes', target: 2, step: 1, position: 1e6, created_ms: Date.now() });
   server.insert('metas_dias', UID, { id: 'meta_pc_20261115', goal_id: 'meta_pc', date: '2026-11-15', amount: 2, target: 2 });
   server.patch('metas_listas', UID, 'gl_financeiro', { name: 'Dinheiro' });
-  w.openListSheet(); w.switchListTab('goals'); w.selectGoalList('gl_profissional');
+  w.openListSheet(); w.switchListTab('goals');
   await syncDone();
   ok(ev("goalsDb.some((g) => g.id === 'meta_pc' && g.listId === 'gl_profissional')") && /Ler 📚/.test($('goals-container').textContent) && /✓ 2 de 2 hoje/.test($('goals-container').textContent), 'meta criada e cumprida no PC chegou e já aparece (✓ 2 de 2 hoje)');
-  ok(ev("goalListsDb.find((l) => l.id === 'gl_financeiro').name") === 'Dinheiro' && pillNames().some((t) => t.startsWith('Dinheiro')), 'lista renomeada no PC chegou');
+  ok(ev("goalListsDb.find((l) => l.id === 'gl_financeiro').name") === 'Dinheiro' && secs().some((x) => x.startsWith('Dinheiro')), 'categoria renomeada no PC chegou');
   ok(JSON.parse(L('tb__sync')).cursorMetasDias > 0, 'o aparelho guarda até onde já leu os dias das metas (cursorMetasDias)');
   // o celular: +1 sobe sozinho
   w.goalBump('meta_pc', 1);
@@ -219,7 +232,7 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   server.patch('metas', UID, 'meta_pc', { deleted: true });
   server.patch('metas_listas', UID, 'gl_profissional', { deleted: true });
   await syncDone();
-  ok(!ev("goalListsDb.some((l) => l.id === 'gl_profissional')") && !ev("goalsDb.some((g) => g.id === 'meta_pc')") && !ev("goalDaysDb.some((x) => x.goalId === 'meta_pc')") && ev('activeGoalListId') !== 'gl_profissional' && !pillNames().some((t) => t.startsWith('Profissional')), 'lista apagada no PC: some do celular com a meta e os dias dela; a tela volta pra outra lista');
+  ok(!ev("goalListsDb.some((l) => l.id === 'gl_profissional')") && !ev("goalsDb.some((g) => g.id === 'meta_pc')") && !ev("goalDaysDb.some((x) => x.goalId === 'meta_pc')") && !secs().some((x) => x.startsWith('Profissional')), 'categoria apagada no PC: some do celular com a meta e os dias dela');
   ok(await waitFor(() => server.get('metas_dias', UID, 'meta_pc_20261115').deleted === true), 'e o dia daquela meta também fica apagado na nuvem');
   await syncDone(); const antes = server.log.length; await syncDone();
   ok(server.log.slice(antes).filter((l) => l.op !== 'select').length === 0, 'sincronizar de novo não envia nada');

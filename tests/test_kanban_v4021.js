@@ -1,6 +1,7 @@
-// V40.21.0 — tela do PC (kanban.html): aba Metas, as mesmas do celular. Listas de metas em colunas (Pessoal,
-// Profissional e Financeiro nascem sozinhas), meta nova (com sugestões), "+" e "−", estrelas, pontos e nível,
-// editar (trocar a frequência recomeça a contagem), apagar, listas de metas, e o Assistente abrindo a meta.
+// V40.21.0 — tela do PC (kanban.html): aba Metas, as mesmas do celular. V40.23.0: uma página só, com um título por
+// categoria e os cartões em grade, como as Rotinas (Pessoal, Profissional e Financeiro nascem sozinhas). Meta nova
+// (com sugestões), "+" e "−", estrelas, pontos e nível, editar (trocar a frequência recomeça a contagem), apagar,
+// categorias, e o Assistente abrindo a meta.
 // Uso: TZ='America/Sao_Paulo' node test_kanban_v4021.js <repo> <backup.json>
 const fs = require('fs');
 const path = require('path');
@@ -47,9 +48,9 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   const click = (el) => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   const key = (el, k) => { const e = new w.KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }); el.dispatchEvent(e); return e.defaultPrevented; };
   const visible = (id) => !$(id).classList.contains('hidden');
-  const cols = () => [...d.querySelectorAll('#mt-cols section.mt-col')];
-  const colOf = (id) => d.querySelector('#mt-cols section[data-mt-col="' + id + '"]');
-  const card = (id) => d.querySelector('#mt-cols [data-goal="' + id + '"]');
+  const cols = () => [...d.querySelectorAll('#mt-sections section.mt-sec')];
+  const colOf = (id) => d.querySelector('#mt-sections section[data-mt-sec="' + id + '"]');
+  const card = (id) => d.querySelector('#mt-sections [data-goal="' + id + '"]');
   const toastTxt = () => $('toast').textContent;
   const dlgOk = async (value) => { await waitFor(() => visible('dialog')); if (value != null) $('dlg-input').value = value; click($('dlg-ok')); await sleep(30); };
   const alive = (t) => server.alive(t, UID);
@@ -64,9 +65,9 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   ok(visible('metas') && !visible('board') && $('tab-metas').classList.contains('on') && w.localStorage.getItem('faz_pc_tab') === 'metas' && !visible('zoom-ctl'), 'abre, fica lembrada e não tem zoom');
   await waitFor(() => alive('metas_listas').length === 3);
   ok(alive('metas_listas').map((r) => r.id + ':' + r.name + ':' + r.is_default).sort().join() === 'gl_financeiro:Financeiro:true,gl_pessoal:Pessoal:true,gl_profissional:Profissional:true', 'nascem Pessoal, Profissional e Financeiro na nuvem (os mesmos ids do celular)');
-  ok(cols().map((c) => c.dataset.mtCol).join() === 'gl_pessoal,gl_profissional,gl_financeiro' && !!$('mt-new-list'), 'uma coluna por lista, na ordem, e "Nova lista de metas" no fim');
+  ok(cols().map((c) => c.dataset.mtSec).join() === 'gl_pessoal,gl_profissional,gl_financeiro' && !d.querySelector('.mt-col') && visible('mt-new-cat'), 'uma página só, um título por categoria, na ordem (nada de colunas); "Nova categoria" no topo');
   ok($('mt-level-n').textContent === '1' && $('mt-level-name').textContent === 'Iniciante' && $('mt-points').textContent === '0 pontos' && $('mt-level-sub').textContent === '⭐ 0 estrelas · faltam 100 pro nível 2', 'nível 1 · Iniciante · 0 pontos · faltam 100 pro nível 2');
-  ok(colOf('gl_pessoal').textContent.includes('Nenhuma meta ainda.') && $('board-summary').textContent === 'Nenhuma meta ainda', 'colunas vazias explicam; o resumo do topo também');
+  ok(colOf('gl_pessoal').querySelector('.mt-sec-add').textContent === 'Meta em Pessoal' && /Crie sua primeira meta/.test($('mt-sections').textContent) && $('board-summary').textContent === 'Nenhuma meta ainda', 'categoria vazia tem o atalho "+ Meta em Pessoal" e a página explica o que fazer');
   await sleep(100);
   ok(alive('metas_listas').length === 3 && server.log.filter((l) => l.op === 'upsert' && l.t === 'metas_listas').length <= 1, 'redesenhar não cria as listas de novo');
 
@@ -85,9 +86,9 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   await waitFor(() => alive('metas').length === 1);
   const agua = alive('metas')[0];
   ok(!visible('modal-goal') && /^meta_\d+$/.test(agua.id) && agua.list_id === 'gl_pessoal' && agua.title === 'Beber água' && agua.emoji === '💧' && agua.period === 'dia' && agua.unit === 'vezes' && agua.target === 8 && agua.step === 1 && agua.position > 0 && toastTxt() === 'Meta criada 🎯', 'salvou na nuvem no formato do app (meta_..., Pessoal, 8 vezes por dia)');
-  ok(card(agua.id) && colOf('gl_pessoal').contains(card(agua.id)) && card(agua.id).querySelector('.mt-status').textContent === '0 de 8 hoje' && card(agua.id).querySelector('[data-mt-plus]').textContent === '+1' && !card(agua.id).querySelector('[data-mt-minus]') && card(agua.id).textContent.includes('8 vezes por dia'), 'cartão na coluna Pessoal: "0 de 8 hoje", botão +1 (sem − ainda)');
-  click(colOf('gl_financeiro').querySelector('[data-mt-add]'));
-  ok(visible('modal-goal') && $('mt-f-list').value === 'gl_financeiro', '"Nova meta" de uma coluna já vem com a lista dela');
+  ok(card(agua.id) && colOf('gl_pessoal').contains(card(agua.id)) && card(agua.id).querySelector('.mt-status').textContent === '0 de 8 hoje' && card(agua.id).querySelector('[data-mt-plus]').textContent === '+1' && !card(agua.id).querySelector('[data-mt-minus]') && card(agua.id).textContent.includes('8 vezes por dia'), 'cartão embaixo do título Pessoal: "0 de 8 hoje", botão +1 (sem − ainda)');
+  click(colOf('gl_financeiro').querySelector('.mt-sec-add'));
+  ok(visible('modal-goal') && $('mt-f-list').value === 'gl_financeiro', '"+ Meta em Financeiro" já vem com a categoria dela');
   $('mt-f-title').value = 'Reserva'; $('mt-f-emoji').value = '🏦🏦'; click(d.querySelector('#mt-f-period [data-period="mes"]')); click(d.querySelector('#mt-f-unit [data-unit="reais"]'));
   $('mt-f-target').value = '1.500,50'; $('mt-f-step').value = '100';
   key($('mt-f-step'), 'Enter');
@@ -125,7 +126,7 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   server.insert('metas_dias', UID, { id: reserva.id + '_20261110', goal_id: reserva.id, date: '2026-11-10', amount: 900, target: 1500.5 });
   ok(await waitFor(() => card(reserva.id).querySelector('.mt-status').textContent === 'R$ 900,00 de R$ 1.500,50 neste mês'), 'R$ 900 guardados no celular aparecem aqui');
   server.insert('metas', UID, { id: 'meta_cel', list_id: 'gl_profissional', title: 'Inglês <b>', emoji: '🇺🇸', period: 'semana', unit: 'minutos', target: 120, step: 30, position: 99999, created_ms: 1 });
-  ok(await waitFor(() => !!card('meta_cel')) && colOf('gl_profissional').contains(card('meta_cel')) && !d.querySelector('#mt-cols b') && card('meta_cel').textContent.includes('Inglês <b>') && card('meta_cel').querySelector('.mt-status').textContent === '0m de 2h nesta semana', 'meta criada no celular aparece na coluna dela (texto com HTML aparece como texto)');
+  ok(await waitFor(() => !!card('meta_cel')) && colOf('gl_profissional').contains(card('meta_cel')) && !d.querySelector('#mt-sections b') && card('meta_cel').textContent.includes('Inglês <b>') && card('meta_cel').querySelector('.mt-status').textContent === '0m de 2h nesta semana', 'meta criada no celular aparece na categoria dela (texto com HTML aparece como texto)');
 
   console.log('\nE) Editar:');
   click(card(agua.id));
@@ -144,7 +145,7 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   ok(row('metas', agua.id).period === 'semana' && row('metas_dias', did).deleted === true && card(agua.id).querySelector('.mt-status').textContent === '0 de 10 nesta semana' && toastTxt() === 'Meta salva. A contagem recomeçou.', 'confirmou: semanal, o que foi marcado sai (na nuvem também) e recomeça');
   click(card(agua.id)); $('mt-f-list').value = 'gl_profissional'; click($('mt-f-save'));
   await waitFor(() => row('metas', agua.id).list_id === 'gl_profissional');
-  ok(colOf('gl_profissional').contains(card(agua.id)) && row('metas', agua.id).position > row('metas', 'meta_cel').position, 'mudar de lista leva a meta pro fim da outra coluna');
+  ok(colOf('gl_profissional').contains(card(agua.id)) && row('metas', agua.id).position > row('metas', 'meta_cel').position, 'mudar de categoria leva a meta pro fim da outra');
 
   console.log('\nF) Apagar meta e listas de metas:');
   click(card(reserva.id)); click($('mt-f-delete'));
@@ -152,24 +153,24 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   ok($('dlg-title').textContent === 'Apagar a meta "Reserva"?' && $('dlg-text').textContent === 'Ela sai daqui e do celular.', 'apagar a meta pergunta antes');
   await dlgOk();
   ok(await waitFor(() => row('metas', reserva.id).deleted === true && row('metas_dias', reserva.id + '_20261110').deleted === true) && !card(reserva.id) && !visible('modal-goal'), 'meta apagada na nuvem, com o que foi marcado nela');
-  click($('mt-new-list'));
+  click($('mt-new-cat'));
   await dlgOk('Saúde');
   await waitFor(() => alive('metas_listas').length === 4);
   const saude = alive('metas_listas').find((r) => r.name === 'Saúde');
-  ok(saude && /^gl_\d+$/.test(saude.id) && saude.position > row('metas_listas', 'gl_financeiro').position && saude.is_default === false && cols().length === 4 && toastTxt() === 'Lista criada', 'lista "Saúde" criada no fim');
+  ok(saude && /^gl_\d+$/.test(saude.id) && saude.position > row('metas_listas', 'gl_financeiro').position && saude.is_default === false && cols().length === 4 && toastTxt() === 'Categoria criada' && cols()[3].dataset.mtSec === saude.id, 'categoria "Saúde" criada, no fim da página');
   click(colOf(saude.id).querySelector('[data-mt-rename]'));
   await dlgOk('Saúde e corpo');
-  ok(await waitFor(() => row('metas_listas', saude.id).name === 'Saúde e corpo') && colOf(saude.id).querySelector('h2').textContent === 'Saúde e corpo', 'renomear a lista');
-  click(colOf(saude.id).querySelector('[data-mt-add]')); click(d.querySelector('#mt-f-tpl [data-mt-tpl="2"]')); $('mt-f-list').value = saude.id; click($('mt-f-save'));
+  ok(await waitFor(() => row('metas_listas', saude.id).name === 'Saúde e corpo') && colOf(saude.id).querySelector('h2').textContent === 'Saúde e corpo', 'renomear a categoria');
+  click(colOf(saude.id).querySelector('header [data-mt-add]')); click(d.querySelector('#mt-f-tpl [data-mt-tpl="2"]')); $('mt-f-list').value = saude.id; click($('mt-f-save'));
   await waitFor(() => alive('metas').some((r) => r.title === 'Meditar'));
   const medit = alive('metas').find((r) => r.title === 'Meditar');
   click(card(medit.id).querySelector('[data-mt-plus]'));
   await waitFor(() => row('metas_dias', medit.id + '_20261116'));
   click(colOf(saude.id).querySelector('[data-mt-dellist]'));
   await waitFor(() => visible('dialog'));
-  ok($('dlg-title').textContent === 'Apagar a lista "Saúde e corpo"?' && $('dlg-text').textContent === 'A meta dela também será apagada, aqui e no celular.', 'apagar a lista avisa que a meta dela vai junto');
+  ok($('dlg-title').textContent === 'Apagar a categoria "Saúde e corpo"?' && $('dlg-text').textContent === 'A meta dela também será apagada, aqui e no celular.', 'apagar a categoria avisa que a meta dela vai junto');
   await dlgOk();
-  ok(await waitFor(() => row('metas_listas', saude.id).deleted === true && row('metas', medit.id).deleted === true && row('metas_dias', medit.id + '_20261116').deleted === true) && !colOf(saude.id) && toastTxt() === 'Lista apagada', 'lista, meta e o que foi marcado: apagados na nuvem');
+  ok(await waitFor(() => row('metas_listas', saude.id).deleted === true && row('metas', medit.id).deleted === true && row('metas_dias', medit.id + '_20261116').deleted === true) && !colOf(saude.id) && toastTxt() === 'Categoria apagada', 'categoria, meta e o que foi marcado: apagados na nuvem');
 
   console.log('\nG) O Assistente fala das metas e abre a meta:');
   click($('tab-assistente'));
@@ -181,13 +182,13 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   key(d.body, 'Escape');
 
   console.log('\nH) Teclado e cuidados:');
-  ok(key(d.body, 'ArrowRight') === true && visible('metas'), 'setas ← → rolam as colunas das metas');
+  ok(key(d.body, 'ArrowRight') === false && visible('metas'), 'setas ← → não fazem nada nas Metas (não tem mais colunas pra rolar)');
   server.patch('metas_listas', UID, 'gl_profissional', { deleted: true });
   server.patch('metas_listas', UID, 'gl_financeiro', { deleted: true });
   await waitFor(() => cols().length === 1);
-  ok(cols().length === 1 && colOf('gl_pessoal').contains(card(agua.id)) && colOf('gl_pessoal').contains(card('meta_cel')), 'lista apagada no celular: as metas dela aparecem na primeira lista (nada some)');
+  ok(cols().length === 1 && colOf('gl_pessoal').contains(card(agua.id)) && colOf('gl_pessoal').contains(card('meta_cel')), 'categoria apagada no celular: as metas dela aparecem na primeira categoria (nada some)');
   click(colOf('gl_pessoal').querySelector('[data-mt-dellist]'));
-  ok(!visible('dialog') && toastTxt() === 'Precisa ter pelo menos uma lista de metas.', 'a última lista não pode ser apagada');
+  ok(!visible('dialog') && toastTxt() === 'Precisa ter pelo menos uma categoria.', 'a última categoria não pode ser apagada');
   ok(errors.length === 0, 'nenhum erro de página' + (errors.length ? ': ' + errors[0].slice(0, 300) : ''));
 
   console.log(`\n==== RESULTADO: ${pass} passaram, ${fail} falharam ====`);

@@ -6,7 +6,7 @@
  * Núcleo puro (não mexe na tela nem no localStorage). Testável em Node.
  *
  * Formato que as telas entregam:
- *   lista { id, name }
+ *   lista { id, name }   (na tela, desde a V40.23.0, se chama "categoria": Pessoal, Profissional, Financeiro...)
  *   meta  { id, listId, title, emoji, period 'dia'|'semana'|'mes', unit 'vezes'|'minutos'|'reais', target, step }
  *   dia   { id, goalId, date 'YYYY-MM-DD', amount, target }
  *         o quanto foi feito naquele dia; id = <meta>_<AAAAMMDD>; target = o alvo da meta quando foi marcado

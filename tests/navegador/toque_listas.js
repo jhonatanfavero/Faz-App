@@ -242,9 +242,9 @@ const { abrir } = require('./apoio');
   await m.tap('#btn-list-goals'); await m.waitForTimeout(350);
   const mt0 = await m.evaluate(() => {
     const v = document.getElementById('view-goals'), lv = document.getElementById('goals-level').getBoundingClientRect(), nb = [...v.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Nova meta').getBoundingClientRect();
-    return { aberta: !v.classList.contains('hidden'), listas: [...document.querySelectorAll('#goals-lists button')].map((b) => b.textContent.trim()), nivel: document.getElementById('goals-level-name').textContent, nivelNaTela: lv.top >= 0 && lv.bottom < innerHeight, botao: nb.bottom <= innerHeight && nb.top > lv.bottom };
+    return { aberta: !v.classList.contains('hidden'), listas: [...document.querySelectorAll('#goals-container .goal-section h3')].map((b) => b.textContent.trim()), nivel: document.getElementById('goals-level-name').textContent, nivelNaTela: lv.top >= 0 && lv.bottom < innerHeight, botao: nb.bottom <= innerHeight && nb.top > lv.bottom };
   });
-  ok(mt0.aberta && mt0.listas.join('|') === 'Pessoal0|Profissional0|Financeiro0|Lista' && mt0.nivel === 'Iniciante' && mt0.nivelNaTela && mt0.botao, 'abre com o nível em cima, as listas Pessoal, Profissional e Financeiro e o "Nova meta" embaixo, à vista');
+  ok(mt0.aberta && mt0.listas.join('|') === 'Pessoal|Profissional|Financeiro' && mt0.nivel === 'Iniciante' && mt0.nivelNaTela && mt0.botao, 'abre com o nível em cima, uma tela só com as categorias Pessoal, Profissional e Financeiro e o "Nova meta" embaixo, à vista');
   await m.tap('#goals-list-view > button'); await m.waitForTimeout(300);
   await m.tap('#goal-templates button:has-text("Beber água")'); await m.waitForTimeout(150);
   const form = await m.evaluate(() => { const b = document.querySelector('#goals-form-view .ios-safe-bottom button').getBoundingClientRect(); return { nome: document.getElementById('goal-title-input').value, salvarNaTela: b.bottom <= innerHeight && b.top > 0, sugestoesRolam: document.getElementById('goal-templates').scrollWidth > document.getElementById('goal-templates').clientWidth }; });

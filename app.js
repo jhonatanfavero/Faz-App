@@ -2141,7 +2141,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.22.0',
+            version: 'v40.23.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -3670,7 +3670,9 @@ window.assistantRestart = function() {
 let goalListsDb = fazLoadList('tb_goal_lists', []);
 let goalsDb = fazLoadList('tb_goals_db', []);
 let goalDaysDb = fazLoadList('tb_goal_days', []);
-let activeGoalListId = null; // lista aberta na aba Metas
+let activeGoalListId = null; // V40.23.0: última categoria usada (a meta nova já vem nela)
+let goalListMenuId = null;   // categoria com o menu (Renomear / Apagar) aberto
+let goalListNameFromForm = false; // "+ Nova" dentro do formulário da meta: a categoria criada já fica escolhida
 let goalEditId = null;       // meta aberta no formulário (null = nova)
 let goalForm = null;         // { listId, period, unit, stepTouched, targetTouched }
 let goalListNameMode = null; // 'create' | 'rename'
@@ -3703,13 +3705,27 @@ function goalTodayAmount(goalId) {
     return d ? Number(d.amount) || 0 : 0;
 }
 
+function goalCardHtml(g, x, M) {
+    const done = x.complete, id = goalJsId(g.id), badges = [];
+    if (x.streak) badges.push('🔥 ' + x.streak);
+    if (x.stars) badges.push('⭐ ' + x.stars);
+    const minus = goalTodayAmount(g.id) > 0
+        ? `<button type="button" onclick="goalBump('${id}', -1)" aria-label="Desfazer o último +" class="w-8 h-9 rounded-xl text-zinc-400 hover:bg-zinc-100 flex items-center justify-center active:scale-90 transition"><i class="ph-bold ph-minus text-sm"></i></button>` : '';
+    return `<div class="bg-white border ${done ? 'border-emerald-200' : 'border-zinc-200'} rounded-2xl p-3 mb-2.5 shadow-sm flex items-center gap-2" data-goal="${escapeHtml(g.id)}">` +
+        `<button type="button" onclick="openGoalForm('${id}')" class="flex-1 min-w-0 flex items-center gap-3 text-left">` +
+        `<span class="w-10 h-10 rounded-xl ${done ? 'bg-emerald-50' : 'bg-zinc-100'} flex items-center justify-center text-xl shrink-0">${escapeHtml(g.emoji || '🎯')}</span>` +
+        `<span class="min-w-0 flex-1"><span class="block text-sm font-bold text-zinc-800 truncate">${escapeHtml(g.title || 'Sem nome')}</span>` +
+        `<span class="goal-status block text-[11px] ${done ? 'text-emerald-600 font-bold' : 'text-zinc-500'} truncate">${done ? '✓ ' : ''}${escapeHtml(x.text)}${badges.length ? ' · ' + badges.join(' · ') : ''}</span>` +
+        `<span class="block mt-1.5 h-1.5 rounded-full bg-zinc-100 overflow-hidden"><span class="block h-full rounded-full ${done ? 'bg-emerald-500' : 'bg-app-focus'}" style="width:${Math.round(x.pct * 100)}%"></span></span></span></button>` +
+        `<div class="flex items-center gap-0.5 shrink-0">${minus}<button type="button" onclick="goalBump('${id}', 1)" class="goal-plus h-9 min-w-[44px] px-2.5 rounded-xl ${done ? 'bg-emerald-500' : 'bg-app-focus'} text-white text-xs font-bold active:scale-95 transition">${escapeHtml(M.addLabel(g))}</button></div></div>`;
+}
+// V40.23.0: uma lista só, com um título por categoria (como as Rotinas: nada de pílulas nem colunas)
 window.renderGoals = function() {
     const wrap = document.getElementById('goals-container');
     if (!wrap) return;
     const M = window.FazMetas;
     if (!M) { wrap.innerHTML = '<p class="text-sm text-zinc-500 py-6 text-center">Não consegui abrir as metas. Feche e abra o app de novo.</p>'; return; }
     ensureGoalLists();
-    if (!goalListsDb.some(l => l.id === activeGoalListId)) activeGoalListId = goalListsDb[0].id;
     const now = new Date(), sum = M.summary(goalsDb, goalDaysDb, now), st = {};
     sum.statuses.forEach(x => { st[x.goal.id] = x; });
 
@@ -3723,42 +3739,23 @@ window.renderGoals = function() {
     sub.push('faltam ' + sum.toNext + ' pro nível ' + (sum.level + 1));
     document.getElementById('goals-level-sub').textContent = sub.join(' · ');
 
-    // listas (tocar na lista aberta abre o menu dela)
-    const count = {};
-    goalsDb.forEach(g => { const l = M.listOf(g, goalListsDb); count[l] = (count[l] || 0) + 1; });
-    document.getElementById('goals-lists').innerHTML = goalListsDb.map(l => {
-        const on = l.id === activeGoalListId, id = goalJsId(l.id);
-        return `<button type="button" onclick="selectGoalList('${id}')" class="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border transition active:scale-95 ${on ? 'bg-app-focus text-white border-app-focus' : 'bg-white text-zinc-600 border-zinc-200'}">${escapeHtml(l.name || 'Sem nome')}<span class="${on ? 'text-white/80' : 'text-zinc-400'}">${count[l.id] || 0}</span>${on ? '<i class="ph-bold ph-dots-three text-sm"></i>' : ''}</button>`;
-    }).join('') + `<button type="button" onclick="openCreateGoalList()" class="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border border-dashed border-zinc-300 text-zinc-500 active:scale-95 transition"><i class="ph ph-plus"></i> Lista</button>`;
-
-    // metas da lista aberta
-    const list = goalListsDb.find(l => l.id === activeGoalListId);
-    const goals = goalsDb.filter(g => M.listOf(g, goalListsDb) === activeGoalListId);
-    if (!goals.length) {
-        wrap.innerHTML = `<div class="text-center py-10 px-4"><div class="w-14 h-14 rounded-2xl bg-zinc-100 text-zinc-400 flex items-center justify-center mx-auto mb-3"><i class="ph ph-target text-3xl"></i></div>` +
-            `<p class="text-sm font-bold text-zinc-600">Nenhuma meta em ${escapeHtml(list ? list.name : '')} ainda</p>` +
-            `<p class="text-xs text-zinc-500 mt-1 leading-relaxed">Toque em <b>Nova meta</b>. Ex.: beber água, correr, meditar, ler, guardar dinheiro...</p></div>`;
-        return;
-    }
-    wrap.innerHTML = goals.map(g => {
-        const x = st[g.id], done = x.complete, id = goalJsId(g.id), badges = [];
-        if (x.streak) badges.push('🔥 ' + x.streak);
-        if (x.stars) badges.push('⭐ ' + x.stars);
-        const minus = goalTodayAmount(g.id) > 0
-            ? `<button type="button" onclick="goalBump('${id}', -1)" aria-label="Desfazer o último +" class="w-8 h-9 rounded-xl text-zinc-400 hover:bg-zinc-100 flex items-center justify-center active:scale-90 transition"><i class="ph-bold ph-minus text-sm"></i></button>` : '';
-        return `<div class="bg-white border ${done ? 'border-emerald-200' : 'border-zinc-200'} rounded-2xl p-3 mb-2.5 shadow-sm flex items-center gap-2" data-goal="${escapeHtml(g.id)}">` +
-            `<button type="button" onclick="openGoalForm('${id}')" class="flex-1 min-w-0 flex items-center gap-3 text-left">` +
-            `<span class="w-10 h-10 rounded-xl ${done ? 'bg-emerald-50' : 'bg-zinc-100'} flex items-center justify-center text-xl shrink-0">${escapeHtml(g.emoji || '🎯')}</span>` +
-            `<span class="min-w-0 flex-1"><span class="block text-sm font-bold text-zinc-800 truncate">${escapeHtml(g.title || 'Sem nome')}</span>` +
-            `<span class="goal-status block text-[11px] ${done ? 'text-emerald-600 font-bold' : 'text-zinc-500'} truncate">${done ? '✓ ' : ''}${escapeHtml(x.text)}${badges.length ? ' · ' + badges.join(' · ') : ''}</span>` +
-            `<span class="block mt-1.5 h-1.5 rounded-full bg-zinc-100 overflow-hidden"><span class="block h-full rounded-full ${done ? 'bg-emerald-500' : 'bg-app-focus'}" style="width:${Math.round(x.pct * 100)}%"></span></span></span></button>` +
-            `<div class="flex items-center gap-0.5 shrink-0">${minus}<button type="button" onclick="goalBump('${id}', 1)" class="goal-plus h-9 min-w-[44px] px-2.5 rounded-xl ${done ? 'bg-emerald-500' : 'bg-app-focus'} text-white text-xs font-bold active:scale-95 transition">${escapeHtml(M.addLabel(g))}</button></div></div>`;
-    }).join('');
-};
-window.selectGoalList = function(id) {
-    if (id === activeGoalListId) return openGoalListMenu();
-    activeGoalListId = id;
-    renderGoals();
+    // as metas de cada categoria, na ordem das categorias
+    const by = {};
+    goalListsDb.forEach(l => { by[l.id] = []; });
+    goalsDb.forEach(g => { const l = M.listOf(g, goalListsDb); if (l) by[l].push(g); });
+    let html = goalsDb.length ? '' : `<p class="text-xs text-zinc-500 leading-relaxed px-1 pb-1">Crie sua primeira meta: beber água, correr, meditar, ler, guardar dinheiro... Toque no <b>+</b> dela quando fizer e ganhe ⭐ estrelas e pontos.</p>`;
+    goalListsDb.forEach(l => {
+        const goals = by[l.id], id = goalJsId(l.id), name = escapeHtml(l.name || 'Sem nome');
+        html += `<section class="goal-section" data-goal-list="${escapeHtml(l.id)}">` +
+            `<div class="flex items-center gap-2 px-1 pt-3 pb-2"><h3 class="min-w-0 truncate text-[11px] font-bold uppercase tracking-wider text-zinc-500">${name}</h3>` +
+            `<span class="text-[11px] font-bold text-zinc-400">${goals.length}</span>` +
+            `<button type="button" onclick="openGoalListMenu('${id}')" aria-label="Opções da categoria ${name}" class="goal-section-menu ml-auto w-8 h-8 -mr-1 flex items-center justify-center text-zinc-400 hover:text-zinc-700 rounded-lg active:scale-90 transition"><i class="ph-bold ph-dots-three text-base"></i></button></div>` +
+            (goals.length ? goals.map(g => goalCardHtml(g, st[g.id], M)).join('')
+                : `<button type="button" onclick="openGoalForm(null, '${id}')" class="goal-section-add w-full mb-2.5 py-3 rounded-2xl border-2 border-dashed border-zinc-200 text-zinc-400 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] transition"><i class="ph ph-plus"></i> Meta em ${name}</button>`) +
+            `</section>`;
+    });
+    html += `<button type="button" onclick="openCreateGoalList()" class="goal-new-cat mt-1 mb-2 mx-auto flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-zinc-500 hover:bg-zinc-100 active:scale-95 transition"><i class="ph ph-folder-plus text-sm"></i> Nova categoria</button>`;
+    wrap.innerHTML = html;
 };
 // "+" (ou "−") na meta: soma no dia de hoje. Cumpriu? Estrela e pontos (e às vezes um nível novo).
 window.goalBump = function(id, dir) {
@@ -3791,14 +3788,14 @@ function goalFormUi() {
     document.getElementById('goal-list-options').innerHTML = goalListsDb.map(l => {
         const on = l.id === f.listId;
         return `<button type="button" onclick="selectGoalFormList('${goalJsId(l.id)}')" class="px-3 py-2 rounded-lg border text-xs font-bold transition active:scale-95 ${on ? 'bg-app-focus text-white border-app-focus' : 'bg-zinc-50 text-zinc-600 border-zinc-200'}">${escapeHtml(l.name || 'Sem nome')}</button>`;
-    }).join('');
+    }).join('') + `<button type="button" onclick="openCreateGoalList(true)" class="px-3 py-2 rounded-lg border border-dashed border-zinc-300 text-xs font-bold text-zinc-500 transition active:scale-95"><i class="ph ph-plus"></i> Nova</button>`;
     const per = M.PERIODS[f.period].per, unit = f.unit;
     document.getElementById('goal-target-suffix').textContent = (unit === 'vezes' ? 'vezes ' : unit === 'minutos' ? 'minutos ' : 'reais ') + per;
     document.getElementById('goal-step-suffix').textContent = unit === 'vezes' ? 'vez(es) por toque' : unit === 'minutos' ? 'minutos por toque' : 'reais por toque';
     const pts = M.PERIODS[f.period].points;
     document.getElementById('goal-points-info').innerHTML = `<i class="ph-fill ph-star text-amber-400"></i> Cada ${f.period === 'dia' ? 'dia' : f.period === 'semana' ? 'semana' : 'mês'} cumprido vale uma estrela e <b>${pts} pontos</b>.`;
 }
-window.openGoalForm = function(id) {
+window.openGoalForm = function(id, listId) {
     const M = window.FazMetas;
     if (!M) return;
     ensureGoalLists();
@@ -3807,7 +3804,7 @@ window.openGoalForm = function(id) {
     goalEditId = g ? g.id : null;
     const n = g ? M.normalize(g) : null;
     goalForm = {
-        listId: g ? M.listOf(g, goalListsDb) : (goalListsDb.some(l => l.id === activeGoalListId) ? activeGoalListId : goalListsDb[0].id),
+        listId: g ? M.listOf(g, goalListsDb) : [listId, activeGoalListId].find(x => goalListsDb.some(l => l.id === x)) || goalListsDb[0].id, // V40.23.0: a categoria tocada, ou a última usada
         period: n ? n.period : 'dia', unit: n ? n.unit : 'vezes', stepTouched: !!g, targetTouched: !!g
     }; // "touched": alvo/passo que a pessoa já escolheu (editando, sugestão ou digitando) não mudam ao trocar a medida
     document.getElementById('goal-form-title').textContent = g ? 'Editar meta' : 'Nova meta';
@@ -3913,57 +3910,62 @@ window.deleteGoalFromForm = function() {
         });
 };
 
-// ---------- listas de metas ----------
-function openGoalListMenu() {
-    const l = goalListsDb.find(x => x.id === activeGoalListId);
+// ---------- categorias das metas (V40.23.0: o que era "lista"; os dados continuam os mesmos) ----------
+window.openGoalListMenu = function(id) {
+    const l = goalListsDb.find(x => x.id === id);
     if (!l) return;
-    document.getElementById('goal-list-menu-title').textContent = l.name || 'Lista';
+    goalListMenuId = l.id;
+    document.getElementById('goal-list-menu-title').textContent = l.name || 'Categoria';
     showModal('goal-list-menu-modal');
-}
-window.openCreateGoalList = function() {
+};
+window.openCreateGoalList = function(fromForm) {
     goalListNameMode = 'create';
-    document.getElementById('goal-list-name-title').textContent = 'Nova lista de metas';
+    goalListNameFromForm = fromForm === true;
+    document.getElementById('goal-list-name-title').textContent = 'Nova categoria';
     document.getElementById('goal-list-name-input').value = '';
     showModal('goal-list-name-modal');
 };
 window.openRenameGoalList = function() {
-    const l = goalListsDb.find(x => x.id === activeGoalListId);
-    if (!l) return;
+    const l = goalListsDb.find(x => x.id === goalListMenuId);
     hideModal('goal-list-menu-modal');
+    if (!l) return;
     goalListNameMode = 'rename';
-    document.getElementById('goal-list-name-title').textContent = 'Renomear lista';
+    goalListNameFromForm = false;
+    document.getElementById('goal-list-name-title').textContent = 'Renomear categoria';
     document.getElementById('goal-list-name-input').value = l.name || '';
     showModal('goal-list-name-modal');
 };
 window.confirmGoalListName = function() {
     const name = document.getElementById('goal-list-name-input').value.trim();
-    if (!name) return showToast('Dê um nome pra lista.');
+    if (!name) return showToast('Dê um nome pra categoria.');
     if (name.length > 30) return showToast('Nome muito longo (máx 30).');
     if (goalListNameMode === 'create') {
         const l = { id: newGoalId('gl_', goalListsDb), name: name, isDefault: false, createdAt: Date.now() };
         goalListsDb.push(l);
         activeGoalListId = l.id;
-        showToast('Lista criada!');
+        if (goalListNameFromForm && goalForm) { goalForm.listId = l.id; goalFormUi(); } // criada de dentro da meta: já fica escolhida
+        showToast('Categoria criada!');
     } else {
-        const l = goalListsDb.find(x => x.id === activeGoalListId);
+        const l = goalListsDb.find(x => x.id === goalListMenuId);
         if (l) l.name = name;
-        showToast('Lista renomeada!');
+        showToast('Categoria renomeada!');
     }
+    goalListNameFromForm = false;
     saveGoalLists();
     hideModal('goal-list-name-modal');
     renderGoals();
 };
 window.openDeleteGoalList = function() {
-    const M = window.FazMetas, l = goalListsDb.find(x => x.id === activeGoalListId);
+    const M = window.FazMetas, l = goalListsDb.find(x => x.id === goalListMenuId);
     hideModal('goal-list-menu-modal');
     if (!M || !l) return;
-    if (goalListsDb.length <= 1) return showToast('Precisa ter pelo menos uma lista de metas.');
+    if (goalListsDb.length <= 1) return showToast('Precisa ter pelo menos uma categoria.');
     const goals = goalsDb.filter(g => M.listOf(g, goalListsDb) === l.id);
     const stars = goals.reduce((a, g) => a + M.status(g, goalDaysDb, new Date()).stars, 0);
-    askGoalConfirm('Apagar a lista "' + (l.name || 'Sem nome') + '"?',
-        !goals.length ? 'A lista está vazia. Ela some aqui e no computador.'
+    askGoalConfirm('Apagar a categoria "' + (l.name || 'Sem nome') + '"?',
+        !goals.length ? 'Ela está vazia. Some aqui e no computador.'
             : (goals.length === 1 ? 'A meta dela também será apagada' : 'As ' + goals.length + ' metas dela também serão apagadas') + (stars ? ' (e as ⭐ ' + stars + ' saem da pontuação)' : '') + ', aqui e no computador.',
-        'Apagar lista', () => {
+        'Apagar categoria', () => {
             const ids = {};
             goals.forEach(g => { ids[g.id] = true; });
             goalsDb = goalsDb.filter(g => !ids[g.id]);
@@ -3972,9 +3974,9 @@ window.openDeleteGoalList = function() {
             saveGoals();
             saveGoalDays();
             saveGoalLists();
-            activeGoalListId = goalListsDb[0].id;
+            if (activeGoalListId === l.id) activeGoalListId = null;
             renderGoals();
-            showToast('Lista apagada');
+            showToast('Categoria apagada');
         });
 };
 

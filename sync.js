@@ -28,6 +28,11 @@
  *   Tarefas e blocos têm 'color' (cor livre) e 'archived'. V40.9.0: arquivado sai de
  *   backlogDb/db e fica em tb_archive_db; no sync é uma linha normal com archived = true.
  *
+ * V40.17.0 — ROTINAS (tb_routines_db), NOTAS (tb_notes_db) e FINANÇAS (tb_financial_db) entram
+ *   no mesmo merge, nos 2 sentidos. Não têm "position": rotinas e notas ficam das mais novas pras
+ *   mais antigas (como o app mostra); finanças mantêm a ordem do aparelho (o app ordena por
+ *   vencimento). Quem já sincronizava sobe essas três na primeira rodada, sem reenviar o resto.
+ *
  * Estado interno em 'tb__sync' (prefixo tb__ = interno: fica FORA do backup e
  * o Restaurar não apaga). Sessão do Supabase fica em 'sb-<ref>-auth-token'.
  *
@@ -43,18 +48,25 @@
 
     var DEFAULT_COL = 'col_geral';
     var STEP = 1024;
-    var KINDS = ['listas', 'tags', 'tarefas', 'blocos'];
+    var KINDS = ['listas', 'tags', 'tarefas', 'blocos', 'rotinas', 'notas', 'financas'];
     // listas/tags/tarefas têm ordem própria (position); blocos se ordenam por dia e horário.
-    var ORDERED = { listas: true, tags: true, tarefas: true, blocos: false };
+    // V40.17.0: rotinas e notas, das mais novas pras mais antigas; finanças, na ordem do aparelho.
+    var ORDERED = { listas: true, tags: true, tarefas: true, blocos: false, rotinas: false, notas: false, financas: false };
+    var NEWEST_FIRST = { rotinas: true, notas: true };
     var FIELDS = {
         tarefas: ['column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived'],
         listas: ['name', 'is_default', 'position', 'created_ms'],
         tags: ['name', 'color', 'position'],
-        blocos: ['date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived']
+        blocos: ['date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived'],
+        rotinas: ['title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms'],
+        notas: ['title', 'content', 'created_ms', 'updated_ms'],
+        financas: ['title', 'amount', 'start_month', 'duration_months', 'is_recurring', 'due_day', 'tag_id', 'paid_months', 'amount_overrides', 'created_ms']
     };
-    var FIELD_DEFAULTS = { archived: false, completed: false, was_delayed: false, is_default: false, microblocks: [], linked_note_ids: [] };
+    var FIELD_DEFAULTS = { archived: false, completed: false, was_delayed: false, is_default: false, microblocks: [], linked_note_ids: [], is_recurring: false, paid_months: [], amount_overrides: {} };
     // Campos estruturais entram em atributos/handlers do HTML do app: só passam nestes formatos.
     var SAFE_ID = /^[\w.\-]{1,64}$/, HEX = /^#[0-9a-fA-F]{3,8}$/, HEX6 = /^#[0-9a-fA-F]{6}$/, WORD = /^[a-z_]{1,32}$/;
+    var MONTH = /^\d{4}-(0[1-9]|1[0-2])$/; // 'YYYY-MM' (mês das finanças)
+    var MAX_AMOUNT = 1e12;                 // mesmo limite do CHECK de financas.amount
     // Tags que o app cria sozinho num aparelho novo (app.js, tagsDb vazio).
     var DEFAULT_TAGS = {
         tag_1: ['Trabalho', '#ef4444'],
@@ -74,13 +86,50 @@
     function clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
     function num(v, def) { var n = Number(v); return Number.isFinite(n) ? n : def; }
     function clampInt(v, def, lo, hi) { var n = Math.round(num(v, def)); return Math.min(hi, Math.max(lo, n)); }
-    function str(v, max) { var s = v == null ? '' : String(v); return max ? s.slice(0, max) : s; }
+    function str(v, max) { // V40.17.0: não corta um emoji (par de surrogates) ao meio
+        var s = v == null ? '' : String(v);
+        if (!max || s.length <= max) return s;
+        var c = s.charCodeAt(max - 1);
+        return s.slice(0, c >= 0xD800 && c <= 0xDBFF ? max - 1 : max);
+    }
+    function msOrNull(v) { var n = Number(v); return v != null && v !== '' && Number.isFinite(n) ? Math.round(n) : null; }
+    function money(v) { var n = num(v, 0); return Math.abs(n) <= MAX_AMOUNT ? n : 0; }
+    function dueDay(v) { var n = Number(v); return v != null && v !== '' && Number.isInteger(n) && n >= 1 && n <= 31 ? n : null; }
+    function cleanMonths(a) { // meses pagos: só 'YYYY-MM', sem repetir, na ordem em que estão
+        var seen = {};
+        return (Array.isArray(a) ? a : []).map(String).filter(function (m) {
+            if (!MONTH.test(m) || seen[m]) return false;
+            seen[m] = true;
+            return true;
+        });
+    }
+    // Valor de um mês específico: { 'YYYY-MM': { amount: n } }. Aceita também { 'YYYY-MM': n } (formato
+    // visto em dados antigos) e grava sempre no formato que o app lê (getAmountInMonth usa .amount).
+    function cleanOverrides(o) {
+        var out = {};
+        if (!o || typeof o !== 'object' || Array.isArray(o)) return out;
+        Object.keys(o).sort().forEach(function (m) {
+            var v = o[m];
+            if (!MONTH.test(m) || v == null) return;
+            var a = typeof v === 'object' ? v.amount : v;
+            if ((typeof a !== 'number' && typeof a !== 'string') || a === '') return;
+            a = Number(a);
+            if (Number.isFinite(a) && Math.abs(a) <= MAX_AMOUNT) out[m] = { amount: a };
+        });
+        return out;
+    }
     function hex6(c) { return HEX6.test(String(c || '')) ? String(c) : null; }
     function byPos(a, b) {
         return (a.position - b.position) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     }
     function byDay(a, b) {
         return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.start_min - b.start_min) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    }
+    function byNewest(a, b) {
+        return ((Number(b.created_ms) || 0) - (Number(a.created_ms) || 0)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    }
+    function byCreated(a, b) {
+        return ((Number(a.created_ms) || 0) - (Number(b.created_ms) || 0)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     }
     function validDate(s) { // data de calendário real (2026-02-30 não passa)
         if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
@@ -186,6 +235,91 @@
                 delete b.__archived;
                 return b;
             }
+        },
+        // V40.17.0: rotinas (tb_routines_db). microblocks = itens da checklist ({ title }).
+        rotinas: {
+            row: function (x) {
+                var theme = String(x.theme || 'focus');
+                return {
+                    id: String(x.id),
+                    title: str(x.title, 200),
+                    emoji: str(x.emoji, 16),
+                    duration: clampInt(x.duration, 60, 0, 1440),
+                    theme: WORD.test(theme) ? theme : 'focus',
+                    tag_id: x.tagId ? String(x.tagId) : null,
+                    microblocks: Array.isArray(x.microblocks) ? clone(x.microblocks) : [],
+                    created_ms: msOrNull(x.createdAt)
+                };
+            },
+            item: function (r, prev) {
+                var x = prev ? Object.assign({}, prev) : { id: r.id };
+                x.title = r.title;
+                x.emoji = r.emoji;
+                x.duration = r.duration;
+                x.theme = r.theme;
+                x.tagId = r.tag_id || null;
+                x.microblocks = clone(r.microblocks || []);
+                x.createdAt = r.created_ms != null ? Number(r.created_ms) : (prev && prev.createdAt) || 0;
+                return x;
+            }
+        },
+        // V40.17.0: notas (tb_notes_db). O vínculo com a agenda mora no bloco (linked_note_ids).
+        notas: {
+            row: function (n) {
+                return {
+                    id: String(n.id),
+                    title: str(n.title, 500),
+                    content: str(n.content, 100000),
+                    created_ms: msOrNull(n.createdAt),
+                    updated_ms: msOrNull(n.updatedAt)
+                };
+            },
+            item: function (r, prev) {
+                var n = prev ? Object.assign({}, prev) : { id: r.id };
+                n.title = r.title;
+                n.content = r.content;
+                n.createdAt = r.created_ms != null ? Number(r.created_ms) : (prev && prev.createdAt) || 0;
+                if (r.updated_ms != null) n.updatedAt = Number(r.updated_ms); else delete n.updatedAt;
+                return n;
+            }
+        },
+        // V40.17.0: despesas (tb_financial_db). Item antigo (V40.4.1–3) tem 'month' e 'paid': viram
+        // startMonth e paidMonths, que é o que o app lê primeiro (getItemStartMonth / isPaidInMonth).
+        financas: {
+            row: function (f) {
+                var start = String(f.startMonth || f.month || '');
+                if (!MONTH.test(start)) return null; // sem mês de início válido não sincroniza (fica só no aparelho)
+                return {
+                    id: String(f.id),
+                    title: str(f.title, 200),
+                    amount: money(f.amount),
+                    start_month: start,
+                    duration_months: clampInt(f.durationMonths, 1, 1, 1200),
+                    is_recurring: !!f.isRecurring,
+                    due_day: dueDay(f.dueDay),
+                    tag_id: f.tagId ? String(f.tagId) : null,
+                    paid_months: cleanMonths(Array.isArray(f.paidMonths) ? f.paidMonths : (f.paid === true ? [start] : [])),
+                    amount_overrides: cleanOverrides(f.paidMonthsOverrides),
+                    created_ms: msOrNull(f.createdAt)
+                };
+            },
+            item: function (r, prev) {
+                var f = prev ? Object.assign({}, prev) : { id: r.id };
+                f.title = r.title;
+                f.amount = r.amount;
+                f.startMonth = r.start_month;
+                delete f.month;
+                f.durationMonths = r.duration_months;
+                f.isRecurring = !!r.is_recurring;
+                f.dueDay = r.due_day != null ? r.due_day : null;
+                f.tagId = r.tag_id || null;
+                f.paidMonths = clone(r.paid_months || []);
+                delete f.paid;
+                if (r.amount_overrides && Object.keys(r.amount_overrides).length) f.paidMonthsOverrides = clone(r.amount_overrides);
+                else delete f.paidMonthsOverrides;
+                f.createdAt = r.created_ms != null ? Number(r.created_ms) : (prev && prev.createdAt) || 0;
+                return f;
+            }
         }
     };
 
@@ -228,6 +362,30 @@
                 if (!WORD.test(String(c.type))) c.type = 'focus';
                 if (!WORD.test(String(c.theme))) c.theme = 'focus';
                 c.linked_note_ids = (Array.isArray(c.linked_note_ids) ? c.linked_note_ids : []).filter(function (x) { return typeof x === 'string' && SAFE_ID.test(x); });
+            }
+            if (kind === 'rotinas') {
+                c.title = str(c.title, 200);
+                c.emoji = str(c.emoji, 16);
+                c.duration = clampInt(c.duration, 60, 0, 1440);
+                if (!WORD.test(String(c.theme))) c.theme = 'focus';
+                c.created_ms = msOrNull(c.created_ms);
+            }
+            if (kind === 'notas') {
+                c.title = str(c.title, 500);
+                c.content = str(c.content, 100000);
+                c.created_ms = msOrNull(c.created_ms);
+                c.updated_ms = msOrNull(c.updated_ms);
+            }
+            if (kind === 'financas') {
+                if (!MONTH.test(String(c.start_month))) return;
+                c.title = str(c.title, 200);
+                c.amount = money(c.amount);
+                c.duration_months = clampInt(c.duration_months, 1, 1, 1200);
+                c.is_recurring = !!c.is_recurring;
+                c.due_day = dueDay(c.due_day);
+                c.paid_months = cleanMonths(c.paid_months);
+                c.amount_overrides = cleanOverrides(c.amount_overrides);
+                c.created_ms = msOrNull(c.created_ms);
             }
             out[c.id] = c;
         });
@@ -432,6 +590,13 @@
             if (!aliveCols[r.column_id]) { r.column_id = DEFAULT_COL; repaired++; }
             if (r.tag_id && !aliveTags[r.tag_id]) { r.tag_id = null; repaired++; }
         });
+        // V40.17.0: rotina ou despesa com tag apagada fica sem tag (igual à tarefa)
+        ['rotinas', 'financas'].forEach(function (k) {
+            Object.keys(merged[k]).forEach(function (id) {
+                var r = merged[k][id];
+                if (!r.deleted && r.tag_id && !aliveTags[r.tag_id]) { r.tag_id = null; repaired++; }
+            });
+        });
 
         // Desempate de posições já nesta rodada (não deixa pra próxima).
         KINDS.forEach(function (k) { if (ORDERED[k]) fixTies(merged[k]); });
@@ -466,13 +631,16 @@
             .filter(function (r) { return !r.deleted && !r.archived; });
         if (ORDERED[kind]) {
             out = alive.sort(byPos).map(function (r) { return MAP[kind].item(r, prevById[r.id]); });
+        } else if (NEWEST_FIRST[kind]) {
+            // V40.17.0: rotinas e notas, das mais novas pras mais antigas (é como o app cria e mostra)
+            out = alive.sort(byNewest).map(function (r) { return MAP[kind].item(r, prevById[r.id]); });
         } else {
-            // mantém a ordem que o app já tinha; o que é novo entra no fim, por dia e horário
+            // mantém a ordem que o app já tinha; o que é novo entra no fim (agenda: por dia e horário)
             (prevItems || []).forEach(function (it) {
                 var id = it && it.id != null ? String(it.id) : null, r = id && mergedRows[id];
                 if (r && !r.deleted && !r.archived && !done[id]) { done[id] = true; out.push(MAP[kind].item(r, prevById[id])); }
             });
-            alive.filter(function (r) { return !done[r.id]; }).sort(byDay)
+            alive.filter(function (r) { return !done[r.id]; }).sort(kind === 'blocos' ? byDay : byCreated)
                 .forEach(function (r) { out.push(MAP[kind].item(r, null)); });
         }
         return out.concat(extras);
@@ -497,7 +665,8 @@
     }
 
     return {
-        DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS,
+        DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS, MONTH: MONTH,
+        cleanOverrides: cleanOverrides, cleanMonths: cleanMonths,
         stable: stable, same: same, validDate: validDate, assignPositions: assignPositions, fixTies: fixTies,
         buildLocal: buildLocal, indexRows: indexRows, cleanRow: cleanRow, merge3: merge3, mergeKind: mergeKind,
         plan: plan, materialize: materialize, materializeArchived: materializeArchived, baseFrom: baseFrom, aliveCount: aliveCount, MAP: MAP
@@ -521,7 +690,10 @@
         tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,deleted',
         listas: 'id,name,is_default,position,created_ms,deleted',
         tags: 'id,name,color,position,deleted',
-        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,deleted,updated_at'
+        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,deleted,updated_at',
+        rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,deleted',
+        notas: 'id,title,content,created_ms,updated_ms,deleted',
+        financas: 'id,title,amount,start_month,duration_months,is_recurring,due_day,tag_id,paid_months,amount_overrides,created_ms,deleted'
     };
     var configured = !!(CFG.url && CFG.key && !/COLE_AQUI/i.test(CFG.url + CFG.key));
 
@@ -559,6 +731,11 @@
         return 'Não consegui sincronizar 😕';
     }
 
+    function shownEl(el) { // nem ele nem nenhum pai escondido com a classe 'hidden'
+        if (!el) return false;
+        for (; el && el !== document.body; el = el.parentElement) if (el.classList && el.classList.contains('hidden')) return false;
+        return true;
+    }
     // O app está no meio de algo que um re-render atrapalharia? Então espera.
     function appBusy() {
         try {
@@ -568,6 +745,14 @@
             if (typeof _moveCardPendingId !== 'undefined' && _moveCardPendingId) return true;
             var form = $('backlog-form-view');
             if (form && !form.classList.contains('hidden')) return true;
+            // V40.17.0: formulário de rotina, nota ou despesa À VISTA (tela da Lista aberta, na aba dele) segura o
+            // redesenho. Trocar de aba ou fechar a tela esconde a aba inteira sem fechar o formulário: aí não pode
+            // travar, senão o celular pararia de sincronizar até alguém voltar naquela aba.
+            var sheet = $('list-sheet');
+            if (sheet && !sheet.classList.contains('translate-y-full')) {
+                var forms = ['routines-form-view', 'financial-form-view', 'notes-form'];
+                for (var f = 0; f < forms.length; f++) if (shownEl($(forms[f]))) return true;
+            }
             // V40.8.0: NÃO usar getOpenModal() do app aqui. Ele procura qualquer elemento com a classe
             // z-[60], e os botões de cada bloco da timeline também têm essa classe: com um bloco
             // na tela ele sempre respondia "tem modal aberto" e o sync nunca rodava (bug da V40.7.0).
@@ -671,6 +856,13 @@
     function localBlocks() {
         try { return (typeof db !== 'undefined' && Array.isArray(db)) ? db : []; } catch (e) { return []; }
     }
+    // V40.17.0: rotinas, notas e finanças do aparelho (o app guarda em routinesDb, notesDb e financialDb)
+    function localList(kind) {
+        try {
+            var a = kind === 'rotinas' ? routinesDb : kind === 'notas' ? notesDb : financialDb;
+            return Array.isArray(a) ? a : [];
+        } catch (e) { return []; }
+    }
     // V40.9.0: arquivados (tb_archive_db) entram no sync como linhas com archived = true.
     function archList() {
         try { return (typeof archiveDb !== 'undefined' && Array.isArray(archiveDb)) ? archiveDb.filter(function (a) { return a && a.item && a.item.id != null; }) : []; } catch (e) { return []; }
@@ -707,6 +899,8 @@
             CORE.aliveCount(remote.tags) + ' tags\n\n' +
             'Vou JUNTAR os dois lados. Se o mesmo item existir nos dois, vale a versão da nuvem.\n' +
             'Agenda: ' + localBlocks().length + ' blocos neste aparelho, ' + CORE.aliveCount(remote.blocos) + ' na nuvem.\n' +
+            'Rotinas, notas e finanças também vão juntas (' + localList('rotinas').length + ', ' + localList('notas').length + ' e ' +
+            localList('financas').length + ' neste aparelho).\n' +
             'Dica: se quiser segurança extra, faça um backup antes (Config → Backup).\n\n' +
             'Continuar?';
     }
@@ -734,9 +928,16 @@
             if (p.changed.listas) { backlogColumnsDb = CORE.materialize('listas', p.merged.listas, backlogColumnsDb, p.localOnly.listas); saveBacklogColumns(); }
             if (p.changed.tags) { tagsDb = CORE.materialize('tags', p.merged.tags, tagsDb, p.localOnly.tags); saveTags(); }
             if (p.changed.blocos) { db = CORE.materialize('blocos', p.merged.blocos, db, p.localOnly.blocos); saveDb(); }
+            // V40.17.0: rotinas, notas e finanças
+            if (p.changed.rotinas) { routinesDb = CORE.materialize('rotinas', p.merged.rotinas, localList('rotinas'), p.localOnly.rotinas); saveRoutinesDb(); }
+            if (p.changed.notas) { notesDb = CORE.materialize('notas', p.merged.notas, localList('notas'), p.localOnly.notas); saveNotes(); }
+            if (p.changed.financas) { financialDb = CORE.materialize('financas', p.merged.financas, localList('financas'), p.localOnly.financas); saveFinancial(); }
         } finally {
             applying = false;
         }
+        if (p.changed.rotinas) { try { if (typeof renderRoutinesList === 'function') renderRoutinesList(); } catch (e) { console.warn('[FazSync] rotinas', e); } }
+        if (p.changed.notas) { try { if (typeof renderNotes === 'function') renderNotes(); } catch (e) { console.warn('[FazSync] notas', e); } }
+        if (p.changed.financas) { try { if (typeof renderFinancial === 'function') renderFinancial(); } catch (e) { console.warn('[FazSync] finanças', e); } }
         try { if (typeof ensureDefaultColumn === 'function') ensureDefaultColumn(); } catch (e) {}
         try {
             if (typeof activeColumnId !== 'undefined' && !backlogColumnsDb.some(function (c) { return c.id === activeColumnId; })) {
@@ -745,7 +946,7 @@
         } catch (e) {}
         try { if (typeof renderBacklog === 'function') renderBacklog(); } catch (e) { console.warn('[FazSync] render', e); }
         try { if (typeof renderArchive === 'function') renderArchive(); } catch (e) {}
-        if (p.changed.tags || p.changed.blocos) {
+        if (p.changed.tags || p.changed.blocos || p.changed.notas) { // nota mudou: o título dela aparece nos cartões da agenda
             try { if (typeof renderTimeline === 'function') renderTimeline(); } catch (e) { console.warn('[FazSync] timeline', e); }
             try { if (typeof renderTagsList === 'function') renderTagsList(); } catch (e) {}
         }
@@ -769,8 +970,12 @@
 
             // Daqui até applyLocal é tudo síncrono: nenhuma ação do usuário entra no meio.
             if (appBusy()) { again = true; return; }
+            var novosTipos = !firstSync && !st.base.rotinas; // V40.17.0: 1ª rodada com rotinas, notas e finanças
             var p = CORE.plan({
-                local: { tarefas: backlogDb.concat(archItems('tarefa')), listas: backlogColumnsDb, tags: tagsDb, blocos: localBlocks().concat(archItems('bloco')) },
+                local: {
+                    tarefas: backlogDb.concat(archItems('tarefa')), listas: backlogColumnsDb, tags: tagsDb, blocos: localBlocks().concat(archItems('bloco')),
+                    rotinas: localList('rotinas'), notas: localList('notas'), financas: localList('financas')
+                },
                 base: firstSync ? null : st.base,
                 remote: remote,
                 firstSync: firstSync,
@@ -787,6 +992,7 @@
             writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), cursorBlocos: fetched.cursor, arch: 1, lastSyncAt: Date.now() });
             lastError = null;
             if (manual || firstSync) toast('Sincronizado ✅');
+            else if (novosTipos) toast('☁️ Rotinas, notas e finanças agora também vão pro computador');
             pushTheme();
         } catch (e) {
             lastError = e;
@@ -830,7 +1036,7 @@
     function updateUI() {
         var logged = !!session, st = readState();
         var menu = $('sync-menu-status');
-        if (menu) menu.textContent = !configured ? 'Em breve' : logged ? 'Conectado como ' + ((session.user && session.user.email) || '') : 'Listas e Agenda no computador';
+        if (menu) menu.textContent = !configured ? 'Em breve' : logged ? 'Conectado como ' + ((session.user && session.user.email) || '') : 'Listas, Agenda, Rotinas, Notas e Finanças no computador';
         var out = $('sync-logged-out'), inn = $('sync-logged-in');
         if (out) out.classList.toggle('hidden', logged);
         if (inn) inn.classList.toggle('hidden', !logged);

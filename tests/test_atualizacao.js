@@ -29,8 +29,14 @@ const ok = (c, m) => { if (c) { pass++; console.log('  ✅', m); } else { fail++
   const { w, L } = A, nb = JSON.parse(backup.data.tb_master_db).length;
   const subiu = await waitFor(() => n('blocos') > 0 && /cursorBlocos/.test(L('tb__sync') || '')); await sleep(1500);
   ok(subiu && n('blocos') === nb, `a agenda sobe sozinha no primeiro sync: ${n('blocos')} de ${nb} blocos na nuvem`);
-  const outros = server.log.filter((l) => ['upsert', 'insert', 'update'].includes(l.op) && l.t !== 'blocos');
+  const NOVOS = ['rotinas', 'notas', 'financas']; // V40.17.0: tipos novos sobem uma vez, inteiros
+  const outros = server.log.filter((l) => ['upsert', 'insert', 'update'].includes(l.op) && l.t !== 'blocos' && !NOVOS.includes(l.t));
   ok(outros.length === 0, 'nenhuma lista, tag ou tarefa é reenviada' + (outros.length ? ': ' + JSON.stringify(outros.map((l) => [l.op, l.t, l.n])) : ''));
+  const qtd = (k) => JSON.parse(backup.data[k] || '[]').length;
+  ok(n('rotinas') === qtd('tb_routines_db') && n('notas') === qtd('tb_notes_db') && n('financas') === qtd('tb_financial_db'),
+    `rotinas, notas e finanças sobem inteiras: ${n('rotinas')}, ${n('notas')} e ${n('financas')}`);
+  ok(NOVOS.every((k) => server.log.filter((l) => l.t === k && l.op === 'upsert').length === 1), 'cada uma sobe numa leva só');
+  ok((w.__toasts || []).some((t) => /Rotinas, notas e finanças/.test(t)), 'aparece um aviso de que rotinas, notas e finanças agora vão pro computador');
   ok(JSON.stringify(['listas', 'tags', 'tarefas'].map((t) => server.rows(t, UID).map((r) => ({ ...r, updated_at: 0 })).sort((a, b) => (a.id < b.id ? -1 : 1)))) === nuvemAntes, 'listas, tags e tarefas da nuvem idênticas às de antes');
   ok(server.users.get(st7.email).meta.faz_theme === backup.data.tb_theme_color, 'a cor do tema vai pra conta (a tela do PC abre na mesma cor)');
   const igual = (k) => L(k) === backup.data[k];

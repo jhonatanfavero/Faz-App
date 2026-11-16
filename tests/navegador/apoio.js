@@ -57,11 +57,11 @@ async function abrirPc() {
         window.Date = class extends RD { constructor(...a) { if (a.length) super(...a); else super(agora()); } static now() { return agora(); } };
     });
     const d = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'dados-ficticios.json'), 'utf8')).data;
-    const plano = require(path.join(ROOT, 'sync.js')).plan({ local: { blocos: JSON.parse(d.tb_master_db), listas: JSON.parse(d.tb_backlog_columns), tags: JSON.parse(d.tb_tags_db), tarefas: JSON.parse(d.tb_backlog_db) }, remote: {}, firstSync: true });
+    const plano = require(path.join(ROOT, 'sync.js')).plan({ local: { blocos: JSON.parse(d.tb_master_db), listas: JSON.parse(d.tb_backlog_columns), tags: JSON.parse(d.tb_tags_db), tarefas: JSON.parse(d.tb_backlog_db), rotinas: JSON.parse(d.tb_routines_db), notas: JSON.parse(d.tb_notes_db), financas: JSON.parse(d.tb_financial_db) }, remote: {}, firstSync: true });
     const nuvem = 'var __mock = (function () { var module = { exports: {} };\n' + fs.readFileSync(path.join(__dirname, '..', 'mock_supabase.js'), 'utf8') + '\nreturn module.exports; })();\n' +
         '(function () { var UID = ' + JSON.stringify(UID) + ', SEED = ' + JSON.stringify(plano.push) + ', s = __mock.makeServer(), u = s.addUser("pessoa@teste.com", "senha123", UID);\n' +
         'u.meta = { faz_theme: "#10b981", faz_hours: [7, 24] };\n' +
-        '["listas", "tags", "tarefas", "blocos"].forEach(function (k) { (SEED[k] || []).forEach(function (r) { s.insert(k, UID, r); }); });\n' +
+        '["listas", "tags", "tarefas", "blocos", "rotinas", "notas", "financas"].forEach(function (k) { (SEED[k] || []).forEach(function (r) { s.insert(k, UID, r); }); });\n' +
         's.storedSession = { access_token: "t", user: { id: UID, email: "pessoa@teste.com", user_metadata: u.meta } };\n' +
         'window.__nuvem = s; window.supabase = { createClient: __mock.makeCreateClient(s) }; })();';
     await ctx.route('**/libs/supabase-js/supabase.js', (r) => r.fulfill({ contentType: 'text/javascript; charset=utf-8', body: nuvem }));

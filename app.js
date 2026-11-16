@@ -66,7 +66,7 @@ function getLocalMonthStr() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 let currentFinanceMonth = getLocalMonthStr(); // 'YYYY-MM' do mês atual (local, não UTC)
-function saveFinancial() { localStorage.setItem('tb_financial_db', JSON.stringify(financialDb)); }
+function saveFinancial() { localStorage.setItem('tb_financial_db', JSON.stringify(financialDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.17.0: finanças vão pra nuvem
 
 // ===== V40.4.4: HELPERS RECORRENTE + PARCELADA =====
 // Declarados no TOPO pra evitar TDZ (lição V40.3.2 e V40.3.5-fix2).
@@ -261,7 +261,9 @@ let activeListTab = 'backlog'; // 'backlog' | 'routines' | 'notes'
 // V40.3 — MOTOR DE ROTINAS (Fase 1: CRUD).
 // Default: 3 rotinas de exemplo viciantes pra Discoverability (mesmo princípio do header em V40.2.28).
 let routinesDb = fazLoadList('tb_routines_db', null);
-if (!routinesDb || routinesDb.length === 0) {
+// V40.17.0: os exemplos só nascem num aparelho novo (sem tb_routines_db). Antes voltavam sempre que a
+// lista ficava vazia; com as rotinas na nuvem, apagar todas no PC faria os exemplos reaparecerem.
+if (!routinesDb) {
     routinesDb = [
         {
             id: 'rt_ex1', title: 'Manhã Produtiva', emoji: '🌞', duration: 120, theme: 'focus', tagId: null,
@@ -281,7 +283,7 @@ if (!routinesDb || routinesDb.length === 0) {
     ];
     localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb));
 }
-function saveRoutinesDb() { localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb)); }
+function saveRoutinesDb() { localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.17.0: rotinas vão pra nuvem
 
 let periodsDb = fazLoadList('tb_periods_db', null);
 if (!periodsDb || periodsDb.length === 0) {
@@ -2135,7 +2137,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.16.0',
+            version: 'v40.17.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -3488,7 +3490,7 @@ window.unlinkNoteFromBlock = function() {
 // Notas com 3 estados: empty / form / list
 // =====================================================
 
-function saveNotes() { localStorage.setItem('tb_notes_db', JSON.stringify(notesDb)); }
+function saveNotes() { localStorage.setItem('tb_notes_db', JSON.stringify(notesDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.17.0: notas vão pra nuvem
 
 // Helper: escapa HTML para evitar quebra de layout / XSS no innerHTML
 function escapeHtml(str) {

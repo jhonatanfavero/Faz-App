@@ -11,7 +11,7 @@ const ok = (c, m) => { if (c) { pass++; console.log('  ✅', m); } else { fail++
 
 // ---------- "nuvem" falsa (como o Supabase com RLS: um usuário) ----------
 class Cloud {
-  constructor() { this.t = { tarefas: {}, listas: {}, tags: {}, blocos: {} }; this.clock = 0; this.upserts = 0; }
+  constructor() { this.t = {}; for (const k of CORE.KINDS) this.t[k] = {}; this.clock = 0; this.upserts = 0; }
   fetch() { const o = {}; for (const k of CORE.KINDS) o[k] = Object.values(this.t[k]).map(clone); return o; }
   upsert(k, rows) { for (const r of rows) { this.t[k][r.id] = { ...clone(r), updated_at: ++this.clock }; this.upserts++; } }
   // o PC (kanban.html) altera só os campos mudados
@@ -22,17 +22,19 @@ class Cloud {
 
 // ---------- "celular" falso ----------
 class Phone {
-  constructor(data) { this.tarefas = clone(data.tarefas); this.listas = clone(data.listas); this.tags = clone(data.tags); this.blocos = clone(data.blocos || []); this.base = null; this.used = data.used || []; }
+  constructor(data) { this.tarefas = clone(data.tarefas); this.listas = clone(data.listas); this.tags = clone(data.tags); this.blocos = clone(data.blocos || []); this.base = null; this.used = data.used || [];
+    this.rotinas = clone(data.rotinas || []); this.notas = clone(data.notas || []); this.financas = clone(data.financas || []); } // V40.17.0
   sync(cloud, { firstSync } = {}) {
     const A = this.arch || (this.arch = { tarefas: [], blocos: [] });
     const fl = (k) => this[k].concat(A[k].map((x) => ({ ...x, __archived: true })));
-    const p = CORE.plan({ local: { tarefas: fl('tarefas'), listas: this.listas, tags: this.tags, blocos: fl('blocos') },
+    const p = CORE.plan({ local: { tarefas: fl('tarefas'), listas: this.listas, tags: this.tags, blocos: fl('blocos'), rotinas: this.rotinas, notas: this.notas, financas: this.financas },
       base: this.base, remote: cloud.fetch(), firstSync: firstSync ?? !this.base, usedTagIds: this.used });
     for (const k of ['tarefas', 'blocos']) if (p.changed[k]) A[k] = CORE.materializeArchived(k, p.merged[k], A[k].concat(this[k]));
     if (p.changed.tarefas) this.tarefas = CORE.materialize('tarefas', p.merged.tarefas, this.tarefas, p.localOnly.tarefas);
     if (p.changed.listas) this.listas = CORE.materialize('listas', p.merged.listas, this.listas, p.localOnly.listas);
     if (p.changed.tags) this.tags = CORE.materialize('tags', p.merged.tags, this.tags, p.localOnly.tags);
     if (p.changed.blocos) this.blocos = CORE.materialize('blocos', p.merged.blocos, this.blocos, p.localOnly.blocos);
+    for (const k of ['rotinas', 'notas', 'financas']) if (p.changed[k]) this[k] = CORE.materialize(k, p.merged[k], this[k], p.localOnly[k]); // V40.17.0
     for (const k of CORE.KINDS) cloud.upsert(k, p.push[k]);
     this.base = CORE.baseFrom(p.merged);
     return p;
@@ -311,6 +313,130 @@ zc.insert('tarefas', { id: 'bl_cor1', column_id: 'col_geral', title: 'pintada no
 ok(zp.tarefas.find((t) => t.id === 'bl_cor1').color === '#ec4899', 'cor escolhida no PC chega no celular');
 zp.tarefas.find((t) => t.id === 'bl_cor1').color = '#10b981'; zp.sync(zc);
 ok(zc.t.tarefas.bl_cor1.color === '#10b981', 'cor trocada no celular chega na nuvem');
+
+// ===================== V40.17.0: ROTINAS, NOTAS e FINANÇAS =====================
+const RT = JSON.parse(D.tb_routines_db), NT = JSON.parse(D.tb_notes_db), FN = JSON.parse(D.tb_financial_db);
+const novos = () => ({ rotinas: clone(RT), notas: clone(NT), financas: clone(FN) });
+console.log(`\n26) Rotinas, notas e finanças sobem no 1º sync sem mexer no celular (${RT.length}, ${NT.length} e ${FN.length}):`);
+const rc = new Cloud(), rp = new Phone({ ...REAL, used: USED, ...novos() });
+const rBefore = JSON.stringify([rp.rotinas, rp.notas, rp.financas]);
+p = rp.sync(rc);
+ok(rc.alive('rotinas').length === RT.length && rc.alive('notas').length === NT.length && rc.alive('financas').length === FN.length, 'as três foram inteiras pra nuvem');
+ok(JSON.stringify([rp.rotinas, rp.notas, rp.financas]) === rBefore && !p.changed.rotinas && !p.changed.notas && !p.changed.financas, 'no celular, BYTE A BYTE iguais');
+const r0 = rc.t.rotinas[RT[0].id];
+ok(r0.title === RT[0].title && r0.emoji === RT[0].emoji && r0.duration === RT[0].duration && r0.created_ms === RT[0].createdAt && JSON.stringify(r0.microblocks) === JSON.stringify(RT[0].microblocks), 'rotina na nuvem com nome, emoji, duração, data e checklist');
+const n0 = rc.t.notas[NT[0].id];
+ok(n0.title === NT[0].title && n0.content === NT[0].content && n0.created_ms === NT[0].createdAt && n0.updated_ms === NT[0].updatedAt, 'nota na nuvem com título, texto e datas');
+const f0 = rc.t.financas[FN[0].id];
+ok(f0.amount === FN[0].amount && f0.start_month === FN[0].startMonth && f0.duration_months === 12 && f0.is_recurring === true && f0.due_day === 1 && JSON.stringify(f0.paid_months) === JSON.stringify(FN[0].paidMonths), 'despesa na nuvem com valor, início, meses, vencimento e meses pagos');
+ok(JSON.stringify(f0.amount_overrides) === '{"2026-06":{"amount":30.5},"2026-07":{"amount":47.5}}', 'valor de mês específico gravado no formato que o app lê ({ amount }) mesmo vindo como número solto');
+p = rp.sync(rc);
+ok(pushes(p) === 0 && !p.changed.rotinas && !p.changed.notas && !p.changed.financas, '2º sync: zero envios, zero mudanças');
+
+console.log('\n27) Quem já sincronizava (base sem os tipos novos) sobe só rotinas, notas e finanças:');
+const oc = new Cloud(), op = new Phone({ ...REAL, blocos: BL.slice(0, 30), used: USED });
+op.sync(oc);
+Object.assign(op, novos());
+const upAntes = { ...Object.fromEntries(CORE.KINDS.map((k) => [k, Object.keys(oc.t[k]).length])) };
+p = op.sync(oc);
+ok(p.push.tarefas.length === 0 && p.push.listas.length === 0 && p.push.tags.length === 0 && p.push.blocos.length === 0, 'listas, tags, tarefas e agenda NÃO são reenviadas');
+ok(p.push.rotinas.length === RT.length && p.push.notas.length === NT.length && p.push.financas.length === FN.length && upAntes.rotinas === 0, 'rotinas, notas e finanças sobem inteiras');
+
+console.log('\n28) Notas: o PC cria, edita e apaga; o celular acompanha:');
+oc.insert('notas', { id: 'note_pc_1', title: 'Do PC', content: 'linha 1\nlinha 2', created_ms: 4e12, updated_ms: 4e12 });
+oc.patch('notas', NT[1].id, { title: 'Título mudado no PC', updated_ms: 4e12 + 5 });
+oc.patch('notas', NT[2].id, { deleted: true });
+p = op.sync(oc);
+ok(op.notas[0].id === 'note_pc_1' && op.notas[0].content === 'linha 1\nlinha 2' && op.notas[0].createdAt === 4e12, 'nota criada no PC aparece EM CIMA (a mais nova primeiro, como no app)');
+ok(op.notas.find((n) => n.id === NT[1].id).title === 'Título mudado no PC' && op.notas.find((n) => n.id === NT[1].id).content === NT[1].content, 'título editado no PC chega e o texto fica');
+ok(!op.notas.some((n) => n.id === NT[2].id) && pushes(p) === 0, 'nota apagada no PC some do celular; nada reenviado');
+
+console.log('\n29) Notas: celular muda o texto enquanto o PC muda o título da MESMA nota → fica com os dois:');
+op.notas.find((n) => n.id === NT[0].id).content = 'texto novo no celular';
+oc.patch('notas', NT[0].id, { title: 'título novo no PC' });
+p = op.sync(oc);
+const nb = op.notas.find((n) => n.id === NT[0].id);
+ok(nb.title === 'título novo no PC' && nb.content === 'texto novo no celular' && oc.t.notas[NT[0].id].content === 'texto novo no celular', 'título do PC + texto do celular, nos dois lados');
+
+console.log('\n30) Rotinas: o PC cria (com checklist) e apaga; o celular acompanha:');
+oc.insert('rotinas', { id: 'rt_pc_1', title: 'Fechamento', emoji: '📦', duration: 90, theme: 'focus', tag_id: REAL.tags[1].id, microblocks: [{ title: 'Conferir caixa' }, { title: 'Lançar notas' }], created_ms: 4e12 });
+oc.patch('rotinas', RT[1].id, { deleted: true });
+p = op.sync(oc);
+const rpc = op.rotinas.find((r) => r.id === 'rt_pc_1');
+ok(op.rotinas[0].id === 'rt_pc_1' && rpc.emoji === '📦' && rpc.duration === 90 && rpc.tagId === REAL.tags[1].id && rpc.microblocks.length === 2 && rpc.createdAt === 4e12, 'rotina do PC chega inteira e fica em cima');
+ok(!op.rotinas.some((r) => r.id === RT[1].id), 'rotina apagada no PC some do celular');
+op.rotinas.find((r) => r.id === 'rt_pc_1').microblocks.push({ title: 'Imprimir relatório' });
+p = op.sync(oc);
+ok(oc.t.rotinas.rt_pc_1.microblocks.length === 3 && p.push.rotinas.length === 1, 'item novo na checklist feito no celular sobe (só essa rotina)');
+
+console.log('\n31) Finanças: o PC marca pago, muda o valor de um mês e o vencimento:');
+const fA = FN.find((f) => f.durationMonths > 1 && !f.isRecurring) || FN[1];
+oc.patch('financas', fA.id, { paid_months: [...oc.t.financas[fA.id].paid_months, '2026-11'], amount_overrides: { '2026-12': { amount: 99.9 } }, due_day: 20 });
+p = op.sync(oc);
+const fa = op.financas.find((f) => f.id === fA.id);
+ok(fa.paidMonths.includes('2026-11') && fa.paidMonthsOverrides['2026-12'].amount === 99.9 && fa.dueDay === 20, 'pago em 11/2026, valor de 12/2026 = 99,90 e vencimento dia 20 no celular');
+ok(fa.title === fA.title && fa.amount === fA.amount && fa.startMonth === fA.startMonth && fa.durationMonths === fA.durationMonths, 'o resto da despesa ficou igual');
+oc.insert('financas', { id: 'fin_pc_1', title: 'Internet', amount: 129.9, start_month: '2026-11', duration_months: 12, is_recurring: true, due_day: 10, paid_months: [], amount_overrides: {}, created_ms: 4e12 });
+p = op.sync(oc);
+const fpc = op.financas[op.financas.length - 1];
+ok(fpc.id === 'fin_pc_1' && fpc.startMonth === '2026-11' && fpc.isRecurring === true && fpc.dueDay === 10 && Array.isArray(fpc.paidMonths) && !('paidMonthsOverrides' in fpc) && op.financas.length === FN.length + 1, 'despesa criada no PC entra no fim, no formato do app');
+
+console.log('\n32) Finanças: formato antigo (V40.4.1–3, com "month" e "paid") vira o novo sem perder nada:');
+const lc = new Cloud(), lp = new Phone({ tarefas: [], listas: [{ id: 'col_geral', name: 'G', isDefault: true, createdAt: 1 }], tags: [],
+  financas: [{ id: 'fin_old1', title: 'Luz', amount: '210.40', month: '2026-03', paid: true, dueDay: '15', createdAt: 5 },
+    { id: 'fin_old2', title: 'Água', amount: 80, month: '2026-03', paid: false, createdAt: 6 },
+    { id: 'fin_ruim', title: 'sem mês', amount: 1, startMonth: 'março', createdAt: 7 }] });
+const lBefore = JSON.stringify(lp.financas);
+p = lp.sync(lc);
+ok(lc.t.financas.fin_old1.start_month === '2026-03' && JSON.stringify(lc.t.financas.fin_old1.paid_months) === '["2026-03"]' && lc.t.financas.fin_old1.amount === 210.4 && lc.t.financas.fin_old1.due_day === 15, 'month → start_month, paid → paid_months, "210.40" → 210,4, "15" → 15');
+ok(JSON.stringify(lc.t.financas.fin_old2.paid_months) === '[]' && lc.t.financas.fin_old2.due_day === null, 'não paga → nenhum mês pago; sem vencimento → null');
+ok(!lc.t.financas.fin_ruim && p.skipped === 1 && JSON.stringify(lp.financas) === lBefore, 'despesa sem mês válido fica só no aparelho e o aparelho não muda');
+lc.patch('financas', 'fin_old2', { title: 'Água e esgoto' });
+p = lp.sync(lc);
+const lo1 = lp.financas.find((f) => f.id === 'fin_old1'), lo2 = lp.financas.find((f) => f.id === 'fin_old2');
+ok(lo2.title === 'Água e esgoto' && lo2.startMonth === '2026-03' && !('month' in lo2) && Array.isArray(lo2.paidMonths) && !('paid' in lo2), 'item editado no PC volta no formato novo (startMonth / paidMonths)');
+ok(lo1.startMonth === '2026-03' && JSON.stringify(lo1.paidMonths) === '["2026-03"]' && lo1.amount === 210.4 && lo1.dueDay === 15 && !('paid' in lo1),
+  'a outra antiga, reescrita junto, tem o mesmo significado no formato novo (é o que o app faz ao marcar pago)');
+ok(lp.financas.some((f) => f.id === 'fin_ruim' && f.startMonth === 'março') && lp.financas[lp.financas.length - 1].id === 'fin_ruim', 'a sem mês válido continua no aparelho, intacta');
+
+console.log('\n33) Celular NOVO: as rotinas de exemplo não duplicam nem ressuscitam:');
+const ex = [{ id: 'rt_ex1', title: 'Manhã Produtiva', emoji: '🌞', duration: 120, theme: 'focus', tagId: null, microblocks: [{ title: 'Meditação e Café' }], createdAt: 9e12 },
+  { id: 'rt_ex2', title: 'Rotina Noturna', emoji: '🌙', duration: 60, theme: 'rest', tagId: null, microblocks: [], createdAt: 9e12 + 1 }];
+const ec = new Cloud(), ep1 = new Phone({ tarefas: [], listas: [{ id: 'col_geral', name: 'G', isDefault: true, createdAt: 1 }], tags: [], rotinas: clone(ex) });
+ep1.sync(ec);
+ep1.rotinas = ep1.rotinas.filter((r) => r.id !== 'rt_ex2'); ep1.rotinas[0].title = 'Minha manhã'; ep1.sync(ec);
+const ep2 = new Phone({ tarefas: [], listas: [{ id: 'col_geral', name: 'G', isDefault: true, createdAt: 1 }], tags: [], rotinas: clone(ex) });
+p = ep2.sync(ec);
+ok(ep2.rotinas.length === 1 && ep2.rotinas[0].title === 'Minha manhã', 'o aparelho novo fica com a versão da nuvem (sem duplicar) e sem a rotina apagada');
+ok(ec.t.rotinas.rt_ex2.deleted === true && ec.t.rotinas.rt_ex1.title === 'Minha manhã', 'a nuvem não foi sobrescrita pelo exemplo');
+
+console.log('\n34) Tag apagada: rotina e despesa ficam sem tag (igual à tarefa):');
+oc.patch('tags', REAL.tags[1].id, { deleted: true });
+p = op.sync(oc);
+ok(op.rotinas.find((r) => r.id === 'rt_pc_1').tagId === null && oc.t.rotinas.rt_pc_1.tag_id === null, 'rotina do PC perdeu a tag apagada, nos dois lados');
+
+console.log('\n35) Linhas estranhas ou maliciosas nas tabelas novas são neutralizadas:');
+oc.insert('rotinas', { id: 'rt_evil', title: 'x', emoji: '😀', duration: 99999, theme: 'x"><img>', tag_id: "a'b", microblocks: [{ id: "m');x('", title: 'i' }, 'lixo'], created_ms: 'abc' });
+oc.insert('rotinas', { id: "rt');alert(1);('", title: 'id ruim', emoji: '', duration: 10, theme: 'focus', microblocks: [] });
+oc.insert('financas', { id: 'fin_evil', title: 'x', amount: 1e20, start_month: '2026-13', duration_months: 0, due_day: 40, paid_months: ['2026-01', 'lixo', '2026-01'], amount_overrides: { '2026-02': { amount: 'abc' }, x: { amount: 1 } }, created_ms: 1 });
+oc.insert('financas', { id: 'fin_estranha', title: 'y', amount: 1e20, start_month: '2026-02', duration_months: 0, due_day: 40, paid_months: ['2026-01', 'lixo', '2026-01'], amount_overrides: { '2026-02': { amount: 'abc' }, '2026-03': 12, x: { amount: 1 } }, created_ms: 2 });
+oc.insert('notas', { id: 'note_null', title: null, content: null, created_ms: null });
+crashed = false; try { p = op.sync(oc); } catch (e) { crashed = e; }
+ok(!crashed, 'não quebrou');
+const ev = op.rotinas.find((r) => r.id === 'rt_evil');
+ok(ev && ev.duration === 1440 && ev.theme === 'focus' && ev.tagId === null && ev.microblocks.length === 1 && ev.microblocks[0].id === 'mb_x0', 'rotina: duração limitada, tema e tag inválidos neutralizados, checklist limpa');
+ok(!op.rotinas.some((r) => /alert/.test(r.id)), 'rotina com id malicioso ignorada');
+ok(!op.financas.some((f) => f.id === 'fin_evil'), 'despesa com mês inexistente (2026-13) ignorada');
+const es = op.financas.find((f) => f.id === 'fin_estranha');
+ok(es && es.amount === 0 && es.durationMonths === 1 && es.dueDay === null && JSON.stringify(es.paidMonths) === '["2026-01"]' && JSON.stringify(es.paidMonthsOverrides) === '{"2026-03":{"amount":12}}', 'despesa estranha: valor absurdo → 0, meses → 1, dia 40 → sem vencimento, meses pagos e valores por mês limpos');
+const nn = op.notas.find((n) => n.id === 'note_null');
+ok(nn && nn.title === '' && nn.content === '', 'nota com título e texto nulos vira texto vazio');
+
+console.log('\n36) Unitários dos formatos de finanças:');
+ok(JSON.stringify(CORE.cleanOverrides({ '2026-01': 5, '2026-02': { amount: '7.5' }, '2026-03': null, '2026-04': { amount: true }, '2026-05': [1], bad: 1 })) === '{"2026-01":{"amount":5},"2026-02":{"amount":7.5}}', 'cleanOverrides aceita número ou { amount } e descarta o resto');
+ok(JSON.stringify(CORE.cleanMonths(['2026-01', '2026-1', '2026-00', '2026-12', '2026-01', 5])) === '["2026-01","2026-12"]', 'cleanMonths: só YYYY-MM válido, sem repetir');
+const longo = 'a'.repeat(199) + '😀';
+ok(CORE.MAP.rotinas.row({ id: 'r', title: longo }).title.length === 199, 'corte no limite não parte um emoji ao meio');
 
 console.log(`\n==== RESULTADO: ${pass} passaram, ${fail} falharam ====`);
 process.exit(fail ? 1 : 0);

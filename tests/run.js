@@ -12,7 +12,9 @@ const SUITES = [
     ['Cor do cartão e Arquivados', 'test_v409.js', [ROOT, DADOS]],
     ['Listas afastadas e arrastar entre listas', 'test_v4091.js', [ROOT, DADOS]],
     ['Atualização de quem já sincronizava numa versão antiga', 'test_atualizacao.js', [ROOT, DADOS]],
+    ['Rotinas, notas e finanças na nuvem (celular)', 'test_v4017.js', [ROOT, DADOS]],
     ['Tela do PC (kanban.html)', 'test_kanban.js', [ROOT, DADOS]],
+    ['Tela do PC: Rotinas e Notas', 'test_kanban_v4017.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

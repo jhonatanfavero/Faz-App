@@ -68,6 +68,13 @@
     body.ag-resizing, body.ag-resizing * { cursor: ns-resize !important; }
     /* V40.14.0: Semana — enquanto um bloco é arrastado, os espaços livres viram lugar de soltar */
     .ag-drop.over { background: var(--focus); color: #fff; border-style: solid; }
+    /* V40.17.0: Rotinas e Notas */
+    .rt-theme { color: #71717a; }
+    .rt-theme.on { background: #fff; color: #18181b; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+    .nt-item.on { background: #fff; box-shadow: 0 0 0 1.5px var(--focus); }
+    /* V40.17.0: filtro da Agenda ligado; bloco escondido pelo filtro na régua do Dia (o horário continua ocupado) */
+    .ag-filter-on { box-shadow: 0 0 0 2px var(--focus); border-color: transparent !important; }
+    .ag-hidden { position: absolute; left: 56px; right: 0; border: 1.5px dashed #d4d4d8; border-radius: 6px; background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(0,0,0,.025) 6px 12px); pointer-events: none; }
     .card .card-sched { opacity: 0; }
     .card:hover .card-sched, .card:focus-within .card-sched { opacity: 1; }
     /* V40.15.0: 3 pontinhos (Arquivar / Apagar) também nos blocos da Semana, e campo de arquivar que aparece ao arrastar */
@@ -159,6 +166,9 @@
         <nav class="inline-flex p-1 bg-zinc-100 rounded-xl shrink-0" role="tablist" aria-label="Seções">
             <button id="tab-listas" role="tab" data-tab="listas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Listas</button>
             <button id="tab-agenda" role="tab" data-tab="agenda" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Agenda</button>
+            <!-- V40.17.0: Rotinas e Notas, as mesmas do celular -->
+            <button id="tab-rotinas" role="tab" data-tab="rotinas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Rotinas</button>
+            <button id="tab-notas" role="tab" data-tab="notas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Notas</button>
         </nav>
         <p id="board-summary" class="hidden sm:block min-w-0 text-xs text-zinc-500 leading-tight truncate"></p>
         <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
@@ -200,13 +210,19 @@
             <button id="ag-next" class="w-9 h-9 rounded-lg flex items-center justify-center bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50" aria-label="Próximo"><i class="ph-bold ph-caret-right"></i></button>
             <h2 id="ag-label" class="ml-1 text-[15px] font-bold text-zinc-900"></h2>
             <button id="ag-new" class="ml-2 inline-flex items-center gap-1.5 bg-focus text-white text-[13px] font-semibold pl-2.5 pr-3 py-1.5 rounded-lg hover:opacity-90" title="Criar um bloco novo na agenda"><i class="ph-bold ph-plus"></i>Novo bloco</button>
-            <!-- V40.14.0: lembrete curto do que dá pra fazer arrastando (só em tela larga) -->
-            <p id="ag-tip" class="hidden xl:block min-w-0 flex-1 truncate pl-2 text-[12px] text-zinc-500"></p>
+            <!-- V40.17.0: filtro por tag e ocultar concluídos (só muda o que aparece; os horários ocupados continuam contando) -->
+            <label id="ag-tag-wrap" class="inline-flex items-center gap-1.5 h-9 pl-2.5 pr-1 rounded-lg bg-white border border-zinc-200 text-zinc-500" title="Mostrar só os blocos de uma tag">
+                <i class="ph ph-funnel"></i>
+                <select id="ag-tag" class="max-w-[150px] bg-transparent outline-none text-[13px] font-semibold text-zinc-700 pr-1 cursor-pointer" aria-label="Filtrar a agenda por tag"></select>
+            </label>
+            <button id="ag-hide-done" type="button" aria-pressed="false" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50" title="Esconder os blocos já concluídos"><i class="ph ph-eye-slash"></i>Ocultar concluídos</button>
             <div class="ml-auto inline-flex p-1 bg-white border border-zinc-200 rounded-xl" role="tablist" aria-label="Visualização">
                 <button data-view="week" class="ag-view px-3 py-1.5 rounded-lg text-[13px] font-semibold">Semana</button>
                 <button data-view="day" class="ag-view px-3 py-1.5 rounded-lg text-[13px] font-semibold">Dia</button>
             </div>
         </div>
+        <!-- V40.14.0: lembrete curto do que dá pra fazer arrastando (só em tela larga). V40.17.0: linha própria, pra caber inteiro junto com o filtro -->
+        <p id="ag-tip" class="hidden xl:block px-4 sm:px-5 pt-2 text-[12px] text-zinc-500 truncate"></p>
         <div id="ag-banner" class="hidden mx-4 sm:mx-5 mt-3 px-4 py-3 bg-white border border-zinc-200 rounded-xl text-[13px] text-zinc-600 leading-relaxed">
             <i class="ph ph-device-mobile text-focus mr-1"></i>Tua agenda ainda não chegou na nuvem. Abra o Faz no celular, com internet, e espere alguns segundos: ele envia sozinho e os compromissos aparecem aqui na hora. Se o selo no canto do app mostrar uma versão anterior à <b>v40.8.0</b>, feche e abra o app de novo.
         </div>
@@ -222,6 +238,97 @@
             <div id="ag-timeline" class="relative mx-auto max-w-3xl my-4 px-4"></div>
         </div>
     </main>
+
+    <!-- V40.17.0: Rotinas (as mesmas do celular). A mão leva a rotina pra Agenda, como o "carimbar" do app. -->
+    <main id="rotinas" class="hidden relative flex-1 min-h-0 flex-col">
+        <div class="shrink-0 flex flex-wrap items-center gap-2 px-4 sm:px-5 pt-4">
+            <button id="rt-new" class="inline-flex items-center gap-1.5 bg-focus text-white text-[13px] font-semibold pl-2.5 pr-3 py-1.5 rounded-lg hover:opacity-90"><i class="ph-bold ph-plus"></i>Nova rotina</button>
+            <p class="hidden md:block min-w-0 flex-1 truncate pl-2 text-[12px] text-zinc-500">Clique numa rotina pra editar. A mão <i class="ph ph-hand-pointing"></i> leva ela pra Agenda: é só clicar no horário livre.</p>
+        </div>
+        <div class="flex-1 min-h-0 overflow-y-auto thin-scroll">
+            <div id="rt-grid" class="grid gap-3 p-4 sm:p-5" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))"></div>
+            <div id="rt-empty" class="hidden px-6 py-16 text-center">
+                <i class="ph ph-stamp text-4xl text-zinc-400"></i>
+                <p class="mt-2 text-sm font-medium text-zinc-500">Nenhuma rotina ainda. Crie uma aqui ou no celular.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- V40.17.0: Notas (as mesmas do celular). Salva sozinho enquanto você escreve. -->
+    <main id="notas" class="hidden relative flex-1 min-h-0">
+        <aside class="w-[300px] shrink-0 border-r border-zinc-200 bg-white/70 flex flex-col min-h-0">
+            <div class="p-3 flex items-center gap-2">
+                <button id="nt-new" class="shrink-0 inline-flex items-center gap-1.5 bg-focus text-white text-[13px] font-semibold pl-2.5 pr-3 py-1.5 rounded-lg hover:opacity-90"><i class="ph-bold ph-plus"></i>Nova nota</button>
+                <label class="min-w-0 flex-1 flex items-center gap-1.5 bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-zinc-400 focus-within:border-zinc-400">
+                    <i class="ph ph-magnifying-glass"></i>
+                    <input id="nt-search" type="search" placeholder="Buscar" aria-label="Buscar nas notas" class="min-w-0 flex-1 text-[13px] text-zinc-800 outline-none bg-transparent">
+                </label>
+            </div>
+            <div id="nt-list" class="flex-1 min-h-0 overflow-y-auto thin-scroll px-2 pb-3 flex flex-col gap-0.5"></div>
+        </aside>
+        <section class="flex-1 min-w-0 flex flex-col">
+            <div id="nt-none" class="flex-1 flex items-center justify-center p-6 text-center">
+                <div>
+                    <i class="ph ph-note-pencil text-4xl text-zinc-400"></i>
+                    <p class="mt-2 text-sm font-medium text-zinc-500">Escolha uma nota na lista ou crie uma nova.</p>
+                </div>
+            </div>
+            <div id="nt-form" class="hidden flex-1 min-h-0 w-full max-w-3xl mx-auto px-5 sm:px-8 pt-5 pb-4 flex-col">
+                <input id="nt-title" maxlength="500" placeholder="Título (opcional)" aria-label="Título da nota" class="w-full bg-transparent text-xl font-bold text-zinc-900 outline-none placeholder-zinc-300">
+                <p id="nt-meta" class="mt-1 text-[12px] text-zinc-500"></p>
+                <textarea id="nt-content" placeholder="Anote uma ideia, lembrete, observação..." aria-label="Texto da nota" class="mt-3 flex-1 min-h-[200px] w-full resize-none bg-white border border-zinc-200 rounded-xl p-4 text-[14.5px] leading-relaxed text-zinc-800 outline-none focus:border-zinc-400 thin-scroll"></textarea>
+                <div class="mt-3 flex items-center gap-2">
+                    <button id="nt-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar nota</button>
+                    <span id="nt-status" class="ml-auto text-[12px] text-zinc-500" role="status" aria-live="polite"></span>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- V40.17.0: editar rotina -->
+<div id="modal-rt" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="rt-f-title">
+    <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div class="p-5 pb-3 overflow-y-auto thin-scroll">
+            <div class="flex items-center gap-2.5">
+                <input id="rt-f-emoji" maxlength="8" aria-label="Emoji da rotina" class="w-12 h-12 shrink-0 text-center text-2xl bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:border-zinc-400">
+                <input id="rt-f-title" maxlength="40" placeholder="Nome da rotina" class="min-w-0 flex-1 text-lg font-bold text-zinc-900 outline-none placeholder-zinc-300">
+            </div>
+            <div class="grid grid-cols-2 gap-3 mt-4">
+                <label class="block">
+                    <span class="text-xs font-semibold text-zinc-500">Duração</span>
+                    <select id="rt-f-dur" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
+                </label>
+                <div>
+                    <span class="text-xs font-semibold text-zinc-500">Tipo</span>
+                    <div id="rt-f-theme" class="mt-1 flex p-1 bg-zinc-100 rounded-xl" role="radiogroup" aria-label="Tipo da rotina">
+                        <button type="button" data-theme="focus" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Foco</button>
+                        <button type="button" data-theme="rest" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Descanso</button>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <span class="text-xs font-semibold text-zinc-500">Tag</span>
+                <div id="rt-f-tags" class="mt-1.5 flex flex-wrap gap-1.5"></div>
+            </div>
+            <div class="mt-4">
+                <span class="text-xs font-semibold text-zinc-500">Checklist</span>
+                <div id="rt-f-mbs" class="mt-1 flex flex-col"></div>
+                <div class="mt-1 flex items-center gap-2 px-1">
+                    <i class="ph ph-plus text-zinc-400"></i>
+                    <input id="rt-f-mb-new" maxlength="200" placeholder="Novo item (Enter)" class="flex-1 text-sm outline-none py-1.5 bg-transparent">
+                </div>
+            </div>
+        </div>
+        <div class="px-5 py-3 border-t border-zinc-100 flex flex-wrap items-center gap-x-1 gap-y-2">
+            <button id="rt-f-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar rotina</button>
+            <button id="rt-f-hand" class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-100 px-3 py-2 rounded-lg" title="Vai pra Agenda com a rotina na mão: é só clicar onde quer colocar"><i class="ph ph-hand-pointing text-base"></i>Colocar na Agenda</button>
+            <div class="ml-auto flex gap-2">
+                <button id="rt-f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
+                <button id="rt-f-save" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Salvar</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- V40.8.0: detalhe do bloco da agenda (só leitura) -->
@@ -346,7 +453,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.16.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.17.0</div>
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
@@ -359,15 +466,20 @@
     var DEFAULT_COL = 'col_geral';
     var STEP = 1024;
     var DURATIONS = [5, 10, 15, 30, 45, 60, 75, 90, 120, 150, 180, 240]; // V40.8.0: mínimo 5 min
-    var KINDS = ['listas', 'tags', 'tarefas', 'blocos'];
+    var KINDS = ['listas', 'tags', 'tarefas', 'blocos', 'rotinas', 'notas', 'financas'];
     var SELECT = {
         tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,deleted',
         listas: 'id,name,is_default,position,created_ms,deleted',
         tags: 'id,name,color,position,deleted',
-        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,color,archived,deleted'
+        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,color,archived,deleted',
+        // V40.17.0: rotinas, notas e finanças (as mesmas do celular)
+        rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,deleted',
+        notas: 'id,title,content,created_ms,updated_ms,deleted',
+        financas: 'id,title,amount,start_month,duration_months,is_recurring,due_day,tag_id,paid_months,amount_overrides,created_ms,deleted'
     };
     var S = {
-        sb: null, uid: null, email: '', listas: {}, tags: {}, tarefas: {}, blocos: {},
+        sb: null, uid: null, email: '', listas: {}, tags: {}, tarefas: {}, blocos: {}, rotinas: {}, notas: {}, financas: {},
+        rtEdit: null, nt: null, ntQuery: '', agTag: '', agHideDone: false,
         tab: 'listas', agView: 'week', agAnchor: null, agScrolled: null, hours: [7, 24], recovery: false,
         channel: null, live: 'connecting', lastLoad: 0, loading: false,
         dragId: null, pendingRender: false, composer: null, editing: null, placing: null, agH0: 7
@@ -465,6 +577,7 @@
             S.lastLoad = Date.now();
             render();
             renderAgenda();
+            renderSide();
         } catch (e) {
             console.error('[Faz kanban] load', e);
             if (!S.lastLoad) toast('Não consegui carregar suas Listas. Confira a internet.');
@@ -497,9 +610,9 @@
 
     async function insertRow(kind, row, okMsg) {
         S[kind][row.id] = row;
-        render(); renderAgenda();
+        render(); renderAgenda(); renderSide();
         var res = await S.sb.from(kind).upsert(row, { onConflict: 'user_id,id' });
-        if (res.error) { delete S[kind][row.id]; render(); renderAgenda(); fail(res.error); return false; }
+        if (res.error) { delete S[kind][row.id]; render(); renderAgenda(); renderSide(); fail(res.error); return false; }
         if (okMsg) toast(okMsg);
         return true;
     }
@@ -510,16 +623,17 @@
         if (!row) return false;
         var prev = Object.assign({}, row);
         Object.assign(row, fields);
-        render(); renderAgenda(); renderArchive();
+        render(); renderAgenda(); renderArchive(); renderSide();
         var res = await S.sb.from(kind).update(fields).eq('user_id', S.uid).eq('id', id);
-        if (res.error) { S[kind][id] = prev; render(); renderAgenda(); renderArchive(); fail(res.error); return false; }
+        if (res.error) { S[kind][id] = prev; render(); renderAgenda(); renderArchive(); renderSide(); fail(res.error); return false; }
         if (okMsg) toast(okMsg);
         return true;
     }
 
     // ---------- render ----------
     var renderT = null;
-    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); if (S.editing && S.editing.kind === 'blocos') renderDone(); }, 60); }
+    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderSide(); if (S.editing && S.editing.kind === 'blocos') renderDone(); }, 60); }
+    function renderSide() { renderRotinas(); renderNotas(); } // V40.17.0: cada uma só desenha se a aba dela estiver aberta
 
     function cardHtml(t) {
         var tag = tagOf(t.tag_id);
@@ -653,10 +767,32 @@
     function gapHtml(day, st, first) {
         return '<button type="button" class="ag-gap' + (first ? ' first' : '') + '" data-gap-day="' + day + '" data-gap-start="' + st + '"><i class="ph ph-plus mr-1"></i>Colocar às ' + clock(st) + (first ? ' (primeiro livre)' : '') + '</button>';
     }
-    function weekListHtml(list, day, today, nm) {
+    // V40.17.0: filtro da Agenda (tag e concluídos). Só esconde da tela: espaço livre e conflito contam todos os blocos.
+    function agFiltering() { return !!S.agTag || !!S.agHideDone; }
+    function agVisible(b) {
+        if (S.agHideDone && b.completed) return false;
+        if (!S.agTag) return true;
+        return S.agTag === '__none__' ? !tagOf(b.tag_id) : b.tag_id === S.agTag;
+    }
+    function renderAgFilter() {
+        if (S.agTag && S.agTag !== '__none__' && !tagOf(S.agTag)) S.agTag = ''; // a tag foi apagada
+        var opts = '<option value="">Todas as tags</option>' + alive('tags').map(function (t) {
+            return '<option value="' + esc(t.id) + '"' + (S.agTag === t.id ? ' selected' : '') + '>' + esc(t.name || 'Sem nome') + '</option>';
+        }).join('') + '<option value="__none__"' + (S.agTag === '__none__' ? ' selected' : '') + '>Sem tag</option>';
+        var sel = $('ag-tag');
+        if (sel.innerHTML !== opts) sel.innerHTML = opts;
+        sel.value = S.agTag || '';
+        $('ag-tag-wrap').classList.toggle('ag-filter-on', !!S.agTag);
+        var hb = $('ag-hide-done');
+        hb.classList.toggle('ag-filter-on', !!S.agHideDone);
+        hb.setAttribute('aria-pressed', S.agHideDone ? 'true' : 'false');
+        hb.innerHTML = S.agHideDone ? '<i class="ph ph-eye"></i>Mostrar concluídos' : '<i class="ph ph-eye-slash"></i>Ocultar concluídos';
+    }
+    function weekListHtml(all, day, today, nm) {
+        var list = all.filter(agVisible); // o que aparece; os espaços livres (tarefa na mão) contam todos os blocos
         if (!S.placing) return list.map(function (b) { return agCardHtml(b, day, today, nm); }).join('') +
             '<button type="button" class="ag-add shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[12.5px] font-medium text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800" data-add-day="' + day + '"><i class="ph ph-plus"></i>Adicionar bloco</button>';
-        var gaps = gapsOf(list, day, S.placing.dur), gi = 0, html = '';
+        var gaps = gapsOf(all, day, S.placing.dur), gi = 0, html = '';
         // Dia cheio: o primeiro espaço livre pode estar lá embaixo, depois de vários blocos. Um atalho fixo no topo resolve.
         if (gaps.length && list.length && gaps[0] > list[0].start_min) html += gapHtml(day, gaps[0], true);
         list.forEach(function (b) {
@@ -669,29 +805,33 @@
     function renderWeek(anchor, map, today, nm) {
         var wrap = $('ag-cols'), scroll = {}, html = '', total = 0, mins = 0;
         wrap.querySelectorAll('.ag-list').forEach(function (el) { scroll[el.dataset.day] = el.scrollTop; });
+        var filt = agFiltering(), hiddenAll = 0;
         for (var i = 0; i < 7; i++) {
-            var day = addDays(anchor, i), d = parseYmd(day), list = map[day] || [];
+            var day = addDays(anchor, i), d = parseYmd(day), all = map[day] || [], list = all.filter(agVisible);
             total += list.length;
             mins += sumMin(list);
+            hiddenAll += all.length - list.length;
             html += '<section class="min-w-[176px] flex-1 max-h-full flex flex-col bg-zinc-50 border rounded-2xl ' + (day === today ? 'border-zinc-400' : 'border-zinc-200') + '">' +
                 '<div class="flex items-stretch">' +
                 '<button class="ag-day-btn min-w-0 flex-1 text-left px-3 pt-2.5 pb-2 hover:bg-zinc-100 ' + (S.placing ? 'rounded-t-2xl' : 'rounded-tl-2xl') + '" data-day="' + day + '" title="Abrir este dia">' +
                 '<span class="flex items-center gap-1.5"><span class="text-[13px] font-bold text-zinc-800">' + WD3[d.getDay()] + '</span>' +
                 '<span class="text-[12px] font-medium text-zinc-500 tabular-nums">' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '</span>' +
                 (day === today ? '<span class="ml-auto text-[10.5px] font-semibold text-white bg-focus rounded-full px-1.5 py-0.5">Hoje</span>' : '') + '</span>' +
-                '<span class="block mt-0.5 text-[11px] font-medium text-zinc-500">' + (list.length ? countLabel(list.length) + ' · ' + fmtDur(sumMin(list)) : 'Livre') + '</span></button>' +
+                '<span class="block mt-0.5 text-[11px] font-medium text-zinc-500">' + (filt && all.length > list.length ? list.length + ' de ' + countLabel(all.length) + (list.length ? ' · ' + fmtDur(sumMin(list)) : '') :
+                    list.length ? countLabel(list.length) + ' · ' + fmtDur(sumMin(list)) : 'Livre') + '</span></button>' +
                 // V40.13.0: "+" sempre à vista no topo do dia (em dia cheio o "Adicionar bloco" do fim fica lá embaixo)
                 (S.placing ? '' : '<button type="button" class="ag-add-top shrink-0 w-9 rounded-tr-2xl flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900" data-add-day="' + day + '" title="Adicionar bloco neste dia" aria-label="Adicionar bloco em ' + WD3[d.getDay()] + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '"><i class="ph-bold ph-plus"></i></button>') +
                 '</div>' +
                 '<div class="ag-list thin-scroll flex-1 min-h-[44px] overflow-y-auto px-2 pb-2 flex flex-col gap-1.5" data-day="' + day + '">' +
-                weekListHtml(list, day, today, nm) + '</div></section>';
+                weekListHtml(all, day, today, nm) + '</div></section>';
         }
         wrap.innerHTML = html;
         wrap.querySelectorAll('.ag-list').forEach(function (el) { if (scroll[el.dataset.day] != null) el.scrollTop = scroll[el.dataset.day]; });
         var a = parseYmd(anchor), z = parseYmd(addDays(anchor, 6));
         $('ag-label').textContent = a.getDate() + (a.getMonth() === z.getMonth() ? '' : ' de ' + MES[a.getMonth()].slice(0, 3)) + ' a ' + z.getDate() + ' de ' + MES[z.getMonth()].slice(0, 3) +
             (z.getFullYear() !== new Date().getFullYear() ? ' de ' + z.getFullYear() : '');
-        return total ? countLabel(total) + ' em 7 dias · ' + fmtDur(mins) + ' planejados' : 'Nada agendado nestes 7 dias';
+        return (total ? countLabel(total) + ' em 7 dias · ' + fmtDur(mins) + ' planejados' : filt && hiddenAll ? 'Nenhum bloco com esse filtro' : 'Nada agendado nestes 7 dias') +
+            (filt && hiddenAll ? ' · ' + hiddenAll + (hiddenAll === 1 ? ' escondido pelo filtro' : ' escondidos pelo filtro') : '');
     }
 
     // V40.14.0: miolo do bloco na régua do Dia. Fica separado pra redesenhar só o bloco enquanto ele é arrastado ou
@@ -722,9 +862,13 @@
             html += '<div class="absolute left-0 right-0 border-t border-zinc-200" style="top:' + y + 'px"></div>' +
                 '<span class="absolute left-0 w-12 text-right text-[11px] font-medium text-zinc-400 tabular-nums" style="top:' + (y - 7) + 'px">' + pad(h) + ':00</span>';
         }
+        var shownN = 0, shownMin = 0;
         list.forEach(function (b) {
             var tag = tagOf(b.tag_id), paint = paintOf(b.completed ? null : b.color);
             var top = (b.start_min - h0 * 60) * PXM + 1, height = Math.max(b.duration * PXM - 2, 14);
+            // V40.17.0: escondido pelo filtro → só um contorno apagado (o horário continua ocupado)
+            if (!agVisible(b)) { html += '<div class="ag-hidden" style="top:' + top + 'px;height:' + height + 'px" title="Escondido pelo filtro"></div>'; return; }
+            shownN++; shownMin += Number(b.duration) || 0;
             html += '<div class="ag-card absolute rounded-md border border-l-4 overflow-hidden cursor-pointer px-2 flex items-center gap-2 ' +
                 paint.cls + (b.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-zinc-200') + (isNow(b, day, today, nm) ? ' ag-now' : '') +
                 '" style="left:56px;right:0;top:' + top + 'px;height:' + height + 'px;' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
@@ -732,6 +876,7 @@
         });
         if (day === today && nm >= h0 * 60 && nm <= h1 * 60) html += '<div class="now-line" style="top:' + ((nm - h0 * 60) * PXM) + 'px"></div>';
         if (!list.length) html += '<p class="absolute left-14 right-0 top-10 text-center text-sm text-zinc-500 pointer-events-none">Nada agendado neste dia.' + (S.placing ? '' : ' Clique num horário pra criar um bloco.') + '</p>';
+        else if (!shownN) html += '<p class="absolute left-14 right-0 top-10 text-center text-sm text-zinc-500 pointer-events-none">Nenhum bloco com esse filtro neste dia.</p>';
         box.style.height = ((h1 - h0) * 60 * PXM + 12) + 'px';
         box.innerHTML = html;
         box.classList.toggle('placing', !!S.placing);
@@ -743,6 +888,7 @@
             var focusMin = day === today ? nm : (list.length ? list[0].start_min : h0 * 60);
             $('ag-day').scrollTop = Math.max(0, (focusMin - h0 * 60) * PXM - 120);
         }
+        if (agFiltering() && shownN < list.length) return shownN + ' de ' + countLabel(list.length) + (shownN ? ' · ' + fmtDur(shownMin) : '') + ' · ' + (list.length - shownN) + (list.length - shownN === 1 ? ' escondido pelo filtro' : ' escondidos pelo filtro');
         return list.length ? countLabel(list.length) + ' · ' + fmtDur(sumMin(list)) + ' planejados' : 'Dia livre';
     }
 
@@ -924,7 +1070,7 @@
         if (!S.agAnchor) S.agAnchor = today;
         $('ag-banner').classList.toggle('hidden', Object.keys(map).length > 0 || !S.lastLoad);
         var pl = S.placing, pb = $('ag-place');
-        if (pl && (!S.tarefas[pl.id] || S.tarefas[pl.id].deleted)) pl = S.placing = null; // a tarefa saiu da lista em outro aparelho
+        if (pl && !placingAlive(pl)) pl = S.placing = null; // a tarefa (ou rotina) foi apagada em outro aparelho
         pb.classList.toggle('hidden', !pl);
         pb.classList.toggle('flex', !!pl);
         if (pl) {
@@ -935,24 +1081,31 @@
         $('ag-tip').textContent = pl ? '' : S.agView === 'day' ? 'Arraste um bloco pra mudar o horário. Puxe a borda de baixo pra mudar a duração.'
             : 'Arraste um bloco pra outro dia ou pra um espaço livre. Horário exato e duração: clique no nome do dia.';
         document.querySelectorAll('.ag-view').forEach(function (b) { b.classList.toggle('on', b.dataset.view === S.agView); });
+        renderAgFilter();
         $('ag-week').classList.toggle('hidden', S.agView !== 'week');
         $('ag-day').classList.toggle('hidden', S.agView !== 'day');
         $('board-summary').textContent = S.agView === 'day' ? renderDay(S.agAnchor, map, today, nowMin()) : renderWeek(S.agAnchor, map, today, nowMin());
     }
 
+    var TABS = ['listas', 'agenda', 'rotinas', 'notas']; // V40.17.0: + Rotinas e Notas
     function setTab(tab) {
-        S.tab = tab === 'agenda' ? 'agenda' : 'listas';
+        var prev = S.tab;
+        S.tab = TABS.indexOf(tab) >= 0 ? tab : 'listas';
+        if (prev === 'notas' && S.tab !== 'notas') ntFlush(); // saindo das Notas: salva o que está escrito
         try { localStorage.setItem('faz_pc_tab', S.tab); } catch (e) {}
         $('board').classList.toggle('hidden', S.tab !== 'listas');
-        $('agenda').classList.toggle('hidden', S.tab !== 'agenda');
-        $('agenda').classList.toggle('flex', S.tab === 'agenda');
+        ['agenda', 'rotinas', 'notas'].forEach(function (t) {
+            $(t).classList.toggle('hidden', S.tab !== t);
+            $(t).classList.toggle('flex', S.tab === t);
+        });
         document.querySelectorAll('.tab').forEach(function (b) {
             b.classList.toggle('on', b.dataset.tab === S.tab);
             b.setAttribute('aria-selected', b.dataset.tab === S.tab ? 'true' : 'false');
         });
-        if (S.tab === 'agenda') { closeComposer(); closeColMenu(); S.agScrolled = null; renderAgenda(); }
-        else if (S.placing) cancelPlacing(); // voltou pras Listas com a tarefa na mão: ela continua lá
-        else render();
+        if (S.tab === 'agenda') { closeComposer(); closeColMenu(); S.agScrolled = null; renderAgenda(); return; }
+        if (S.placing) cancelPlacing(); // saiu da Agenda com algo na mão: nada é agendado
+        if (S.tab === 'listas') render();
+        else { closeComposer(); closeColMenu(); renderSide(); }
     }
 
     // ---------- adicionar tarefa (direto na coluna) ----------
@@ -1387,19 +1540,23 @@
         document.querySelector('[data-date-for="f-sched-date"]').focus();
     }
     // Cria o bloco a partir da tarefa e só depois tira a tarefa da lista (se o bloco não entrar, nada muda).
+    // V40.17.0: a origem também pode ser uma rotina (src.kind === 'rotinas'): a rotina continua existindo,
+    // e o bloco leva o tipo dela (Foco ou Descanso), como o "carimbar" do app.
+    function placingAlive(src) { var k = src.kind === 'rotinas' ? 'rotinas' : 'tarefas', r = S[k][src.id]; return !!r && !r.deleted; }
     async function createBlockFromTask(src, day, slot, asked) {
-        var t = S.tarefas[src.id];
-        if (!t || t.deleted) { toast('Essa tarefa foi apagada em outro aparelho.'); return false; }
+        var isRt = src.kind === 'rotinas';
+        if (!placingAlive(src)) { toast(isRt ? 'Essa rotina foi apagada em outro aparelho.' : 'Essa tarefa foi apagada em outro aparelho.'); return false; }
         var n = Date.now();
         var block = {
             user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: slot, duration: src.dur, title: src.title,
-            type: blockType(day, slot, src.dur), theme: 'focus', tag_id: src.tag || null,
+            type: blockType(day, slot, src.dur), theme: src.theme === 'rest' ? 'rest' : 'focus', tag_id: src.tag || null,
             microblocks: normMbs(src.mbs).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: false }; }),
             completed: false, was_delayed: false, linked_note_ids: [], color: src.color || null, archived: false, deleted: false
         };
         if (!(await insertRow('blocos', block))) return false;
-        await patchRow('tarefas', src.id, { deleted: true },
-            'Agendado para ' + dayLabel(day) + ' às ' + clock(slot) + (asked != null && slot !== asked ? ' (às ' + clock(asked) + ' já tinha bloco)' : ''));
+        var where = dayLabel(day) + ' às ' + clock(slot) + (asked != null && slot !== asked ? ' (às ' + clock(asked) + ' já tinha bloco)' : '');
+        if (isRt) { toast('Rotina na Agenda: ' + where); return true; }
+        await patchRow('tarefas', src.id, { deleted: true }, 'Agendado para ' + where);
         return true;
     }
     function formAsSource() { // o que está escrito no cartão aberto, mesmo sem salvar
@@ -1435,11 +1592,12 @@
     }
     function cancelPlacing() {
         if (!S.placing) return;
+        var wasRt = S.placing.kind === 'rotinas';
         S.placing = null;
         $('ag-place').classList.add('hidden'); // (a Agenda pode não estar na tela: renderAgenda não roda nesse caso)
         $('ag-place').classList.remove('flex');
         renderAgenda();
-        toast('Nada foi agendado. A tarefa continua na lista.');
+        toast(wasRt ? 'Nada foi agendado.' : 'Nada foi agendado. A tarefa continua na lista.');
     }
     async function placeHere(day, st) {
         var p = S.placing;
@@ -1449,7 +1607,272 @@
         if (slot === null) return toast('Esse dia não tem um espaço livre de ' + fmtDur(p.dur) + '.');
         S.placing = null;
         renderAgenda();
-        if (!(await createBlockFromTask(p, day, slot, st)) && S.tarefas[p.id] && !S.tarefas[p.id].deleted) { S.placing = p; renderAgenda(); } // não deu: a tarefa volta pra mão
+        if (!(await createBlockFromTask(p, day, slot, st)) && placingAlive(p)) { S.placing = p; renderAgenda(); } // não deu: volta pra mão
+    }
+
+    // ---------- V40.17.0: ROTINAS (as mesmas do celular) ----------
+    var THEME_LABEL = { focus: 'Foco', rest: 'Descanso' };
+    function aliveNewest(kind) { // rotinas e notas: das mais novas pras mais antigas (igual ao app)
+        return Object.keys(S[kind]).map(function (k) { return S[kind][k]; }).filter(function (r) { return !r.deleted; })
+            .sort(function (a, b) { return ((Number(b.created_ms) || 0) - (Number(a.created_ms) || 0)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
+    }
+    function rtTitles(a) { return (Array.isArray(a) ? a : []).map(function (m) { return String((m && m.title) || '').trim(); }).filter(Boolean); }
+    function rtCardHtml(r) {
+        var tag = tagOf(r.tag_id), mbs = rtTitles(r.microblocks), shown = mbs.slice(0, 4), rest = mbs.length - shown.length;
+        return '<article class="rt-card bg-white border border-zinc-200 border-l-4 rounded-2xl p-4 cursor-pointer hover:border-zinc-300 hover:shadow-sm transition-shadow" style="border-left-color:' +
+            esc(safeColor(tag ? tag.color : '#d4d4d8')) + '" tabindex="0" data-rt="' + esc(r.id) + '">' +
+            '<div class="flex items-start gap-3">' +
+            '<span class="w-10 h-10 shrink-0 rounded-xl bg-zinc-100 flex items-center justify-center text-xl leading-none">' + (esc(r.emoji) || '✨') + '</span>' +
+            '<div class="min-w-0 flex-1">' +
+            '<h3 class="text-[14px] font-bold text-zinc-900 leading-snug break-words">' + (esc(r.title) || '<span class="text-zinc-400">Sem nome</span>') + '</h3>' +
+            '<p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">' +
+            '<span class="inline-flex items-center gap-1"><i class="ph ph-clock"></i>' + fmtDur(r.duration) + '</span>' +
+            '<span class="inline-flex items-center gap-1"><i class="ph ' + (r.theme === 'rest' ? 'ph-coffee' : 'ph-lightning') + '"></i>' + (THEME_LABEL[r.theme] || 'Foco') + '</span>' +
+            (tag ? '<span class="inline-flex items-center gap-1.5 font-medium text-zinc-600"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
+            '</p></div>' +
+            '<button type="button" class="shrink-0 w-8 h-8 -mr-1 -mt-1 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100" data-rt-hand="' + esc(r.id) +
+            '" title="Levar pra Agenda e clicar onde quer colocar" aria-label="Colocar a rotina na Agenda"><i class="ph ph-hand-pointing text-lg"></i></button>' +
+            '</div>' +
+            (mbs.length ? '<ul class="mt-3 flex flex-col gap-1">' + shown.map(function (t) {
+                return '<li class="flex items-center gap-2 text-[12.5px] text-zinc-600"><i class="ph ph-square text-zinc-400 shrink-0"></i><span class="min-w-0 truncate">' + esc(t) + '</span></li>';
+            }).join('') + (rest > 0 ? '<li class="pl-6 text-[12px] text-zinc-400">+' + rest + (rest === 1 ? ' item' : ' itens') + '</li>' : '') + '</ul>' : '') +
+            '</article>';
+    }
+    function renderRotinas() {
+        if (!S.uid || S.tab !== 'rotinas') return;
+        var list = aliveNewest('rotinas');
+        $('board-summary').textContent = list.length + (list.length === 1 ? ' rotina' : ' rotinas');
+        $('rt-grid').innerHTML = list.map(rtCardHtml).join('');
+        $('rt-empty').classList.toggle('hidden', list.length > 0 || !S.lastLoad);
+        if (S.rtEdit && S.rtEdit.id && !(S.rotinas[S.rtEdit.id] && !S.rotinas[S.rtEdit.id].deleted)) { closeRoutine(); toast('Essa rotina foi apagada em outro aparelho.'); }
+    }
+    function rtDurOptions(cur) { // como o app: de 5 em 5 até 15 min, depois de 15 em 15, até 8h
+        var o = [5, 10];
+        for (var m = 15; m <= 480; m += 15) o.push(m);
+        if (o.indexOf(cur) < 0) { o.push(cur); o.sort(function (a, b) { return a - b; }); }
+        return o.map(function (m) { return '<option value="' + m + '"' + (m === cur ? ' selected' : '') + '>' + fmtDur(m) + '</option>'; }).join('');
+    }
+    function openRoutine(id) {
+        var r = id ? S.rotinas[id] : null;
+        if (id && (!r || r.deleted)) return;
+        S.rtEdit = { id: id || null, tag: r && tagOf(r.tag_id) ? r.tag_id : null, theme: r && r.theme === 'rest' ? 'rest' : 'focus', mbs: rtTitles(r && r.microblocks) };
+        $('rt-f-emoji').value = r ? (r.emoji || '') : '✨';
+        $('rt-f-title').value = r ? (r.title || '') : '';
+        var dur = r ? Math.max(5, Math.min(1440, Math.round(Number(r.duration) || 60))) : 60;
+        $('rt-f-dur').innerHTML = rtDurOptions(dur);
+        $('rt-f-delete').classList.toggle('hidden', !id);
+        $('rt-f-mb-new').value = '';
+        renderRtTheme(); renderRtTags(); renderRtMbs();
+        var m = $('modal-rt');
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+        $('rt-f-title').focus();
+    }
+    function closeRoutine() {
+        S.rtEdit = null;
+        $('modal-rt').classList.add('hidden');
+        $('modal-rt').classList.remove('flex');
+    }
+    function renderRtTheme() {
+        document.querySelectorAll('#rt-f-theme .rt-theme').forEach(function (b) {
+            var on = !!S.rtEdit && b.dataset.theme === S.rtEdit.theme;
+            b.classList.toggle('on', on);
+            b.setAttribute('aria-checked', on ? 'true' : 'false');
+        });
+    }
+    function renderRtTags() {
+        var ed = S.rtEdit;
+        var chip = function (id, label, color) {
+            var on = (ed.tag || null) === id;
+            return '<button type="button" data-tag="' + esc(id || '') + '" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50' + (on ? ' chip-on' : '') + '">' +
+                (color ? '<span class="w-2.5 h-2.5 rounded-full" style="background:' + esc(safeColor(color)) + '"></span>' : '<i class="ph ph-prohibit text-zinc-400"></i>') + esc(label) + '</button>';
+        };
+        $('rt-f-tags').innerHTML = chip(null, 'Sem tag', null) + alive('tags').map(function (t) { return chip(t.id, t.name, t.color); }).join('');
+    }
+    function renderRtMbs() {
+        $('rt-f-mbs').innerHTML = S.rtEdit.mbs.map(function (t, i) {
+            return '<div class="group flex items-center gap-2 px-1 py-1 rounded-lg hover:bg-zinc-50">' +
+                '<i class="ph ph-square text-zinc-400"></i>' +
+                '<input data-rt-mb="' + i + '" value="' + esc(t) + '" maxlength="200" class="flex-1 min-w-0 text-sm text-zinc-800 outline-none bg-transparent py-0.5" aria-label="Item ' + (i + 1) + ' da checklist">' +
+                '<button type="button" data-rt-mb-del="' + i + '" class="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus:opacity-100" aria-label="Tirar o item"><i class="ph ph-x"></i></button>' +
+                '</div>';
+        }).join('');
+    }
+    function rtFields() { // o que está escrito na janela, no formato da nuvem
+        var ed = S.rtEdit;
+        return {
+            title: $('rt-f-title').value.trim(),
+            emoji: $('rt-f-emoji').value.trim() || '✨',
+            duration: parseInt($('rt-f-dur').value, 10) || 60,
+            theme: ed.theme,
+            tag_id: ed.tag && tagOf(ed.tag) ? ed.tag : null,
+            microblocks: ed.mbs.map(function (t) { return String(t || '').trim(); }).filter(Boolean).map(function (t) { return { title: t }; })
+        };
+    }
+    // Salva a rotina aberta. Devolve o id (ou null se não deu). Só os campos que mudaram sobem.
+    async function saveRoutine() {
+        var ed = S.rtEdit;
+        if (!ed) return null;
+        var f = rtFields();
+        if (!f.title) { $('rt-f-title').focus(); toast('A rotina precisa de um nome.'); return null; }
+        if (ed.id) {
+            var r = S.rotinas[ed.id];
+            if (!r || r.deleted) { closeRoutine(); toast('Essa rotina foi apagada em outro aparelho.'); return null; }
+            var changed = {};
+            Object.keys(f).forEach(function (k) { if (JSON.stringify(f[k]) !== JSON.stringify(r[k] == null ? null : r[k])) changed[k] = f[k]; });
+            var id = ed.id;
+            closeRoutine();
+            if (Object.keys(changed).length && !(await patchRow('rotinas', id, changed, 'Rotina salva'))) return null;
+            return id;
+        }
+        var row = Object.assign({ user_id: S.uid, id: newId('rt_', 'rotinas'), created_ms: Date.now(), deleted: false }, f);
+        closeRoutine();
+        return (await insertRow('rotinas', row, 'Rotina criada')) ? row.id : null;
+    }
+    async function deleteRoutine() {
+        var ed = S.rtEdit;
+        if (!ed || !ed.id) return;
+        var r = S.rotinas[ed.id];
+        var yes = await dialog({ title: 'Apagar a rotina?', text: '"' + ((r && r.title) || 'Sem nome') + '" sai daqui e do celular. Os blocos que ela já colocou na Agenda continuam lá.', okLabel: 'Apagar', danger: true });
+        if (!yes || !S.rtEdit || S.rtEdit.id !== ed.id) return;
+        closeRoutine();
+        await patchRow('rotinas', ed.id, { deleted: true }, 'Rotina apagada');
+    }
+    function startPlacingRoutine(id) {
+        var r = S.rotinas[id];
+        if (!r || r.deleted) return;
+        startPlacing({
+            kind: 'rotinas', id: id, title: (r.emoji ? r.emoji + ' ' : '') + (r.title || ''), // o app põe o emoji na frente do nome
+            dur: Number(r.duration) > 0 ? Number(r.duration) : 30, tag: tagOf(r.tag_id) ? r.tag_id : null,
+            theme: r.theme === 'rest' ? 'rest' : 'focus', color: null, mbs: rtTitles(r.microblocks).map(function (t) { return { title: t, done: false }; })
+        });
+    }
+
+    // ---------- V40.17.0: NOTAS (as mesmas do celular). Salva sozinho 0,9s depois de parar de escrever. ----------
+    var ntT = null;
+    function noteLabel(n) {
+        var t = String(n.title || '').trim();
+        if (t) return t;
+        var c = String(n.content || '').trim().split('\n')[0];
+        return c ? c.slice(0, 80) : 'Nota sem título';
+    }
+    function fmtWhen(ms) {
+        ms = Number(ms);
+        if (!ms) return '';
+        var d = new Date(ms);
+        return ymd(d) === todayStr() ? 'hoje, ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) : pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear();
+    }
+    function ntItemHtml(n, on) {
+        var hasTitle = !!String(n.title || '').trim(), body = String(n.content || '').trim();
+        var snippet = (hasTitle ? body : body.split('\n').slice(1).join(' ')).replace(/\s+/g, ' ').slice(0, 160);
+        return '<button type="button" class="nt-item w-full text-left rounded-xl px-3 py-2.5 hover:bg-white' + (on ? ' on' : '') + '" data-nt="' + esc(n.id) + '">' +
+            '<p class="text-[13.5px] font-semibold text-zinc-900 truncate">' + esc(noteLabel(n)) + '</p>' +
+            (snippet ? '<p class="mt-0.5 text-[12px] text-zinc-500 leading-snug line-clamp-2 break-words">' + esc(snippet) + '</p>' : '') +
+            '<p class="mt-1 text-[11px] text-zinc-400">' + esc(fmtWhen(n.updated_ms || n.created_ms)) + '</p></button>';
+    }
+    function renderNotas() {
+        if (!S.uid || S.tab !== 'notas') return;
+        var all = aliveNewest('notas'), q = S.ntQuery.trim().toLowerCase(), nt = S.nt;
+        var list = q ? all.filter(function (n) { return (String(n.title || '') + '\n' + String(n.content || '')).toLowerCase().indexOf(q) >= 0; }) : all;
+        $('board-summary').textContent = all.length + (all.length === 1 ? ' nota' : ' notas');
+        // a nota aberta foi apagada ou mudou em outro aparelho
+        if (nt && nt.id) {
+            var cur = S.notas[nt.id];
+            if (!cur || cur.deleted) {
+                if (nt.dirty || $('nt-title').value.trim() || $('nt-content').value.trim()) { nt.id = null; nt.draft = true; nt.dirty = true; ntSchedule(); toast('Essa nota foi apagada em outro aparelho. O que você escreveu vira uma nota nova.', 4200); }
+                else { ntClose(); toast('Essa nota foi apagada em outro aparelho.'); }
+            } else if (!nt.dirty && !nt.saving && ($('nt-title').value.trim() !== String(cur.title || '').trim() || $('nt-content').value !== (cur.content || ''))) {
+                // (o título é gravado sem espaço nas pontas: comparar sem eles, senão o espaço digitado no fim sumiria)
+                $('nt-title').value = cur.title || '';
+                $('nt-content').value = cur.content || '';
+            }
+        }
+        nt = S.nt;
+        var draft = nt && nt.draft ? '<div class="nt-item on w-full rounded-xl px-3 py-2.5"><p class="text-[13.5px] font-semibold text-zinc-900 truncate">' +
+            esc(noteLabel({ title: $('nt-title').value, content: $('nt-content').value }) === 'Nota sem título' ? 'Nota nova' : noteLabel({ title: $('nt-title').value, content: $('nt-content').value })) + '</p><p class="mt-1 text-[11px] text-zinc-400">ainda não salva</p></div>' : '';
+        $('nt-list').innerHTML = draft + list.map(function (n) { return ntItemHtml(n, !!nt && nt.id === n.id); }).join('') +
+            (!list.length && !draft ? '<p class="px-3 py-6 text-center text-[13px] text-zinc-500">' + (q ? 'Nenhuma nota com "' + esc(S.ntQuery.trim()) + '".' : 'Nenhuma nota ainda.') + '</p>' : '');
+        ntMeta();
+    }
+    function ntShowForm(on) {
+        $('nt-none').classList.toggle('hidden', on);
+        $('nt-form').classList.toggle('hidden', !on);
+        $('nt-form').classList.toggle('flex', on);
+    }
+    function ntMeta() {
+        var nt = S.nt, n = nt && nt.id ? S.notas[nt.id] : null;
+        $('nt-meta').textContent = n ? 'Criada ' + (ymd(new Date(Number(n.created_ms) || 0)) === todayStr() ? 'hoje' : 'em ' + fmtWhen(n.created_ms)) +
+            (n.updated_ms && n.updated_ms !== n.created_ms ? ' · editada ' + fmtWhen(n.updated_ms) : '') : (nt ? 'Nota nova' : '');
+        $('nt-status').textContent = !nt ? '' : nt.saving ? 'Salvando…' : nt.dirty ? 'Não salvo ainda' : nt.id ? 'Salvo' : '';
+        $('nt-delete').classList.toggle('hidden', !(nt && nt.id));
+    }
+    async function openNote(id) {
+        await ntFlush();
+        var n = S.notas[id];
+        if (!n || n.deleted) return;
+        S.nt = { id: id, draft: false, dirty: false, saving: false };
+        $('nt-title').value = n.title || '';
+        $('nt-content').value = n.content || '';
+        ntShowForm(true);
+        renderNotas();
+        $('nt-content').focus();
+    }
+    async function newNote() {
+        await ntFlush();
+        S.nt = { id: null, draft: true, dirty: false, saving: false };
+        $('nt-title').value = '';
+        $('nt-content').value = '';
+        ntShowForm(true);
+        renderNotas();
+        $('nt-title').focus();
+    }
+    function ntClose() { clearTimeout(ntT); S.nt = null; ntShowForm(false); }
+    function ntSchedule() { clearTimeout(ntT); ntT = setTimeout(ntSave, 900); }
+    function ntInput() {
+        if (!S.nt) return;
+        S.nt.dirty = true;
+        ntMeta();
+        ntSchedule();
+        if (S.nt.draft) renderNotas(); // o item "Nota nova" da lista acompanha o que está sendo escrito
+    }
+    async function ntSave() {
+        clearTimeout(ntT);
+        var nt = S.nt;
+        if (!nt || !nt.dirty) return;
+        if (nt.saving) { ntSchedule(); return; } // termina a gravação anterior primeiro
+        var title = $('nt-title').value, content = $('nt-content').value, now = Date.now();
+        nt.dirty = false;
+        nt.saving = true;
+        ntMeta();
+        var ok = true;
+        if (!nt.id) {
+            if (!title.trim() && !content.trim()) { nt.saving = false; ntMeta(); return; } // nota vazia não é criada
+            var row = { user_id: S.uid, id: 'note_' + now + '_' + Math.random().toString(36).slice(2, 9), title: title.trim(), content: content, created_ms: now, updated_ms: now, deleted: false };
+            ok = await insertRow('notas', row);
+            if (ok && S.nt === nt) { nt.id = row.id; nt.draft = false; }
+        } else {
+            var cur = S.notas[nt.id], fields = {};
+            if (cur && !cur.deleted) {
+                if (title.trim() !== (cur.title || '')) fields.title = title.trim();
+                if (content !== (cur.content || '')) fields.content = content;
+                if (Object.keys(fields).length) { fields.updated_ms = now; ok = await patchRow('notas', nt.id, fields); }
+            }
+        }
+        nt.saving = false;
+        if (!ok) nt.dirty = true; // não deu (internet?): continua marcada pra tentar de novo
+        if (S.nt === nt) { renderNotas(); if (nt.dirty) ntSchedule(); }
+    }
+    async function ntFlush() { if (S.nt && (S.nt.dirty || S.nt.saving)) { await ntSave(); var g = 0; while (S.nt && S.nt.saving && g++ < 100) await new Promise(function (r) { setTimeout(r, 30); }); } }
+    async function deleteNote() {
+        var nt = S.nt;
+        if (!nt || !nt.id) return;
+        var n = S.notas[nt.id];
+        var yes = await dialog({ title: 'Apagar a nota?', text: '"' + noteLabel(n || {}) + '" sai daqui e do celular.', okLabel: 'Apagar', danger: true });
+        if (!yes || S.nt !== nt) return;
+        var id = nt.id;
+        ntClose();
+        await patchRow('notas', id, { deleted: true }, 'Nota apagada');
+        renderNotas();
     }
 
     // ---------- V40.12.0: calendário e hora próprios, sempre em português e em 24h ----------
@@ -1700,6 +2123,77 @@
         $('f-cancel').addEventListener('click', closeTask);
         $('f-delete').addEventListener('click', deleteTask);
         $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this) closeTask(); });
+
+        // V40.17.0: Rotinas
+        $('rt-new').addEventListener('click', function () { openRoutine(null); });
+        $('rt-grid').addEventListener('click', function (e) {
+            var h = e.target.closest('[data-rt-hand]');
+            if (h) { e.stopPropagation(); return startPlacingRoutine(h.dataset.rtHand); }
+            var c = e.target.closest('[data-rt]');
+            if (c) openRoutine(c.dataset.rt);
+        });
+        $('rt-grid').addEventListener('keydown', function (e) {
+            var c = e.target.closest && e.target.closest('[data-rt]');
+            if (c && e.target === c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openRoutine(c.dataset.rt); }
+        });
+        $('modal-rt').addEventListener('mousedown', function (e) { if (e.target === this) closeRoutine(); });
+        $('rt-f-cancel').addEventListener('click', closeRoutine);
+        $('rt-f-save').addEventListener('click', function () { saveRoutine(); });
+        $('rt-f-delete').addEventListener('click', function () { deleteRoutine(); });
+        $('rt-f-hand').addEventListener('click', async function () { var id = await saveRoutine(); if (id) startPlacingRoutine(id); });
+        $('rt-f-theme').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-theme]');
+            if (!b || !S.rtEdit) return;
+            S.rtEdit.theme = b.dataset.theme === 'rest' ? 'rest' : 'focus';
+            renderRtTheme();
+        });
+        $('rt-f-tags').addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-tag]');
+            if (!b || !S.rtEdit) return;
+            S.rtEdit.tag = b.dataset.tag || null;
+            renderRtTags();
+        });
+        $('rt-f-mbs').addEventListener('input', function (e) {
+            var i = e.target.dataset.rtMb;
+            if (i != null && S.rtEdit) S.rtEdit.mbs[Number(i)] = e.target.value;
+        });
+        $('rt-f-mbs').addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-rt-mb-del]');
+            if (!b || !S.rtEdit) return;
+            S.rtEdit.mbs.splice(Number(b.dataset.rtMbDel), 1);
+            renderRtMbs();
+        });
+        $('rt-f-mb-new').addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' || !S.rtEdit) return;
+            e.preventDefault();
+            var v = this.value.trim();
+            if (!v) return;
+            S.rtEdit.mbs.push(v);
+            this.value = '';
+            renderRtMbs();
+        });
+        $('rt-f-title').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); saveRoutine(); } });
+
+        // V40.17.0: Notas
+        $('nt-new').addEventListener('click', function () { newNote(); });
+        $('nt-list').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-nt]');
+            if (b && !(S.nt && S.nt.id === b.dataset.nt)) openNote(b.dataset.nt);
+        });
+        $('nt-search').addEventListener('input', function () { S.ntQuery = this.value; renderNotas(); });
+        ['nt-title', 'nt-content'].forEach(function (id) {
+            $(id).addEventListener('input', ntInput);
+            $(id).addEventListener('blur', function () { if (S.nt && S.nt.dirty) ntSave(); });
+            $(id).addEventListener('keydown', function (e) {
+                if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); ntSave(); }
+            });
+        });
+        $('nt-title').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('nt-content').focus(); } });
+        $('nt-delete').addEventListener('click', function () { deleteNote(); });
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') ntFlush(); });
+        window.addEventListener('beforeunload', function (e) { // ainda tem texto da nota sem salvar: salva e pergunta antes de sair
+            if (S.nt && (S.nt.dirty || S.nt.saving)) { ntSave(); e.preventDefault(); e.returnValue = ''; }
+        });
         // V40.11.0: concluir, agendar e voltar pra lista
         $('f-done').addEventListener('click', function () { if (S.editing && S.editing.kind === 'blocos' && !S.editing.isNew) toggleDone(S.editing.id); });
         // V40.13.0: bloco novo → trocar o dia sugere de novo o horário, até a pessoa escolher um
@@ -1781,6 +2275,7 @@
             if (!$('dialog').classList.contains('hidden')) return;
             if (!$('cal-pop').classList.contains('hidden')) return closeCal();
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
+            if (S.rtEdit) return closeRoutine(); // V40.17.0
             if (menuEl) return closeColMenu();
             if (S.editing) return closeTask();
             if (S.placing) return cancelPlacing();
@@ -1796,6 +2291,17 @@
                 S.agScrolled = null;
                 renderAgenda();
             });
+        });
+        // V40.17.0: filtro da Agenda (lembrado neste computador)
+        $('ag-tag').addEventListener('change', function () {
+            S.agTag = this.value || '';
+            try { localStorage.setItem('faz_pc_ag_tag', S.agTag); } catch (e) {}
+            renderAgenda();
+        });
+        $('ag-hide-done').addEventListener('click', function () {
+            S.agHideDone = !S.agHideDone;
+            try { localStorage.setItem('faz_pc_ag_hidedone', S.agHideDone ? '1' : '0'); } catch (e) {}
+            renderAgenda();
         });
         function agMove(sign) { S.agAnchor = addDays(S.agAnchor || todayStr(), sign * (S.agView === 'week' ? 7 : 1)); S.agScrolled = null; renderAgenda(); }
         $('ag-prev').addEventListener('click', function () { agMove(-1); });
@@ -2049,6 +2555,7 @@
         if (!session) {
             unsubscribe();
             S.uid = null; S.listas = {}; S.tags = {}; S.tarefas = {}; S.blocos = {}; S.lastLoad = 0; S.composer = null;
+            S.rotinas = {}; S.notas = {}; S.financas = {}; closeRoutine(); ntClose(); // V40.17.0
             closeTask();
             S.placing = null;
             closeArchive();
@@ -2064,6 +2571,7 @@
         show('view-board');
         var savedTab = 'listas';
         try { savedTab = localStorage.getItem('faz_pc_tab') || 'listas'; S.agView = localStorage.getItem('faz_pc_agview') === 'day' ? 'day' : 'week'; } catch (e) {}
+        try { S.agTag = localStorage.getItem('faz_pc_ag_tag') || ''; S.agHideDone = localStorage.getItem('faz_pc_ag_hidedone') === '1'; } catch (e) {} // V40.17.0
         setTab(savedTab);
         loadAll();
         subscribe();

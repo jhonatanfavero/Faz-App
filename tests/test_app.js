@@ -63,7 +63,7 @@ async function waitFor(fn, ms = 9000, step = 50) { const t0 = Date.now(); while 
   w.eval('saveBacklog(); saveTags(); saveBacklogColumns();');
   await sleep(100);
   ok(server.log.length === 0, 'salvar sem login não manda nada pra lugar nenhum');
-  ok($('sync-menu-status').textContent === 'Listas e Agenda no computador', 'menu Config mostra "Listas e Agenda no computador"');
+  ok($('sync-menu-status').textContent === 'Listas, Agenda, Rotinas, Notas e Finanças no computador', 'menu Config mostra "Listas, Agenda, Rotinas, Notas e Finanças no computador"');
 
   console.log('\nB) Config → Sincronizar → Entrar (1ª sincronização):');
   w.openConfigSheet();

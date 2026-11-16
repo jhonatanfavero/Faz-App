@@ -6,12 +6,19 @@ const COLUMNS = {
   blocos: ['user_id', 'id', 'date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'deleted', 'updated_at'],
   listas: ['user_id', 'id', 'name', 'is_default', 'position', 'created_ms', 'deleted', 'updated_at'],
   tags: ['user_id', 'id', 'name', 'color', 'position', 'deleted', 'updated_at'],
+  // V40.17.0
+  rotinas: ['user_id', 'id', 'title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms', 'deleted', 'updated_at'],
+  notas: ['user_id', 'id', 'title', 'content', 'created_ms', 'updated_ms', 'deleted', 'updated_at'],
+  financas: ['user_id', 'id', 'title', 'amount', 'start_month', 'duration_months', 'is_recurring', 'due_day', 'tag_id', 'paid_months', 'amount_overrides', 'created_ms', 'deleted', 'updated_at'],
 };
 const DEFAULTS = {
   tarefas: { column_id: 'col_geral', title: '', duration: 30, tag_id: null, microblocks: [], position: 0, color: null, archived: false, deleted: false },
   blocos: { title: '', type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, deleted: false },
   listas: { name: '', is_default: false, position: 0, created_ms: null, deleted: false },
   tags: { name: '', color: '#a1a1aa', position: 0, deleted: false },
+  rotinas: { title: '', emoji: '', duration: 60, theme: 'focus', tag_id: null, microblocks: [], created_ms: null, deleted: false },
+  notas: { title: '', content: '', created_ms: null, updated_ms: null, deleted: false },
+  financas: { title: '', amount: 0, duration_months: 1, is_recurring: false, due_day: null, tag_id: null, paid_months: [], amount_overrides: {}, created_ms: null, deleted: false },
 };
 
 function check(table, r) { // mesmas CHECKs da migration
@@ -25,6 +32,35 @@ function check(table, r) { // mesmas CHECKs da migration
     for (const k of ['start_min', 'duration']) if (k in r && (!Number.isInteger(r[k]) || r[k] < 0 || r[k] > 1440)) return bad(k);
     for (const k of ['microblocks', 'linked_note_ids']) if (k in r && !Array.isArray(r[k])) return bad(k);
     for (const k of ['completed', 'was_delayed']) if (k in r && typeof r[k] !== 'boolean') return bad(k);
+    return null;
+  }
+  // V40.17.0: mesmos CHECKs da migration faz_v40_17_0_rotinas_notas_financas
+  const txt = (k, max) => k in r && (typeof r[k] !== 'string' || [...r[k]].length > max);
+  const int = (k, lo, hi) => k in r && (!Number.isInteger(r[k]) || r[k] < lo || r[k] > hi);
+  const ms = (k) => k in r && r[k] !== null && !Number.isFinite(r[k]);
+  const tag = () => 'tag_id' in r && r.tag_id !== null && (typeof r.tag_id !== 'string' || r.tag_id.length > 64);
+  if ('deleted' in r && typeof r.deleted !== 'boolean') return bad('deleted');
+  if (table === 'rotinas') {
+    if (txt('title', 200)) return bad('title'); if (txt('emoji', 16)) return bad('emoji'); if (txt('theme', 32)) return bad('theme');
+    if (int('duration', 0, 1440)) return bad('duration'); if (tag()) return bad('tag_id'); if (ms('created_ms')) return bad('created_ms');
+    if ('microblocks' in r && !Array.isArray(r.microblocks)) return bad('microblocks');
+    return null;
+  }
+  if (table === 'notas') {
+    if (txt('title', 500)) return bad('title'); if (txt('content', 100000)) return bad('content');
+    if (ms('created_ms')) return bad('created_ms'); if (ms('updated_ms')) return bad('updated_ms');
+    return null;
+  }
+  if (table === 'financas') {
+    if (txt('title', 200)) return bad('title');
+    if ('amount' in r && (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || Math.abs(r.amount) > 1e12)) return bad('amount');
+    if ('start_month' in r && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(r.start_month))) return bad('start_month');
+    if (int('duration_months', 1, 1200)) return bad('duration_months');
+    if ('is_recurring' in r && typeof r.is_recurring !== 'boolean') return bad('is_recurring');
+    if ('due_day' in r && r.due_day !== null && (!Number.isInteger(r.due_day) || r.due_day < 1 || r.due_day > 31)) return bad('due_day');
+    if (tag()) return bad('tag_id'); if (ms('created_ms')) return bad('created_ms');
+    if ('paid_months' in r && !Array.isArray(r.paid_months)) return bad('paid_months');
+    if ('amount_overrides' in r && (!r.amount_overrides || typeof r.amount_overrides !== 'object' || Array.isArray(r.amount_overrides))) return bad('amount_overrides');
     return null;
   }
   if ('position' in r && (typeof r.position !== 'number' || !Number.isFinite(r.position))) return bad('position');
@@ -50,7 +86,7 @@ function check(table, r) { // mesmas CHECKs da migration
 
 function makeServer() {
   const s = {
-    tables: { tarefas: new Map(), listas: new Map(), tags: new Map(), blocos: new Map() },
+    tables: { tarefas: new Map(), listas: new Map(), tags: new Map(), blocos: new Map(), rotinas: new Map(), notas: new Map(), financas: new Map() },
     users: new Map(), clock: 0, log: [], channels: [], storedSession: null, createClientCalls: 0, failNext: 0,
   };
   s.emitters = [];
@@ -104,6 +140,7 @@ class Query {
         const err = check(this.t, r);
         if (err) return { data: null, error: err };
         if (this.op === 'insert' && tb.has(uid + '|' + r.id)) return { data: null, error: { code: '23505', message: 'duplicate key' } };
+        if (this.t === 'financas' && !tb.has(uid + '|' + r.id) && !r.start_month) return { data: null, error: { code: '23502', message: 'null value in column "start_month" violates not-null constraint' } };
       }
       for (const r of this.payload) {
         const key = uid + '|' + r.id, prev = tb.get(key);

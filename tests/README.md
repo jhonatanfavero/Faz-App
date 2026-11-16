@@ -18,8 +18,10 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_v408.js` | idem | agenda na nuvem, blocos de 5 e 10 min, dado corrompido, iOS, esqueci a senha |
 | `test_v409.js` | idem | cor livre do cartão, arquivar e desarquivar |
 | `test_v4091.js` | idem | listas afastadas e seus níveis (1, 1½, 2, 3), menu da lupa, arrastar entre listas, pinça, sync do movimento |
+| `test_v4017.js` | `index.html` + `app.js` + `sync.js` de verdade | rotinas, notas e finanças nos dois sentidos, formulário aberto segura o sync, exemplos só em aparelho novo |
 | `test_atualizacao.js` | idem, partindo do estado gravado pela V40.7.0 | quem já sincronizava numa versão antiga abre a atual: nada se perde, nada é reenviado à toa, nenhuma pergunta aparece |
 | `test_kanban.js` | `kanban.html` de verdade | tela do PC: listas, agenda (semana e dia), arrastar, arquivados, tempo real |
+| `test_kanban_v4017.js` | `kanban.html` de verdade | abas Rotinas e Notas: criar, editar, apagar, rotina na Agenda, nota que salva sozinha, tempo real |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)

@@ -265,3 +265,54 @@ body { overflow-x: hidden; max-width: 100vw; }
 .card-dark .bg-zinc-100.h-px, .card-painted .h-px { background-color: rgba(0, 0, 0, 0.12) !important; }
 .card-dark button.hover\:underline { color: #fff !important; } /* só o link "+ N mais"; os ícones dos botões ficam na cor normal */
 .card-painted .shrink-0 > button { background-color: rgba(255, 255, 255, 0.88) !important; }
+
+/* ========================================================================
+   V40.9.1 — LISTAS AFASTADAS (#backlog-columns-wrapper.lists-zoom): várias listas
+   lado a lado com cartões compactos, pra arrastar de uma lista pra outra.
+   No modo normal só existe o .zoom-col-head, escondido.
+   ======================================================================== */
+.zoom-col-head { display: none; }
+.lists-zoom { scroll-snap-type: none !important; gap: 8px; padding: 0 10px; align-items: flex-start; }
+.lists-zoom::after { content: ''; flex: 0 0 2px; } /* respiro depois da última lista */
+.lists-zoom > [data-column-id] {
+    width: 46% !important; height: auto !important; max-height: 100%;
+    padding: 0 6px 8px 6px !important; scroll-snap-align: none !important;
+    background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 14px;
+}
+.lists-zoom > [data-column-id]:only-child { width: 100% !important; } /* uma lista só: compacta, na largura toda */
+.lists-zoom > [data-column-id].zoom-active { border-color: var(--theme-color, #4f46e5); }
+.lists-zoom .zoom-col-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    position: sticky; top: 0; z-index: 5; background: #f4f4f5;
+    padding: 8px 4px 6px; font-size: 11px; font-weight: 700; color: #3f3f46;
+    text-transform: uppercase; letter-spacing: 0.02em; cursor: pointer;
+}
+.lists-zoom .zoom-col-count { font-size: 10px; font-weight: 700; color: #71717a; flex-shrink: 0; }
+.lists-zoom [data-bl-card], .bl-ghost { padding: 7px 9px !important; margin-bottom: 6px !important; border-radius: 10px !important; }
+.lists-zoom [data-bl-card] > .flex, .bl-ghost > .flex { margin-bottom: 0 !important; }
+/* segurar o dedo num cartão é arrastar: sem seleção de texto nem menu do sistema */
+.lists-zoom [data-bl-card] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.lists-zoom [data-bl-card] h4, .bl-ghost h4 { font-size: 12px !important; white-space: normal !important; overflow-wrap: anywhere; }
+.lists-zoom [data-bl-card] p, .bl-ghost p { font-size: 10px !important; }
+.lists-zoom [data-bl-card] .shrink-0, .lists-zoom [data-bl-card] > .h-px, .lists-zoom [data-bl-card] > .flex.flex-col,
+.bl-ghost .shrink-0, .bl-ghost > .h-px, .bl-ghost > .flex.flex-col { display: none !important; }
+.lists-zoom [data-column-id] > .opacity-50 { padding: 14px 4px !important; }
+.lists-zoom [data-column-id] > .opacity-50 i { font-size: 20px !important; }
+.lists-zoom [data-column-id] > .opacity-50 p:last-child { display: none; }
+/* Arrasto: o cartão que acompanha o dedo, o cartão de origem apagado e o espaço onde ele vai cair */
+.bl-ghost {
+    position: fixed !important; z-index: 90 !important; pointer-events: none !important; margin: 0 !important; opacity: 1 !important;
+    transform: rotate(2deg) !important; transition: none !important; box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22) !important;
+}
+.lists-zoom [data-bl-card].bl-src { opacity: 0.35 !important; transform: none !important; box-shadow: none !important; }
+/* quando o destino já é outro lugar, o cartão de origem some da lista (altura zero, mas continua no DOM:
+   é ele que está recebendo o toque) */
+.lists-zoom [data-bl-card].bl-src-gone {
+    height: 0 !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important;
+    border-width: 0 !important; overflow: hidden !important; opacity: 0 !important;
+}
+.zoom-slot {
+    box-sizing: border-box; margin-bottom: 6px; border-radius: 10px;
+    border: 2px dashed var(--theme-color, #4f46e5); background: rgba(0, 0, 0, 0.04);
+}
+.lists-zoom [data-column-id]:has(> .zoom-slot) > .opacity-50 { display: none; } /* lista vazia recebendo cartão */

@@ -262,6 +262,7 @@
                             <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider shrink-0" id="backlog-count">0</span>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
+                            <button onclick="toggleBacklogZoom()" id="backlog-zoom-btn" aria-label="Afastar ou aproximar as listas" title="Afastar (ver várias listas)" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 active:scale-95 transition"><i class="ph ph-magnifying-glass-minus text-lg"></i></button>
                             <button onclick="openColumnMenuFromHeader()" id="backlog-column-menu-btn" aria-label="Opções da lista" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 transition active:scale-90">
                                 <i class="ph-bold ph-dots-three-vertical text-base"></i>
                             </button>
@@ -1264,7 +1265,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.9.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.9.1</div>
 
     </div>
 

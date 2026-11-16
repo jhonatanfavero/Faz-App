@@ -2135,7 +2135,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.9.0',
+            version: 'v40.9.1',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -2576,6 +2576,18 @@ function renderBacklog() {
     updateActiveColumnHeader();
     
     // Renderiza cada coluna como uma "página" no scroll horizontal
+    // V40.9.1: modo afastado (várias listas lado a lado). No modo normal nada muda.
+    const zoomKeepLeft = wrapper.scrollLeft;
+    // Onde cada lista estava rolada: redesenhar com a Lista aberta (mover, editar, apagar) não pode
+    // jogar a lista pro topo. Ao ABRIR a Lista continua começando do topo, como sempre.
+    const keepTop = {};
+    const sheetEl = document.getElementById('list-sheet');
+    if (sheetEl && !sheetEl.classList.contains('translate-y-full')) {
+        Array.from(wrapper.children).forEach(el => { if (el.scrollTop) keepTop[el.dataset.columnId] = el.scrollTop; });
+    }
+    wrapper.classList.toggle('lists-zoom', !!backlogZoomOut);
+    const zoomBtn = document.getElementById('backlog-zoom-btn');
+    if (zoomBtn) { zoomBtn.innerHTML = `<i class="ph ${backlogZoomOut ? 'ph-magnifying-glass-plus' : 'ph-magnifying-glass-minus'} text-lg"></i>`; zoomBtn.title = backlogZoomOut ? 'Aproximar (uma lista por vez)' : 'Afastar (ver várias listas)'; }
     wrapper.innerHTML = backlogColumnsDb.map((col, idx) => {
         const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
         let cardsHtml;
@@ -2592,10 +2604,12 @@ function renderBacklog() {
         // V40.5.1-fix1: w-full (era w-[78%]) — cards iguais aos das outras abas.
         // Sem beiradinha — descoberta do swipe fica nos DOTS embaixo do header.
         return `
-            <div class="snap-center snap-always shrink-0 w-full h-full overflow-y-auto no-scrollbar px-4 pb-4" data-column-id="${col.id}">
+            <div class="snap-center snap-always shrink-0 w-full h-full overflow-y-auto no-scrollbar px-4 pb-4${col.id === activeColumnId ? ' zoom-active' : ''}" data-column-id="${col.id}">
+                <div class="zoom-col-head" onclick="setActiveColumnFromZoom('${col.id}')"><span class="truncate">${escapeHtml(col.name)}</span><span class="zoom-col-count">${colItems.length}</span></div>
                 ${cardsHtml}
             </div>`;
     }).join('');
+    Array.from(wrapper.children).forEach(el => { if (keepTop[el.dataset.columnId]) el.scrollTop = keepTop[el.dataset.columnId]; });
     
     // Dots de navegação
     if (dotsContainer) {
@@ -2609,7 +2623,19 @@ function renderBacklog() {
     // Após render, garante que o scroll está na coluna ativa (sem animação)
     requestAnimationFrame(() => {
         const activeIdx = backlogColumnsDb.findIndex(c => c.id === activeColumnId);
-        if (activeIdx >= 0) {
+        if (backlogZoomOut) {
+            // afastado: o quadro fica onde estava. Só encosta a lista ativa na esquerda ao entrar no modo
+            // ou quando a lista ativa mudou por fora (lista criada/apagada) e não está aparecendo.
+            const actEl = wrapper.children[activeIdx];
+            wrapper.scrollLeft = zoomKeepLeft;
+            if (actEl && (_zoomAlignActive || (_zoomLastActive !== activeColumnId && !backlogColVisible(wrapper, actEl)))) {
+                wrapper.scrollLeft = Math.max(0, backlogColLeft(wrapper, actEl) - 10);
+            } else {
+                backlogZoomSyncActive();
+            }
+            _zoomAlignActive = false;
+            _zoomLastActive = activeColumnId;
+        } else if (activeIdx >= 0) {
             const cols = wrapper.children;
             if (cols[activeIdx]) {
                 // V40.5.0-fix: centraliza (compatível com snap-center + w-[88%])
@@ -2634,6 +2660,7 @@ function onBacklogColumnsScroll() {
     _scrollDebounceTimer = setTimeout(() => {
         const wrapper = document.getElementById('backlog-columns-wrapper');
         if (!wrapper) return;
+        if (backlogZoomOut) { backlogZoomSyncActive(); return; } // V40.9.1
         // Centro visível do wrapper
         const viewportCenter = wrapper.scrollLeft + (wrapper.clientWidth / 2);
         const cols = wrapper.children;
@@ -2654,6 +2681,7 @@ function onBacklogColumnsScroll() {
 }
 
 function updateActiveColumnHeader() {
+    document.querySelectorAll('#backlog-columns-wrapper > [data-column-id]').forEach(el => el.classList.toggle('zoom-active', el.dataset.columnId === activeColumnId)); // V40.9.1
     const col = backlogColumnsDb.find(c => c.id === activeColumnId) || backlogColumnsDb[0];
     if (!col) return;
     const titleEl = document.getElementById('backlog-column-title');
@@ -2691,6 +2719,13 @@ const DRAG_MOVE_THRESHOLD = 8; // pixels antes de cancelar long-press
 let _dragState = null; // { itemId, columnEl, cardEl, startY, longPressTimer, dragging }
 
 function backlogDragOnTouchStart(e) {
+    if (_dragState) backlogDragAbort(); // sobra de um toque que não terminou
+    // V40.9.1: dois dedos = pinça (afastar/aproximar), nunca arrasto
+    _pinchState = e.touches.length === 2
+        ? { d0: backlogPinchDist(e.touches), pts: [0, 1].map(i => [e.touches[i].clientX, e.touches[i].clientY]), done: false }
+        : null;
+    if (e.touches.length !== 1) return;
+
     const card = e.target.closest('[data-bl-card]');
     if (!card) return;
     
@@ -2713,19 +2748,206 @@ function backlogDragOnTouchStart(e) {
     };
     
     // D1: long-press 400ms = inicia drag
+    const st = _dragState;
     _dragState.longPressTimer = setTimeout(() => {
-        if (!_dragState) return;
+        if (_dragState !== st) return;
         _dragState.dragging = true;
         // D4: feedback visual
-        card.classList.add('opacity-60', 'scale-105', 'shadow-lg', 'z-10', 'relative');
+        card.classList.add('opacity-60', 'scale-105', 'shadow-lg', 'z-10');
         // D2: durante drag, navegador só permite scroll vertical (sem swipe horizontal)
         card.style.touchAction = 'none';
         // Haptic feedback se disponível
         if (navigator.vibrate) navigator.vibrate(30);
+        backlogDragBegin(card); // V40.9.1: no modo afastado o cartão acompanha o dedo
     }, DRAG_LONGPRESS_MS);
 }
 
+// =====================================================
+// V40.9.1 — LISTAS AFASTADAS: várias listas lado a lado, pra arrastar o cartão de uma pra outra.
+// A escolha fica em tb__lista_afastada (preferência do aparelho: fora do backup e da nuvem).
+// =====================================================
+var backlogZoomOut = false;   // var (não let): renderBacklog pode rodar antes desta linha
+var _zoomAlignActive = false; // true = no próximo desenho, encosta a lista ativa na esquerda
+var _zoomLastActive = null;   // lista ativa no último desenho afastado
+var _pinchState = null;       // { d0, pts, done } enquanto dois dedos estão na tela
+var _blClickBlockUntil = 0;   // depois de um arrasto, o "clique" que sobra não abre o cartão
+try { backlogZoomOut = localStorage.getItem('tb__lista_afastada') === '1'; } catch (e) {}
+
+window.toggleBacklogZoom = function() {
+    backlogDragAbort();
+    backlogZoomOut = !backlogZoomOut;
+    _zoomAlignActive = backlogZoomOut;
+    try { localStorage.setItem('tb__lista_afastada', backlogZoomOut ? '1' : '0'); } catch (e) {}
+    renderBacklog();
+};
+window.setActiveColumnFromZoom = function(colId) {
+    if (!backlogColumnsDb.some(c => c.id === colId)) return;
+    activeColumnId = colId;
+    _zoomLastActive = colId;
+    updateActiveColumnHeader();
+    updateColumnDots();
+};
+
+// Posição da lista dentro da área que rola (offsetLeft não serve aqui: ele conta a partir da sheet).
+function backlogColLeft(wrapper, col) {
+    return col.getBoundingClientRect().left - wrapper.getBoundingClientRect().left + wrapper.scrollLeft;
+}
+function backlogColVisible(wrapper, col) { // pelo menos metade da lista está aparecendo
+    const wr = wrapper.getBoundingClientRect(), r = col.getBoundingClientRect();
+    return Math.min(r.right, wr.right) - Math.max(r.left, wr.left) >= r.width / 2;
+}
+// Afastado: a lista ativa só troca sozinha quando some da tela (senão o título ficaria pulando).
+function backlogZoomSyncActive() {
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    if (!wrapper || !backlogZoomOut) return;
+    const cols = Array.from(wrapper.children);
+    const cur = cols.find(el => el.dataset.columnId === activeColumnId);
+    if (cur && backlogColVisible(wrapper, cur)) return;
+    const first = cols.find(el => backlogColVisible(wrapper, el));
+    if (first) setActiveColumnFromZoom(first.dataset.columnId);
+}
+
+// Pinça com dois dedos: fechar os dedos afasta (várias listas), abrir aproxima (uma lista).
+function backlogPinchDist(touches) {
+    return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+}
+function backlogPinchOnTouchMove(e) {
+    const p = _pinchState;
+    if (!p || e.touches.length !== 2) return false;
+    if (p.done || p.d0 < 30) return true;
+    // Só vale se os DOIS dedos se mexeram (um dedo parado + outro rolando a lista não é pinça).
+    const moved = (i) => Math.hypot(e.touches[i].clientX - p.pts[i][0], e.touches[i].clientY - p.pts[i][1]) >= 12;
+    if (!moved(0) || !moved(1)) return true;
+    const ratio = backlogPinchDist(e.touches) / p.d0;
+    if ((ratio < 0.75 && !backlogZoomOut) || (ratio > 1.33 && backlogZoomOut)) {
+        p.done = true; // uma troca por gesto
+        toggleBacklogZoom();
+    }
+    return true;
+}
+
+// No modo afastado o cartão "sai" e acompanha o dedo, e o lugar onde ele vai cair abre um espaço
+// tracejado. Chegar na borda do quadro rola o quadro; no topo ou no fim da lista, rola a lista.
+function backlogDragBegin(card) {
+    const st = _dragState;
+    if (!backlogZoomOut || !st) return;
+    const r = card.getBoundingClientRect();
+    const w = card.offsetWidth, h = card.offsetHeight; // tamanho sem o "levantado" (scale)
+    const left = r.left + (r.width - w) / 2, top = r.top + (r.height - h) / 2;
+    const ghost = card.cloneNode(true);
+    ghost.removeAttribute('data-bl-card');
+    ghost.removeAttribute('onclick');
+    ghost.classList.remove('opacity-60', 'scale-105', 'z-10', 'relative'); // 'relative' do Tailwind ganharia do position: fixed
+    ghost.classList.add('bl-ghost');
+    ghost.style.width = w + 'px';
+    ghost.style.left = left + 'px';
+    ghost.style.top = top + 'px';
+    document.body.appendChild(ghost);
+    const slot = document.createElement('div');
+    slot.className = 'zoom-slot';
+    slot.style.height = h + 'px';
+    card.classList.add('bl-src');
+    st.ghost = ghost;
+    st.slot = slot;
+    st.offX = st.startX - left;
+    st.offY = st.startY - top;
+    st.lastX = st.startX;
+    st.lastY = st.startY;
+    st.edgeX = 0;
+    st.edgeY = 0;
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    const timer = setInterval(() => {
+        if (_dragState !== st) { clearInterval(timer); return; }
+        if (!st.cardEl.isConnected) { backlogDragAbort(); return; } // a tela foi redesenhada no meio do arrasto
+        if (!st.edgeX && !st.edgeY) return;
+        if (st.edgeX) wrapper.scrollLeft += st.edgeX * 6;
+        if (st.edgeY && st.overColEl) st.overColEl.scrollTop += st.edgeY * 6;
+        backlogDragUpdateTarget(st.lastX, st.lastY); // o dedo está parado, mas o que está embaixo dele mudou
+    }, 16);
+    st.edgeTimer = timer;
+}
+
+// Encerra o arrasto sem mover nada: tira o cartão flutuante, o espaço, os timers e os destaques.
+function backlogDragAbort() {
+    const st = _dragState;
+    if (!st) return;
+    _dragState = null;
+    clearTimeout(st.longPressTimer);
+    if (st.edgeTimer) clearInterval(st.edgeTimer);
+    if (st.ghost) st.ghost.remove();
+    if (st.slot) st.slot.remove();
+    st.cardEl.classList.remove('opacity-60', 'scale-105', 'shadow-lg', 'z-10', 'bl-src', 'bl-src-gone');
+    st.cardEl.style.touchAction = '';
+    backlogDragClearMarks();
+}
+
+function backlogDragClearMarks() {
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    if (!wrapper) return;
+    wrapper.querySelectorAll('[data-bl-card].ring-2').forEach(c => c.classList.remove('ring-2', 'ring-app-focus'));
+}
+
+// Lista mais perto do dedo na horizontal (o vão entre duas listas conta pra mais próxima).
+function backlogColumnAtX(x) {
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    const wr = wrapper.getBoundingClientRect();
+    const cx = Math.min(Math.max(x, wr.left + 1), wr.right - 1);
+    let best = null, bestDist = Infinity;
+    for (const col of wrapper.children) {
+        const r = col.getBoundingClientRect();
+        const dist = cx < r.left ? r.left - cx : (cx > r.right ? cx - r.right : 0);
+        if (dist < bestDist) { bestDist = dist; best = col; }
+    }
+    return best;
+}
+
+// Decide onde o cartão cairia se o dedo soltasse em (x, y) e mostra isso na tela.
+function backlogDragUpdateTarget(x, y) {
+    const st = _dragState;
+    if (!st || !st.dragging) return;
+    if (!st.slot) {
+        // Modo normal (V40.5.1): só dentro da própria lista; destaca o cartão alvo.
+        backlogDragClearMarks();
+        st.overCardEl = null;
+        for (const c of st.columnEl.querySelectorAll('[data-bl-card]')) {
+            if (c === st.cardEl) continue;
+            const rect = c.getBoundingClientRect();
+            if (y >= rect.top && y <= rect.bottom) {
+                c.classList.add('ring-2', 'ring-app-focus');
+                st.overCardEl = c;
+                break;
+            }
+        }
+        return;
+    }
+    // Modo afastado: a lista vem da posição horizontal do dedo; o lugar na lista, da vertical
+    // (entra antes do primeiro cartão cujo meio está abaixo do dedo; se não houver, no fim).
+    const col = backlogColumnAtX(x);
+    if (!col) return;
+    const cards = Array.from(col.querySelectorAll('[data-bl-card]'));
+    let ref = null;
+    for (const c of cards) {
+        if (c === st.cardEl) continue;
+        const r = c.getBoundingClientRect();
+        if (y < r.top + r.height / 2) { ref = c; break; }
+    }
+    // Soltar onde o cartão já está não é mover: não abre espaço e o cartão de origem continua no lugar.
+    // Fora isso, o cartão de origem "sai" da lista (fica com altura zero) e o espaço mostra o destino.
+    const samePlace = col === st.columnEl && ref === (cards[cards.indexOf(st.cardEl) + 1] || null);
+    st.overColEl = col;
+    st.beforeId = ref ? ref.dataset.blCard : null;
+    st.hasTarget = !samePlace;
+    st.cardEl.classList.toggle('bl-src-gone', !samePlace);
+    if (samePlace) { st.slot.remove(); return; }
+    if (ref) {
+        if (st.slot.parentNode !== col || st.slot.nextElementSibling !== ref) col.insertBefore(st.slot, ref);
+    } else if (st.slot.parentNode !== col || col.lastElementChild !== st.slot) {
+        col.appendChild(st.slot);
+    }
+}
+
 function backlogDragOnTouchMove(e) {
+    if (backlogPinchOnTouchMove(e)) return; // V40.9.1: pinça
     if (!_dragState) return;
     
     const touch = e.touches[0];
@@ -2744,58 +2966,55 @@ function backlogDragOnTouchMove(e) {
     // Já está em modo drag — previne scroll
     e.preventDefault();
     
-    // D5: detecta sobre qual card está
-    const columnEl = _dragState.columnEl;
-    const cards = Array.from(columnEl.querySelectorAll('[data-bl-card]'));
-    const touchY = touch.clientY;
-    
-    // Visual: empurra cards pra cima/baixo via translate (feedback enquanto arrasta)
-    // MVP: só destaca o card alvo, não anima os outros (mais simples)
-    cards.forEach(c => c.classList.remove('ring-2', 'ring-app-focus'));
-    for (const c of cards) {
-        if (c === _dragState.cardEl) continue;
-        const rect = c.getBoundingClientRect();
-        if (touchY >= rect.top && touchY <= rect.bottom) {
-            c.classList.add('ring-2', 'ring-app-focus');
-            break;
-        }
+    const st = _dragState;
+    if (st.ghost) {
+        st.lastX = touch.clientX;
+        st.lastY = touch.clientY;
+        st.ghost.style.left = (touch.clientX - st.offX) + 'px';
+        st.ghost.style.top = (touch.clientY - st.offY) + 'px';
+        const wr = document.getElementById('backlog-columns-wrapper').getBoundingClientRect();
+        st.edgeX = touch.clientX < wr.left + 36 ? -1 : (touch.clientX > wr.right - 36 ? 1 : 0);
+        st.edgeY = touch.clientY < wr.top + 56 ? -1 : (touch.clientY > wr.bottom - 36 ? 1 : 0);
     }
+    backlogDragUpdateTarget(touch.clientX, touch.clientY);
 }
 
 function backlogDragOnTouchEnd(e) {
-    if (!_dragState) return;
+    if (e.touches && e.touches.length < 2) _pinchState = null;
+    const st = _dragState;
+    if (!st) return;
     
-    // D10: SEMPRE limpa o timer/visual
-    clearTimeout(_dragState.longPressTimer);
-    
-    if (!_dragState.dragging) {
+    if (!st.dragging) {
+        clearTimeout(st.longPressTimer);
         _dragState = null;
         return;
     }
     
-    // Restaura visual do card arrastado
-    const card = _dragState.cardEl;
-    card.classList.remove('opacity-60', 'scale-105', 'shadow-lg', 'z-10', 'relative');
-    card.style.touchAction = '';
+    backlogDragAbort(); // limpa o visual do arrasto (cartão, espaço, timers, destaques)
+    _blClickBlockUntil = Date.now() + 350;
+    if (e.type === 'touchcancel') return; // toque cancelado pelo sistema: não move nada
     
-    // Encontra card alvo (último com ring)
-    const columnEl = _dragState.columnEl;
-    let targetCardEl = null;
-    columnEl.querySelectorAll('[data-bl-card]').forEach(c => {
-        if (c.classList.contains('ring-2')) {
-            targetCardEl = c;
-            c.classList.remove('ring-2', 'ring-app-focus');
-        }
-    });
-    
-    // Reordena no backlogDb se há alvo válido
-    if (targetCardEl && targetCardEl !== card) {
-        const fromId = _dragState.itemId;
-        const toId = targetCardEl.dataset.blCard;
-        reorderBacklog(fromId, toId);
+    if (st.slot) {
+        // V40.9.1 (afastado): outra lista ou outro lugar na mesma lista, exatamente onde o espaço abriu
+        if (st.hasTarget && st.overColEl) moveBacklogCardTo(st.itemId, st.overColEl.dataset.columnId, st.beforeId);
+    } else if (st.overCardEl && st.overCardEl !== st.cardEl) {
+        reorderBacklog(st.itemId, st.overCardEl.dataset.blCard);
     }
-    
-    _dragState = null;
+}
+
+// Coloca o cartão na lista `destColId`, antes de `beforeId` (ou no fim da lista).
+function moveBacklogCardTo(fromId, destColId, beforeId) {
+    const item = backlogDb.find(i => i.id === fromId);
+    const destCol = backlogColumnsDb.find(c => c.id === destColId);
+    if (!item || !destCol || fromId === beforeId) return;
+    const changedList = getItemColumn(item) !== destColId;
+    backlogDb.splice(backlogDb.indexOf(item), 1);
+    if (changedList) item.columnId = destColId;
+    const toIdx = beforeId ? backlogDb.findIndex(i => i.id === beforeId) : -1;
+    if (toIdx >= 0) backlogDb.splice(toIdx, 0, item); else backlogDb.push(item);
+    saveBacklog();
+    renderBacklog();
+    if (changedList) showToast(`Movido pra ${destCol.name}!`);
 }
 
 // D3: reordena backlogDb (array plano) movendo `fromId` pra posição de `toId`
@@ -2818,6 +3037,13 @@ function attachBacklogDragListeners() {
     wrapper.addEventListener('touchmove', backlogDragOnTouchMove, { passive: false });
     wrapper.addEventListener('touchend', backlogDragOnTouchEnd, { passive: true });
     wrapper.addEventListener('touchcancel', backlogDragOnTouchEnd, { passive: true });
+    // V40.9.1: o "clique" que o navegador gera ao soltar um arrasto não pode abrir o cartão
+    wrapper.addEventListener('click', (e) => {
+        if (Date.now() >= _blClickBlockUntil) return;
+        _blClickBlockUntil = 0; // só o primeiro clique depois do arrasto
+        e.stopPropagation();
+        e.preventDefault();
+    }, true);
     wrapper.dataset.dragListenersAttached = 'true';
 }
 
@@ -2831,7 +3057,9 @@ window.scrollToColumn = function(columnId) {
     const col = wrapper.children[idx];
     if (!col) return;
     // Posiciona o centro da coluna no centro do viewport
-    const targetScroll = col.offsetLeft + (col.offsetWidth / 2) - (wrapper.clientWidth / 2);
+    const targetScroll = backlogZoomOut
+        ? Math.max(0, backlogColLeft(wrapper, col) - 10) // V40.9.1: afastado → encosta a lista na esquerda
+        : col.offsetLeft + (col.offsetWidth / 2) - (wrapper.clientWidth / 2);
     wrapper.scrollTo({ left: targetScroll, behavior: 'smooth' });
     activeColumnId = columnId;
     updateActiveColumnHeader();

@@ -2135,7 +2135,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.9.1',
+            version: 'v40.10.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -2990,13 +2990,21 @@ function backlogDragOnTouchEnd(e) {
         return;
     }
     
+    // Rolagem da lista de destino ANTES de tirar o espaço tracejado (tirar o espaço encolhe a lista e o
+    // navegador "puxa" a rolagem; sem isto, soltar no fim de uma lista comprida escondia o cartão recém-solto).
+    const dropTop = st.overColEl ? st.overColEl.scrollTop : 0;
     backlogDragAbort(); // limpa o visual do arrasto (cartão, espaço, timers, destaques)
     _blClickBlockUntil = Date.now() + 350;
     if (e.type === 'touchcancel') return; // toque cancelado pelo sistema: não move nada
     
     if (st.slot) {
         // V40.9.1 (afastado): outra lista ou outro lugar na mesma lista, exatamente onde o espaço abriu
-        if (st.hasTarget && st.overColEl) moveBacklogCardTo(st.itemId, st.overColEl.dataset.columnId, st.beforeId);
+        if (st.hasTarget && st.overColEl) {
+            const destId = st.overColEl.dataset.columnId;
+            moveBacklogCardTo(st.itemId, destId, st.beforeId);
+            const destEl = Array.from(document.getElementById('backlog-columns-wrapper').children).find(el => el.dataset.columnId === destId);
+            if (destEl && dropTop) destEl.scrollTop = dropTop;
+        }
     } else if (st.overCardEl && st.overCardEl !== st.cardEl) {
         reorderBacklog(st.itemId, st.overCardEl.dataset.blCard);
     }

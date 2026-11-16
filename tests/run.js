@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+// Roda todas as suítes de teste do Faz (é o que o "npm test" chama).
+// Cada suíte roda num processo separado, sempre no fuso de São Paulo (Regra de Ouro: datas são locais).
+//   node tests/run.js            resumo de cada suíte
+//   node tests/run.js --tudo     mostra todas as verificações, uma por linha
+const { spawnSync } = require('child_process'), path = require('path');
+const ROOT = path.join(__dirname, '..'), DADOS = path.join(__dirname, 'dados-ficticios.json');
+const SUITES = [
+    ['Motor de sincronização (regras de mesclagem)', 'sim_sync.js', [path.join(ROOT, 'sync.js'), DADOS]],
+    ['App do celular + sincronização', 'test_app.js', [ROOT, DADOS]],
+    ['Agenda na nuvem, blocos de 5 min, segurança, iOS', 'test_v408.js', [ROOT, DADOS]],
+    ['Cor do cartão e Arquivados', 'test_v409.js', [ROOT, DADOS]],
+    ['Listas afastadas e arrastar entre listas', 'test_v4091.js', [ROOT, DADOS]],
+    ['Tela do PC (kanban.html)', 'test_kanban.js', [ROOT, DADOS]],
+    ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
+];
+const tudo = process.argv.includes('--tudo');
+let passou = 0, falhou = 0, quebradas = 0;
+for (const [nome, arquivo, args] of SUITES) {
+    const t0 = Date.now();
+    const r = spawnSync(process.execPath, [path.join(__dirname, arquivo), ...args], { encoding: 'utf8', env: { ...process.env, TZ: 'America/Sao_Paulo' }, timeout: 300000 });
+    const out = (r.stdout || '') + (r.stderr || '');
+    const m = out.match(/RESULTADO: (\d+) passaram, (\d+) falharam/);
+    const ok = !!m && m[2] === '0' && r.status === 0;
+    if (m) { passou += +m[1]; falhou += +m[2]; }
+    if (!ok && !(m && +m[2] > 0)) quebradas++;
+    console.log(`${ok ? '✅' : '❌'} ${nome}: ${m ? m[1] + ' passaram, ' + m[2] + ' falharam' : 'não terminou'} (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+    if (tudo || !ok) console.log(out.split('\n').filter((l) => tudo || /FALHOU|ERRO|Error|^\s+at /.test(l)).slice(0, tudo ? 400 : 25).map((l) => '    ' + l).join('\n'));
+}
+console.log(`\n${falhou || quebradas ? '❌' : '✅'} TOTAL: ${passou} verificações passaram, ${falhou} falharam` + (quebradas ? `, ${quebradas} suíte(s) não terminaram` : ''));
+process.exit(falhou || quebradas ? 1 : 0);

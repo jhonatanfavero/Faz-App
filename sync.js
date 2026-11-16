@@ -515,7 +515,7 @@
     var CORE = window.FazSyncCore;
     var CFG = window.FAZ_SUPABASE || {};
     var STATE_KEY = 'tb__sync';
-    var LIB_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    var LIB_URL = 'libs/supabase-js/supabase.js'; // V40.10.0: cópia local, versão travada (ver libs/README.md)
     var KINDS = CORE.KINDS;
     var SELECT = {
         tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,deleted',

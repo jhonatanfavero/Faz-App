@@ -13,11 +13,18 @@
     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- V40.10.0: fonte e ícones ficam DENTRO do app (versão travada, funciona offline, nada vai pra
+         terceiros). Versões e licenças em libs/README.md. -->
+    <link rel="stylesheet" href="libs/inter/inter.css">
+    <link rel="stylesheet" href="libs/phosphor/regular/style.css">
+    <link rel="stylesheet" href="libs/phosphor/bold/style.css">
+    <link rel="stylesheet" href="libs/phosphor/fill/style.css">
     <script src="https://cdn.tailwindcss.com"></script>
 
     <script>
+        // Sem internet o script do Tailwind (acima) não carrega: o visual vem do libs/tailwind.css,
+        // e esta linha só evita o erro "tailwind is not defined".
+        window.tailwind = window.tailwind || {};
         tailwind.config = {
             theme: {
                 extend: {
@@ -34,6 +41,9 @@
         }
     </script>
     <link rel="stylesheet" href="style.css">
+    <!-- V40.10.0: Tailwind já pronto (gerado por "npm run build:css" a partir da configuração acima).
+         Vem DEPOIS do style.css, na mesma ordem em que o script do Tailwind aplica as regras dele. -->
+    <link rel="stylesheet" href="libs/tailwind.css">
 </head>
 <body class="text-zinc-900 selection:bg-app-focus selection:text-white font-sans flex items-center justify-center min-h-[100dvh] overflow-hidden">
 
@@ -1265,7 +1275,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.9.1</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.10.0</div>
 
     </div>
 

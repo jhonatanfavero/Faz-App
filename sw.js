@@ -4,14 +4,25 @@
 // V10.9 - v40.8.0 (Agenda na nuvem nos 2 sentidos + aba Agenda no PC; mínimo de 5 min; texto do usuário sempre escapado; leitura protegida do localStorage; esqueci a senha; ajustes só-iOS.)
 // V10.10 - v40.9.0 (Cor livre do cartão na Lista e na agenda; Arquivados (arquivar/desarquivar) no app e no PC; PC arrasta bloco de um dia pro outro.)
 // V10.11 - v40.9.1 (Listas afastadas no celular: botão da lupa ou pinça mostram várias listas lado a lado; segurar e arrastar leva o cartão de uma lista pra outra, com rolagem automática nas bordas. Redesenhar com a Lista aberta não joga mais a lista pro topo.)
-const CACHE_NAME = 'timeblock-v40-9-1';
+// V10.12 - v40.10.0 (Fonte, ícones e Supabase passam a vir da pasta libs/ do próprio app, com versão travada, e entram no cache offline junto com um Tailwind já pronto (libs/tailwind.css): o app abre com o visual completo sem internet. O script do Tailwind pelo CDN continua, pra classe nova funcionar sem build.)
+const CACHE_NAME = 'timeblock-v40-10-0';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './faz-config.js',
-  './sync.js'
+  './sync.js',
+  './libs/tailwind.css',
+  './libs/inter/inter.css',
+  './libs/inter/inter-latin-wght-normal.woff2',
+  './libs/phosphor/regular/style.css',
+  './libs/phosphor/regular/Phosphor.woff2',
+  './libs/phosphor/bold/style.css',
+  './libs/phosphor/bold/Phosphor-Bold.woff2',
+  './libs/phosphor/fill/style.css',
+  './libs/phosphor/fill/Phosphor-Fill.woff2',
+  './libs/supabase-js/supabase.js'
 ];
 
 self.addEventListener('install', (e) => {

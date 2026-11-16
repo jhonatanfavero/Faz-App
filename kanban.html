@@ -7,12 +7,14 @@
 <title>Faz no computador</title>
 <meta name="theme-color" content="#4f46e5">
 <link rel="icon" type="image/png" href="icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<!-- V40.10.0: fonte, ícones e Supabase vêm da pasta libs/ do próprio app (versão travada) -->
+<link rel="stylesheet" href="libs/inter/inter.css">
+<link rel="stylesheet" href="libs/phosphor/regular/style.css">
+<link rel="stylesheet" href="libs/phosphor/bold/style.css">
+<link rel="stylesheet" href="libs/phosphor/fill/style.css">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
+    window.tailwind = window.tailwind || {}; // se o script acima não carregar, o visual vem do libs/tailwind-kanban.css
     tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } } };
 </script>
 <style>
@@ -51,6 +53,8 @@
         *, *::before, *::after { transition: none !important; animation: none !important; }
     }
 </style>
+<!-- V40.10.0: Tailwind já pronto desta página (npm run build:css); vem por último, como o script do Tailwind faz -->
+<link rel="stylesheet" href="libs/tailwind-kanban.css">
 </head>
 <body class="font-sans text-zinc-900 antialiased">
 
@@ -255,7 +259,7 @@
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="libs/supabase-js/supabase.js"></script>
 <script>
 (function () {
     'use strict';

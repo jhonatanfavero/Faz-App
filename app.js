@@ -36,7 +36,28 @@ let mbDragActive = false;
 let expandedBacklogIds = new Set();
 let expandedRoutineIds = new Set();
 // V40.4.1: estado financeiro no topo (lição TDZ V40.3.2 — declarar antes do init).
-let financialDb = JSON.parse(localStorage.getItem('tb_financial_db') || '[]');
+// V40.8.0: leitura protegida do localStorage. Se um dado salvo estiver corrompido, o app ABRE
+// mesmo assim: guarda o valor cru em tb__corrompido_<chave> (interno, fora do backup), usa o
+// padrão e apaga o histórico do sync (tb__sync) pra próxima sincronização JUNTAR em vez de
+// interpretar a lista vazia como "apagou tudo".
+function fazLoadList(key, fallback) {
+    let raw = null;
+    try {
+        raw = localStorage.getItem(key);
+        if (raw === null || raw === '') return fallback;
+        const v = JSON.parse(raw);
+        if (Array.isArray(v)) return v;
+        if (v === null) return fallback;
+        throw new Error('formato inesperado');
+    } catch (e) {
+        (window.fazCorruptKeys = window.fazCorruptKeys || []).push(key);
+        try { if (raw != null) localStorage.setItem('tb__corrompido_' + key, raw); } catch (e2) {}
+        try { localStorage.removeItem('tb__sync'); } catch (e3) {}
+        console.error('[Faz] dado corrompido em', key, e);
+        return fallback;
+    }
+}
+let financialDb = fazLoadList('tb_financial_db', []);
 // V40.4.3-fix (Gemini): fuso horário — toISOString() retorna UTC, então no fim do mês
 // às 21h+ no Brasil (UTC-3) já mostrava o mês seguinte e marcava tudo como atrasado.
 // Usar getFullYear() + getMonth() do Date local resolve.
@@ -196,14 +217,14 @@ function getActiveDateStr() { return activeDateObj.toLocaleDateString('en-CA'); 
 function getTodayStr() { return new Date().toLocaleDateString('en-CA'); }
 
 // --- 2. O BANCO DE DADOS ---
-let db = JSON.parse(localStorage.getItem('tb_master_db'));
-let backlogDb = JSON.parse(localStorage.getItem('tb_backlog_db')) || [];
+let db = fazLoadList('tb_master_db', null);
+let backlogDb = fazLoadList('tb_backlog_db', []);
 let backlogSelectedDur = 30;
 
 // ===== V40.5.0: KANBAN — colunas no backlog =====
 // Schema: { id, name, isDefault, createdAt }
 // Coluna "Geral" (id: 'col_geral') é criada automaticamente. Não pode ser apagada.
-let backlogColumnsDb = JSON.parse(localStorage.getItem('tb_backlog_columns')) || [];
+let backlogColumnsDb = fazLoadList('tb_backlog_columns', []);
 let activeColumnId = 'col_geral'; // coluna que está sendo visualizada (pra criar nova tarefa nela)
 
 function saveBacklogColumns() {
@@ -234,12 +255,12 @@ function getItemColumn(item) {
 ensureDefaultColumn();
 
 // V40.1: Super Gabinete - Notas livres do dia
-let notesDb = JSON.parse(localStorage.getItem('tb_notes_db')) || [];
+let notesDb = fazLoadList('tb_notes_db', []);
 let activeListTab = 'backlog'; // 'backlog' | 'routines' | 'notes'
 
 // V40.3 — MOTOR DE ROTINAS (Fase 1: CRUD).
 // Default: 3 rotinas de exemplo viciantes pra Discoverability (mesmo princípio do header em V40.2.28).
-let routinesDb = JSON.parse(localStorage.getItem('tb_routines_db'));
+let routinesDb = fazLoadList('tb_routines_db', null);
 if (!routinesDb || routinesDb.length === 0) {
     routinesDb = [
         {
@@ -262,7 +283,7 @@ if (!routinesDb || routinesDb.length === 0) {
 }
 function saveRoutinesDb() { localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb)); }
 
-let periodsDb = JSON.parse(localStorage.getItem('tb_periods_db'));
+let periodsDb = fazLoadList('tb_periods_db', null);
 if (!periodsDb || periodsDb.length === 0) {
     periodsDb = [
         { id: 'p1', name: 'Manhã', start: '08:00', end: '12:00' },
@@ -273,7 +294,7 @@ if (!periodsDb || periodsDb.length === 0) {
     localStorage.setItem('tb_periods_db', JSON.stringify(periodsDb));
 }
 
-let tagsDb = JSON.parse(localStorage.getItem('tb_tags_db'));
+let tagsDb = fazLoadList('tb_tags_db', null);
 if (!tagsDb || tagsDb.length === 0) {
     tagsDb = [
         { id: 'tag_1', name: 'Trabalho', color: '#ef4444' }, // Vermelho
@@ -282,6 +303,9 @@ if (!tagsDb || tagsDb.length === 0) {
     ];
     localStorage.setItem('tb_tags_db', JSON.stringify(tagsDb));
 }
+
+// V40.8.0: cor de tag só em #hex (ela vai dentro de atributo style).
+tagsDb.forEach(t => { if (t && !/^#[0-9a-fA-F]{3,8}$/.test(String(t.color || ''))) t.color = '#a1a1aa'; });
 
 if (!db || db.length === 0) {
     const nowH = new Date().getHours();
@@ -386,7 +410,7 @@ function renderTagsList() {
         <div class="flex items-center justify-between p-3 bg-white border border-zinc-200 rounded-xl">
             <div class="flex items-center gap-3">
                 <div class="w-4 h-4 rounded-full" style="background-color: ${t.color};"></div>
-                <span class="font-bold text-sm text-zinc-800">${t.name}</span>
+                <span class="font-bold text-sm text-zinc-800">${escapeHtml(t.name)}</span>
             </div>
             <button onclick="deleteTag('${t.id}')" class="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Excluir">
                 <i class="ph ph-trash text-lg"></i>
@@ -410,7 +434,7 @@ function renderTagSelector() {
         html += `
             <button onclick="selectTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeClass}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}">
                 <div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>
-                ${t.name}
+                ${escapeHtml(t.name)}
             </button>
         `;
     });
@@ -991,14 +1015,14 @@ function drawBlock(block) {
             if (block.duration >= pendingIntent.duration) {
                 el.classList.add('border-black/20', 'animate-pulse-drop', 'cursor-pointer', 'z-30');
                 el.onclick = () => performEncaixeMatematico(block.startMin, block.duration);
-                el.innerHTML = `<i class="ph ph-hand-pointing text-2xl text-app-focus drop-shadow-md mb-1"></i> ${!isSmall ? `<span class="text-[10px] font-bold text-app-focus uppercase tracking-widest">Soltar Aqui</span>` : ''}`;
+                el.innerHTML = `<i class="ph ph-hand-pointing ${block.duration < 15 ? 'text-xs' : 'text-2xl mb-1'} text-app-focus drop-shadow-md"></i> ${!isSmall ? `<span class="text-[10px] font-bold text-app-focus uppercase tracking-widest">Soltar Aqui</span>` : ''}`;
             } else {
                 el.classList.add('border-red-500/20', 'opacity-50');
                 el.innerHTML = `<span class="text-[9px] text-red-500 font-bold uppercase">Muito Curto</span>`;
             }
         } else {
             el.classList.add('border-black/10', 'opacity-60');
-            el.innerHTML = `${!isSmall ? `<span class="text-sm font-semibold tracking-wide mb-1 text-zinc-500">Tempo Livre</span>` : ''}<span class="text-[10px] bg-black/5 text-zinc-600 px-2 py-1 rounded font-medium">${formatDur(block.duration)} livres</span>`;
+            el.innerHTML = block.duration < 15 ? '' : `${!isSmall ? `<span class="text-sm font-semibold tracking-wide mb-1 text-zinc-500">Tempo Livre</span>` : ''}<span class="text-[10px] bg-black/5 text-zinc-600 px-2 py-1 rounded font-medium">${formatDur(block.duration)} livres</span>`;
         }
     }
     else if (block.type === 'focus' || block.type === 'past') {
@@ -1038,6 +1062,8 @@ function drawBlock(block) {
             : '';
 
         const isMicro = !block.expanded && block.duration <= 25;
+        // V40.8.0: blocos de 5 e 10 min (13px e 28px de altura). Só na timeline, não no modo lista.
+        const isNano = isMicro && block.duration <= 10 && !document.querySelector('.filter-list-mode');
         if (block.expanded) {
             // V40.2.21: pb-12 (era pb-6) pra dar espaço pra action bar (Editar/Duplicar/Apagar)
             // que agora ocupa o rodapé via absolute. A barra usa bottom-1, height ~32px.
@@ -1046,7 +1072,9 @@ function drawBlock(block) {
             el.style.height = 'auto'; el.style.minHeight = `${heightPx}px`; el.style.zIndex = '35'; 
         } else {
             // V40.2.23: px-3 → pr-3 (drag-handle absolute ocupa a esquerda).
-            el.className += ` ${bgClass} border pr-3 ${isMicro ? 'pt-1.5 pb-1.5' : 'pt-2 pb-4'} group select-none transition-all duration-300`;
+            el.className += ` ${bgClass} border pr-3 ${isMicro ? 'pt-1.5 pb-1.5' : 'pt-2 pb-4'} group select-none transition-all duration-300${isNano ? ' nano-block' + (block.duration < 10 ? ' nano-5' : '') : ''}`;
+            // V40.8.0: no bloco de 5 min não cabem os botões → tocar no bloco expande.
+            if (isNano && block.duration < 10) el.onclick = (e) => { if (!pendingIntent && !e.target.closest('.drag-handle, .resize-handle')) toggleExpandBlock(block.id, e); };
         }
         if (borderStyle) el.style.cssText += borderStyle;
 
@@ -1070,7 +1098,7 @@ function drawBlock(block) {
                 <button onclick="toggleMicroblock('${block.id}', '${mb.id}', event)" class="mt-[3px] shrink-0 w-3.5 h-3.5 rounded-[4px] border ${mb.done ? (isDarkTheme ? 'bg-white border-white' : 'bg-emerald-500 border-emerald-500') : (isDarkTheme ? 'border-white/30' : 'border-black/20')} flex items-center justify-center transition-colors">
                     ${mb.done ? `<i class="ph-bold ph-check text-[10px] ${isDarkTheme ? 'text-app-focus' : 'text-white'}"></i>` : ''}
                 </button>
-                <span class="text-[11px] font-medium leading-tight flex-1 pt-[1px] ${mb.done ? (isDarkTheme ? 'text-white/40 line-through' : 'text-black/40 line-through') : (isDarkTheme ? 'text-white/90' : 'text-black/80')}">${mb.title}</span>
+                <span class="text-[11px] font-medium leading-tight flex-1 pt-[1px] ${mb.done ? (isDarkTheme ? 'text-white/40 line-through' : 'text-black/40 line-through') : (isDarkTheme ? 'text-white/90' : 'text-black/80')}">${escapeHtml(mb.title)}</span>
                 <button onclick="deleteMicroblock('${block.id}', '${mb.id}', event)" class="shrink-0 mt-[2px] flex items-center justify-center ${isDarkTheme ? 'text-white/40 hover:text-red-400' : 'text-black/30 hover:text-red-500'} transition-colors">
                    <i class="ph ph-x text-[12px]"></i>
                 </button>
@@ -1166,17 +1194,17 @@ function drawBlock(block) {
                         <span ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition max-w-full" title="${isSearching ? '' : 'Alterar Horário'}">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
                         <div class="title-wrapper flex items-center ${isMicro ? 'mt-0' : 'mt-0.5'} min-w-0 pointer-events-none">
                             ${pastIconHtml}
-                            <h3 class="block-title ${isMicro ? 'text-[13px] mt-0' : 'text-[14px]'} font-bold leading-tight truncate ${titleClass}">${block.title}</h3>
+                            <h3 class="block-title ${isMicro ? 'text-[13px] mt-0' : 'text-[14px]'} font-bold leading-tight truncate ${titleClass}">${escapeHtml(block.title)}</h3>
                             <span class="micro-time ${isMicro ? 'block' : 'hidden'} text-[11px] font-bold ${timeColor} ml-1 shrink-0 ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition pointer-events-auto" ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} title="${isSearching ? '' : 'Alterar Horário'}">&bull; <span class="micro-time-val">${formatDur(block.duration)}</span></span>
                         </div>
                     </div>
                 </div>
                 
                 <div class="flex gap-1.5 shrink-0 relative z-[60] pointer-events-auto select-auto">
-                    <button onclick="toggleExpandBlock('${block.id}', event)" class="w-7 h-7 flex items-center justify-center ${btnBg} ${iconColor} rounded transition" title="Expandir/Recolher">
+                    <button onclick="toggleExpandBlock('${block.id}', event)" class="block-btn w-7 h-7 flex items-center justify-center ${btnBg} ${iconColor} rounded transition" title="Expandir/Recolher">
                         <i class="ph ${block.expanded ? 'ph-caret-up' : 'ph-caret-down'}"></i>
                     </button>
-                    <button onclick="toggleBlockCompletion('${block.id}', event)" class="w-7 h-7 flex items-center justify-center ${btnBg} ${checkColor} rounded transition" title="Concluir">
+                    <button onclick="toggleBlockCompletion('${block.id}', event)" class="block-btn w-7 h-7 flex items-center justify-center ${btnBg} ${checkColor} rounded transition" title="Concluir">
                         <i class="${block.completed ? 'ph-fill ph-check-circle' : 'ph ph-check'}"></i>
                     </button>
                 </div>
@@ -1564,7 +1592,7 @@ function enablePhysics(el, block) {
         
         let newDur = initialVal + deltaMins;
         newDur = Math.round(newDur / 5) * 5; 
-        newDur = Math.max(15, Math.min(newDur, maxVal));
+        newDur = Math.max(5, Math.min(newDur, maxVal)); // V40.8.0: mínimo 5 min (era 15)
         
         if (newDur !== block.duration) {
             block.duration = newDur;
@@ -1576,6 +1604,7 @@ function enablePhysics(el, block) {
             
             if (newDur <= 25) el.classList.add('micro-block');
             else el.classList.remove('micro-block');
+            el.classList.toggle('nano-block', newDur <= 10); el.classList.toggle('nano-5', newDur < 10); // V40.8.0
         }
     }
 
@@ -2098,7 +2127,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.7.0',
+            version: 'v40.8.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -2167,6 +2196,40 @@ window.handleFazImportFile = function(inputEl) {
     reader.readAsText(file);
 };
 
+// V40.8.0: campos estruturais (ids, cores, datas, horários, números) entram em atributos e
+// handlers do HTML. Um backup só é aceito se todos estiverem no formato esperado.
+function fazBackupLooksSafe(incoming) {
+    const ID = /^[\w.\-]{1,64}$/, HEX = /^#[0-9a-fA-F]{3,8}$/, DATE = /^\d{4}-\d{2}-\d{2}$/, MONTH = /^\d{4}-\d{2}$/, TIME = /^\d{1,2}:\d{2}$/, NUMSTR = /^-?\d+(\.\d+)?$/;
+    const NUM = { startMin: 1, duration: 1, amount: 1, dueDay: 1, durationMonths: 1, createdAt: 1 };
+    const isNum = (v) => (typeof v === 'number' && isFinite(v)) || (typeof v === 'string' && NUMSTR.test(v));
+    const okVal = (k, v) => {
+        if (v === null || v === undefined) return true;
+        if (k === 'id' || /Id$/.test(k)) return typeof v === 'string' && ID.test(v);
+        if (/Ids$/.test(k) || k === 'paidMonths') return Array.isArray(v) && v.every(x => typeof x === 'string' && ID.test(x));
+        if (k === 'color') return typeof v === 'string' && HEX.test(v);
+        if (k === 'date') return typeof v === 'string' && DATE.test(v);
+        if (k === 'startMonth') return typeof v === 'string' && MONTH.test(v);
+        if (k === 'start' || k === 'end') return isNum(v) || (typeof v === 'string' && TIME.test(v));
+        if (NUM[k]) return isNum(v);
+        return true;
+    };
+    const walk = (v, depth) => {
+        if (depth > 6) return true;
+        if (Array.isArray(v)) return v.every(x => walk(x, depth + 1));
+        if (v && typeof v === 'object') return Object.keys(v).every(k => okVal(k, v[k]) && walk(v[k], depth + 1));
+        return true;
+    };
+    const LISTS = ['tb_master_db', 'tb_backlog_db', 'tb_backlog_columns', 'tb_tags_db', 'tb_periods_db', 'tb_notes_db', 'tb_routines_db', 'tb_financial_db'];
+    for (const key of LISTS) {
+        if (!(key in incoming)) continue;
+        let v;
+        try { v = JSON.parse(incoming[key]); } catch (e) { return false; }
+        if (v !== null && !Array.isArray(v)) return false;
+        if (v && !walk(v, 0)) return false;
+    }
+    return true;
+}
+
 function applyFazImport(parsed) {
     // Valida assinatura + estrutura.
     if (!parsed || parsed.signature !== FAZ_BACKUP_SIGNATURE || typeof parsed.data !== 'object' || parsed.data === null) {
@@ -2181,6 +2244,7 @@ function applyFazImport(parsed) {
         if (isFazDataKey(k) && typeof parsed.data[k] === 'string') { incoming[k] = parsed.data[k]; count++; }
     }
     if (count === 0) { showToast('Backup vazio ou sem dados reconhecidos 🤔'); return; }
+    if (!fazBackupLooksSafe(incoming)) { showToast('Backup com dados inválidos. Nada foi alterado 😕'); return; }
 
     const s = parsed.summary || fazDataSummary(incoming);
     const quando = parsed.exportedAt ? new Date(parsed.exportedAt).toLocaleString('pt-BR') : 'data desconhecida';
@@ -2302,7 +2366,7 @@ function renderPeriodSelect() {
     const container = document.getElementById('period-select-container');
     container.innerHTML = periodsDb.map(p => `
         <button onclick="commitPeriodBlock('${p.id}')" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-app-focus hover:text-white transition text-left group">
-            <span class="font-bold text-zinc-800 group-hover:text-white">${p.name}</span>
+            <span class="font-bold text-zinc-800 group-hover:text-white">${escapeHtml(p.name)}</span>
             <span class="text-[11px] font-bold text-zinc-500 bg-white border border-zinc-200 px-2 py-1 rounded group-hover:text-zinc-800">${p.start} às ${p.end}</span>
         </button>
     `).join('');
@@ -2313,7 +2377,7 @@ function renderConfigPeriods() {
     container.innerHTML = periodsDb.map(p => `
         <div class="flex items-center justify-between bg-white border border-zinc-200 p-3 rounded-xl shadow-sm">
             <div class="flex flex-col">
-                <span class="text-sm font-bold text-zinc-800">${p.name}</span>
+                <span class="text-sm font-bold text-zinc-800">${escapeHtml(p.name)}</span>
                 <span class="text-[11px] font-bold text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i> ${p.start} - ${p.end}</span>
             </div>
             <button onclick="deleteConfigPeriod('${p.id}')" class="w-8 h-8 flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition" title="Excluir">
@@ -3007,7 +3071,7 @@ window.renderExistingNotesList = function(filter) {
     }
     
     container.innerHTML = filtered.map(n => {
-        const title = n.title || '<span class="text-zinc-400 italic">Sem título</span>';
+        const title = n.title ? escapeHtml(n.title) : '<span class="text-zinc-400 italic">Sem título</span>';
         const preview = (n.content || '').slice(0, 60) + ((n.content || '').length > 60 ? '…' : '');
         return `
             <button onclick="linkExistingNoteToBlock('${n.id}')" class="w-full text-left p-3 rounded-xl bg-zinc-50 border border-zinc-200 hover:bg-zinc-100 active:scale-[0.99] transition mb-1.5">
@@ -3560,7 +3624,7 @@ window.renderReports = function(period) {
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2">
                         <div class="w-3 h-3 rounded-full" style="background-color: ${t.color}"></div>
-                        <span class="font-bold text-sm text-zinc-800">${t.name}</span>
+                        <span class="font-bold text-sm text-zinc-800">${escapeHtml(t.name)}</span>
                     </div>
                     <span class="text-[11px] bg-zinc-100 px-2 py-1 rounded font-bold text-zinc-500">${formatDur(t.planned)}</span>
                 </div>
@@ -3771,7 +3835,7 @@ window.renderEditTagSelector = function() {
     tagsDb.forEach(t => {
         const isActive = editingTagId === t.id;
         const activeClass = isActive ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100';
-        html += `<button onclick="selectEditTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeClass}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>${t.name}</button>`;
+        html += `<button onclick="selectEditTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeClass}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>${escapeHtml(t.name)}</button>`;
     });
     container.innerHTML = html;
 }
@@ -4022,7 +4086,7 @@ window.renderRoutinesList = function() {
             <div class="flex justify-between items-start mb-2">
                 <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
                     <div class="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center text-xl shrink-0 shadow-inner">
-                        ${r.emoji || '✨'}
+                        ${escapeHtml(r.emoji || '✨')}
                     </div>
                     <div class="min-w-0">
                         <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(r.title)}</h4>
@@ -4099,10 +4163,15 @@ window.closeRoutineForm = function(force = false) {
     if (!force) renderRoutinesList();
 }
 
+// V40.8.0: duração mínima de 5 min. Abaixo de 15 anda de 5 em 5 (15 → 10 → 5);
+// acima de 15 mantém o passo do botão e sempre para no 15.
+function fazStepDuration(cur, delta) {
+    const next = delta < 0 ? (cur <= 15 ? cur - 5 : Math.max(15, cur + delta)) : (cur < 15 ? cur + 5 : cur + delta);
+    return Math.min(480, Math.max(5, next));
+}
+
 window.changeRoutineFormDuration = function(delta) {
-    currentRtDur += delta;
-    if (currentRtDur < 15) currentRtDur = 15;
-    if (currentRtDur > 480) currentRtDur = 480;
+    currentRtDur = fazStepDuration(currentRtDur, delta);
     updateRtFormVisuals();
 }
 
@@ -4326,9 +4395,7 @@ window.closeBacklogForm = function(force = false) {
 }
 
 window.changeBacklogFormDuration = function(delta) {
-    currentBlDur += delta;
-    if (currentBlDur < 15) currentBlDur = 15;
-    if (currentBlDur > 480) currentBlDur = 480;
+    currentBlDur = fazStepDuration(currentBlDur, delta);
     updateBacklogFormVisuals();
 }
 
@@ -5659,3 +5726,44 @@ document.addEventListener('click', (e) => {
     }
 }, true);
 
+// V40.8.0 — avisa (uma vez por abertura) se algum dado salvo estava ilegível.
+if (window.fazCorruptKeys && window.fazCorruptKeys.length) {
+    const nomes = { tb_master_db: 'agenda', tb_backlog_db: 'listas', tb_backlog_columns: 'listas', tb_tags_db: 'tags', tb_notes_db: 'notas', tb_routines_db: 'rotinas', tb_periods_db: 'períodos', tb_financial_db: 'finanças' };
+    const quais = Array.from(new Set(window.fazCorruptKeys.map(k => nomes[k] || k))).join(', ');
+    setTimeout(() => alert('⚠️ Parte dos dados deste aparelho estava ilegível (' + quais + ') e voltou ao padrão.\n\nGuardei uma cópia do que havia. Se você tem um backup, restaure em Config → Backup e Restauração.'), 800);
+}
+
+// V40.8.0 — iOS (iPhone/iPad): ajustes que só rodam lá. Android e desktop não entram aqui.
+(function () {
+    const ua = navigator.userAgent || '';
+    const isIOS = /iP(hone|ad|od)/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!isIOS) return;
+    document.documentElement.classList.add('is-ios');
+    // 1) O feedback de toque (:active) dos botões só funciona no iOS se existir um listener de toque.
+    document.addEventListener('touchstart', function () {}, { passive: true });
+    // 2) Depois que o teclado fecha, o iOS às vezes deixa a página deslocada. Volta pro lugar.
+    document.addEventListener('focusout', function () {
+        setTimeout(function () {
+            const a = document.activeElement;
+            if (!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) window.scrollTo(0, 0);
+        }, 80);
+    });
+    // 3) O iOS não oferece "Instalar app" sozinho. Mostra a dica uma vez, fora do modo instalado.
+    const standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    let seen = false;
+    try { seen = localStorage.getItem('tb__ios_dica_instalar') === '1'; } catch (e) {}
+    if (standalone || seen) return;
+    window.addEventListener('load', function () {
+        const hint = document.createElement('div');
+        hint.className = 'fixed left-3 right-3 bg-zinc-900 text-white px-4 py-3 rounded-2xl shadow-2xl z-[80] flex items-start gap-3';
+        hint.style.bottom = 'calc(env(safe-area-inset-bottom) + 12px)';
+        hint.innerHTML = '<i class="ph ph-export text-xl shrink-0 mt-0.5"></i>' +
+            '<p class="text-[13px] leading-snug flex-1"><b>Instale o app no iPhone:</b> toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>. Instalado, ele abre em tela cheia e guarda seus dados com segurança.</p>' +
+            '<button aria-label="Fechar" class="shrink-0 w-8 h-8 -mr-1 flex items-center justify-center rounded-full bg-white/10"><i class="ph-bold ph-x"></i></button>';
+        hint.querySelector('button').addEventListener('click', function () {
+            try { localStorage.setItem('tb__ios_dica_instalar', '1'); } catch (e) {}
+            hint.remove();
+        });
+        document.body.appendChild(hint);
+    });
+})();

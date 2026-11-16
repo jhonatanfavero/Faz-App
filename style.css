@@ -200,3 +200,56 @@ body { overflow-x: hidden; max-width: 100vw; }
     visibility: hidden !important;
     transition-delay: 0s, 300ms !important;
 }
+
+/* ========================================================================
+   V40.8.0 — Blocos de 5 e 10 min na timeline (13px e 28px de altura).
+   .nano-block = 10 min ou menos; .nano-5 = menos de 10 (sem espaço pros botões:
+   tocar no bloco expande). Só vale no bloco recolhido e fora do modo lista.
+   ======================================================================== */
+.nano-block { padding-top: 0 !important; padding-bottom: 0 !important; }
+.nano-block .drag-handle { padding-top: 0 !important; align-items: center !important; }
+.nano-block .title-wrapper { margin-top: 0 !important; }
+.nano-block .block-title { font-size: 12px !important; line-height: 26px !important; }
+.nano-block .micro-time { line-height: 26px !important; }
+.nano-block .block-btn { width: 24px !important; height: 24px !important; margin-top: 1px; }
+.nano-block .resize-handle { height: 10px !important; padding-bottom: 2px !important; }
+.nano-block.nano-5 .block-title,
+.nano-block.nano-5 .micro-time { font-size: 10px !important; line-height: 11px !important; }
+.nano-block.nano-5 .block-btn { display: none !important; }
+.nano-block.nano-5 .drag-handle i { font-size: 10px !important; margin-top: 0 !important; }
+.nano-block.nano-5 .title-wrapper > div { width: 10px !important; height: 10px !important; }
+.nano-block.nano-5 .resize-handle { height: 6px !important; padding-bottom: 1px !important; }
+
+/* ========================================================================
+   V40.8.0 — Navegadores sem 100dvh (iOS antes do 15.4): usa a altura clássica.
+   ======================================================================== */
+@supports not (height: 100dvh) {
+    body { min-height: 100vh; min-height: -webkit-fill-available; }
+    @media (max-width: 639px) {
+        .app-frame-locked { height: 100vh; height: -webkit-fill-available; }
+    }
+}
+
+/* ========================================================================
+   V40.8.0 — Ajustes SÓ de iOS (iPhone/iPad). O @supports abaixo só é verdadeiro
+   no Safari do iOS: Android e desktop não entram aqui.
+   ======================================================================== */
+@supports (-webkit-touch-callout: none) {
+    /* segurar o dedo num cartão não abre o menu/seleção de texto do iOS (atrapalha o arrastar) */
+    [data-bl-card], .mb-item, .block-item {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+    [data-bl-card] input, [data-bl-card] textarea, .block-item input, .block-item textarea {
+        -webkit-user-select: text;
+        user-select: text;
+    }
+    /* sem o retângulo cinza do iOS a cada toque (os botões já têm o próprio feedback) */
+    .app-frame-locked { -webkit-tap-highlight-color: rgba(0, 0, 0, 0); }
+    /* botões do rodapé acima da barra de início do iPhone */
+    #fab-btn, #list-btn { bottom: max(2rem, calc(env(safe-area-inset-bottom) + 0.75rem)) !important; }
+    #floating-task { bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 0.5rem)) !important; }
+    .ios-safe-bottom { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)) !important; }
+}
+.nano-block.nano-5 .resize-handle > div { display: none !important; } /* a barrinha cobria o texto no bloco de 13px */

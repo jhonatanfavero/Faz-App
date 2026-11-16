@@ -1,5 +1,5 @@
 /* ===========================================================================
- * Faz / TimeBlock — V40.7.0 — SINCRONIZAÇÃO OPCIONAL DAS LISTAS (Fase 2 MVP)
+ * Faz / TimeBlock — SINCRONIZAÇÃO OPCIONAL (Listas desde a V40.7.0, Agenda desde a V40.8.0)
  * ---------------------------------------------------------------------------
  * Sincroniza as Listas do app (tb_backlog_db), as colunas (tb_backlog_columns)
  * e as tags (tb_tags_db) com o Supabase, nos 2 sentidos — SÓ pra quem fizer
@@ -21,10 +21,12 @@
  *   edições feitas no PC ao mesmo tempo.
  * Órfãos: tarefa numa lista apagada vai pra lista padrão; tag apagada vira null.
  *
- * V40.8.0 — AGENDA (tb_master_db) SÓ IDA: o celular envia blocos novos/alterados
- *   (comparando uma impressão digital de cada bloco com a do último envio) e
- *   marca como apagados os que sumiram. NUNCA altera a timeline do celular.
- *   O PC só lê. 'expanded' (estado de tela) não vai pra nuvem.
+ * V40.8.0 — AGENDA (tb_master_db) entra no mesmo merge de 3 vias, nos 2 sentidos.
+ *   Como ela é grande, a nuvem é lida de forma INCREMENTAL: só as linhas que mudaram
+ *   desde a última rodada (updated_at do servidor, com 30s de folga); o resto da nuvem
+ *   é, por definição, igual à base guardada neste aparelho. 'expanded' não sincroniza.
+ *   Tarefas e blocos têm 'color' (cor livre) e 'archived' (arquivado: some das listas
+ *   do app, mas continua existindo — nunca é tratado como apagado).
  *
  * Estado interno em 'tb__sync' (prefixo tb__ = interno: fica FORA do backup e
  * o Restaurar não apaga). Sessão do Supabase fica em 'sb-<ref>-auth-token'.
@@ -41,12 +43,18 @@
 
     var DEFAULT_COL = 'col_geral';
     var STEP = 1024;
-    var KINDS = ['listas', 'tags', 'tarefas'];
+    var KINDS = ['listas', 'tags', 'tarefas', 'blocos'];
+    // listas/tags/tarefas têm ordem própria (position); blocos se ordenam por dia e horário.
+    var ORDERED = { listas: true, tags: true, tarefas: true, blocos: false };
     var FIELDS = {
-        tarefas: ['column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position'],
+        tarefas: ['column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived'],
         listas: ['name', 'is_default', 'position', 'created_ms'],
-        tags: ['name', 'color', 'position']
+        tags: ['name', 'color', 'position'],
+        blocos: ['date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived']
     };
+    var FIELD_DEFAULTS = { archived: false, completed: false, was_delayed: false, is_default: false, microblocks: [], linked_note_ids: [] };
+    // Campos estruturais entram em atributos/handlers do HTML do app: só passam nestes formatos.
+    var SAFE_ID = /^[\w.\-]{1,64}$/, HEX = /^#[0-9a-fA-F]{3,8}$/, HEX6 = /^#[0-9a-fA-F]{6}$/, WORD = /^[a-z_]{1,32}$/;
     // Tags que o app cria sozinho num aparelho novo (app.js, tagsDb vazio).
     var DEFAULT_TAGS = {
         tag_1: ['Trabalho', '#ef4444'],
@@ -67,8 +75,18 @@
     function num(v, def) { var n = Number(v); return Number.isFinite(n) ? n : def; }
     function clampInt(v, def, lo, hi) { var n = Math.round(num(v, def)); return Math.min(hi, Math.max(lo, n)); }
     function str(v, max) { var s = v == null ? '' : String(v); return max ? s.slice(0, max) : s; }
+    function hex6(c) { return HEX6.test(String(c || '')) ? String(c) : null; }
     function byPos(a, b) {
         return (a.position - b.position) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    }
+    function byDay(a, b) {
+        return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.start_min - b.start_min) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    }
+    function validDate(s) { // data de calendário real (2026-02-30 não passa)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+        var y = +s.slice(0, 4), m = +s.slice(5, 7), d = +s.slice(8, 10);
+        if (y < 1900 || y > 2999 || m < 1 || m > 12 || d < 1) return false;
+        return d <= new Date(Date.UTC(y, m, 0)).getUTCDate();
     }
 
     // ---------- item do app <-> linha da nuvem ----------
@@ -81,7 +99,9 @@
                     title: str(it.title, 2000),
                     duration: clampInt(it.duration, 30, 0, 1440),
                     tag_id: it.tagId ? String(it.tagId) : null,
-                    microblocks: Array.isArray(it.microblocks) ? clone(it.microblocks) : []
+                    microblocks: Array.isArray(it.microblocks) ? clone(it.microblocks) : [],
+                    color: hex6(it.color),
+                    archived: false
                 };
             },
             item: function (r, prev) {
@@ -93,6 +113,7 @@
                 // retrocompat: tarefa que nunca teve columnId e continua na padrão fica sem (zero diff)
                 if (prev && !prev.columnId && r.column_id === DEFAULT_COL) delete it.columnId;
                 else it.columnId = r.column_id;
+                if (r.color) it.color = r.color; else delete it.color;
                 return it;
             }
         },
@@ -124,21 +145,90 @@
                 t.color = r.color;
                 return t;
             }
+        },
+        // V40.8.0: blocos da agenda (tb_master_db). 'expanded' é estado de tela e não sincroniza.
+        blocos: {
+            row: function (b) {
+                var date = String(b.date || '');
+                if (!validDate(date)) return null; // sem data válida não sincroniza (fica só no aparelho)
+                return {
+                    id: String(b.id),
+                    date: date,
+                    start_min: clampInt(b.startMin, 0, 0, 1440),
+                    duration: clampInt(b.duration, 15, 0, 1440),
+                    title: str(b.title, 2000),
+                    type: str(b.type || 'focus', 32),
+                    theme: str(b.theme || 'focus', 32),
+                    tag_id: b.tagId ? String(b.tagId) : null,
+                    microblocks: Array.isArray(b.microblocks) ? clone(b.microblocks) : [],
+                    completed: !!b.completed,
+                    was_delayed: !!b.wasDelayed,
+                    linked_note_ids: Array.isArray(b.linkedNoteIds) ? clone(b.linkedNoteIds) : [],
+                    color: hex6(b.color),
+                    archived: false
+                };
+            },
+            item: function (r, prev) {
+                var b = prev ? Object.assign({}, prev) : { id: r.id, expanded: false };
+                b.date = r.date;
+                b.startMin = r.start_min;
+                b.duration = r.duration;
+                b.title = r.title;
+                b.type = r.type;
+                b.theme = r.theme;
+                b.tagId = r.tag_id || null;
+                b.microblocks = clone(r.microblocks || []);
+                b.completed = !!r.completed;
+                if (r.was_delayed) b.wasDelayed = true; else delete b.wasDelayed;
+                b.linkedNoteIds = clone(r.linked_note_ids || []);
+                if (r.color) b.color = r.color; else delete b.color;
+                return b;
+            }
         }
     };
 
-    // Linha "limpa" (só os campos conhecidos) — usada pra nuvem e pra base.
+    // Linha "limpa" (só os campos conhecidos, com padrões) — usada pra local, nuvem e base.
     function cleanRow(kind, r) {
         var o = { id: String(r.id), deleted: !!r.deleted };
-        FIELDS[kind].forEach(function (f) { o[f] = clone(r[f] === undefined ? null : r[f]); });
-        if (typeof o.position !== 'number' || !Number.isFinite(o.position)) o.position = 0;
-        if (kind === 'tarefas' && !Array.isArray(o.microblocks)) o.microblocks = [];
+        FIELDS[kind].forEach(function (f) {
+            var v = r[f];
+            if (v === undefined || v === null) v = (f in FIELD_DEFAULTS) ? FIELD_DEFAULTS[f] : null;
+            o[f] = clone(v);
+        });
+        if (ORDERED[kind] && (typeof o.position !== 'number' || !Number.isFinite(o.position))) o.position = 0;
         if (kind === 'tarefas' && !o.column_id) o.column_id = DEFAULT_COL;
         return o;
     }
+    function safeMbs(a) {
+        return (Array.isArray(a) ? a : []).filter(function (m) { return m && typeof m === 'object' && !Array.isArray(m); })
+            .map(function (m, i) {
+                var o = clone(m);
+                if (o.id != null && !SAFE_ID.test(String(o.id))) o.id = 'mb_x' + i;
+                return o;
+            });
+    }
+    // Linhas que chegam da nuvem: campos estruturais fora do formato são neutralizados.
     function indexRows(kind, rows) {
         var out = {};
-        (rows || []).forEach(function (r) { if (r && r.id != null) out[String(r.id)] = cleanRow(kind, r); });
+        (rows || []).forEach(function (r) {
+            if (!r || r.id == null || !SAFE_ID.test(String(r.id))) return;
+            var c = cleanRow(kind, r);
+            if ('tag_id' in c && c.tag_id && !SAFE_ID.test(String(c.tag_id))) c.tag_id = null;
+            if ('microblocks' in c) c.microblocks = safeMbs(c.microblocks);
+            if (kind === 'tags') { if (!HEX.test(String(c.color || ''))) c.color = '#a1a1aa'; }
+            else if ('color' in c) c.color = hex6(c.color);
+            if (kind === 'tarefas' && !SAFE_ID.test(String(c.column_id))) c.column_id = DEFAULT_COL;
+            if (kind === 'blocos') {
+                c.date = String(c.date || '').slice(0, 10);
+                if (!validDate(c.date)) return;
+                c.start_min = clampInt(c.start_min, 0, 0, 1440);
+                c.duration = clampInt(c.duration, 15, 0, 1440);
+                if (!WORD.test(String(c.type))) c.type = 'focus';
+                if (!WORD.test(String(c.theme))) c.theme = 'focus';
+                c.linked_note_ids = (Array.isArray(c.linked_note_ids) ? c.linked_note_ids : []).filter(function (x) { return typeof x === 'string' && SAFE_ID.test(x); });
+            }
+            out[c.id] = c;
+        });
         return out;
     }
     function sameRow(kind, a, b) {
@@ -199,26 +289,26 @@
     }
 
     function buildLocal(kind, items, baseRows) {
-        var seen = {}, ordered = [], dups = 0;
+        var seen = {}, ordered = [], rows = {}, dups = 0, localOnly = {};
         (items || []).forEach(function (it) {
             if (!it || it.id == null) return;
             var id = String(it.id);
             if (seen[id]) { dups++; return; }
+            var r = SAFE_ID.test(id) ? MAP[kind].row(it) : null;
+            if (!r) { localOnly[id] = true; return; } // id/data fora do formato: fica só neste aparelho
             seen[id] = true;
-            ordered.push(it);
+            ordered.push(r);
         });
-        var pos = assignPositions(ordered.map(function (it) {
-            var b = baseRows[String(it.id)];
+        var pos = ORDERED[kind] ? assignPositions(ordered.map(function (r) {
+            var b = baseRows[r.id];
             return b && !b.deleted ? b.position : undefined;
-        }));
-        var rows = {};
-        ordered.forEach(function (it, i) {
-            var r = MAP[kind].row(it);
-            r.position = pos[i];
+        })) : null;
+        ordered.forEach(function (r, i) {
+            if (pos) r.position = pos[i];
             r.deleted = false;
-            rows[r.id] = r;
+            rows[r.id] = cleanRow(kind, r);
         });
-        return { rows: rows, dups: dups };
+        return { rows: rows, dups: dups, localOnly: localOnly };
     }
 
     // ---------- merge ----------
@@ -243,15 +333,15 @@
         [L, B, R].forEach(function (m) { Object.keys(m).forEach(function (id) { ids[id] = true; }); });
         Object.keys(ids).forEach(function (id) {
             var b = B[id], l = L[id], r = R[id], m;
-            if (!l && b) l = Object.assign({}, b, { deleted: true }); // sumiu daqui = apagado aqui
+            // Sumiu daqui: se estava arquivado (não aparece no app) segue igual; senão foi apagado aqui.
+            if (!l && b) l = b.archived ? b : Object.assign({}, b, { deleted: true });
             if (!r && b) r = Object.assign({}, b, { deleted: true }); // sumiu da nuvem = apagado lá
             if (!l && !r) return;
             if (!l) m = r;
             else if (!r) m = l;
             else if (firstSync || !b) m = r; // 1º sync: na sobreposição vale a nuvem
             else m = merge3(kind, l, b, r);
-            m = cleanRow(kind, Object.assign({}, m, { id: id }));
-            merged[id] = m;
+            merged[id] = cleanRow(kind, Object.assign({}, m, { id: id }));
         });
         return merged;
     }
@@ -265,23 +355,24 @@
 
     /**
      * Planeja uma rodada de sync (função pura).
-     * opts.local      { tarefas:[itens do app], listas:[...], tags:[...] }
-     * opts.base       { tarefas:{id:linha}, listas:{...}, tags:{...} } ou null
-     * opts.remote     { tarefas:[linhas da nuvem], listas:[...], tags:[...] }
+     * opts.local      { tarefas:[itens do app], listas:[...], tags:[...], blocos:[...] }
+     * opts.base       { tarefas:{id:linha}, listas:{...}, tags:{...}, blocos:{...} } ou null
+     * opts.remote     { tarefas:[linhas da nuvem], ... }
      * opts.firstSync  true no 1º sync do aparelho/conta
      * opts.usedTagIds ids de tag usados em qualquer lugar do app (agenda, rotinas...)
-     * Retorna { merged, push, changed, droppedDefaults, repaired, dups }
+     * Retorna { merged, push, changed, droppedDefaults, droppedSeeds, repaired, dups, skipped, localOnly }
      */
     function plan(opts) {
-        var base = opts.base || { tarefas: {}, listas: {}, tags: {} };
         var firstSync = !!opts.firstSync || !opts.base;
-        var local = {
-            tarefas: (opts.local && opts.local.tarefas) || [],
-            listas: (opts.local && opts.local.listas) || [],
-            tags: ((opts.local && opts.local.tags) || []).slice()
-        };
-        var remote = {};
-        KINDS.forEach(function (k) { remote[k] = indexRows(k, (opts.remote || {})[k]); });
+        var firstBlocks = firstSync || !(opts.base && opts.base.blocos); // agenda entrou na V40.8.0
+        var base = {}, local = {}, remote = {};
+        KINDS.forEach(function (k) {
+            base[k] = {};
+            var src = (!firstSync && opts.base && opts.base[k]) || {};
+            Object.keys(src).forEach(function (id) { base[k][id] = cleanRow(k, Object.assign({}, src[id], { id: id })); });
+            local[k] = ((opts.local && opts.local[k]) || []).slice();
+            remote[k] = indexRows(k, (opts.remote || {})[k]);
+        });
 
         // Aparelho novo: as 3 tags padrão (intactas e sem uso) não sobem pra nuvem.
         var droppedDefaults = [];
@@ -297,14 +388,24 @@
                 return true;
             });
         }
+        // Idem pro bloco de demonstração do app novo, quando a nuvem já tem agenda.
+        var droppedSeeds = 0;
+        if (firstBlocks && aliveCount(remote.blocos) > 0) {
+            local.blocos = local.blocos.filter(function (b) {
+                if (b && /^seed_/.test(String(b.id)) && !remote.blocos[String(b.id)]) { droppedSeeds++; return false; }
+                return true;
+            });
+        }
 
-        var L = {}, merged = {}, dups = 0;
+        var L = {}, merged = {}, dups = {}, totalDups = 0, skipped = 0, localOnly = {};
         KINDS.forEach(function (k) {
-            var b = base[k] || {};
-            var built = buildLocal(k, local[k], b);
+            var built = buildLocal(k, local[k], base[k]);
             L[k] = built.rows;
-            dups += built.dups;
-            merged[k] = mergeKind(k, L[k], b, remote[k], firstSync);
+            dups[k] = built.dups;
+            totalDups += built.dups;
+            localOnly[k] = built.localOnly;
+            skipped += Object.keys(built.localOnly).length;
+            merged[k] = mergeKind(k, L[k], base[k], remote[k], firstSync);
         });
 
         // Reparo de órfãos (lista/tag apagada de um lado enquanto o outro usava).
@@ -320,89 +421,49 @@
         });
 
         // Desempate de posições já nesta rodada (não deixa pra próxima).
-        KINDS.forEach(function (k) { fixTies(merged[k]); });
+        KINDS.forEach(function (k) { if (ORDERED[k]) fixTies(merged[k]); });
 
         var push = {}, changed = {};
         KINDS.forEach(function (k) {
             push[k] = [];
-            changed[k] = false;
+            changed[k] = !!dups[k];
             Object.keys(merged[k]).forEach(function (id) {
                 var m = merged[k][id], r = remote[k][id], l = L[k][id];
                 if (!r || !sameRow(k, m, r)) push[k].push(m);
-                if ((!!l) !== (!m.deleted) || (l && !sameRow(k, m, l))) changed[k] = true;
+                var shown = !m.deleted && !m.archived; // arquivado não aparece nas listas do app
+                if ((!!l) !== shown || (l && !sameRow(k, m, l))) changed[k] = true;
             });
         });
         if (droppedDefaults.length) changed.tags = true;
-        if (dups) KINDS.forEach(function (k) { changed[k] = true; });
+        if (droppedSeeds) changed.blocos = true;
 
-        return { merged: merged, push: push, changed: changed, droppedDefaults: droppedDefaults, repaired: repaired, dups: dups };
+        return { merged: merged, push: push, changed: changed, droppedDefaults: droppedDefaults, droppedSeeds: droppedSeeds, repaired: repaired, dups: totalDups, skipped: skipped, localOnly: localOnly };
     }
 
-    // Lista do app, na ordem, a partir das linhas mescladas (preserva campos extras do item).
-    function materialize(kind, mergedRows, prevItems) {
-        var prevById = {};
+    // Lista do app a partir das linhas mescladas (preserva campos extras de cada item).
+    // localOnly = ids locais que não sincronizam (id/data fora do formato): ficam como estão, no fim.
+    function materialize(kind, mergedRows, prevItems, localOnly) {
+        var prevById = {}, extras = [], out = [], done = {};
         (prevItems || []).forEach(function (it) {
-            if (it && it.id != null && !prevById[String(it.id)]) prevById[String(it.id)] = it;
+            if (!it || it.id == null) return;
+            var id = String(it.id);
+            if (!mergedRows[id]) { if (localOnly && localOnly[id]) extras.push(it); return; }
+            if (!prevById[id]) prevById[id] = it;
         });
-        return Object.keys(mergedRows).map(function (id) { return mergedRows[id]; })
-            .filter(function (r) { return !r.deleted; })
-            .sort(byPos)
-            .map(function (r) { return MAP[kind].item(r, prevById[r.id]); });
-    }
-
-    // ---------- V40.8.0: AGENDA, só ida (celular → nuvem) ----------
-    var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-    function validDate(s) { // data de calendário real (2026-02-30 não passa)
-        if (!DATE_RE.test(s)) return false;
-        var y = +s.slice(0, 4), m = +s.slice(5, 7), d = +s.slice(8, 10);
-        if (y < 1900 || y > 2999 || m < 1 || m > 12 || d < 1) return false;
-        return d <= new Date(Date.UTC(y, m, 0)).getUTCDate();
-    }
-    function blockRow(b) {
-        if (!b || b.id == null) return null;
-        var id = String(b.id), date = String(b.date || '');
-        if (!id.length || id.length > 64 || !validDate(date)) return null;
-        return {
-            id: id,
-            date: date,
-            start_min: clampInt(b.startMin, 0, 0, 1440),
-            duration: clampInt(b.duration, 15, 0, 1440),
-            title: str(b.title, 2000),
-            type: str(b.type || 'focus', 32),
-            theme: str(b.theme || 'focus', 32),
-            tag_id: b.tagId && String(b.tagId).length <= 64 ? String(b.tagId) : null,
-            microblocks: Array.isArray(b.microblocks) ? clone(b.microblocks) : [],
-            completed: !!b.completed,
-            was_delayed: !!b.wasDelayed,
-            linked_note_ids: Array.isArray(b.linkedNoteIds) ? clone(b.linkedNoteIds) : []
-        };
-    }
-    function hash53(s) { // cyrb53: impressão digital de 53 bits
-        var h1 = 0xdeadbeef, h2 = 0x41c6ce57;
-        for (var i = 0, ch; i < s.length; i++) {
-            ch = s.charCodeAt(i);
-            h1 = Math.imul(h1 ^ ch, 2654435761);
-            h2 = Math.imul(h2 ^ ch, 1597334677);
+        var alive = Object.keys(mergedRows).map(function (id) { return mergedRows[id]; })
+            .filter(function (r) { return !r.deleted && !r.archived; });
+        if (ORDERED[kind]) {
+            out = alive.sort(byPos).map(function (r) { return MAP[kind].item(r, prevById[r.id]); });
+        } else {
+            // mantém a ordem que o app já tinha; o que é novo entra no fim, por dia e horário
+            (prevItems || []).forEach(function (it) {
+                var id = it && it.id != null ? String(it.id) : null, r = id && mergedRows[id];
+                if (r && !r.deleted && !r.archived && !done[id]) { done[id] = true; out.push(MAP[kind].item(r, prevById[id])); }
+            });
+            alive.filter(function (r) { return !done[r.id]; }).sort(byDay)
+                .forEach(function (r) { out.push(MAP[kind].item(r, null)); });
         }
-        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-        return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
-    }
-    // Diferença entre a agenda local e o último envio (baseHashes = {id: impressão}).
-    function planBlocks(blocks, baseHashes) {
-        baseHashes = baseHashes || {};
-        var seen = {}, upserts = [], hashes = {}, skipped = 0;
-        (blocks || []).forEach(function (b) {
-            var r = blockRow(b);
-            if (!r) { if (b && b.id != null) skipped++; return; }
-            if (seen[r.id]) return; // id repetido: vale o primeiro
-            seen[r.id] = true;
-            var h = hash53(stable(r));
-            hashes[r.id] = h;
-            if (baseHashes[r.id] !== h) { r.deleted = false; upserts.push(r); }
-        });
-        var tombstones = Object.keys(baseHashes).filter(function (id) { return !seen[id]; });
-        return { upserts: upserts, tombstones: tombstones, hashes: hashes, skipped: skipped };
+        return out.concat(extras);
     }
 
     function baseFrom(merged) {
@@ -415,11 +476,10 @@
     }
 
     return {
-        DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS,
-        stable: stable, same: same, assignPositions: assignPositions, fixTies: fixTies, buildLocal: buildLocal,
-        indexRows: indexRows, cleanRow: cleanRow, merge3: merge3, mergeKind: mergeKind,
-        plan: plan, materialize: materialize, baseFrom: baseFrom, aliveCount: aliveCount, MAP: MAP,
-        validDate: validDate, blockRow: blockRow, hash53: hash53, planBlocks: planBlocks
+        DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS,
+        stable: stable, same: same, validDate: validDate, assignPositions: assignPositions, fixTies: fixTies,
+        buildLocal: buildLocal, indexRows: indexRows, cleanRow: cleanRow, merge3: merge3, mergeKind: mergeKind,
+        plan: plan, materialize: materialize, baseFrom: baseFrom, aliveCount: aliveCount, MAP: MAP
     };
 });
 
@@ -437,9 +497,10 @@
     var LIB_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
     var KINDS = CORE.KINDS;
     var SELECT = {
-        tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,deleted',
+        tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,deleted',
         listas: 'id,name,is_default,position,created_ms,deleted',
-        tags: 'id,name,color,position,deleted'
+        tags: 'id,name,color,position,deleted',
+        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,deleted,updated_at'
     };
     var configured = !!(CFG.url && CFG.key && !/COLE_AQUI/i.test(CFG.url + CFG.key));
 
@@ -486,7 +547,17 @@
             if (typeof _moveCardPendingId !== 'undefined' && _moveCardPendingId) return true;
             var form = $('backlog-form-view');
             if (form && !form.classList.contains('hidden')) return true;
-            if (typeof getOpenModal === 'function' && getOpenModal()) return true;
+            // V40.8.0: NÃO usar getOpenModal() do app aqui. Ele procura qualquer elemento com a classe
+            // z-[60], e os botões de cada bloco da timeline também têm essa classe: com um bloco
+            // na tela ele sempre respondia "tem modal aberto" e o sync nunca rodava (bug da V40.7.0).
+            var modals = document.querySelectorAll('[id$="-modal"]');
+            for (var i = 0; i < modals.length; i++) {
+                var m = modals[i];
+                if (!m.classList.contains('hidden') && (m.classList.contains('flex') || (window.getComputedStyle && getComputedStyle(m).display !== 'none' && m.offsetParent !== null))) return true;
+            }
+            // V40.8.0: digitando em algum campo do app (ex.: item de checklist)? Não redesenha por baixo.
+            var a = document.activeElement;
+            if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !(a.closest && a.closest('#config-sheet'))) return true;
         } catch (e) {}
         return false;
     }
@@ -534,19 +605,35 @@
         debounceT = setTimeout(function () { debounceT = null; sync('auto'); }, ms);
     }
 
-    async function fetchAll(uid) {
-        var out = {};
-        for (var i = 0; i < KINDS.length; i++) {
-            var k = KINDS[i];
-            out[k] = [];
-            for (var from = 0; ; from += 1000) {
-                var res = await sb.from(k).select(SELECT[k]).eq('user_id', uid).order('id').range(from, from + 999);
-                if (res.error) throw res.error;
-                out[k] = out[k].concat(res.data || []);
-                if (!res.data || res.data.length < 1000) break;
-            }
+    async function fetchRows(kind, uid, sinceMs) {
+        var out = [];
+        for (var from = 0; ; from += 1000) {
+            var q = sb.from(kind).select(SELECT[kind]).eq('user_id', uid);
+            if (sinceMs) q = q.gt('updated_at', new Date(sinceMs).toISOString());
+            var res = await q.order('id').range(from, from + 999);
+            if (res.error) throw res.error;
+            out = out.concat(res.data || []);
+            if (!res.data || res.data.length < 1000) break;
         }
         return out;
+    }
+
+    // Listas, tags e tarefas: lê tudo (são pequenas). Agenda: só o que mudou desde a última
+    // rodada (30s de folga); o restante da nuvem é igual à base guardada neste aparelho.
+    async function fetchAll(uid, st) {
+        var out = {}, cursor = (st && st.cursorBlocos) || 0;
+        for (var i = 0; i < KINDS.length; i++) if (KINDS[i] !== 'blocos') out[KINDS[i]] = await fetchRows(KINDS[i], uid, 0);
+        var incremental = !!(st && st.base && st.base.blocos && cursor);
+        var rows = await fetchRows('blocos', uid, incremental ? cursor - 30000 : 0);
+        rows.forEach(function (r) { var t = Date.parse(r.updated_at); if (t > cursor) cursor = t; });
+        if (incremental) {
+            var byId = {};
+            Object.keys(st.base.blocos).forEach(function (id) { byId[id] = Object.assign({}, st.base.blocos[id], { id: id }); });
+            rows.forEach(function (r) { byId[r.id] = r; });
+            rows = Object.keys(byId).map(function (id) { return byId[id]; });
+        }
+        out.blocos = rows;
+        return { remote: out, cursor: cursor };
     }
 
     async function pushAll(uid, push) {
@@ -560,19 +647,6 @@
         }
     }
 
-    // V40.8.0: agenda só ida. Novos/alterados em lotes de 500; apagados viram tombstone
-    // por UPDATE (o upsert exigiria data/horário de um bloco que já não existe aqui).
-    async function pushBlocks(uid, pb) {
-        for (var j = 0; j < pb.upserts.length; j += 500) {
-            var chunk = pb.upserts.slice(j, j + 500).map(function (r) { return Object.assign({ user_id: uid }, r); });
-            var res = await sb.from('blocos').upsert(chunk, { onConflict: 'user_id,id' });
-            if (res.error) throw res.error;
-        }
-        for (var k = 0; k < pb.tombstones.length; k += 100) {
-            var r2 = await sb.from('blocos').update({ deleted: true }).eq('user_id', uid).in('id', pb.tombstones.slice(k, k + 100));
-            if (r2.error) throw r2.error;
-        }
-    }
     function localBlocks() {
         try { return (typeof db !== 'undefined' && Array.isArray(db)) ? db : []; } catch (e) { return []; }
     }
@@ -585,7 +659,7 @@
             'Na nuvem: ' + CORE.aliveCount(remote.tarefas) + ' tarefas, ' + CORE.aliveCount(remote.listas) + ' listas, ' +
             CORE.aliveCount(remote.tags) + ' tags\n\n' +
             'Vou JUNTAR os dois lados. Se o mesmo item existir nos dois, vale a versão da nuvem.\n' +
-            'Tua agenda (' + localBlocks().length + ' blocos) também vai, só pra ver no computador.\n' +
+            'Agenda: ' + localBlocks().length + ' blocos neste aparelho, ' + CORE.aliveCount(remote.blocos) + ' na nuvem.\n' +
             'Dica: se quiser segurança extra, faça um backup antes (Config → Backup).\n\n' +
             'Continuar?';
     }
@@ -593,9 +667,10 @@
     function applyLocal(p) {
         applying = true;
         try {
-            if (p.changed.tarefas) { backlogDb = CORE.materialize('tarefas', p.merged.tarefas, backlogDb); saveBacklog(); }
-            if (p.changed.listas) { backlogColumnsDb = CORE.materialize('listas', p.merged.listas, backlogColumnsDb); saveBacklogColumns(); }
-            if (p.changed.tags) { tagsDb = CORE.materialize('tags', p.merged.tags, tagsDb); saveTags(); }
+            if (p.changed.tarefas) { backlogDb = CORE.materialize('tarefas', p.merged.tarefas, backlogDb, p.localOnly.tarefas); saveBacklog(); }
+            if (p.changed.listas) { backlogColumnsDb = CORE.materialize('listas', p.merged.listas, backlogColumnsDb, p.localOnly.listas); saveBacklogColumns(); }
+            if (p.changed.tags) { tagsDb = CORE.materialize('tags', p.merged.tags, tagsDb, p.localOnly.tags); saveTags(); }
+            if (p.changed.blocos) { db = CORE.materialize('blocos', p.merged.blocos, db, p.localOnly.blocos); saveDb(); }
         } finally {
             applying = false;
         }
@@ -606,8 +681,8 @@
             }
         } catch (e) {}
         try { if (typeof renderBacklog === 'function') renderBacklog(); } catch (e) { console.warn('[FazSync] render', e); }
-        if (p.changed.tags) {
-            try { if (typeof renderTimeline === 'function') renderTimeline(); } catch (e) {}
+        if (p.changed.tags || p.changed.blocos) {
+            try { if (typeof renderTimeline === 'function') renderTimeline(); } catch (e) { console.warn('[FazSync] timeline', e); }
             try { if (typeof renderTagsList === 'function') renderTagsList(); } catch (e) {}
         }
     }
@@ -624,19 +699,18 @@
             var uid = session.user.id;
             var st = readState();
             var firstSync = !st || st.userId !== uid || !st.base;
-            var remote = await fetchAll(uid);
+            var fetched = await fetchAll(uid, firstSync ? null : st);
+            var remote = fetched.remote;
 
             // Daqui até applyLocal é tudo síncrono: nenhuma ação do usuário entra no meio.
             if (appBusy()) { again = true; return; }
             var p = CORE.plan({
-                local: { tarefas: backlogDb, listas: backlogColumnsDb, tags: tagsDb },
+                local: { tarefas: backlogDb, listas: backlogColumnsDb, tags: tagsDb, blocos: localBlocks() },
                 base: firstSync ? null : st.base,
                 remote: remote,
                 firstSync: firstSync,
                 usedTagIds: usedTagIds()
             });
-            // V40.8.0: agenda (só ida) — fotografa a diferença no mesmo instante do plano.
-            var pb = CORE.planBlocks(localBlocks(), (st && st.userId === uid && st.blocos) || {});
             if (firstSync && !confirm(firstSyncText(remote))) {
                 await window.fazSyncLogout(true);
                 toast('Sincronização cancelada');
@@ -645,8 +719,7 @@
             if (KINDS.some(function (k) { return p.changed[k]; })) applyLocal(p);
 
             await pushAll(uid, p.push);
-            await pushBlocks(uid, pb);
-            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), blocos: pb.hashes, lastSyncAt: Date.now() });
+            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), cursorBlocos: fetched.cursor, lastSyncAt: Date.now() });
             lastError = null;
             if (manual || firstSync) toast('Sincronizado ✅');
             pushTheme();
@@ -666,8 +739,11 @@
         try {
             var c = (typeof themeColor !== 'undefined') ? themeColor : null;
             var meta = (session && session.user && session.user.user_metadata) || {};
-            if (!/^#[0-9a-fA-F]{6}$/.test(String(c || '')) || meta.faz_theme === c) return;
-            sb.auth.updateUser({ data: { faz_theme: c } }).catch(function () {});
+            if (!/^#[0-9a-fA-F]{6}$/.test(String(c || ''))) return;
+            // janela do dia (ex.: 7 → 24) também vai, pro PC desenhar a agenda no mesmo intervalo
+            var hours = (typeof START_HOUR !== 'undefined' && typeof END_HOUR !== 'undefined') ? [Number(START_HOUR), Number(END_HOUR)] : null;
+            if (meta.faz_theme === c && CORE.same(meta.faz_hours || null, hours)) return;
+            sb.auth.updateUser({ data: { faz_theme: c, faz_hours: hours } }).catch(function () {});
         } catch (e) {}
     }
 
@@ -689,7 +765,7 @@
     function updateUI() {
         var logged = !!session, st = readState();
         var menu = $('sync-menu-status');
-        if (menu) menu.textContent = !configured ? 'Em breve' : logged ? 'Conectado como ' + ((session.user && session.user.email) || '') : 'Ver suas Listas no computador';
+        if (menu) menu.textContent = !configured ? 'Em breve' : logged ? 'Conectado como ' + ((session.user && session.user.email) || '') : 'Listas e Agenda no computador';
         var out = $('sync-logged-out'), inn = $('sync-logged-in');
         if (out) out.classList.toggle('hidden', logged);
         if (inn) inn.classList.toggle('hidden', !logged);
@@ -738,6 +814,7 @@
             if (res.error) throw res.error;
             session = res.data.session;
             if ($('sync-password')) $('sync-password').value = '';
+            try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e2) {}
             updateUI();
             schedule(300); // 1ª sincronização (pede confirmação)
         } catch (e) {
@@ -769,6 +846,20 @@
             toast(errMsg(e));
         } finally {
             setButtonsDisabled(false);
+        }
+    };
+
+    // V40.8.0: esqueci a senha. O link do e-mail abre a página do computador (kanban.html), que pede a senha nova.
+    window.fazSyncForgot = async function () {
+        var email = ($('sync-email') && $('sync-email').value || '').trim();
+        if (!email) return toast('Digite seu e-mail no campo acima');
+        try {
+            await ensureClient();
+            var res = await sb.auth.resetPasswordForEmail(email, { redirectTo: kanbanUrl() });
+            if (res.error) throw res.error;
+            alert('Pronto! 📧\n\nSe existe uma conta com ' + email + ', enviamos um link pra criar uma senha nova.\n\nAbra o link, defina a senha e depois volte aqui pra entrar.');
+        } catch (e) {
+            toast(errMsg(e));
         }
     };
 

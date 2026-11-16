@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- V40.7.0: Listas do Faz no computador (kanban). Lê e grava no Supabase, sincronizado com o app do celular. -->
-<title>Listas do Faz</title>
+<!-- Faz no computador: Listas (kanban, V40.7.0) e Agenda (V40.8.0). Lê e grava no Supabase, sincronizado com o app do celular. -->
+<title>Faz no computador</title>
 <meta name="theme-color" content="#4f46e5">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,8 +21,14 @@
     body { background: var(--canvas); }
     .bg-focus { background-color: var(--focus); }
     .text-focus { color: var(--focus); }
-    .bg-focus-soft { background-color: color-mix(in srgb, var(--focus) 10%, white); }
-    .chip-on { box-shadow: 0 0 0 2px var(--focus); background-color: color-mix(in srgb, var(--focus) 8%, white); }
+    .bg-focus-soft { background-color: #f4f4f5; background-color: color-mix(in srgb, var(--focus) 10%, white); }
+    .chip-on { box-shadow: 0 0 0 2px var(--focus); background-color: #fafafa; background-color: color-mix(in srgb, var(--focus) 8%, white); }
+    .tab, .ag-view { color: #71717a; }
+    .tab.on { background: #fff; color: #18181b; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+    .ag-view.on { background: var(--focus); color: #fff; }
+    .ag-now { box-shadow: 0 0 0 2px var(--focus); }
+    .now-line { position: absolute; left: 56px; right: 0; height: 2px; background: #ef4444; z-index: 5; pointer-events: none; }
+    .now-line::before { content: ''; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
     input:focus, select:focus, textarea.field:focus { border-color: var(--focus) !important; }
     :focus-visible:not(.outline-none) { outline: 2px solid var(--focus); outline-offset: 2px; }
     .thin-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
@@ -73,7 +79,23 @@
         <p id="login-msg" class="hidden mt-3 text-[13px] leading-relaxed"></p>
         <button id="login-btn" type="submit" class="mt-5 w-full bg-focus text-white font-semibold text-sm py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60">Entrar</button>
         <button id="signup-btn" type="button" class="mt-2 w-full text-sm font-semibold text-zinc-600 py-2.5 rounded-lg hover:bg-zinc-100 disabled:opacity-60">Criar conta</button>
+        <button id="forgot-btn" type="button" class="mt-1 w-full text-[13px] font-medium text-zinc-500 py-2 rounded-lg hover:text-zinc-800 disabled:opacity-60">Esqueci minha senha</button>
         <p class="mt-5 text-xs text-zinc-500 leading-relaxed">Pra trazer as Listas do celular: no Faz, abra <b>Configurações</b> e toque em <b>Sincronizar com a nuvem</b>.</p>
+    </form>
+</div>
+
+<!-- V40.8.0: nova senha (chega aqui pelo link do e-mail de recuperação) -->
+<div id="view-recovery" class="hidden min-h-full flex items-center justify-center p-4">
+    <form id="recovery-form" class="w-full max-w-sm bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm" novalidate>
+        <img src="icon-192.png" alt="" class="w-12 h-12 rounded-xl">
+        <h1 class="mt-4 text-xl font-bold text-zinc-900">Criar uma senha nova</h1>
+        <p class="mt-1.5 text-sm text-zinc-600 leading-relaxed">Ela vale pro Faz no celular e no computador.</p>
+        <label class="block mt-5">
+            <span class="text-xs font-semibold text-zinc-600">Senha nova</span>
+            <input id="recovery-pass" type="password" autocomplete="new-password" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2.5 text-sm outline-none">
+        </label>
+        <p id="recovery-msg" class="hidden mt-3 text-[13px] leading-relaxed text-red-600"></p>
+        <button id="recovery-btn" type="submit" class="mt-5 w-full bg-focus text-white font-semibold text-sm py-2.5 rounded-lg hover:opacity-90 disabled:opacity-60">Salvar senha</button>
     </form>
 </div>
 
@@ -114,7 +136,7 @@
     </main>
 
     <!-- V40.8.0: Agenda (só leitura — quem manda é o celular) -->
-    <main id="agenda" class="hidden relative flex-1 min-h-0 flex flex-col">
+    <main id="agenda" class="hidden relative flex-1 min-h-0 flex-col">
         <div class="shrink-0 flex flex-wrap items-center gap-2 px-4 sm:px-5 pt-4">
             <button id="ag-prev" class="w-9 h-9 rounded-lg flex items-center justify-center bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50" aria-label="Anterior"><i class="ph-bold ph-caret-left"></i></button>
             <button id="ag-today" class="h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50">Hoje</button>
@@ -129,7 +151,7 @@
             <i class="ph ph-device-mobile text-focus mr-1"></i>Tua agenda ainda não chegou na nuvem. Abra o Faz no celular (versão <b>v40.8.0</b>) com internet: ele envia sozinho.
         </div>
         <div id="ag-week" class="flex-1 min-h-0 overflow-x-auto overflow-y-hidden thin-scroll">
-            <div id="ag-cols" class="h-full inline-flex items-start gap-3 p-4 sm:p-5"></div>
+            <div id="ag-cols" class="h-full flex items-start gap-3 p-4 sm:p-5"></div>
         </div>
         <div id="ag-day" class="hidden flex-1 min-h-0 overflow-y-auto thin-scroll">
             <div id="ag-timeline" class="relative mx-auto max-w-3xl my-4 px-4"></div>
@@ -147,7 +169,7 @@
             <div id="b-mbs" class="mt-4 flex flex-col gap-1.5"></div>
         </div>
         <div class="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
-            <p class="text-[11.5px] text-zinc-400">Pra editar, use o app no celular.</p>
+            <p class="text-[11.5px] text-zinc-500">Pra editar, use o app no celular.</p>
             <button id="b-close" class="ml-auto text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Fechar</button>
         </div>
     </div>
@@ -215,15 +237,17 @@
     var CFG = window.FAZ_SUPABASE || {};
     var DEFAULT_COL = 'col_geral';
     var STEP = 1024;
-    var DURATIONS = [15, 30, 45, 60, 75, 90, 120, 150, 180, 240];
-    var KINDS = ['listas', 'tags', 'tarefas'];
+    var DURATIONS = [5, 10, 15, 30, 45, 60, 75, 90, 120, 150, 180, 240]; // V40.8.0: mínimo 5 min
+    var KINDS = ['listas', 'tags', 'tarefas', 'blocos'];
     var SELECT = {
-        tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,deleted',
+        tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,deleted',
         listas: 'id,name,is_default,position,created_ms,deleted',
-        tags: 'id,name,color,position,deleted'
+        tags: 'id,name,color,position,deleted',
+        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,color,archived,deleted'
     };
     var S = {
-        sb: null, uid: null, email: '', listas: {}, tags: {}, tarefas: {},
+        sb: null, uid: null, email: '', listas: {}, tags: {}, tarefas: {}, blocos: {},
+        tab: 'listas', agView: 'week', agAnchor: null, agScrolled: null, hours: [7, 24], recovery: false,
         channel: null, live: 'connecting', lastLoad: 0, loading: false,
         dragId: null, pendingRender: false, composer: null, editing: null
     };
@@ -243,7 +267,7 @@
     }
     function byPos(a, b) { return (a.position - b.position) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); }
     function alive(kind) {
-        return Object.keys(S[kind]).map(function (k) { return S[kind][k]; }).filter(function (r) { return !r.deleted; }).sort(byPos);
+        return Object.keys(S[kind]).map(function (k) { return S[kind][k]; }).filter(function (r) { return !r.deleted && !r.archived; }).sort(byPos);
     }
     function aliveListIds() { var s = {}; alive('listas').forEach(function (c) { s[c.id] = true; }); return s; }
     function colOf(t, ids) { ids = ids || aliveListIds(); return ids[t.column_id] ? t.column_id : DEFAULT_COL; } // órfã → lista padrão (igual ao app)
@@ -253,7 +277,7 @@
     function tagOf(id) { var t = id && S.tags[id]; return t && !t.deleted ? t : null; }
     function normMbs(a) { return (Array.isArray(a) ? a : []).map(function (m) { return { title: String((m && m.title) || '').trim(), done: !!(m && m.done) }; }).filter(function (m) { return m.title; }); }
     function show(view) {
-        ['view-loading', 'view-error', 'view-login', 'view-board'].forEach(function (v) { $(v).classList.toggle('hidden', v !== view); });
+        ['view-loading', 'view-error', 'view-login', 'view-recovery', 'view-board'].forEach(function (v) { $(v).classList.toggle('hidden', v !== view); });
     }
     function showError(text) { $('error-text').textContent = text; show('view-error'); }
 
@@ -277,6 +301,8 @@
             var meta = document.querySelector('meta[name="theme-color"]');
             if (meta) meta.setAttribute('content', c);
         }
+        var h = user && user.user_metadata && user.user_metadata.faz_hours; // janela do dia configurada no celular
+        if (Array.isArray(h) && h[0] >= 0 && h[1] <= 24 && h[0] < h[1]) S.hours = [Math.floor(h[0]), Math.ceil(h[1])];
     }
 
     function setLive(state) {
@@ -290,7 +316,9 @@
     async function fetchKind(kind) {
         var out = [];
         for (var from = 0; ; from += 1000) {
-            var res = await S.sb.from(kind).select(SELECT[kind]).eq('user_id', S.uid).order('id').range(from, from + 999);
+            var q = S.sb.from(kind).select(SELECT[kind]).eq('user_id', S.uid);
+            if (kind === 'blocos') q = q.eq('deleted', false); // a agenda é grande: não traz o que já foi apagado
+            var res = await q.order('id').range(from, from + 999);
             if (res.error) throw res.error;
             out = out.concat(res.data || []);
             if (!res.data || res.data.length < 1000) break;
@@ -310,6 +338,7 @@
             });
             S.lastLoad = Date.now();
             render();
+            renderAgenda();
         } catch (e) {
             console.error('[Faz kanban] load', e);
             if (!S.lastLoad) toast('Não consegui carregar suas Listas. Confira a internet.');
@@ -364,7 +393,7 @@
 
     // ---------- render ----------
     var renderT = null;
-    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(render, 60); }
+    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); }, 60); }
 
     function cardHtml(t) {
         var tag = tagOf(t.tag_id);
@@ -412,7 +441,7 @@
         var tasks = alive('tarefas');
         tasks.forEach(function (t) { var c = colOf(t, ids); (byCol[c] = byCol[c] || []).push(t); });
 
-        $('board-summary').textContent = tasks.length + (tasks.length === 1 ? ' tarefa em ' : ' tarefas em ') + cols.length + (cols.length === 1 ? ' lista' : ' listas');
+        if (S.tab === 'listas') $('board-summary').textContent = tasks.length + (tasks.length === 1 ? ' tarefa em ' : ' tarefas em ') + cols.length + (cols.length === 1 ? ' lista' : ' listas');
         if (!cols.length) {
             wrap.innerHTML = '';
             $('empty-email').textContent = S.email;
@@ -427,6 +456,159 @@
         wrap.querySelectorAll('.col-list').forEach(function (el) { if (colScroll[el.dataset.col] != null) el.scrollTop = colScroll[el.dataset.col]; });
         if (S.composer) openComposer(S.composer.col, S.composer.text, composerFocused);
     }
+
+    // ---------- V40.8.0: AGENDA (só leitura — quem edita é o celular) ----------
+    var WD = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    var WD3 = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    var MES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    var PXM = 3.2; // pixels por minuto na visão Dia (5 min = 16px)
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+    // Datas sempre no fuso LOCAL e ao meio-dia (imune a UTC e a horário de verão).
+    function parseYmd(s) { return new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10), 12, 0, 0); }
+    function addDays(s, n) { var d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); }
+    function todayStr() { return ymd(new Date()); }
+    function clock(m) { m = Math.max(0, Math.round(Number(m) || 0)); return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
+    function nowMin() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+    function blocksByDay() {
+        var map = {};
+        Object.keys(S.blocos).forEach(function (id) {
+            var b = S.blocos[id];
+            if (!b || b.deleted || b.archived || !/^\d{4}-\d{2}-\d{2}/.test(String(b.date))) return;
+            var day = String(b.date).slice(0, 10);
+            (map[day] = map[day] || []).push(b);
+        });
+        Object.keys(map).forEach(function (d) { map[d].sort(function (a, b) { return (a.start_min - b.start_min) || (a.id < b.id ? -1 : 1); }); });
+        return map;
+    }
+    function sumMin(list) { return list.reduce(function (a, b) { return a + (Number(b.duration) || 0); }, 0); }
+    function isNow(b, day, today, nm) { return day === today && !b.completed && nm >= b.start_min && nm < b.start_min + b.duration; }
+    function mbCount(b) { var m = Array.isArray(b.microblocks) ? b.microblocks : []; return { n: m.length, done: m.filter(function (x) { return x && x.done; }).length }; }
+    function countLabel(n) { return n + (n === 1 ? ' bloco' : ' blocos'); }
+
+    function agCardHtml(b, day, today, nm) {
+        var tag = tagOf(b.tag_id), mb = mbCount(b);
+        return '<article class="ag-card bg-white border border-zinc-200 border-l-4 rounded-lg px-2.5 py-1.5 cursor-pointer hover:border-zinc-300' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
+            '" style="border-left-color:' + esc(safeColor(tag ? tag.color : '#d4d4d8')) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
+            '<p class="text-[11px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + '<span class="font-medium text-zinc-400"> · ' + fmtDur(b.duration) + '</span></p>' +
+            '<p class="text-[13px] font-semibold leading-snug break-words ' + (b.completed ? 'line-through text-zinc-400' : 'text-zinc-800') + '">' + (esc(b.title) || 'Sem nome') + '</p>' +
+            ((tag || mb.n || b.completed) ? '<div class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-zinc-500">' +
+                (b.completed ? '<span class="inline-flex items-center gap-1 text-emerald-600 font-medium"><i class="ph-fill ph-check-circle"></i>Concluído</span>' : '') +
+                (tag ? '<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
+                (mb.n ? '<span class="inline-flex items-center gap-1"><i class="ph ph-check-square"></i>' + mb.done + '/' + mb.n + '</span>' : '') + '</div>' : '') +
+            '</article>';
+    }
+
+    function renderWeek(anchor, map, today, nm) {
+        var wrap = $('ag-cols'), scroll = {}, html = '', total = 0, mins = 0;
+        wrap.querySelectorAll('.ag-list').forEach(function (el) { scroll[el.dataset.day] = el.scrollTop; });
+        for (var i = 0; i < 7; i++) {
+            var day = addDays(anchor, i), d = parseYmd(day), list = map[day] || [];
+            total += list.length;
+            mins += sumMin(list);
+            html += '<section class="min-w-[176px] flex-1 max-h-full flex flex-col bg-zinc-50 border rounded-2xl ' + (day === today ? 'border-zinc-400' : 'border-zinc-200') + '">' +
+                '<button class="ag-day-btn text-left px-3 pt-2.5 pb-2 rounded-t-2xl hover:bg-zinc-100" data-day="' + day + '" title="Abrir este dia">' +
+                '<span class="flex items-center gap-1.5"><span class="text-[13px] font-bold text-zinc-800">' + WD3[d.getDay()] + '</span>' +
+                '<span class="text-[12px] font-medium text-zinc-500 tabular-nums">' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '</span>' +
+                (day === today ? '<span class="ml-auto text-[10.5px] font-semibold text-white bg-focus rounded-full px-1.5 py-0.5">Hoje</span>' : '') + '</span>' +
+                '<span class="block mt-0.5 text-[11px] font-medium text-zinc-500">' + (list.length ? countLabel(list.length) + ' · ' + fmtDur(sumMin(list)) : 'Livre') + '</span></button>' +
+                '<div class="ag-list thin-scroll flex-1 min-h-[44px] overflow-y-auto px-2 pb-2 flex flex-col gap-1.5" data-day="' + day + '">' +
+                list.map(function (b) { return agCardHtml(b, day, today, nm); }).join('') + '</div></section>';
+        }
+        wrap.innerHTML = html;
+        wrap.querySelectorAll('.ag-list').forEach(function (el) { if (scroll[el.dataset.day] != null) el.scrollTop = scroll[el.dataset.day]; });
+        var a = parseYmd(anchor), z = parseYmd(addDays(anchor, 6));
+        $('ag-label').textContent = a.getDate() + (a.getMonth() === z.getMonth() ? '' : ' de ' + MES[a.getMonth()].slice(0, 3)) + ' a ' + z.getDate() + ' de ' + MES[z.getMonth()].slice(0, 3) +
+            (z.getFullYear() !== new Date().getFullYear() ? ' de ' + z.getFullYear() : '');
+        return total ? countLabel(total) + ' em 7 dias · ' + fmtDur(mins) + ' planejados' : 'Nada agendado nestes 7 dias';
+    }
+
+    function renderDay(day, map, today, nm) {
+        var list = map[day] || [], d = parseYmd(day), box = $('ag-timeline');
+        var h0 = Math.min(S.hours[0], list.length ? Math.floor(list[0].start_min / 60) : 24);
+        var h1 = list.reduce(function (m, b) { return Math.max(m, Math.ceil((b.start_min + b.duration) / 60)); }, S.hours[1]);
+        h0 = Math.max(0, Math.min(h0, 23));
+        h1 = Math.min(24, Math.max(h1, h0 + 1));
+        var html = '';
+        for (var h = h0; h <= h1; h++) {
+            var y = (h - h0) * 60 * PXM;
+            html += '<div class="absolute left-0 right-0 border-t border-zinc-200" style="top:' + y + 'px"></div>' +
+                '<span class="absolute left-0 w-12 text-right text-[11px] font-medium text-zinc-400 tabular-nums" style="top:' + (y - 7) + 'px">' + pad(h) + ':00</span>';
+        }
+        list.forEach(function (b) {
+            var tag = tagOf(b.tag_id), compact = b.duration < 20;
+            var top = (b.start_min - h0 * 60) * PXM + 1, height = Math.max(b.duration * PXM - 2, 14);
+            var titleCls = b.completed ? 'line-through text-zinc-400' : 'text-zinc-800';
+            html += '<div class="ag-card absolute rounded-md border border-l-4 overflow-hidden cursor-pointer px-2 flex ' + (compact ? 'items-center gap-2 ' : 'flex-col justify-center ') +
+                (b.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-zinc-200') + (isNow(b, day, today, nm) ? ' ag-now' : '') +
+                '" style="left:56px;right:0;top:' + top + 'px;height:' + height + 'px;border-left-color:' + esc(safeColor(tag ? tag.color : '#d4d4d8')) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
+                (compact
+                    ? '<span class="text-[10.5px] leading-none font-semibold text-zinc-500 tabular-nums shrink-0">' + clock(b.start_min) + '</span>' +
+                      '<span class="text-[11.5px] leading-none font-semibold truncate ' + titleCls + '">' + (esc(b.title) || 'Sem nome') + '</span>' +
+                      '<span class="ml-auto text-[10.5px] leading-none text-zinc-400 shrink-0">' + fmtDur(b.duration) + '</span>'
+                    : '<span class="text-[10.5px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration) + (tag ? ' · ' + esc(tag.name) : '') + '</span>' +
+                      '<span class="text-[13px] font-semibold truncate ' + titleCls + '">' + (esc(b.title) || 'Sem nome') + '</span>') +
+                '</div>';
+        });
+        if (day === today && nm >= h0 * 60 && nm <= h1 * 60) html += '<div class="now-line" style="top:' + ((nm - h0 * 60) * PXM) + 'px"></div>';
+        if (!list.length) html += '<p class="absolute left-14 right-0 top-10 text-center text-sm text-zinc-500">Nada agendado neste dia.</p>';
+        box.style.height = ((h1 - h0) * 60 * PXM + 12) + 'px';
+        box.innerHTML = html;
+        $('ag-label').textContent = WD[d.getDay()] + ', ' + d.getDate() + ' de ' + MES[d.getMonth()] + (day === today ? ' (hoje)' : '');
+        if (S.agScrolled !== day) { // ao abrir o dia: rola pro horário atual ou pro primeiro bloco
+            S.agScrolled = day;
+            var focusMin = day === today ? nm : (list.length ? list[0].start_min : h0 * 60);
+            $('ag-day').scrollTop = Math.max(0, (focusMin - h0 * 60) * PXM - 120);
+        }
+        return list.length ? countLabel(list.length) + ' · ' + fmtDur(sumMin(list)) + ' planejados' : 'Dia livre';
+    }
+
+    function renderAgenda() {
+        if (!S.uid || S.tab !== 'agenda') return;
+        var today = todayStr(), map = blocksByDay();
+        if (!S.agAnchor) S.agAnchor = today;
+        $('ag-banner').classList.toggle('hidden', Object.keys(map).length > 0 || !S.lastLoad);
+        document.querySelectorAll('.ag-view').forEach(function (b) { b.classList.toggle('on', b.dataset.view === S.agView); });
+        $('ag-week').classList.toggle('hidden', S.agView !== 'week');
+        $('ag-day').classList.toggle('hidden', S.agView !== 'day');
+        $('board-summary').textContent = S.agView === 'day' ? renderDay(S.agAnchor, map, today, nowMin()) : renderWeek(S.agAnchor, map, today, nowMin());
+    }
+
+    function setTab(tab) {
+        S.tab = tab === 'agenda' ? 'agenda' : 'listas';
+        try { localStorage.setItem('faz_pc_tab', S.tab); } catch (e) {}
+        $('board').classList.toggle('hidden', S.tab !== 'listas');
+        $('agenda').classList.toggle('hidden', S.tab !== 'agenda');
+        $('agenda').classList.toggle('flex', S.tab === 'agenda');
+        document.querySelectorAll('.tab').forEach(function (b) {
+            b.classList.toggle('on', b.dataset.tab === S.tab);
+            b.setAttribute('aria-selected', b.dataset.tab === S.tab ? 'true' : 'false');
+        });
+        if (S.tab === 'agenda') { closeComposer(); closeColMenu(); S.agScrolled = null; renderAgenda(); }
+        else render();
+    }
+
+    function openBlock(id) {
+        var b = S.blocos[id];
+        if (!b || b.deleted) return;
+        var d = parseYmd(String(b.date).slice(0, 10)), tag = tagOf(b.tag_id), mbs = Array.isArray(b.microblocks) ? b.microblocks : [];
+        $('b-when').textContent = WD[d.getDay()] + ', ' + d.getDate() + ' de ' + MES[d.getMonth()] + ' · ' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration);
+        $('b-title').textContent = b.title || 'Sem nome';
+        $('b-meta').innerHTML =
+            (b.completed ? '<span class="inline-flex items-center gap-1 text-emerald-600 font-semibold"><i class="ph-fill ph-check-circle"></i>Concluído</span>' : '') +
+            (!b.completed && b.was_delayed ? '<span class="inline-flex items-center gap-1 text-amber-600 font-semibold"><i class="ph ph-clock-countdown"></i>Atrasou</span>' : '') +
+            (tag ? '<span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '');
+        $('b-mbs').innerHTML = mbs.map(function (m) {
+            var done = !!(m && m.done);
+            return '<div class="flex items-start gap-2 text-sm"><i class="ph ' + (done ? 'ph-fill ph-check-square text-emerald-600' : 'ph-square text-zinc-400') + ' text-base mt-0.5 shrink-0"></i>' +
+                '<span class="' + (done ? 'line-through text-zinc-400' : 'text-zinc-700') + '">' + esc(m && m.title) + '</span></div>';
+        }).join('');
+        var m = $('modal-block');
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+        $('b-close').focus();
+    }
+    function closeBlock() { var m = $('modal-block'); m.classList.add('hidden'); m.classList.remove('flex'); }
 
     // ---------- adicionar tarefa (direto na coluna) ----------
     function footerOf(colId) {
@@ -522,7 +704,7 @@
 
     var menuEl = null;
     function closeColMenu() {
-        if (menuEl) { menuEl.remove(); menuEl = null; document.removeEventListener('mousedown', outsideMenu, true); }
+        if (menuEl) { menuEl.remove(); menuEl = null; document.removeEventListener('pointerdown', outsideMenu, true); }
     }
     function outsideMenu(e) { if (menuEl && !menuEl.contains(e.target)) closeColMenu(); }
     function openColMenu(colId, btn) {
@@ -545,7 +727,7 @@
             if (b.dataset.act === 'rename') renameList(colId); else deleteList(colId);
         });
         document.body.appendChild(menuEl);
-        setTimeout(function () { document.addEventListener('mousedown', outsideMenu, true); }, 0);
+        setTimeout(function () { document.addEventListener('pointerdown', outsideMenu, true); }, 0); // pointerdown: também dispara em toque no iPad/iPhone
     }
 
     // ---------- diálogo genérico ----------
@@ -819,14 +1001,44 @@
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             if (!$('dialog').classList.contains('hidden')) return;
+            if (!$('modal-block').classList.contains('hidden')) return closeBlock();
             if (menuEl) return closeColMenu();
             if (S.editing) return closeTask();
             if (S.composer) closeComposer();
         });
 
+        // V40.8.0: abas e agenda
+        document.querySelectorAll('.tab').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
+        document.querySelectorAll('.ag-view').forEach(function (b) {
+            b.addEventListener('click', function () {
+                S.agView = b.dataset.view === 'day' ? 'day' : 'week';
+                try { localStorage.setItem('faz_pc_agview', S.agView); } catch (e) {}
+                S.agScrolled = null;
+                renderAgenda();
+            });
+        });
+        function agMove(sign) { S.agAnchor = addDays(S.agAnchor || todayStr(), sign * (S.agView === 'week' ? 7 : 1)); S.agScrolled = null; renderAgenda(); }
+        $('ag-prev').addEventListener('click', function () { agMove(-1); });
+        $('ag-next').addEventListener('click', function () { agMove(1); });
+        $('ag-today').addEventListener('click', function () { S.agAnchor = todayStr(); S.agScrolled = null; renderAgenda(); });
+        $('agenda').addEventListener('click', function (e) {
+            var dayBtn = e.target.closest('.ag-day-btn');
+            if (dayBtn) { S.agAnchor = dayBtn.dataset.day; S.agView = 'day'; S.agScrolled = null; return renderAgenda(); }
+            var c = e.target.closest('[data-block]');
+            if (c) openBlock(c.dataset.block);
+        });
+        $('agenda').addEventListener('keydown', function (e) {
+            var c = e.target.closest && e.target.closest('[data-block]');
+            if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openBlock(c.dataset.block); }
+        });
+        $('b-close').addEventListener('click', closeBlock);
+        $('modal-block').addEventListener('mousedown', function (e) { if (e.target === this) closeBlock(); });
+
         // login
         $('login-form').addEventListener('submit', function (e) { e.preventDefault(); doLogin(); });
         $('signup-btn').addEventListener('click', doSignup);
+        $('forgot-btn').addEventListener('click', doForgot);
+        $('recovery-form').addEventListener('submit', function (e) { e.preventDefault(); doRecovery(); });
 
         // rede / foco: garante que nada fica velho mesmo se o tempo real cair
         window.addEventListener('online', function () { if (S.uid) { setLive('connecting'); subscribe(); loadAll(); } });
@@ -835,6 +1047,8 @@
         setInterval(function () {
             if (S.uid && document.visibilityState === 'visible' && (S.live !== 'live' || Date.now() - S.lastLoad > 300000)) loadAll();
         }, 30000);
+        // agenda: bloco atual, linha do agora e virada do dia
+        setInterval(function () { if (S.uid && S.tab === 'agenda' && document.visibilityState === 'visible') renderAgenda(); }, 60000);
     }
 
     // ---------- login ----------
@@ -847,6 +1061,7 @@
     function authError(e) {
         var m = String((e && e.message) || e || '');
         if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos.';
+        if (/different from the old/i.test(m)) return 'A senha nova precisa ser diferente da antiga.';
         if (/Email not confirmed/i.test(m)) return 'Confirme seu e-mail primeiro: abra o link que enviamos e tente de novo.';
         if (/already registered|already exists/i.test(m)) return 'Esse e-mail já tem conta. Use Entrar.';
         if (/at least 6|Password should/i.test(m)) return 'A senha precisa ter pelo menos 6 caracteres.';
@@ -855,7 +1070,7 @@
         return 'Não foi possível entrar agora. Tente de novo.';
     }
     function creds() { return { email: $('login-email').value.trim(), password: $('login-pass').value }; }
-    function lockLogin(on) { $('login-btn').disabled = on; $('signup-btn').disabled = on; }
+    function lockLogin(on) { $('login-btn').disabled = on; $('signup-btn').disabled = on; $('forgot-btn').disabled = on; }
     async function doLogin() {
         var c = creds();
         if (!c.email || !c.password) return loginMsg('Preencha e-mail e senha.', true);
@@ -882,17 +1097,50 @@
         finally { lockLogin(false); }
     }
 
+    // V40.8.0: esqueci a senha. O link do e-mail volta pra esta página, que pede a senha nova.
+    async function doForgot() {
+        var email = $('login-email').value.trim();
+        if (!email) return loginMsg('Digite seu e-mail acima e clique de novo em "Esqueci minha senha".', true);
+        lockLogin(true);
+        loginMsg('', false);
+        try {
+            var res = await S.sb.auth.resetPasswordForEmail(email, { redirectTo: location.href.split('#')[0].split('?')[0] });
+            if (res.error) throw res.error;
+            loginMsg('Se existe uma conta com esse e-mail, enviamos um link pra criar uma senha nova.', false);
+        } catch (e) { loginMsg(authError(e), true); }
+        finally { lockLogin(false); }
+    }
+    async function doRecovery() {
+        var pass = $('recovery-pass').value, msg = $('recovery-msg');
+        if (pass.length < 6) { msg.textContent = 'A senha precisa ter pelo menos 6 caracteres.'; msg.classList.remove('hidden'); return; }
+        $('recovery-btn').disabled = true;
+        try {
+            var res = await S.sb.auth.updateUser({ password: pass });
+            if (res.error) throw res.error;
+            S.recovery = false;
+            $('recovery-pass').value = '';
+            msg.classList.add('hidden');
+            toast('Senha alterada');
+            var r = await S.sb.auth.getSession();
+            currentUid = undefined;
+            onSession(r && r.data ? r.data.session : null);
+        } catch (e) { msg.textContent = authError(e); msg.classList.remove('hidden'); }
+        finally { $('recovery-btn').disabled = false; }
+    }
+
     // ---------- sessão ----------
     var currentUid;
     function onSession(session) {
         var uid = session ? session.user.id : null;
         if (session) applyTheme(session.user);
+        if (S.recovery && session) { show('view-recovery'); $('recovery-pass').focus(); return; }
         if (uid === currentUid) return;
         currentUid = uid;
         if (!session) {
             unsubscribe();
-            S.uid = null; S.listas = {}; S.tags = {}; S.tarefas = {}; S.lastLoad = 0; S.composer = null;
+            S.uid = null; S.listas = {}; S.tags = {}; S.tarefas = {}; S.blocos = {}; S.lastLoad = 0; S.composer = null;
             closeTask();
+            closeBlock();
             closeColMenu();
             show('view-login');
             return;
@@ -903,6 +1151,9 @@
         $('board-summary').textContent = 'Carregando…';
         $('columns').innerHTML = '';
         show('view-board');
+        var savedTab = 'listas';
+        try { savedTab = localStorage.getItem('faz_pc_tab') || 'listas'; S.agView = localStorage.getItem('faz_pc_agview') === 'day' ? 'day' : 'week'; } catch (e) {}
+        setTab(savedTab);
         loadAll();
         subscribe();
     }
@@ -912,7 +1163,10 @@
         if (!window.supabase || !window.supabase.createClient) return showError('Não consegui carregar a conexão com a nuvem. Confira a internet e tente de novo.');
         S.sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
         bindEvents();
-        S.sb.auth.onAuthStateChange(function (event, session) { setTimeout(function () { onSession(session); }, 0); });
+        S.sb.auth.onAuthStateChange(function (event, session) {
+            if (event === 'PASSWORD_RECOVERY') S.recovery = true;
+            setTimeout(function () { onSession(session); }, 0);
+        });
         try {
             var r = await S.sb.auth.getSession();
             onSession(r && r.data ? r.data.session : null);

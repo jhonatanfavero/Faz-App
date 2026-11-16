@@ -133,6 +133,7 @@
                 </button>
             </div>
             <div class="flex gap-2">
+                <button class="float-dur-btn flex-1 py-1.5 rounded bg-zinc-100 text-zinc-500 hover:bg-zinc-200 text-xs font-bold transition" data-time="5" onclick="changeFloatDuration(5)">5m</button>
                 <button class="float-dur-btn flex-1 py-1.5 rounded bg-zinc-100 text-zinc-500 hover:bg-zinc-200 text-xs font-bold transition" data-time="15" onclick="changeFloatDuration(15)">15m</button>
                 <button class="float-dur-btn flex-1 py-1.5 rounded bg-app-focus text-white text-xs font-bold transition shadow-md" data-time="30" onclick="changeFloatDuration(30)">30m</button>
                 <button class="float-dur-btn flex-1 py-1.5 rounded bg-zinc-100 text-zinc-500 hover:bg-zinc-200 text-xs font-bold transition" data-time="45" onclick="changeFloatDuration(45)">45m</button>
@@ -198,6 +199,9 @@
             <div class="mb-8">
                 <p class="text-xs text-zinc-500 font-medium mb-3 uppercase tracking-wider">Volume de Tempo</p>
                 <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                    <!-- V40.8.0: 5 e 10 min -->
+                    <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="5">5m</button>
+                    <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="10">10m</button>
                     <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="15">15m</button>
                     <button class="sheet-dur-btn px-4 py-2 rounded-full bg-app-focus border border-app-focus text-white text-sm font-medium shadow-md transition active-chip" data-time="30">30m</button>
                     <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="45">45m</button>
@@ -438,7 +442,7 @@
                         </div>
                     </div>
 
-                    <div class="absolute bottom-0 left-0 right-0 bg-white border-t border-zinc-100 p-4 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+                    <div class="ios-safe-bottom absolute bottom-0 left-0 right-0 bg-white border-t border-zinc-100 p-4 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
                         <button onclick="saveRoutine()" class="w-full h-12 flex items-center justify-center bg-app-focus text-white rounded-xl font-bold hover:shadow-lg transition active:scale-95 text-sm">
                             Salvar Rotina
                         </button>
@@ -609,7 +613,7 @@
                         </div>
                     </div>
 
-                    <div class="absolute bottom-0 left-0 right-0 bg-white border-t border-zinc-100 p-4 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+                    <div class="ios-safe-bottom absolute bottom-0 left-0 right-0 bg-white border-t border-zinc-100 p-4 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
                         <button onclick="saveFinancialForm()" class="w-full h-12 flex items-center justify-center bg-app-focus text-white rounded-xl font-bold hover:shadow-lg transition active:scale-95 text-sm">
                             Salvar Despesa
                         </button>
@@ -790,7 +794,7 @@
                         </div>
                         <div class="flex flex-col min-w-0">
                             <span class="font-bold text-zinc-800 text-sm">Sincronizar com a nuvem</span>
-                            <span class="text-[11px] text-zinc-500 font-medium truncate" id="sync-menu-status">Ver suas Listas no computador</span>
+                            <span class="text-[11px] text-zinc-500 font-medium truncate" id="sync-menu-status">Listas e Agenda no computador</span>
                         </div>
                     </div>
                     <i class="ph ph-caret-right text-zinc-400 shrink-0"></i>
@@ -909,7 +913,7 @@
                 <!-- Desconectado -->
                 <div id="sync-logged-out">
                     <p class="text-[13px] text-zinc-600 leading-relaxed mb-4">
-                        Entre com uma conta pra ver e editar suas <b>Listas</b> no computador. Tudo continua salvo neste aparelho também, funcionando sem internet.
+                        Entre com uma conta pra ver suas <b>Listas</b> e sua <b>Agenda</b> no computador. Tudo continua salvo neste aparelho também, funcionando sem internet.
                     </p>
                     <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-4 mb-3">
                         <label class="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-1" for="sync-email">E-mail</label>
@@ -922,9 +926,10 @@
                         <button id="sync-signup-btn" onclick="fazSyncSignup()" class="w-full bg-white border-2 border-app-focus text-app-focus rounded-lg px-3 py-2.5 text-sm font-bold hover:bg-zinc-50 transition">
                             Criar conta
                         </button>
+                        <button onclick="fazSyncForgot()" class="w-full text-center text-[12px] text-zinc-500 font-medium pt-3 pb-1 hover:text-zinc-700 transition">Esqueci minha senha</button>
                     </div>
                     <p class="text-[11px] text-zinc-400 text-center leading-relaxed px-4">
-                        Por enquanto sincroniza só as Listas (tarefas, listas e tags). Agenda, rotinas, notas e finanças continuam só neste aparelho.
+                        Sincroniza as Listas e a Agenda. Rotinas, notas e finanças continuam só neste aparelho.
                     </p>
                 </div>
 
@@ -955,7 +960,7 @@
                         Sair desta conta
                     </button>
                     <p class="text-[11px] text-zinc-400 text-center leading-relaxed px-4 mt-1">
-                        Sincroniza sozinho ao abrir o app, ao voltar pra ele e logo depois de cada mudança nas Listas.
+                        Sincroniza sozinho ao abrir o app, ao voltar pra ele e logo depois de cada mudança nas Listas ou na Agenda.
                     </p>
                 </div>
             </div>
@@ -1230,7 +1235,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.7.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.8.0</div>
 
     </div>
 

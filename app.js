@@ -1051,6 +1051,9 @@ function drawBlock(block) {
             bgClass = 'bg-app-focus border-transparent shadow-md';
         }
         const tagColor = getTagColor(block.tagId);
+        // V40.9.0: cor livre do cartão (concluído continua verde)
+        const cardColor = block.completed ? null : fazCardColor(block.color);
+        if (cardColor) bgClass = 'border-transparent shadow-md';
         // V40.2.14: tag agora tem destaque claro mesmo quando bate com cor do card.
         //   - borda lateral colorida com 5px (era 4px)
         //   - inset shadow projeta linha branca de 1px logo após a borda colorida,
@@ -1077,12 +1080,13 @@ function drawBlock(block) {
             if (isNano && block.duration < 10) el.onclick = (e) => { if (!pendingIntent && !e.target.closest('.drag-handle, .resize-handle')) toggleExpandBlock(block.id, e); };
         }
         if (borderStyle) el.style.cssText += borderStyle;
+        if (cardColor) el.style.backgroundColor = cardColor;
 
         // V40.2.20: isDarkTheme agora cobre TODOS os fundos escuros do app:
         //   - foco normal (futuro OU atrasado, ambos com bg-app-focus)
         //   - concluído (sempre emerald-500)
         // Só rest não-concluído (emerald-50 / zinc-50) usa tema claro.
-        const isDarkTheme = !isRest || block.completed;
+        const isDarkTheme = cardColor ? fazIsDark(cardColor) : (!isRest || block.completed);
 
         const timeColor = isDarkTheme ? 'text-white/60' : 'text-zinc-500';
         // V40.2.20: título do concluído agora é branco riscado (sobre fundo emerald-500), não mais emerald-900 desbotado.
@@ -1148,6 +1152,9 @@ function drawBlock(block) {
                 </button>
                 <button onclick="duplicateTask('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarBtnClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Duplicar">
                     <i class="ph ph-copy text-[12px]"></i>Duplicar
+                </button>
+                <button onclick="fazArchiveBlock('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarBtnClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Arquivar">
+                    <i class="ph ph-archive text-[12px]"></i>Arquivar
                 </button>
                 <button onclick="openDeleteModal('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarDeleteClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Apagar">
                     <i class="ph ph-trash text-[12px]"></i>Apagar
@@ -1249,7 +1256,7 @@ function performEncaixeMatematico(gapStart, gapDuration) {
     db.push({ 
         id: 'f_' + Date.now(), 
         type: 'focus', 
-        title: pendingIntent.title, 
+        title: pendingIntent.title, ...(fazCardColor(pendingIntent.color) ? { color: fazCardColor(pendingIntent.color) } : {}), 
         startMin: start, 
         duration: pendingIntent.duration,
         date: getActiveDateStr(),
@@ -1978,6 +1985,7 @@ window.openConfigSheet = () => {
     document.getElementById('config-appearance-view').classList.add('hidden');
     document.getElementById('config-backup-view').classList.add('hidden'); // V40.6.0: nova sub-view Backup
     document.getElementById('config-sync-view').classList.add('hidden'); // V40.7.0: nova sub-view Sincronizar
+    document.getElementById('config-archive-view').classList.add('hidden'); // V40.9.0: nova sub-view Arquivados
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
     document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
@@ -2127,7 +2135,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.8.0',
+            version: 'v40.9.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -2219,7 +2227,7 @@ function fazBackupLooksSafe(incoming) {
         if (v && typeof v === 'object') return Object.keys(v).every(k => okVal(k, v[k]) && walk(v[k], depth + 1));
         return true;
     };
-    const LISTS = ['tb_master_db', 'tb_backlog_db', 'tb_backlog_columns', 'tb_tags_db', 'tb_periods_db', 'tb_notes_db', 'tb_routines_db', 'tb_financial_db'];
+    const LISTS = ['tb_master_db', 'tb_backlog_db', 'tb_backlog_columns', 'tb_tags_db', 'tb_periods_db', 'tb_notes_db', 'tb_routines_db', 'tb_financial_db', 'tb_archive_db'];
     for (const key of LISTS) {
         if (!(key in incoming)) continue;
         let v;
@@ -2456,6 +2464,7 @@ window.scheduleBacklogItem = (id) => {
         theme: 'focus', 
         tagId: item.tagId || null,
         microblocks: item.microblocks || [],
+        color: item.color || null, // V40.9.0
         fromBacklogId: id  // V40.5.0-fix8: marker pra cleanup só se confirmar
     };
     selectedDur = item.duration;
@@ -2508,13 +2517,18 @@ function renderBacklogCard(item) {
         </div>` : '';
     
     // V40.5.1: botão Mover só aparece se tem >1 lista (M4)
+    // V40.9.0: cor livre (pinta o cartão inteiro; a faixa da tag continua)
+    const paint = fazCardColor(item.color);
+    const cardPaintStyle = paint ? `background-color: ${paint}; border-color: ${paint}; ` : '';
+    const cardPaintClass = paint ? (fazIsDark(paint) ? 'card-painted card-dark ' : 'card-painted card-light ') : '';
+
     const moveBtn = backlogColumnsDb.length > 1 ? `
                 <button onclick="event.stopPropagation(); openMoveCardModal('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 active:scale-95 transition" title="Mover pra outra lista">
                     <i class="ph ph-arrows-left-right text-sm"></i>
                 </button>` : '';
     
     return `
-    <div onclick="openBacklogForm('${item.id}')" data-bl-card="${item.id}" class="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition" style="${cardBorderStyle}">
+    <div onclick="openBacklogForm('${item.id}')" data-bl-card="${item.id}" class="${cardPaintClass}bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition" style="${cardPaintStyle}${cardBorderStyle}">
         <div class="flex justify-between items-start mb-2">
             <div class="min-w-0 flex-1 pr-2">
                 <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${escapeHtml(item.title)}</h4>
@@ -3802,6 +3816,8 @@ setTimeout(applyHeaderState, 100);
 // --- V2.0 - COMBO A: Edição ---
 let editingTaskId = null;
 let editingTagId = null;
+let editingColor = null; // V40.9.0
+window.fazPickEditColor = function(c) { editingColor = fazCardColor(c); fazRenderColorPicker('edit-color-picker', editingColor, 'fazPickEditColor'); };
 
 window.openEditModal = function(id, e) {
     if(e) e.stopPropagation();
@@ -3812,6 +3828,8 @@ window.openEditModal = function(id, e) {
     
     editingTaskId = id;
     editingTagId = b.tagId;
+    editingColor = fazCardColor(b.color);
+    fazRenderColorPicker('edit-color-picker', editingColor, 'fazPickEditColor');
     
     document.getElementById('edit-task-title').value = b.title;
     renderEditTagSelector();
@@ -3847,6 +3865,7 @@ window.saveEditTask = function() {
     if(b && newTitle) {
         b.title = newTitle;
         b.tagId = editingTagId;
+        if (editingColor) b.color = editingColor; else delete b.color; // V40.9.0
         saveDb();
         renderTimeline();
     }
@@ -3889,7 +3908,8 @@ window.moveToBacklog = function() {
             title: b.title, 
             duration: b.duration, 
             tagId: b.tagId || null,
-            microblocks: clonedMbs
+            microblocks: clonedMbs,
+            ...(fazCardColor(b.color) ? { color: fazCardColor(b.color) } : {}) // V40.9.0
         });
         saveBacklog();
         db = db.filter(x => x.id !== deletingTaskId);
@@ -4163,6 +4183,135 @@ window.closeRoutineForm = function(force = false) {
     if (!force) renderRoutinesList();
 }
 
+// ============================================================================
+// V40.9.0 — COR LIVRE DO CARTÃO (independente da tag) e ARQUIVO
+// ----------------------------------------------------------------------------
+// Cor: campo opcional `color` (#rrggbb) em tarefas da Lista e blocos da agenda.
+//   Pinta o cartão inteiro; a faixa lateral da tag continua. Concluído segue verde.
+// Arquivo: o item SAI de backlogDb/db e vai pra archiveDb (tb_archive_db). Assim a
+//   timeline e as listas não precisam saber de "arquivado". Desarquivar devolve.
+// ============================================================================
+const FAZ_CARD_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#14b8a6', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f472b6', '#64748b'];
+function fazCardColor(c) { return (typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c)) ? c.toLowerCase() : null; }
+function fazIsDark(hex) { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 165; }
+function fazRenderColorPicker(containerId, current, fn) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    const cur = fazCardColor(current), custom = cur && !FAZ_CARD_COLORS.includes(cur);
+    const ring = (on) => on ? 'border-zinc-900 scale-110 shadow' : 'border-white shadow-sm';
+    el.innerHTML =
+        `<button type="button" onclick="${fn}(null)" class="h-8 px-3 rounded-full border text-[11px] font-bold transition ${!cur ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-200 text-zinc-600'}">Sem cor</button>` +
+        FAZ_CARD_COLORS.map(c => `<button type="button" onclick="${fn}('${c}')" aria-label="Cor ${c}" class="w-8 h-8 rounded-full border-2 transition ${ring(cur === c)}" style="background-color:${c}"></button>`).join('') +
+        `<label class="relative w-8 h-8 rounded-full border-2 overflow-hidden cursor-pointer ${ring(custom)}" style="background:${custom ? cur : 'conic-gradient(#ef4444,#f59e0b,#10b981,#3b82f6,#8b5cf6,#ec4899,#ef4444)'}" title="Outra cor">` +
+        `<input type="color" value="${cur || '#ec4899'}" onchange="${fn}(this.value)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" aria-label="Escolher outra cor"></label>`;
+}
+
+let archiveDb = fazLoadList('tb_archive_db', []);
+function saveArchive() { localStorage.setItem('tb_archive_db', JSON.stringify(archiveDb)); if (window.fazSyncNotify) window.fazSyncNotify(); }
+
+// Primeiro horário livre do dia pra um bloco: o próprio horário, depois o fim de cada bloco.
+function fazFreeSlot(dateStr, startMin, duration) {
+    const day = db.filter(b => b.date === dateStr);
+    const fits = (st) => st >= 0 && st + duration <= 1440 && !day.some(b => st < b.startMin + b.duration && b.startMin < st + duration);
+    if (fits(startMin)) return startMin;
+    const ends = day.map(b => b.startMin + b.duration).sort((a, b) => a - b);
+    for (const st of ends.filter(x => x >= startMin).concat(ends)) if (fits(st)) return st;
+    return null;
+}
+
+window.fazArchiveTask = function(id) {
+    const i = backlogDb.findIndex(x => x.id === id);
+    if (i < 0) return;
+    archiveDb.unshift({ kind: 'tarefa', archivedAt: Date.now(), item: backlogDb.splice(i, 1)[0] });
+    saveBacklog(); saveArchive();
+    closeBacklogForm(true);
+    renderBacklog();
+    showToast('Arquivado! Está em Config → Arquivados');
+};
+
+window.fazArchiveBlock = function(id, e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const i = db.findIndex(x => x.id === id);
+    if (i < 0) return;
+    const item = db.splice(i, 1)[0];
+    item.expanded = false;
+    archiveDb.unshift({ kind: 'bloco', archivedAt: Date.now(), item: item });
+    saveDb(); saveArchive();
+    renderTimeline();
+    showToast('Arquivado! Está em Config → Arquivados');
+};
+
+window.fazUnarchive = function(id) {
+    const i = archiveDb.findIndex(a => a && a.item && a.item.id === id);
+    if (i < 0) return;
+    const a = archiveDb[i];
+    if (a.kind === 'bloco') {
+        const slot = fazFreeSlot(a.item.date, a.item.startMin, a.item.duration);
+        if (slot === null) return showToast('Esse dia está sem espaço livre pra esse bloco.');
+        a.item.startMin = slot;
+        a.item.expanded = false;
+        db.push(a.item);
+        saveDb();
+    } else {
+        if (a.item.columnId && !backlogColumnsDb.some(c => c.id === a.item.columnId)) delete a.item.columnId; // lista apagada → lista padrão
+        backlogDb.push(a.item);
+        saveBacklog();
+    }
+    archiveDb.splice(i, 1);
+    saveArchive();
+    renderArchive(); renderTimeline(); renderBacklog();
+    showToast('Desarquivado!');
+};
+
+window.fazDeleteArchived = function(id) {
+    const a = archiveDb.find(x => x && x.item && x.item.id === id);
+    if (!a || !confirm('Apagar "' + (a.item.title || 'sem nome') + '" de vez?\n\nEssa ação não pode ser desfeita.')) return;
+    archiveDb = archiveDb.filter(x => x !== a);
+    saveArchive();
+    renderArchive();
+    showToast('Apagado.');
+};
+
+function renderArchive() {
+    const el = document.getElementById('config-archive-list');
+    if (!el) return;
+    if (archiveDb.length === 0) {
+        el.innerHTML = `<div class="text-center py-12 px-6"><i class="ph ph-archive text-4xl text-zinc-300"></i><p class="text-sm font-medium text-zinc-500 mt-2">Nada arquivado.</p><p class="text-[11px] text-zinc-400 mt-1">Arquive uma tarefa pelo formulário dela, ou um bloco pelo botão Arquivar.</p></div>`;
+        return;
+    }
+    el.innerHTML = archiveDb.map(a => {
+        const it = a.item || {}, isBlock = a.kind === 'bloco';
+        const col = backlogColumnsDb.find(c => c.id === (it.columnId || 'col_geral'));
+        const d = isBlock && /^\d{4}-\d{2}-\d{2}$/.test(it.date || '') ? it.date.slice(8, 10) + '/' + it.date.slice(5, 7) : '';
+        const where = isBlock ? `Agenda · ${d} às ${formatClock(it.startMin || 0)}` : `Lista · ${escapeHtml(col ? col.name : 'padrão')}`;
+        const paint = fazCardColor(it.color);
+        return `
+        <div class="flex items-center gap-3 p-3 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl" style="${paint ? `border-left: 5px solid ${paint};` : ''}">
+            <div class="min-w-0 flex-1">
+                <p class="font-bold text-sm text-zinc-800 truncate">${escapeHtml(it.title || 'Sem nome')}</p>
+                <p class="text-[11px] text-zinc-500 font-medium truncate">${where} · ${formatDur(it.duration || 0)}</p>
+            </div>
+            <button onclick="fazUnarchive('${it.id}')" class="shrink-0 px-3 py-2 rounded-lg bg-white border border-app-focus text-app-focus text-[11px] font-bold active:scale-95 transition">Desarquivar</button>
+            <button onclick="fazDeleteArchived('${it.id}')" class="shrink-0 w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg active:scale-95 transition" title="Apagar de vez"><i class="ph ph-trash text-sm"></i></button>
+        </div>`;
+    }).join('');
+}
+
+window.openConfigArchive = function() {
+    document.getElementById('config-main-menu').classList.add('hidden');
+    document.getElementById('config-archive-view').classList.remove('hidden');
+    document.getElementById('config-title').innerText = 'Arquivados';
+    document.getElementById('config-back-btn').setAttribute('onclick', 'closeConfigArchive()');
+    renderArchive();
+};
+
+window.closeConfigArchive = function() {
+    document.getElementById('config-archive-view').classList.add('hidden');
+    document.getElementById('config-main-menu').classList.remove('hidden');
+    document.getElementById('config-title').innerText = 'Configurações';
+    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+};
+
 // V40.8.0: duração mínima de 5 min. Abaixo de 15 anda de 5 em 5 (15 → 10 → 5);
 // acima de 15 mantém o passo do botão e sempre para no 15.
 function fazStepDuration(cur, delta) {
@@ -4346,6 +4495,8 @@ window.cancelDeleteRoutine = function() {
 //   C13: stepper -15/+15 (igual rotinas) em vez de quick buttons
 
 let currentBlId = null;
+let currentBlColor = null; // V40.9.0: cor livre do cartão
+window.fazPickBlColor = function(c) { currentBlColor = fazCardColor(c); fazRenderColorPicker('bl-form-colors', currentBlColor, 'fazPickBlColor'); };
 let currentBlDur = 30;
 let currentBlTagId = null;
 let currentBlMicroblocks = [];
@@ -4367,21 +4518,28 @@ window.openBacklogForm = function(id = null) {
         document.getElementById('backlog-input').value = item.title;
         currentBlDur = item.duration;
         currentBlTagId = item.tagId || null;
+        currentBlColor = fazCardColor(item.color);
         currentBlMicroblocks = JSON.parse(JSON.stringify(item.microblocks || []));
         document.getElementById('bl-form-delete-btn').classList.remove('hidden');
         document.getElementById('bl-form-delete-btn').classList.add('flex');
+        document.getElementById('bl-form-archive-btn').classList.remove('hidden');
+        document.getElementById('bl-form-archive-btn').classList.add('flex');
     } else {
         document.getElementById('bl-form-title-label').innerText = 'Nova Tarefa';
         document.getElementById('backlog-input').value = '';
         currentBlDur = 30;
         currentBlTagId = null;
+        currentBlColor = null;
         currentBlMicroblocks = []; // C14: começa vazio
         document.getElementById('bl-form-delete-btn').classList.add('hidden');
         document.getElementById('bl-form-delete-btn').classList.remove('flex');
+        document.getElementById('bl-form-archive-btn').classList.add('hidden');
+        document.getElementById('bl-form-archive-btn').classList.remove('flex');
     }
     
     updateBacklogFormVisuals();
     renderBlFormMicroblocks();
+    fazRenderColorPicker('bl-form-colors', currentBlColor, 'fazPickBlColor'); // V40.9.0
 }
 
 window.closeBacklogForm = function(force = false) {
@@ -4530,6 +4688,7 @@ window.saveBacklogForm = function() {
             item.duration = currentBlDur;
             item.tagId = currentBlTagId;
             item.microblocks = validMbs;
+            if (currentBlColor) item.color = currentBlColor; else delete item.color; // V40.9.0
         }
         showToast('Tarefa atualizada!');
     } else {
@@ -4539,6 +4698,7 @@ window.saveBacklogForm = function() {
             duration: currentBlDur,
             tagId: currentBlTagId,
             microblocks: validMbs,
+            ...(currentBlColor ? { color: currentBlColor } : {}), // V40.9.0
             columnId: activeColumnId || 'col_geral'  // V40.5.0: nova tarefa nasce na coluna ativa
         });
         showToast('Tarefa adicionada!');

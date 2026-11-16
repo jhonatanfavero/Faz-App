@@ -27,6 +27,13 @@
     .tab.on { background: #fff; color: #18181b; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
     .ag-view.on { background: var(--focus); color: #fff; }
     .ag-now { box-shadow: 0 0 0 2px var(--focus); }
+    .ag-over { border-color: var(--focus) !important; background-color: #fff !important; }
+    .ag-card.dragging { opacity: .35; }
+    /* V40.9.0: cartão pintado com cor livre; .dark = cor escura → texto claro */
+    .painted.dark p, .painted.dark span, .painted.dark i { color: #fff !important; }
+    .painted.dark .text-zinc-400, .painted.dark .text-zinc-500 { color: rgba(255,255,255,.85) !important; }
+    .swatch { width: 28px; height: 28px; border-radius: 9999px; border: 2px solid #fff; box-shadow: 0 0 0 1px #d4d4d8; }
+    .swatch.on { box-shadow: 0 0 0 2px #18181b; }
     .now-line { position: absolute; left: 56px; right: 0; height: 2px; background: #ef4444; z-index: 5; pointer-events: none; }
     .now-line::before { content: ''; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
     input:focus, select:focus, textarea.field:focus { border-color: var(--focus) !important; }
@@ -113,6 +120,7 @@
             <span id="sync-pill" class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 px-2.5 py-1 rounded-full bg-zinc-100" title="Mudanças do celular aparecem aqui sozinhas">
                 <span id="sync-dot" class="w-2 h-2 rounded-full bg-amber-400"></span><span id="sync-label">Conectando</span>
             </span>
+            <button id="btn-archive" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Arquivados" aria-label="Arquivados"><i class="ph ph-archive text-lg"></i></button>
             <button id="btn-refresh" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Atualizar agora" aria-label="Atualizar agora">
                 <i class="ph ph-arrows-clockwise text-lg"></i>
             </button>
@@ -169,7 +177,8 @@
             <div id="b-mbs" class="mt-4 flex flex-col gap-1.5"></div>
         </div>
         <div class="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
-            <p class="text-[11.5px] text-zinc-500">Pra editar, use o app no celular.</p>
+            <button id="b-archive" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3 py-2 rounded-lg">Arquivar</button>
+            <p class="text-[11.5px] text-zinc-500 leading-snug">Arraste o bloco pra mudar o dia. O resto se edita no celular.</p>
             <button id="b-close" class="ml-auto text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Fechar</button>
         </div>
     </div>
@@ -195,6 +204,10 @@
                 <div id="f-tags" class="mt-1.5 flex flex-wrap gap-1.5"></div>
             </div>
             <div class="mt-4">
+                <span class="text-xs font-semibold text-zinc-500">Cor do cartão</span>
+                <div id="f-colors" class="mt-1.5 flex flex-wrap items-center gap-2"></div>
+            </div>
+            <div class="mt-4">
                 <span class="text-xs font-semibold text-zinc-500">Checklist</span>
                 <div id="f-mbs" class="mt-1 flex flex-col"></div>
                 <div class="mt-1 flex items-center gap-2 px-1">
@@ -205,6 +218,7 @@
         </div>
         <div class="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
             <button id="f-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar tarefa</button>
+            <button id="f-archive" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3 py-2 rounded-lg">Arquivar</button>
             <div class="ml-auto flex gap-2">
                 <button id="f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
                 <button id="f-save" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Salvar</button>
@@ -223,6 +237,18 @@
             <button id="dlg-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
             <button id="dlg-ok" class="text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90"></button>
         </div>
+    </div>
+</div>
+
+<!-- V40.9.0: Arquivados -->
+<div id="modal-archive" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="ar-title">
+    <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[85vh]">
+        <div class="px-5 pt-5 pb-3 flex items-center gap-3">
+            <h3 id="ar-title" class="text-base font-bold text-zinc-900">Arquivados</h3>
+            <span id="ar-count" class="text-xs text-zinc-500"></span>
+            <button id="ar-close" class="ml-auto text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Fechar</button>
+        </div>
+        <div id="ar-list" class="px-5 pb-5 overflow-y-auto thin-scroll flex flex-col gap-2"></div>
     </div>
 </div>
 
@@ -260,6 +286,11 @@
         });
     }
     function safeColor(c) { return /^#[0-9a-fA-F]{3,8}$/.test(String(c || '')) ? c : '#d4d4d8'; }
+    // V40.9.0: cor livre do cartão
+    var CARD_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#14b8a6', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f472b6', '#64748b'];
+    function hex6(c) { return /^#[0-9a-fA-F]{6}$/.test(String(c || '')) ? String(c).toLowerCase() : null; }
+    function isDark(hex) { var n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 165; }
+    function paintOf(c) { var h = hex6(c); return h ? { cls: 'painted ' + (isDark(h) ? 'dark ' : ''), css: 'background-color:' + h + ';border-color:' + h + ';', hex: h } : { cls: '', css: '', hex: null }; }
     function fmtDur(m) { // igual ao formatDur do app
         m = Math.max(0, Math.round(Number(m) || 0));
         var h = Math.floor(m / 60), r = m % 60;
@@ -384,24 +415,24 @@
         if (!row) return false;
         var prev = Object.assign({}, row);
         Object.assign(row, fields);
-        render();
+        render(); renderAgenda(); renderArchive();
         var res = await S.sb.from(kind).update(fields).eq('user_id', S.uid).eq('id', id);
-        if (res.error) { S[kind][id] = prev; render(); fail(res.error); return false; }
+        if (res.error) { S[kind][id] = prev; render(); renderAgenda(); renderArchive(); fail(res.error); return false; }
         if (okMsg) toast(okMsg);
         return true;
     }
 
     // ---------- render ----------
     var renderT = null;
-    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); }, 60); }
+    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); }, 60); }
 
     function cardHtml(t) {
         var tag = tagOf(t.tag_id);
         var mbs = Array.isArray(t.microblocks) ? t.microblocks : [];
         var done = mbs.filter(function (m) { return m && m.done; }).length;
-        var all = mbs.length > 0 && done === mbs.length;
-        return '<article class="card bg-white border border-zinc-200 border-l-4 rounded-xl px-3 py-2.5 cursor-pointer hover:border-zinc-300 hover:shadow-sm transition-shadow" ' +
-            'style="border-left-color:' + esc(safeColor(tag ? tag.color : '#d4d4d8')) + '" draggable="true" tabindex="0" data-id="' + esc(t.id) + '">' +
+        var all = mbs.length > 0 && done === mbs.length, paint = paintOf(t.color);
+        return '<article class="card ' + paint.cls + 'bg-white border border-zinc-200 border-l-4 rounded-xl px-3 py-2.5 cursor-pointer hover:border-zinc-300 hover:shadow-sm transition-shadow" ' +
+            'style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" draggable="true" tabindex="0" data-id="' + esc(t.id) + '">' +
             '<p class="text-[13.5px] font-semibold text-zinc-800 leading-snug break-words">' + (esc(t.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
             '<div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">' +
             (tag ? '<span class="inline-flex items-center gap-1.5 font-medium text-zinc-600"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
@@ -487,9 +518,9 @@
     function countLabel(n) { return n + (n === 1 ? ' bloco' : ' blocos'); }
 
     function agCardHtml(b, day, today, nm) {
-        var tag = tagOf(b.tag_id), mb = mbCount(b);
-        return '<article class="ag-card bg-white border border-zinc-200 border-l-4 rounded-lg px-2.5 py-1.5 cursor-pointer hover:border-zinc-300' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
-            '" style="border-left-color:' + esc(safeColor(tag ? tag.color : '#d4d4d8')) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
+        var tag = tagOf(b.tag_id), mb = mbCount(b), paint = paintOf(b.completed ? null : b.color);
+        return '<article draggable="true" class="ag-card ' + paint.cls + 'bg-white border border-zinc-200 border-l-4 rounded-lg px-2.5 py-1.5 cursor-pointer hover:border-zinc-300' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
+            '" style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
             '<p class="text-[11px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + '<span class="font-medium text-zinc-400"> · ' + fmtDur(b.duration) + '</span></p>' +
             '<p class="text-[13px] font-semibold leading-snug break-words ' + (b.completed ? 'line-through text-zinc-400' : 'text-zinc-800') + '">' + (esc(b.title) || 'Sem nome') + '</p>' +
             ((tag || mb.n || b.completed) ? '<div class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-zinc-500">' +
@@ -536,12 +567,12 @@
                 '<span class="absolute left-0 w-12 text-right text-[11px] font-medium text-zinc-400 tabular-nums" style="top:' + (y - 7) + 'px">' + pad(h) + ':00</span>';
         }
         list.forEach(function (b) {
-            var tag = tagOf(b.tag_id), compact = b.duration < 20;
+            var tag = tagOf(b.tag_id), compact = b.duration < 20, paint = paintOf(b.completed ? null : b.color);
             var top = (b.start_min - h0 * 60) * PXM + 1, height = Math.max(b.duration * PXM - 2, 14);
             var titleCls = b.completed ? 'line-through text-zinc-400' : 'text-zinc-800';
             html += '<div class="ag-card absolute rounded-md border border-l-4 overflow-hidden cursor-pointer px-2 flex ' + (compact ? 'items-center gap-2 ' : 'flex-col justify-center ') +
-                (b.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-zinc-200') + (isNow(b, day, today, nm) ? ' ag-now' : '') +
-                '" style="left:56px;right:0;top:' + top + 'px;height:' + height + 'px;border-left-color:' + esc(safeColor(tag ? tag.color : '#d4d4d8')) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
+                paint.cls + (b.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-zinc-200') + (isNow(b, day, today, nm) ? ' ag-now' : '') +
+                '" style="left:56px;right:0;top:' + top + 'px;height:' + height + 'px;' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
                 (compact
                     ? '<span class="text-[10.5px] leading-none font-semibold text-zinc-500 tabular-nums shrink-0">' + clock(b.start_min) + '</span>' +
                       '<span class="text-[11.5px] leading-none font-semibold truncate ' + titleCls + '">' + (esc(b.title) || 'Sem nome') + '</span>' +
@@ -563,8 +594,31 @@
         return list.length ? countLabel(list.length) + ' · ' + fmtDur(sumMin(list)) + ' planejados' : 'Dia livre';
     }
 
+    // Primeiro horário livre do dia pra um bloco: o próprio horário, depois o fim de cada bloco.
+    function freeSlot(day, start, dur, ignoreId) {
+        var list = (blocksByDay()[day] || []).filter(function (b) { return b.id !== ignoreId; });
+        function fits(st) { return st >= 0 && st + dur <= 1440 && !list.some(function (b) { return st < b.start_min + b.duration && b.start_min < st + dur; }); }
+        if (fits(start)) return start;
+        var ends = list.map(function (b) { return b.start_min + b.duration; }).sort(function (a, b) { return a - b; });
+        var cands = ends.filter(function (x) { return x >= start; }).concat(ends);
+        for (var i = 0; i < cands.length; i++) if (fits(cands[i])) return cands[i];
+        return null;
+    }
+    // V40.9.0: arrastar um bloco pra outro dia (o celular recebe pela sincronização)
+    function moveBlockToDay(id, day) {
+        var b = S.blocos[id];
+        if (!b || b.deleted || String(b.date).slice(0, 10) === day) return;
+        var slot = freeSlot(day, b.start_min, b.duration, id);
+        if (slot === null) return toast('Esse dia não tem um espaço livre desse tamanho.');
+        var d = parseYmd(day);
+        patchRow('blocos', id, { date: day, start_min: slot, type: day >= todayStr() ? 'focus' : 'past' },
+            'Bloco movido para ' + WD3[d.getDay()] + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' às ' + clock(slot));
+    }
+
     function renderAgenda() {
         if (!S.uid || S.tab !== 'agenda') return;
+        if (S.agDrag) { S.agPending = true; return; } // não redesenha no meio de um arraste
+        S.agPending = false;
         var today = todayStr(), map = blocksByDay();
         if (!S.agAnchor) S.agAnchor = today;
         $('ag-banner').classList.toggle('hidden', Object.keys(map).length > 0 || !S.lastLoad);
@@ -606,6 +660,7 @@
         var m = $('modal-block');
         m.classList.remove('hidden');
         m.classList.add('flex');
+        S.viewBlock = id;
         $('b-close').focus();
     }
     function closeBlock() { var m = $('modal-block'); m.classList.add('hidden'); m.classList.remove('flex'); }
@@ -778,7 +833,7 @@
         var t = S.tarefas[id];
         if (!t || t.deleted) return;
         closeComposer();
-        S.editing = { id: id, orig: JSON.parse(JSON.stringify(t)), tag: tagOf(t.tag_id) ? t.tag_id : null, mbs: normMbs(t.microblocks) };
+        S.editing = { id: id, orig: JSON.parse(JSON.stringify(t)), tag: tagOf(t.tag_id) ? t.tag_id : null, mbs: normMbs(t.microblocks), color: hex6(t.color) };
         $('f-title').value = t.title || '';
         $('f-col').innerHTML = alive('listas').map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('');
         $('f-col').value = colOf(t);
@@ -789,6 +844,7 @@
         $('f-mb-new').value = '';
         renderTagChips();
         renderMbs();
+        renderColors();
         var m = $('modal-task');
         m.classList.remove('hidden');
         m.classList.add('flex');
@@ -809,6 +865,13 @@
                 (color ? '<span class="w-2.5 h-2.5 rounded-full" style="background:' + esc(safeColor(color)) + '"></span>' : '<i class="ph ph-prohibit text-zinc-400"></i>') + esc(label) + '</button>';
         };
         $('f-tags').innerHTML = chip(null, 'Sem tag', null) + alive('tags').map(function (t) { return chip(t.id, t.name, t.color); }).join('');
+    }
+    function renderColors() {
+        var cur = S.editing.color, custom = cur && CARD_COLORS.indexOf(cur) < 0;
+        $('f-colors').innerHTML = '<button type="button" data-color="" class="h-7 px-2.5 rounded-full border text-[12px] font-semibold ' + (!cur ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50') + '">Sem cor</button>' +
+            CARD_COLORS.map(function (c) { return '<button type="button" data-color="' + c + '" class="swatch' + (cur === c ? ' on' : '') + '" style="background:' + c + '" aria-label="Cor ' + c + '"></button>'; }).join('') +
+            '<label class="swatch relative overflow-hidden cursor-pointer' + (custom ? ' on' : '') + '" style="background:' + (custom ? cur : 'conic-gradient(#ef4444,#f59e0b,#10b981,#3b82f6,#8b5cf6,#ec4899,#ef4444)') + '" title="Outra cor">' +
+            '<input type="color" id="f-color-custom" value="' + (cur || '#ec4899') + '" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" aria-label="Escolher outra cor"></label>';
     }
     function renderMbs() {
         $('f-mbs').innerHTML = S.editing.mbs.map(function (m, i) {
@@ -835,6 +898,7 @@
         if ((ed.tag || null) !== (ed.orig.tag_id || null)) fields.tag_id = ed.tag || null;
         var mbs = normMbs(ed.mbs);
         if (JSON.stringify(mbs) !== JSON.stringify(normMbs(ed.orig.microblocks))) fields.microblocks = mbs;
+        if ((ed.color || null) !== hex6(ed.orig.color)) fields.color = ed.color || null;
         closeTask();
         if (Object.keys(fields).length) patchRow('tarefas', ed.id, fields, 'Tarefa salva');
     }
@@ -845,6 +909,57 @@
         if (!ok) return;
         closeTask();
         patchRow('tarefas', ed.id, { deleted: true }, 'Tarefa apagada');
+    }
+
+    // ---------- V40.9.0: arquivar / arquivados ----------
+    function archiveTask() {
+        var ed = S.editing;
+        if (!ed) return;
+        closeTask();
+        patchRow('tarefas', ed.id, { archived: true }, 'Tarefa arquivada');
+    }
+    function archivedRows() {
+        var out = [];
+        ['tarefas', 'blocos'].forEach(function (k) {
+            Object.keys(S[k]).forEach(function (id) { var r = S[k][id]; if (r && r.archived && !r.deleted) out.push({ kind: k, row: r }); });
+        });
+        return out.sort(function (a, b) { return String(a.row.title).localeCompare(String(b.row.title)); });
+    }
+    function renderArchive() {
+        if ($('modal-archive').classList.contains('hidden')) return;
+        var rows = archivedRows(), lists = S.listas;
+        $('ar-count').textContent = rows.length ? rows.length + (rows.length === 1 ? ' cartão' : ' cartões') : '';
+        $('ar-list').innerHTML = rows.length ? rows.map(function (x) {
+            var r = x.row, where;
+            if (x.kind === 'blocos') { var d = parseYmd(String(r.date).slice(0, 10)); where = 'Agenda · ' + WD3[d.getDay()] + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' às ' + clock(r.start_min); }
+            else { var c = lists[r.column_id]; where = 'Lista · ' + esc(c && !c.deleted ? c.name : 'padrão'); }
+            var paint = hex6(r.color);
+            return '<div class="flex items-center gap-3 p-3 bg-zinc-50 border border-zinc-200 rounded-xl"' + (paint ? ' style="border-left:5px solid ' + paint + '"' : '') + '>' +
+                '<div class="min-w-0 flex-1"><p class="text-[13.5px] font-semibold text-zinc-800 truncate">' + (esc(r.title) || 'Sem nome') + '</p>' +
+                '<p class="text-[11.5px] text-zinc-500 truncate">' + where + ' · ' + fmtDur(r.duration) + '</p></div>' +
+                '<button data-unarchive="' + x.kind + '|' + esc(r.id) + '" class="shrink-0 text-[12.5px] font-semibold text-focus border border-zinc-200 bg-white hover:bg-zinc-50 px-3 py-1.5 rounded-lg">Desarquivar</button>' +
+                '<button data-delarch="' + x.kind + '|' + esc(r.id) + '" class="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-red-600 hover:bg-red-50" aria-label="Apagar de vez"><i class="ph ph-trash"></i></button></div>';
+        }).join('') : '<p class="py-10 text-center text-sm text-zinc-500">Nada arquivado. Pra arquivar, abra uma tarefa ou um bloco e clique em Arquivar.</p>';
+    }
+    function openArchive() { var m = $('modal-archive'); m.classList.remove('hidden'); m.classList.add('flex'); renderArchive(); $('ar-close').focus(); }
+    function closeArchive() { var m = $('modal-archive'); m.classList.add('hidden'); m.classList.remove('flex'); }
+    function unarchive(kind, id) {
+        var r = S[kind][id];
+        if (!r) return;
+        if (kind === 'blocos') {
+            var slot = freeSlot(String(r.date).slice(0, 10), r.start_min, r.duration, id);
+            if (slot === null) return toast('Esse dia não tem um espaço livre desse tamanho.');
+            return patchRow('blocos', id, { archived: false, start_min: slot }, 'Bloco desarquivado');
+        }
+        var f = { archived: false, position: maxPos('tarefas') + STEP };
+        if (!aliveListIds()[r.column_id]) f.column_id = DEFAULT_COL; // a lista foi apagada → lista padrão
+        patchRow('tarefas', id, f, 'Tarefa desarquivada');
+    }
+    async function deleteArchived(kind, id) {
+        var r = S[kind][id];
+        if (!r) return;
+        var ok = await dialog({ title: 'Apagar de vez?', text: '"' + (r.title || 'Sem nome') + '" some daqui e do celular. Não dá pra desfazer.', okLabel: 'Apagar', danger: true });
+        if (ok) patchRow(kind, id, { deleted: true }, 'Apagado');
     }
 
     // ---------- arrastar e soltar ----------
@@ -1002,6 +1117,7 @@
             if (e.key !== 'Escape') return;
             if (!$('dialog').classList.contains('hidden')) return;
             if (!$('modal-block').classList.contains('hidden')) return closeBlock();
+            if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
             if (menuEl) return closeColMenu();
             if (S.editing) return closeTask();
             if (S.composer) closeComposer();
@@ -1030,6 +1146,54 @@
         $('agenda').addEventListener('keydown', function (e) {
             var c = e.target.closest && e.target.closest('[data-block]');
             if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openBlock(c.dataset.block); }
+        });
+        // V40.9.0: arrastar bloco entre os dias da semana
+        var agCols = $('ag-cols');
+        function agClear() { agCols.querySelectorAll('.ag-over').forEach(function (el) { el.classList.remove('ag-over'); }); }
+        function agEnd() { agClear(); agCols.querySelectorAll('.ag-card.dragging').forEach(function (el) { el.classList.remove('dragging'); }); S.agDrag = null; if (S.agPending) renderAgenda(); }
+        agCols.addEventListener('dragstart', function (e) {
+            var c = e.target.closest('[data-block]');
+            if (!c) return;
+            S.agDrag = c.dataset.block;
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', S.agDrag); } catch (err) {}
+            requestAnimationFrame(function () { c.classList.add('dragging'); });
+        });
+        agCols.addEventListener('dragover', function (e) {
+            var sec = S.agDrag && e.target.closest('section');
+            if (!sec) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (!sec.classList.contains('ag-over')) { agClear(); sec.classList.add('ag-over'); }
+        });
+        agCols.addEventListener('drop', function (e) {
+            var sec = S.agDrag && e.target.closest('section');
+            if (!sec) return;
+            e.preventDefault();
+            var id = S.agDrag, day = sec.querySelector('.ag-list').dataset.day;
+            agEnd();
+            moveBlockToDay(id, day);
+        });
+        agCols.addEventListener('dragend', agEnd);
+        $('b-archive').addEventListener('click', function () { var id = S.viewBlock; closeBlock(); if (id) patchRow('blocos', id, { archived: true }, 'Bloco arquivado'); });
+        $('btn-archive').addEventListener('click', openArchive);
+        $('ar-close').addEventListener('click', closeArchive);
+        $('modal-archive').addEventListener('mousedown', function (e) { if (e.target === this) closeArchive(); });
+        $('ar-list').addEventListener('click', function (e) {
+            var u = e.target.closest('[data-unarchive]'), x = e.target.closest('[data-delarch]'), v = (u ? u.dataset.unarchive : x ? x.dataset.delarch : '').split('|');
+            if (u) unarchive(v[0], v.slice(1).join('|')); else if (x) deleteArchived(v[0], v.slice(1).join('|'));
+        });
+        $('f-archive').addEventListener('click', archiveTask);
+        $('f-colors').addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-color]');
+            if (!b || !S.editing) return;
+            S.editing.color = hex6(b.dataset.color);
+            renderColors();
+        });
+        $('f-colors').addEventListener('change', function (e) {
+            if (e.target.id !== 'f-color-custom' || !S.editing) return;
+            S.editing.color = hex6(e.target.value);
+            renderColors();
         });
         $('b-close').addEventListener('click', closeBlock);
         $('modal-block').addEventListener('mousedown', function (e) { if (e.target === this) closeBlock(); });
@@ -1141,6 +1305,7 @@
             S.uid = null; S.listas = {}; S.tags = {}; S.tarefas = {}; S.blocos = {}; S.lastLoad = 0; S.composer = null;
             closeTask();
             closeBlock();
+            closeArchive();
             closeColMenu();
             show('view-login');
             return;

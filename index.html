@@ -298,6 +298,7 @@
                             </button>
                             <h3 id="bl-form-title-label" class="font-bold text-zinc-800 text-sm">Nova Tarefa</h3>
                         </div>
+                        <button id="bl-form-archive-btn" onclick="fazArchiveTask(currentBlId)" class="hidden w-8 h-8 items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 rounded-lg transition" title="Arquivar"><i class="ph ph-archive"></i></button>
                         <button id="bl-form-delete-btn" onclick="deleteBacklogFromForm()" class="hidden w-8 h-8 items-center justify-center text-zinc-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition">
                             <i class="ph ph-trash"></i>
                         </button>
@@ -328,6 +329,12 @@
                             <div id="bl-form-tag-container" class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                 <!-- preenchido por updateBacklogFormVisuals() -->
                             </div>
+                        </div>
+
+                        <!-- V40.9.0: cor livre do cartão (independente da tag) -->
+                        <div class="mb-5">
+                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Cor do cartão (Opcional)</label>
+                            <div id="bl-form-colors" class="flex flex-wrap items-center gap-2"></div>
                         </div>
 
                         <!-- Checklist (C14 — começa com 1 slot vazio) -->
@@ -786,6 +793,20 @@
                     <i class="ph ph-caret-right text-zinc-400"></i>
                 </button>
 
+                <!-- V40.9.0: Arquivados -->
+                <button onclick="openConfigArchive()" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <i class="ph ph-archive text-xl"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="font-bold text-zinc-800 text-sm">Arquivados</span>
+                            <span class="text-[11px] text-zinc-500 font-medium">Ver e desarquivar cartões</span>
+                        </div>
+                    </div>
+                    <i class="ph ph-caret-right text-zinc-400"></i>
+                </button>
+
                 <!-- V40.7.0: Sincronizar com a nuvem (Fase 2 MVP — só as Listas, opcional) -->
                 <button onclick="openConfigSync()" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left">
                     <div class="flex items-center gap-3 min-w-0">
@@ -902,6 +923,11 @@
                 <p class="text-[11px] text-zinc-400 text-center leading-relaxed px-4 mt-1">
                     Dica: faça backup de vez em quando e guarde no Google Drive. Se trocar de celular, é só instalar o app e restaurar.
                 </p>
+            </div>
+
+            <!-- V40.9.0: Arquivados (tarefas e blocos fora das listas/agenda, mas guardados) -->
+            <div class="flex-1 overflow-y-auto no-scrollbar hidden" id="config-archive-view">
+                <div id="config-archive-list"></div>
             </div>
 
             <!-- V40.7.0: Sincronizar com a nuvem (lógica em sync.js) -->
@@ -1043,7 +1069,10 @@
             <h3 class="text-lg font-bold text-zinc-900 mb-4 text-center">Editar Tarefa</h3>
             <input type="text" id="edit-task-title" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-4 text-sm text-center">
             <p class="text-xs text-zinc-500 font-medium mb-2 uppercase tracking-wider text-center">Etiqueta</p>
-            <div class="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2" id="edit-tag-selector-container"></div>
+            <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-2" id="edit-tag-selector-container"></div>
+            <!-- V40.9.0: cor livre do cartão -->
+            <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Cor do cartão</p>
+            <div class="flex flex-wrap items-center gap-2 mb-6" id="edit-color-picker"></div>
             <div class="flex gap-2">
                 <button onclick="cancelEdit()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
                 <button onclick="saveEditTask()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:opacity-90 shadow-md transition">Salvar</button>
@@ -1235,7 +1264,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.8.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.9.0</div>
 
     </div>
 

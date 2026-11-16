@@ -25,8 +25,8 @@
  *   Como ela é grande, a nuvem é lida de forma INCREMENTAL: só as linhas que mudaram
  *   desde a última rodada (updated_at do servidor, com 30s de folga); o resto da nuvem
  *   é, por definição, igual à base guardada neste aparelho. 'expanded' não sincroniza.
- *   Tarefas e blocos têm 'color' (cor livre) e 'archived' (arquivado: some das listas
- *   do app, mas continua existindo — nunca é tratado como apagado).
+ *   Tarefas e blocos têm 'color' (cor livre) e 'archived'. V40.9.0: arquivado sai de
+ *   backlogDb/db e fica em tb_archive_db; no sync é uma linha normal com archived = true.
  *
  * Estado interno em 'tb__sync' (prefixo tb__ = interno: fica FORA do backup e
  * o Restaurar não apaga). Sessão do Supabase fica em 'sb-<ref>-auth-token'.
@@ -101,7 +101,7 @@
                     tag_id: it.tagId ? String(it.tagId) : null,
                     microblocks: Array.isArray(it.microblocks) ? clone(it.microblocks) : [],
                     color: hex6(it.color),
-                    archived: false
+                    archived: !!it.__archived
                 };
             },
             item: function (r, prev) {
@@ -114,6 +114,7 @@
                 if (prev && !prev.columnId && r.column_id === DEFAULT_COL) delete it.columnId;
                 else it.columnId = r.column_id;
                 if (r.color) it.color = r.color; else delete it.color;
+                delete it.__archived;
                 return it;
             }
         },
@@ -165,7 +166,7 @@
                     was_delayed: !!b.wasDelayed,
                     linked_note_ids: Array.isArray(b.linkedNoteIds) ? clone(b.linkedNoteIds) : [],
                     color: hex6(b.color),
-                    archived: false
+                    archived: !!b.__archived
                 };
             },
             item: function (r, prev) {
@@ -182,6 +183,7 @@
                 if (r.was_delayed) b.wasDelayed = true; else delete b.wasDelayed;
                 b.linkedNoteIds = clone(r.linked_note_ids || []);
                 if (r.color) b.color = r.color; else delete b.color;
+                delete b.__archived;
                 return b;
             }
         }
@@ -299,12 +301,22 @@
             seen[id] = true;
             ordered.push(r);
         });
-        var pos = ORDERED[kind] ? assignPositions(ordered.map(function (r) {
-            var b = baseRows[r.id];
-            return b && !b.deleted ? b.position : undefined;
-        })) : null;
-        ordered.forEach(function (r, i) {
-            if (pos) r.position = pos[i];
+        if (ORDERED[kind]) {
+            // Arquivado não aparece nas listas: não entra na ordenação e mantém a posição que tinha.
+            var live = ordered.filter(function (r) { return !r.archived; });
+            var pos = assignPositions(live.map(function (r) {
+                var b = baseRows[r.id];
+                return b && !b.deleted ? b.position : undefined;
+            }));
+            var maxPos = 0;
+            live.forEach(function (r, i) { r.position = pos[i]; if (pos[i] > maxPos) maxPos = pos[i]; });
+            ordered.forEach(function (r) {
+                if (!r.archived) return;
+                var b = baseRows[r.id];
+                r.position = (b && Number.isFinite(b.position)) ? b.position : (maxPos += STEP);
+            });
+        }
+        ordered.forEach(function (r) {
             r.deleted = false;
             rows[r.id] = cleanRow(kind, r);
         });
@@ -333,8 +345,9 @@
         [L, B, R].forEach(function (m) { Object.keys(m).forEach(function (id) { ids[id] = true; }); });
         Object.keys(ids).forEach(function (id) {
             var b = B[id], l = L[id], r = R[id], m;
-            // Sumiu daqui: se estava arquivado (não aparece no app) segue igual; senão foi apagado aqui.
-            if (!l && b) l = b.archived ? b : Object.assign({}, b, { deleted: true });
+            // Sumiu daqui = apagado aqui. (Desde a V40.9.0 os arquivados são itens locais de verdade,
+            // guardados em tb_archive_db; quem vinha da V40.8.0 é migrado antes de planejar.)
+            if (!l && b) l = Object.assign({}, b, { deleted: true });
             if (!r && b) r = Object.assign({}, b, { deleted: true }); // sumiu da nuvem = apagado lá
             if (!l && !r) return;
             if (!l) m = r;
@@ -430,8 +443,7 @@
             Object.keys(merged[k]).forEach(function (id) {
                 var m = merged[k][id], r = remote[k][id], l = L[k][id];
                 if (!r || !sameRow(k, m, r)) push[k].push(m);
-                var shown = !m.deleted && !m.archived; // arquivado não aparece nas listas do app
-                if ((!!l) !== shown || (l && !sameRow(k, m, l))) changed[k] = true;
+                if ((!!l) !== (!m.deleted) || (l && !sameRow(k, m, l))) changed[k] = true; // 'archived' conta como campo
             });
         });
         if (droppedDefaults.length) changed.tags = true;
@@ -466,6 +478,15 @@
         return out.concat(extras);
     }
 
+    // Itens ARQUIVADOS (pra tb_archive_db) a partir das linhas mescladas.
+    function materializeArchived(kind, mergedRows, prevItems) {
+        var prevById = {};
+        (prevItems || []).forEach(function (it) { if (it && it.id != null && !prevById[String(it.id)]) prevById[String(it.id)] = it; });
+        return Object.keys(mergedRows).map(function (id) { return mergedRows[id]; })
+            .filter(function (r) { return r.archived && !r.deleted; })
+            .map(function (r) { return MAP[kind].item(r, prevById[r.id]); });
+    }
+
     function baseFrom(merged) {
         var b = {};
         KINDS.forEach(function (k) {
@@ -479,7 +500,7 @@
         DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS,
         stable: stable, same: same, validDate: validDate, assignPositions: assignPositions, fixTies: fixTies,
         buildLocal: buildLocal, indexRows: indexRows, cleanRow: cleanRow, merge3: merge3, mergeKind: mergeKind,
-        plan: plan, materialize: materialize, baseFrom: baseFrom, aliveCount: aliveCount, MAP: MAP
+        plan: plan, materialize: materialize, materializeArchived: materializeArchived, baseFrom: baseFrom, aliveCount: aliveCount, MAP: MAP
     };
 });
 
@@ -650,6 +671,32 @@
     function localBlocks() {
         try { return (typeof db !== 'undefined' && Array.isArray(db)) ? db : []; } catch (e) { return []; }
     }
+    // V40.9.0: arquivados (tb_archive_db) entram no sync como linhas com archived = true.
+    function archList() {
+        try { return (typeof archiveDb !== 'undefined' && Array.isArray(archiveDb)) ? archiveDb.filter(function (a) { return a && a.item && a.item.id != null; }) : []; } catch (e) { return []; }
+    }
+    function archItems(kind) {
+        return archList().filter(function (a) { return a.kind === kind; }).map(function (a) { return Object.assign({}, a.item, { __archived: true }); });
+    }
+    // Quem vem da V40.8.0 pode ter arquivados só na base do sync (arquivados em outro aparelho).
+    // Traz pra tb_archive_db uma única vez, antes de planejar, pra não parecerem "apagados aqui".
+    function migrateArchived(st) {
+        if (!st || !st.base || st.arch || typeof archiveDb === 'undefined') return;
+        var have = {};
+        archList().forEach(function (a) { have[a.kind + '|' + a.item.id] = true; });
+        [['tarefa', 'tarefas', backlogDb], ['bloco', 'blocos', localBlocks()]].forEach(function (x) {
+            var rows = st.base[x[1]] || {}, live = {};
+            x[2].forEach(function (it) { if (it && it.id != null) live[String(it.id)] = true; });
+            Object.keys(rows).forEach(function (id) {
+                var r = rows[id];
+                if (r && r.archived && !r.deleted && !live[id] && !have[x[0] + '|' + id]) {
+                    archiveDb.push({ kind: x[0], archivedAt: Date.now(), item: CORE.MAP[x[1]].item(CORE.cleanRow(x[1], Object.assign({}, r, { id: id })), null) });
+                }
+            });
+        });
+        applying = true;
+        try { saveArchive(); } finally { applying = false; }
+    }
 
     function firstSyncText(remote) {
         var email = (session && session.user && session.user.email) || '';
@@ -667,6 +714,22 @@
     function applyLocal(p) {
         applying = true;
         try {
+            // V40.9.0: refaz o arquivo local quando tarefas/blocos mudaram (arquivar/desarquivar em outro aparelho)
+            if ((p.changed.tarefas || p.changed.blocos) && typeof archiveDb !== 'undefined') {
+                var prevArch = {}, next = [];
+                archList().forEach(function (a) { prevArch[a.kind + '|' + a.item.id] = a; });
+                [['tarefa', 'tarefas', backlogDb], ['bloco', 'blocos', localBlocks()]].forEach(function (x) {
+                    var prevItems = archList().filter(function (a) { return a.kind === x[0]; }).map(function (a) { return a.item; }).concat(x[2]);
+                    CORE.materializeArchived(x[1], p.merged[x[1]], prevItems).forEach(function (it) {
+                        var old = prevArch[x[0] + '|' + it.id];
+                        if (x[0] === 'bloco') it.expanded = false;
+                        next.push({ kind: x[0], archivedAt: old ? old.archivedAt : Date.now(), item: it });
+                    });
+                });
+                next.sort(function (a, b) { return b.archivedAt - a.archivedAt; });
+                archiveDb = next;
+                saveArchive();
+            }
             if (p.changed.tarefas) { backlogDb = CORE.materialize('tarefas', p.merged.tarefas, backlogDb, p.localOnly.tarefas); saveBacklog(); }
             if (p.changed.listas) { backlogColumnsDb = CORE.materialize('listas', p.merged.listas, backlogColumnsDb, p.localOnly.listas); saveBacklogColumns(); }
             if (p.changed.tags) { tagsDb = CORE.materialize('tags', p.merged.tags, tagsDb, p.localOnly.tags); saveTags(); }
@@ -681,6 +744,7 @@
             }
         } catch (e) {}
         try { if (typeof renderBacklog === 'function') renderBacklog(); } catch (e) { console.warn('[FazSync] render', e); }
+        try { if (typeof renderArchive === 'function') renderArchive(); } catch (e) {}
         if (p.changed.tags || p.changed.blocos) {
             try { if (typeof renderTimeline === 'function') renderTimeline(); } catch (e) { console.warn('[FazSync] timeline', e); }
             try { if (typeof renderTagsList === 'function') renderTagsList(); } catch (e) {}
@@ -699,13 +763,14 @@
             var uid = session.user.id;
             var st = readState();
             var firstSync = !st || st.userId !== uid || !st.base;
+            if (!firstSync) migrateArchived(st);
             var fetched = await fetchAll(uid, firstSync ? null : st);
             var remote = fetched.remote;
 
             // Daqui até applyLocal é tudo síncrono: nenhuma ação do usuário entra no meio.
             if (appBusy()) { again = true; return; }
             var p = CORE.plan({
-                local: { tarefas: backlogDb, listas: backlogColumnsDb, tags: tagsDb, blocos: localBlocks() },
+                local: { tarefas: backlogDb.concat(archItems('tarefa')), listas: backlogColumnsDb, tags: tagsDb, blocos: localBlocks().concat(archItems('bloco')) },
                 base: firstSync ? null : st.base,
                 remote: remote,
                 firstSync: firstSync,
@@ -719,7 +784,7 @@
             if (KINDS.some(function (k) { return p.changed[k]; })) applyLocal(p);
 
             await pushAll(uid, p.push);
-            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), cursorBlocos: fetched.cursor, lastSyncAt: Date.now() });
+            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), cursorBlocos: fetched.cursor, arch: 1, lastSyncAt: Date.now() });
             lastError = null;
             if (manual || firstSync) toast('Sincronizado ✅');
             pushTheme();

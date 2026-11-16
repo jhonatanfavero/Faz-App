@@ -68,6 +68,22 @@ const waitFor = async (fn, ms = 9000) => { const t0 = Date.now(); while (Date.no
     w.eval("activeDateObj = new Date(); renderTimeline();");
   }
 
+  console.log('\nC3) V40.14.0 — PC arrasta um bloco pra outro horário e estica → chega no celular:');
+  {
+    const day17 = JSON.parse(L('tb_master_db')).filter((b) => b.date === '2026-11-17').sort((a, b) => a.startMin - b.startMin), mv = day17[day17.length - 1], n17 = JSON.parse(L('tb_master_db')).length;
+    // o que a tela do PC grava ao tirar um bloco do lugar e esticar: horário, duração e, se ele já tinha passado, tipo e "atrasou"
+    server.patch('blocos', UID, mv.id, { start_min: 900 });
+    server.patch('blocos', UID, mv.id, { duration: 45, type: 'focus', was_delayed: true });
+    const stC3 = L('tb__sync'); w.fazSyncNow(); await waitFor(() => L('tb__sync') !== stC3);
+    const got3 = JSON.parse(L('tb_master_db')).find((b) => b.id === mv.id);
+    ok(got3.startMin === 900 && got3.duration === 45 && got3.type === 'focus' && got3.wasDelayed === true, 'horário (15:00), duração (45m), tipo e "atrasou" novos chegam no celular');
+    ok(got3.title === mv.title && got3.date === mv.date && JSON.stringify(got3.microblocks) === JSON.stringify(mv.microblocks) && got3.completed === mv.completed && JSON.parse(L('tb_master_db')).length === n17, 'o resto do bloco fica igual e nenhum bloco some');
+    w.eval("activeDateObj = new Date(2026, 10, 17, 12, 0, 0); renderTimeline();");
+    const el3 = w.document.querySelector(`[data-block-id="${mv.id}"]`), h0 = w.eval('START_HOUR'), ppm = w.eval('PX_PER_MIN');
+    ok(!!el3 && parseFloat(el3.style.top) === (900 - h0 * 60) * ppm + 1 && parseFloat(el3.style.height) === 45 * ppm - 2, 'e o app desenha o bloco no horário e no tamanho novos (' + (el3 && el3.style.top) + ', ' + (el3 && el3.style.height) + ')');
+    w.eval("activeDateObj = new Date(); renderTimeline();");
+  }
+
   console.log('\nD) Checklist sem limite (40 itens em cada lugar):');
   for (let i = 1; i <= 40; i++) w.eval(`addMicroblock('${b1}', { value: 'Item ${i}' }, null)`);
   ok(w.eval(`db.find(x => x.id === '${b1}').microblocks.length`) >= 40, 'bloco da agenda aceitou 40 itens');

@@ -42,17 +42,19 @@ O "hoje" desses dados é **15/11/2026**. Os testes travam o relógio do app ness
 ## Testes de navegador (opcionais)
 
 Algumas coisas o jsdom não sabe fazer: medir tamanho na tela, rolar, toque de verdade, service worker.
-Para isso existem dois testes que abrem um Chrome de verdade:
+Para isso existem três testes que abrem um Chrome de verdade:
 
 ```
 npm i -D playwright && npx playwright install chromium    # uma vez
-node tests/navegador/toque_listas.js    # listas afastadas e arrastar com o dedo
+node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo
 node tests/navegador/offline.js         # o app abre completo sem internet?
+node tests/navegador/agenda_pc.js       # tela do PC: arrastar e esticar blocos na Agenda, com mouse
 ```
 
 Com `CHROME=/caminho/do/chrome` eles usam um Chrome já instalado; com `FOTOS=/alguma/pasta` salvam
 imagens das telas. Eles não entram no `npm test` porque o Playwright é pesado. Vale rodar quando
-mexer em arrasto, rolagem, `sw.js` ou na pasta `libs/`.
+mexer em arrasto, rolagem, `sw.js` ou na pasta `libs/`. O da tela do PC usa uma "nuvem" de mentira
+(o mesmo `mock_supabase.js`, rodando dentro da página) e um relógio fixo: veja `abrirPc()` no `apoio.js`.
 
 O que nenhum teste daqui cobre: **Safari do iPhone**. Mudança de toque ou de layout precisa de uma
 conferida num iPhone de verdade.

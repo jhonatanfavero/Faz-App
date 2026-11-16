@@ -252,7 +252,7 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   dragEv('drop', agCols()[3]);
   await waitFor(() => server.get('blocos', UID, bid).date === '2026-11-19');
   const mvd = server.get('blocos', UID, bid);
-  ok(mvd.date === '2026-11-19' && mvd.start_min === st0 && mvd.type === 'focus' && lastLog('update', 'blocos').fields.sort().join() === 'date,start_min,type', 'bloco de terça foi pra quinta 19/11 no mesmo horário');
+  ok(mvd.date === '2026-11-19' && mvd.start_min === st0 && mvd.type === 'focus' && lastLog('update', 'blocos').fields.sort().join() === 'date', 'bloco de terça foi pra quinta 19/11 no mesmo horário (só o dia sobe: horário e tipo não mudaram)');
   ok(!!agCols()[3].querySelector(`[data-block="${bid}"]`) && /Bloco movido para Qui 19\/11/.test($('toast').textContent), 'aviso: "' + $('toast').textContent + '"');
   const oid2 = agCols()[1].querySelector('[data-block]').dataset.block;
   server.patch('blocos', UID, oid2, { start_min: st0, duration: 15 }); await sleep(150);
@@ -515,6 +515,238 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
     click($('tab-agenda')); click(d.querySelector('#ag-cols [data-block]'));
     ok(visible('f-delete') && visible('f-archive') && visible('f-tolist') && visible('f-done') && $('f-save').textContent === 'Salvar', 'abrir um bloco que já existe continua com todos os botões');
     click($('f-cancel')); click($('tab-listas'));
+  }
+
+  console.log('\nS) V40.14.0 — mover o bloco no horário e ajustar a duração arrastando (PC):');
+  {
+    const B = (id) => server.get('blocos', UID, id);
+    const visible = (id) => !$(id).classList.contains('hidden');
+    const DAY = '2026-12-02', PX = 3.2; // quarta, numa semana sem nada nos dados de teste; a régua começa às 07:00
+    const mk = (id, st, dur, extra) => server.insert('blocos', UID, Object.assign({ id, date: DAY, start_min: st, duration: dur, title: 'Bloco ' + id.slice(-1).toUpperCase(), type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, deleted: false }, extra || {}));
+    const A = 'f_s_a', Bk = 'f_s_b', C = 'f_s_c';
+    mk(A, 540, 30); mk(Bk, 570, 30); mk(C, 660, 15); // A 09:00–09:30, B 09:30–10:00 (encostado no A), C 11:00–11:15
+    click($('tab-agenda')); click(d.querySelector('.ag-view[data-view="week"]')); click($('ag-today')); click($('ag-next')); click($('ag-next'));
+    await waitFor(() => d.querySelector(`#ag-cols [data-block="${C}"]`));
+    ok($('ag-label').textContent === '30 de nov a 6 de dez' && /espaço livre/.test($('ag-tip').textContent), 'Semana mostra o lembrete: "' + $('ag-tip').textContent + '"');
+    click(d.querySelector(`#ag-cols .ag-day-btn[data-day="${DAY}"]`)); await sleep(40);
+    const el = (id) => [...d.querySelectorAll('#ag-timeline [data-block]')].find((e) => e.dataset.block === id);
+    const topOf = (min) => ((min - 420) * PX + 1) + 'px', hOf = (dur) => Math.max(dur * PX - 2, 14) + 'px';
+    const ev = (type, target, y, init) => target.dispatchEvent(new w.MouseEvent(type, Object.assign({ bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1, clientX: 300, clientY: y }, init || {})));
+    // aperta o botão no bloco (ou na alça de baixo) e devolve o y do mouse; "move" anda a partir dali, em minutos
+    const grab = (id, handle) => { const b = B(id), y = (handle ? b.start_min + b.duration - 420 : b.start_min - 420) * PX + (handle ? -3 : 5); ev('mousedown', handle ? el(id).querySelector('.ag-rz') : el(id), y); return y; };
+    const move = (y, mins) => { ev('mousemove', d, y + 10 * Math.sign(mins || 1)); ev('mousemove', d, y + mins * PX); };
+    const release = (id) => { ev('mouseup', d, 0); const e = id && el(id); if (e) click(e); }; // soltar + o clique que o navegador dispara em seguida
+    const updates = () => server.log.filter((x) => x.op === 'update' && x.t === 'blocos');
+    ok($('ag-label').textContent === 'Quarta, 2 de dezembro' && d.querySelectorAll('#ag-timeline [data-block]').length === 3 && d.querySelectorAll('#ag-timeline [data-block] .ag-rz').length === 3 && /Puxe a borda de baixo/.test($('ag-tip').textContent),
+      'visão Dia: cada bloco tem a alça de baixo e a barra lembra como usar ("' + $('ag-tip').textContent + '")');
+
+    // 1) clique simples continua abrindo o cartão (apertar e soltar sem andar, ou andando menos de 4px)
+    let y = grab(C); ev('mouseup', d, y); click(el(C));
+    ok(visible('modal-task') && $('f-title').value === 'Bloco C', 'apertar e soltar sem arrastar abre o cartão, como antes');
+    click($('f-cancel'));
+    y = grab(C); ev('mousemove', d, y + 3); ev('mouseup', d, y + 3); click(el(C));
+    ok(visible('modal-task') && B(C).start_min === 660, 'tremidinha de 3px ainda é clique (não mexe no horário)');
+    click($('f-cancel'));
+
+    // 2) arrastar pra um horário livre: 11:00 → 12:00
+    y = grab(C); move(y, 60);
+    const mid = el(C), org = d.querySelector('#ag-timeline .ag-origin');
+    ok(mid.classList.contains('ag-moving') && mid.style.top === topOf(720) && /12:00/.test(mid.textContent) && d.body.classList.contains('ag-grabbing'), 'no meio do arraste o bloco acompanha o mouse e mostra o horário novo (12:00)');
+    ok(!!org && org.style.top === topOf(660) && B(C).start_min === 660, 'o lugar de origem fica marcado e nada é gravado antes de soltar');
+    server.patch('blocos', UID, A, { title: 'A mudou no celular' }); await sleep(150);
+    ok(el(C) === mid && mid.classList.contains('ag-moving') && !/A mudou/.test(el(A).textContent), 'mudança que chega do celular no meio do arraste não redesenha a tela (o bloco não escapa da mão)');
+    server.log.length = 0; release(C);
+    await waitFor(() => B(C).start_min === 720);
+    ok(B(C).start_min === 720 && updates().length === 1 && updates()[0].fields.join() === 'start_min', 'soltou: grava só o horário novo (12:00)');
+    ok(!visible('modal-task') && /^Bloco movido: 12:00–12:15$/.test($('toast').textContent) && !d.querySelector('.ag-origin') && !d.body.classList.contains('ag-grabbing') && el(C).style.top === topOf(720), 'o clique que sobra ao soltar não abre o cartão; aviso: "' + $('toast').textContent + '"');
+    ok(/A mudou no celular/.test(el(A).textContent), 'e a mudança do celular que ficou esperando aparece logo depois');
+    await sleep(80); click(el(C));
+    ok(visible('modal-task'), 'um clique de verdade, depois, abre o cartão normalmente');
+    click($('f-cancel'));
+
+    // 3) de 5 em 5 minutos
+    y = grab(C); move(y, 7); release(C);
+    await waitFor(() => B(C).start_min === 725);
+    ok(B(C).start_min === 725, 'anda de 5 em 5 min: 7 min de mouse viram 5 (12:05)');
+
+    // 4) em cima de outro bloco: fica vermelho, e ao soltar volta (igual ao app)
+    server.log.length = 0;
+    y = grab(C); move(y, 575 - 725); // em cima do B (09:30–10:00)
+    ok(el(C).classList.contains('ag-clash') && /horário ocupado/.test(el(C).textContent) && el(C).style.top === topOf(575), 'em cima de outro bloco fica marcado como "horário ocupado"');
+    release(C); await sleep(120);
+    ok(B(C).start_min === 725 && updates().length === 0 && /^Conflito! O bloco voltou pro lugar\.$/.test($('toast').textContent) && el(C).style.top === topOf(725) && !el(C).classList.contains('ag-clash'), 'soltou em cima: nada muda e avisa "' + $('toast').textContent + '"');
+
+    // 5) não sai da régua
+    y = grab(C); move(y, -3000); release(C);
+    await waitFor(() => B(C).start_min === 420);
+    ok(B(C).start_min === 420, 'puxar pra cima além do começo para no começo da régua (07:00)');
+    y = grab(C); move(y, 5000); release(C);
+    await waitFor(() => B(C).start_min === 1425);
+    ok(B(C).start_min === 1425 && B(C).type === 'focus', 'puxar pra baixo além do fim para no último horário que cabe (23:45)');
+
+    // 6) Esc desiste; botão solto fora da janela desiste
+    server.log.length = 0;
+    y = grab(C); move(y, -200);
+    key(d.body, 'Escape');
+    ok(!el(C).classList.contains('ag-moving') && el(C).style.top === topOf(1425) && !d.body.classList.contains('ag-grabbing'), 'Esc no meio do arraste devolve o bloco');
+    release(C); await sleep(120);
+    ok(!visible('modal-task') && updates().length === 0 && B(C).start_min === 1425, 'e soltar o botão depois do Esc não grava nem abre o cartão');
+    y = grab(C); move(y, -200);
+    ev('mousemove', d, y - 300, { buttons: 0 }); // o navegador avisa que o botão já não está apertado
+    ok(!el(C).classList.contains('ag-moving') && updates().length === 0 && B(C).start_min === 1425, 'botão solto fora da janela: o arraste é cancelado, nada muda');
+    click(el(C));
+    ok(visible('modal-task'), 'e o próximo clique funciona normalmente');
+    click($('f-cancel'));
+
+    // 7) duração pela alça de baixo
+    server.log.length = 0;
+    y = grab(A, true); move(y, 12); // A está encostado no B
+    ok(el(A).classList.contains('ag-sizing') && el(A).classList.contains('ag-limit') && el(A).style.height === hOf(30) && /o próximo começa às 09:30/.test(el(A).textContent) && d.body.classList.contains('ag-resizing'), 'bloco encostado no de baixo não cresce e explica por quê');
+    release(A); await sleep(120);
+    ok(B(A).duration === 30 && updates().length === 0 && /^O próximo bloco começa às 09:30\. Abra espaço antes de aumentar\.$/.test($('toast').textContent) && !visible('modal-task'), 'soltou: duração igual; aviso: "' + $('toast').textContent + '"');
+    y = grab(A, true); move(y, -15);
+    ok(el(A).style.height === hOf(15) && /15m/.test(el(A).textContent) && el(A).style.top === topOf(540), 'puxar pra cima diminui na hora (o começo não sai do lugar)');
+    release(A);
+    await waitFor(() => B(A).duration === 15);
+    ok(B(A).duration === 15 && B(A).start_min === 540 && updates().length === 1 && updates()[0].fields.join() === 'duration' && /^Duração ajustada: 15m \(09:00–09:15\)$/.test($('toast').textContent), 'grava só a duração; aviso: "' + $('toast').textContent + '"');
+    y = grab(A, true); move(y, 11); release(A);
+    await waitFor(() => B(A).duration === 25);
+    ok(B(A).duration === 25, 'cresce de 5 em 5 dentro do espaço que abriu (15m → 25m)');
+    y = grab(A, true); move(y, 300); release(A);
+    await waitFor(() => B(A).duration === 30);
+    ok(B(A).duration === 30, 'puxar demais para no começo do próximo bloco (30m, até 09:30)');
+    y = grab(A, true); move(y, -500); release(A);
+    await waitFor(() => B(A).duration === 5);
+    ok(B(A).duration === 5 && el(A).style.height === hOf(5) && el(A).querySelector('.ag-rz').classList.contains('s'), 'mínimo de 5 min (igual ao app)');
+    server.log.length = 0;
+    y = grab(C, true); move(y, 60); release(C); await sleep(120);
+    ok(B(C).duration === 15 && updates().length === 0 && /^A régua do dia termina às 24:00\.$/.test($('toast').textContent), 'último bloco do dia não passa da meia-noite: "' + $('toast').textContent + '"');
+    ev('mousedown', el(A).querySelector('[data-done]'), 0); ev('mousemove', d, 80); ev('mousemove', d, 200); ev('mouseup', d, 200);
+    ok(B(A).start_min === 540 && !el(A).classList.contains('ag-moving'), 'apertar no círculo de concluir não arrasta o bloco');
+
+    // 8) o que chega de outro aparelho no meio do gesto
+    server.patch('blocos', UID, C, { start_min: 720 }); await sleep(150); // C às 12:00
+    server.log.length = 0;
+    y = grab(C); move(y, 60); // rumo às 13:00, que está livre
+    mk('f_s_d', 780, 30); await sleep(150); // o celular coloca um bloco às 13:00 enquanto o mouse está apertado
+    release(C); await sleep(150);
+    ok(B(C).start_min === 720 && updates().length === 0 && /^Conflito!/.test($('toast').textContent) && !!el('f_s_d'), 'horário ocupado pelo celular no meio do arraste: o PC confere de novo ao soltar e não sobrepõe');
+    y = grab(C); move(y, -60);
+    server.patch('blocos', UID, C, { start_min: 900 }); await sleep(150);
+    release(C); await sleep(150);
+    ok(B(C).start_min === 900 && updates().length === 0 && /mudou em outro aparelho/.test($('toast').textContent) && el(C).style.top === topOf(900), 'bloco mexido no celular no meio do arraste: vale o do celular e o PC avisa');
+    y = grab('f_s_d'); move(y, 120);
+    server.patch('blocos', UID, 'f_s_d', { deleted: true }); await sleep(150);
+    release(null); await sleep(150);
+    ok(!el('f_s_d') && updates().length === 0, 'bloco apagado no celular no meio do arraste: some, e o PC não grava nada');
+
+    // 9) "atrasou": mesma regra do app ao tirar do passado um bloco que ficou pra trás
+    server.patch('blocos', UID, C, { type: 'past', start_min: 720 }); await sleep(150);
+    server.log.length = 0;
+    y = grab(C); move(y, 30); release(C);
+    await waitFor(() => B(C).start_min === 750);
+    ok(B(C).type === 'focus' && B(C).was_delayed === true && updates()[0].fields.slice().sort().join() === 'start_min,type,was_delayed', 'bloco "passado" levado pra um horário que ainda vem volta a valer e fica marcado como atrasado (como no app)');
+    server.log.length = 0;
+    y = grab(C); move(y, 30); release(C);
+    await waitFor(() => B(C).start_min === 780);
+    ok(updates()[0].fields.join() === 'start_min', 'mexer de novo no mesmo bloco sobe só o horário');
+    server.patch('blocos', UID, A, { type: 'past' }); await sleep(150);
+    server.log.length = 0;
+    y = grab(A, true); move(y, 10); release(A);
+    await waitFor(() => B(A).duration === 15);
+    ok(B(A).type === 'focus' && B(A).was_delayed === true && updates()[0].fields.slice().sort().join() === 'duration,type,was_delayed', 'esticar segue a mesma regra');
+
+    // 10) falha de rede: desfaz na tela e avisa
+    server.failNext = 1; server.log.length = 0;
+    y = grab(C); move(y, 60); release(C); await sleep(250);
+    ok(B(C).start_min === 780 && el(C).style.top === topOf(780) && /Não foi possível salvar/.test($('toast').textContent), 'sem internet ao soltar: o bloco volta pro horário gravado e a tela avisa');
+
+    // 11) dia que já passou: o bloco arrastado continua (ou vira) "passado"
+    click(d.querySelector('.ag-view[data-view="week"]')); click($('ag-today'));
+    for (let i = 0; i < 15; i++) click($('ag-prev')); // semana de 3 a 9 de agosto
+    server.insert('blocos', UID, { id: 'f_s_p', date: '2026-08-05', start_min: 540, duration: 30, title: 'Bloco P', type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, deleted: false });
+    await waitFor(() => d.querySelector('#ag-cols [data-block="f_s_p"]'));
+    click(d.querySelector('#ag-cols .ag-day-btn[data-day="2026-08-05"]')); await sleep(40);
+    server.log.length = 0;
+    y = grab('f_s_p'); move(y, 60); release('f_s_p');
+    await waitFor(() => B('f_s_p').start_min === 600);
+    ok(B('f_s_p').type === 'past' && B('f_s_p').was_delayed === false && updates()[0].fields.slice().sort().join() === 'start_min,type', 'arrastar dentro de um dia que já passou deixa o bloco como "passado", sem marcar atraso');
+    server.patch('blocos', UID, 'f_s_p', { deleted: true });
+
+    // 12) com tarefa na mão, os blocos não se mexem
+    click(d.querySelector('.ag-view[data-view="week"]')); click($('ag-today')); click($('ag-next')); click($('ag-next')); click($('tab-listas')); await sleep(40);
+    click(d.querySelector(`.card[data-id="${server.alive('tarefas', UID).filter((t) => !t.archived)[0].id}"] [data-hand]`));
+    click(d.querySelector(`#ag-cols .ag-day-btn[data-day="${DAY}"]`)); await sleep(40);
+    server.log.length = 0;
+    y = grab(C); move(y, 60);
+    ok(!el(C).classList.contains('ag-moving') && $('ag-tip').textContent === '', 'com uma tarefa na mão, arrastar um bloco não faz nada (e o lembrete sai da barra)');
+    ev('mouseup', d, 0);
+    ok(updates().length === 0 && B(C).start_min === 780, 'nada gravado');
+    click($('ag-place-cancel')); click($('tab-listas')); click($('tab-agenda'));
+
+    // 13) Semana: enquanto arrasta, os espaços livres viram lugar de soltar
+    click(d.querySelector('.ag-view[data-view="week"]')); await sleep(40);
+    server.patch('blocos', UID, A, { start_min: 540, duration: 30 }); server.patch('blocos', UID, Bk, { start_min: 570, duration: 30 }); server.patch('blocos', UID, C, { start_min: 660, duration: 15 }); await sleep(150);
+    const wk = (id) => d.querySelector(`#ag-cols [data-block="${id}"]`), colOf = (day) => d.querySelector(`#ag-cols .ag-list[data-day="${day}"]`);
+    const zones = (day) => [...(day ? colOf(day) : $('ag-cols')).querySelectorAll('.ag-drop')];
+    const zone = (day, st) => zones(day).find((z) => +z.dataset.dropStart === st && !z.classList.contains('first'));
+    ok(zones().length === 0, 'parado, a Semana não mostra espaços tracejados');
+    dragEv('dragstart', wk(C)); await sleep(40);
+    const order = [...colOf(DAY).children].map((n) => n.classList.contains('ag-drop') ? 'livre ' + hhmm(+n.dataset.dropStart) : n.dataset.block ? n.dataset.block.slice(-1) : 'add').join(' | ');
+    ok(order === 'livre 07:00 | a | b | livre 10:00 | c | add' && zones().length === 8 && zones().every((z) => /^Soltar às \d\d:\d\d/.test(z.textContent)), 'ao arrastar, cada dia mostra onde o bloco cabe (' + order + '; os outros 6 dias, às 07:00)');
+    dragEv('dragover', zone(DAY, 600));
+    ok(zone(DAY, 600).classList.contains('over') && d.querySelectorAll('#ag-cols .ag-over').length === 0, 'em cima de um espaço, só ele acende');
+    dragEv('dragover', wk(A));
+    ok(d.querySelectorAll('#ag-cols .ag-over, #ag-cols .ag-drop.over').length === 0, 'no próprio dia, fora dos espaços, nada acende');
+    dragEv('dragover', colOf('2026-12-04'));
+    ok(colOf('2026-12-04').closest('section').classList.contains('ag-over'), 'em outro dia, fora dos espaços, o dia inteiro acende (mesmo horário, como já era)');
+    server.log.length = 0; dragEv('drop', zone(DAY, 600));
+    await waitFor(() => B(C).start_min === 600);
+    ok(B(C).start_min === 600 && B(C).date === DAY && updates()[0].fields.join() === 'start_min' && /^Bloco movido para Qua 02\/12 às 10:00$/.test($('toast').textContent) && zones().length === 0, 'soltar no espaço muda o horário (10:00) e os tracejados somem; aviso: "' + $('toast').textContent + '"');
+    dragEv('dragstart', wk(C)); await sleep(40);
+    ok(zones(DAY).length === 1 && +zones(DAY)[0].dataset.dropStart === 420, 'o lugar onde o bloco já está não vira opção');
+    server.log.length = 0; dragEv('drop', wk(Bk));
+    await sleep(120);
+    ok(updates().length === 0 && B(C).start_min === 600 && /solte num espaço tracejado/.test($('toast').textContent) && zones().length === 0, 'soltar entre os cartões do próprio dia não muda nada e ensina: "' + $('toast').textContent + '"');
+    $('toast').textContent = '-';
+    dragEv('dragstart', wk(C)); await sleep(40); dragEv('drop', wk(C)); await sleep(60);
+    ok($('toast').textContent === '-' && updates().length === 0, 'soltar o bloco em cima dele mesmo (desistir) não mostra aviso');
+    dragEv('dragstart', wk(C)); await sleep(40); dragEv('drop', zone('2026-12-03', 420));
+    await waitFor(() => B(C).date === '2026-12-03');
+    ok(B(C).start_min === 420 && updates()[0].fields.slice().sort().join() === 'date,start_min' && /Qui 03\/12 às 07:00/.test($('toast').textContent), 'espaço de outro dia: muda dia e horário de uma vez');
+    server.log.length = 0;
+    dragEv('dragstart', wk(C)); await sleep(40); dragEv('drop', colOf('2026-12-04').closest('section').querySelector('.ag-day-btn'));
+    await waitFor(() => B(C).date === '2026-12-04');
+    ok(B(C).start_min === 420 && updates()[0].fields.join() === 'date', 'soltar em outro dia fora dos espaços continua levando pro mesmo horário');
+    dragEv('dragstart', wk(Bk)); await sleep(40);
+    const fri = zones('2026-12-04');
+    ok(fri.length === 2 && fri[0].classList.contains('first') && fri[0] === colOf('2026-12-04').firstElementChild && fri.every((z) => +z.dataset.dropStart === 435), 'dia que começa ocupado: o primeiro espaço livre também fica fixo no topo');
+    dragEv('dragend', wk(Bk));
+    ok(zones().length === 0 && !wk(Bk).classList.contains('dragging'), 'desistir do arraste limpa os tracejados');
+    server.patch('blocos', UID, A, { type: 'past', was_delayed: false }); await sleep(150);
+    server.log.length = 0;
+    dragEv('dragstart', wk(A)); await sleep(40); dragEv('drop', zone('2026-12-05', 420));
+    await waitFor(() => B(A).date === '2026-12-05');
+    ok(B(A).type === 'focus' && B(A).was_delayed === true && updates()[0].fields.slice().sort().join() === 'date,start_min,type,was_delayed', 'bloco que ficou pra trás, levado pra frente, fica marcado como atrasado também pela Semana');
+    click($('tab-listas')); await sleep(40);
+    click(d.querySelector(`.card[data-id="${server.alive('tarefas', UID).filter((t) => !t.archived)[0].id}"] [data-hand]`));
+    dragEv('dragstart', wk(Bk)); await sleep(40);
+    ok(zones().length === 0 && d.querySelectorAll('#ag-cols [data-gap-day]').length > 0, 'com tarefa na mão, arrastar um bloco não soma tracejados aos que já estão na tela');
+    dragEv('dragend', wk(Bk)); click($('ag-place-cancel')); click($('tab-listas')); click($('tab-agenda'));
+
+    // 14) pelo cartão: tirar do passado também marca "atrasou"
+    server.patch('blocos', UID, Bk, { type: 'past', was_delayed: false }); await sleep(150);
+    click(wk(Bk));
+    const pick = (el2, v) => { el2.value = v; el2.dispatchEvent(new w.Event('input', { bubbles: true })); el2.dispatchEvent(new w.Event('change', { bubbles: true })); };
+    pick($('f-start'), '15:00'); server.log.length = 0; click($('f-save'));
+    await waitFor(() => B(Bk).start_min === 900);
+    ok(B(Bk).type === 'focus' && B(Bk).was_delayed === true && updates()[0].fields.slice().sort().join() === 'start_min,type,was_delayed', 'trocar o horário pelo cartão segue a mesma regra de quem arrasta');
+    click(wk(Bk));
+    ok($('f-status').textContent === 'Atrasou' && visible('f-status'), 'e o cartão mostra "Atrasou"');
+    click($('f-cancel'));
+    for (const id of [A, Bk, C]) server.patch('blocos', UID, id, { deleted: true });
+    await sleep(150);
+    click(d.querySelector('.ag-view[data-view="week"]')); click($('ag-today')); click($('tab-listas'));
   }
 
   console.log('\nJ) Sair e entrar:');

@@ -48,6 +48,26 @@ const waitFor = async (fn, ms = 9000) => { const t0 = Date.now(); while (Date.no
   ok(got.date === '2026-11-18' && got.startMin === 615 && got.title === b2.title, 'dia/horário novos salvos no celular, título intacto');
   ok(JSON.parse(L('tb_master_db')).length === dbLen, 'nenhum bloco perdido');
 
+  console.log('\nC2) V40.11.0 — PC agenda uma tarefa e conclui um bloco → chega no celular:');
+  {
+    const tasks0 = JSON.parse(L('tb_backlog_db')), tk = tasks0[tasks0.length - 1], last = tomorrow[tomorrow.length - 1];
+    // o que a tela do PC grava ao "Agendar": cria o bloco e marca a tarefa como apagada
+    server.insert('blocos', UID, { id: 'f_1900000000001', date: '2026-11-19', start_min: 600, duration: tk.duration, title: tk.title, type: 'focus', theme: 'focus', tag_id: tk.tagId || null,
+      microblocks: [{ id: 'mb_1900000000001', title: 'Item vindo do PC', done: false }], completed: false, was_delayed: false, linked_note_ids: [], color: '#ec4899', archived: false, deleted: false });
+    server.patch('tarefas', UID, tk.id, { deleted: true });
+    server.patch('blocos', UID, last.id, { completed: true });
+    const stC2 = L('tb__sync'); w.fazSyncNow(); await waitFor(() => L('tb__sync') !== stC2);
+    const dbNow = JSON.parse(L('tb_master_db')), nb = dbNow.find((b) => b.id === 'f_1900000000001');
+    ok(!!nb && nb.date === '2026-11-19' && nb.startMin === 600 && nb.duration === tk.duration && nb.title === tk.title && nb.type === 'focus' && nb.color === '#ec4899' && nb.completed === false && Array.isArray(nb.linkedNoteIds), 'bloco criado no PC entra na agenda do celular com dia, horário, nome e cor');
+    ok(nb.microblocks.length === 1 && nb.microblocks[0].id === 'mb_1900000000001' && nb.microblocks[0].done === false, 'a checklist chega com o id de cada item (o app precisa dele pra arrastar)');
+    ok(!JSON.parse(L('tb_backlog_db')).some((t) => t.id === tk.id) && JSON.parse(L('tb_backlog_db')).length === tasks0.length - 1 && dbNow.length === dbLen + 1, 'a tarefa agendada no PC sai da Lista do celular (nada mais muda)');
+    ok(dbNow.find((b) => b.id === last.id).completed === true, 'bloco concluído no PC aparece concluído no celular');
+    w.eval("activeDateObj = new Date(2026, 10, 19, 12, 0, 0); renderTimeline();");
+    const drawn = w.document.querySelector('[data-block-id="f_1900000000001"]');
+    ok(!!drawn && drawn.textContent.includes(tk.title), 'e o bloco aparece desenhado na agenda do celular, no dia 19/11');
+    w.eval("activeDateObj = new Date(); renderTimeline();");
+  }
+
   console.log('\nD) Checklist sem limite (40 itens em cada lugar):');
   for (let i = 1; i <= 40; i++) w.eval(`addMicroblock('${b1}', { value: 'Item ${i}' }, null)`);
   ok(w.eval(`db.find(x => x.id === '${b1}').microblocks.length`) >= 40, 'bloco da agenda aceitou 40 itens');

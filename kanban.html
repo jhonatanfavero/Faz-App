@@ -35,6 +35,13 @@
     .painted.dark p, .painted.dark span, .painted.dark i { color: #fff !important; }
     .painted.dark .text-zinc-400, .painted.dark .text-zinc-500 { color: rgba(255,255,255,.85) !important; }
     .swatch { width: 28px; height: 28px; border-radius: 9999px; border: 2px solid #fff; box-shadow: 0 0 0 1px #d4d4d8; }
+    /* V40.11.0: círculo de concluir nos blocos da agenda e botão de agendar nos cartões das listas */
+    .ag-done { color: #a1a1aa; line-height: 0; border-radius: 9999px; }
+    .ag-done:hover, .ag-done:focus-visible { color: #059669; }
+    .ag-done.on { color: #059669; }
+    .painted.dark .ag-done i { color: rgba(255,255,255,.8) !important; }
+    .card .card-sched { opacity: 0; }
+    .card:hover .card-sched, .card:focus-within .card-sched { opacity: 1; }
     .swatch.on { box-shadow: 0 0 0 2px #18181b; }
     .now-line { position: absolute; left: 56px; right: 0; height: 2px; background: #ef4444; z-index: 5; pointer-events: none; }
     .now-line::before { content: ''; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
@@ -172,31 +179,27 @@
 </div>
 
 <!-- V40.8.0: detalhe do bloco da agenda (só leitura) -->
-<div id="modal-block" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="b-title">
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
-        <div class="p-5 overflow-y-auto thin-scroll">
-            <p id="b-when" class="text-xs font-semibold text-zinc-500 tabular-nums"></p>
-            <h3 id="b-title" class="mt-1 text-lg font-bold text-zinc-900 leading-snug break-words"></h3>
-            <div id="b-meta" class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-zinc-600"></div>
-            <div id="b-mbs" class="mt-4 flex flex-col gap-1.5"></div>
-        </div>
-        <div class="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
-            <button id="b-archive" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3 py-2 rounded-lg">Arquivar</button>
-            <p class="text-[11.5px] text-zinc-500 leading-snug">Arraste o bloco pra mudar o dia. O resto se edita no celular.</p>
-            <button id="b-close" class="ml-auto text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Fechar</button>
-        </div>
-    </div>
-</div>
-
-<!-- Editar tarefa -->
+<!-- Cartão aberto: tarefa (Listas) ou bloco (Agenda). V40.11.0: o bloco abre aqui também. -->
 <div id="modal-task" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="f-title">
-    <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+    <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
         <div class="p-5 pb-3 overflow-y-auto thin-scroll">
-            <textarea id="f-title" rows="1" maxlength="500" placeholder="Nome da tarefa" class="w-full resize-none text-lg font-bold text-zinc-900 leading-snug outline-none placeholder-zinc-300"></textarea>
-            <div class="grid grid-cols-2 gap-3 mt-4">
-                <label class="block">
+            <div class="flex items-start gap-2">
+                <button id="f-done" type="button" class="ag-done hidden shrink-0 -ml-1 w-8 h-8 flex items-center justify-center hover:bg-emerald-50" aria-pressed="false"></button>
+                <textarea id="f-title" rows="1" maxlength="500" placeholder="Nome da tarefa" class="flex-1 min-w-0 resize-none text-lg font-bold text-zinc-900 leading-snug outline-none placeholder-zinc-300"></textarea>
+            </div>
+            <p id="f-status" class="hidden mt-1 text-[12.5px] font-semibold"></p>
+            <div id="f-grid" class="grid grid-cols-2 gap-3 mt-4">
+                <label id="f-col-wrap" class="block">
                     <span class="text-xs font-semibold text-zinc-500">Lista</span>
                     <select id="f-col" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
+                </label>
+                <label id="f-date-wrap" class="hidden">
+                    <span class="text-xs font-semibold text-zinc-500">Dia</span>
+                    <input id="f-date" type="date" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-[7px] text-sm outline-none">
+                </label>
+                <label id="f-start-wrap" class="hidden">
+                    <span class="text-xs font-semibold text-zinc-500">Início</span>
+                    <input id="f-start" type="time" step="300" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-[7px] text-sm outline-none">
                 </label>
                 <label class="block">
                     <span class="text-xs font-semibold text-zinc-500">Duração</span>
@@ -219,10 +222,31 @@
                     <input id="f-mb-new" maxlength="200" placeholder="Novo item (Enter)" class="flex-1 text-sm outline-none py-1.5 bg-transparent">
                 </div>
             </div>
+            <!-- Agendar (só tarefa): aparece ao clicar em "Agendar" -->
+            <div id="f-sched" class="hidden mt-4 p-3.5 rounded-xl border border-zinc-200 bg-zinc-50">
+                <p class="text-[13px] font-semibold text-zinc-800">Agendar esta tarefa</p>
+                <div class="mt-2 grid grid-cols-2 gap-3">
+                    <label class="block">
+                        <span class="text-xs font-semibold text-zinc-500">Dia</span>
+                        <input id="f-sched-date" type="date" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-[7px] text-sm outline-none">
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-semibold text-zinc-500">Início</span>
+                        <input id="f-sched-time" type="time" step="300" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-[7px] text-sm outline-none">
+                    </label>
+                </div>
+                <p id="f-sched-info" class="mt-2 text-[12px] text-zinc-600 leading-snug"></p>
+                <div class="mt-3 flex justify-end gap-2">
+                    <button id="f-sched-cancel" type="button" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-200 px-3.5 py-2 rounded-lg">Agora não</button>
+                    <button id="f-sched-ok" type="button" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Colocar na agenda</button>
+                </div>
+            </div>
         </div>
-        <div class="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
+        <div class="px-5 py-3 border-t border-zinc-100 flex flex-wrap items-center gap-x-1 gap-y-2">
             <button id="f-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar tarefa</button>
             <button id="f-archive" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3 py-2 rounded-lg">Arquivar</button>
+            <button id="f-schedule" class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-100 px-3 py-2 rounded-lg"><i class="ph ph-calendar-plus text-base"></i>Agendar</button>
+            <button id="f-tolist" class="hidden items-center gap-1.5 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-100 px-3 py-2 rounded-lg"><i class="ph ph-list-checks text-base"></i>Voltar pra lista</button>
             <div class="ml-auto flex gap-2">
                 <button id="f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
                 <button id="f-save" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Salvar</button>
@@ -256,6 +280,8 @@
     </div>
 </div>
 
+<!-- Selo de versão: o mesmo número do app do celular -->
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.11.0</div>
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
@@ -406,9 +432,9 @@
 
     async function insertRow(kind, row, okMsg) {
         S[kind][row.id] = row;
-        render();
+        render(); renderAgenda();
         var res = await S.sb.from(kind).upsert(row, { onConflict: 'user_id,id' });
-        if (res.error) { delete S[kind][row.id]; render(); fail(res.error); return false; }
+        if (res.error) { delete S[kind][row.id]; render(); renderAgenda(); fail(res.error); return false; }
         if (okMsg) toast(okMsg);
         return true;
     }
@@ -428,7 +454,7 @@
 
     // ---------- render ----------
     var renderT = null;
-    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); }, 60); }
+    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); if (S.editing && S.editing.kind === 'blocos') renderDone(); }, 60); }
 
     function cardHtml(t) {
         var tag = tagOf(t.tag_id);
@@ -437,7 +463,10 @@
         var all = mbs.length > 0 && done === mbs.length, paint = paintOf(t.color);
         return '<article class="card ' + paint.cls + 'bg-white border border-zinc-200 border-l-4 rounded-xl px-3 py-2.5 cursor-pointer hover:border-zinc-300 hover:shadow-sm transition-shadow" ' +
             'style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" draggable="true" tabindex="0" data-id="' + esc(t.id) + '">' +
-            '<p class="text-[13.5px] font-semibold text-zinc-800 leading-snug break-words">' + (esc(t.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
+            '<div class="flex items-start gap-1">' +
+            '<p class="min-w-0 flex-1 text-[13.5px] font-semibold text-zinc-800 leading-snug break-words">' + (esc(t.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
+            '<button type="button" class="card-sched shrink-0 -mr-1.5 -mt-1 w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-sched="' + esc(t.id) + '" title="Agendar" aria-label="Agendar esta tarefa"><i class="ph ph-calendar-plus text-base"></i></button>' +
+            '</div>' +
             '<div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">' +
             (tag ? '<span class="inline-flex items-center gap-1.5 font-medium text-zinc-600"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
             '<span class="inline-flex items-center gap-1"><i class="ph ph-clock"></i>' + fmtDur(t.duration) + '</span>' +
@@ -521,17 +550,24 @@
     function mbCount(b) { var m = Array.isArray(b.microblocks) ? b.microblocks : []; return { n: m.length, done: m.filter(function (x) { return x && x.done; }).length }; }
     function countLabel(n) { return n + (n === 1 ? ' bloco' : ' blocos'); }
 
+    // V40.11.0: círculo de concluir no próprio cartão (clicar nele não abre o cartão)
+    function doneBtnHtml(b, extra) {
+        var label = b.completed ? 'Desmarcar concluído' : 'Marcar como concluído';
+        return '<button type="button" class="ag-done shrink-0 ' + (extra || '') + (b.completed ? ' on' : '') + '" data-done="' + esc(b.id) + '" aria-pressed="' + (b.completed ? 'true' : 'false') +
+            '" aria-label="' + label + '" title="' + label + '"><i class="' + (b.completed ? 'ph-fill ph-check-circle' : 'ph ph-circle') + ' text-[17px]"></i></button>';
+    }
     function agCardHtml(b, day, today, nm) {
         var tag = tagOf(b.tag_id), mb = mbCount(b), paint = paintOf(b.completed ? null : b.color);
         return '<article draggable="true" class="ag-card ' + paint.cls + 'bg-white border border-zinc-200 border-l-4 rounded-lg px-2.5 py-1.5 cursor-pointer hover:border-zinc-300' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
             '" style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
+            '<div class="flex items-start gap-1.5">' + doneBtnHtml(b, 'mt-0.5 -ml-0.5') + '<div class="min-w-0 flex-1">' +
             '<p class="text-[11px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + '<span class="font-medium text-zinc-400"> · ' + fmtDur(b.duration) + '</span></p>' +
             '<p class="text-[13px] font-semibold leading-snug break-words ' + (b.completed ? 'line-through text-zinc-400' : 'text-zinc-800') + '">' + (esc(b.title) || 'Sem nome') + '</p>' +
             ((tag || mb.n || b.completed) ? '<div class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-zinc-500">' +
                 (b.completed ? '<span class="inline-flex items-center gap-1 text-emerald-600 font-medium"><i class="ph-fill ph-check-circle"></i>Concluído</span>' : '') +
                 (tag ? '<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
                 (mb.n ? '<span class="inline-flex items-center gap-1"><i class="ph ph-check-square"></i>' + mb.done + '/' + mb.n + '</span>' : '') + '</div>' : '') +
-            '</article>';
+            '</div></div></article>';
     }
 
     function renderWeek(anchor, map, today, nm) {
@@ -574,15 +610,17 @@
             var tag = tagOf(b.tag_id), compact = b.duration < 20, paint = paintOf(b.completed ? null : b.color);
             var top = (b.start_min - h0 * 60) * PXM + 1, height = Math.max(b.duration * PXM - 2, 14);
             var titleCls = b.completed ? 'line-through text-zinc-400' : 'text-zinc-800';
-            html += '<div class="ag-card absolute rounded-md border border-l-4 overflow-hidden cursor-pointer px-2 flex ' + (compact ? 'items-center gap-2 ' : 'flex-col justify-center ') +
+            html += '<div class="ag-card absolute rounded-md border border-l-4 overflow-hidden cursor-pointer px-2 flex items-center gap-2 ' +
                 paint.cls + (b.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-zinc-200') + (isNow(b, day, today, nm) ? ' ag-now' : '') +
                 '" style="left:56px;right:0;top:' + top + 'px;height:' + height + 'px;' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
+                doneBtnHtml(b, '') +
                 (compact
                     ? '<span class="text-[10.5px] leading-none font-semibold text-zinc-500 tabular-nums shrink-0">' + clock(b.start_min) + '</span>' +
                       '<span class="text-[11.5px] leading-none font-semibold truncate ' + titleCls + '">' + (esc(b.title) || 'Sem nome') + '</span>' +
                       '<span class="ml-auto text-[10.5px] leading-none text-zinc-400 shrink-0">' + fmtDur(b.duration) + '</span>'
-                    : '<span class="text-[10.5px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration) + (tag ? ' · ' + esc(tag.name) : '') + '</span>' +
-                      '<span class="text-[13px] font-semibold truncate ' + titleCls + '">' + (esc(b.title) || 'Sem nome') + '</span>') +
+                    : '<span class="min-w-0 flex-1 flex flex-col justify-center">' +
+                      '<span class="text-[10.5px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration) + (tag ? ' · ' + esc(tag.name) : '') + '</span>' +
+                      '<span class="text-[13px] font-semibold truncate ' + titleCls + '">' + (esc(b.title) || 'Sem nome') + '</span></span>') +
                 '</div>';
         });
         if (day === today && nm >= h0 * 60 && nm <= h1 * 60) html += '<div class="now-line" style="top:' + ((nm - h0 * 60) * PXM) + 'px"></div>';
@@ -645,29 +683,6 @@
         if (S.tab === 'agenda') { closeComposer(); closeColMenu(); S.agScrolled = null; renderAgenda(); }
         else render();
     }
-
-    function openBlock(id) {
-        var b = S.blocos[id];
-        if (!b || b.deleted) return;
-        var d = parseYmd(String(b.date).slice(0, 10)), tag = tagOf(b.tag_id), mbs = Array.isArray(b.microblocks) ? b.microblocks : [];
-        $('b-when').textContent = WD[d.getDay()] + ', ' + d.getDate() + ' de ' + MES[d.getMonth()] + ' · ' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration);
-        $('b-title').textContent = b.title || 'Sem nome';
-        $('b-meta').innerHTML =
-            (b.completed ? '<span class="inline-flex items-center gap-1 text-emerald-600 font-semibold"><i class="ph-fill ph-check-circle"></i>Concluído</span>' : '') +
-            (!b.completed && b.was_delayed ? '<span class="inline-flex items-center gap-1 text-amber-600 font-semibold"><i class="ph ph-clock-countdown"></i>Atrasou</span>' : '') +
-            (tag ? '<span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '');
-        $('b-mbs').innerHTML = mbs.map(function (m) {
-            var done = !!(m && m.done);
-            return '<div class="flex items-start gap-2 text-sm"><i class="ph ' + (done ? 'ph-fill ph-check-square text-emerald-600' : 'ph-square text-zinc-400') + ' text-base mt-0.5 shrink-0"></i>' +
-                '<span class="' + (done ? 'line-through text-zinc-400' : 'text-zinc-700') + '">' + esc(m && m.title) + '</span></div>';
-        }).join('');
-        var m = $('modal-block');
-        m.classList.remove('hidden');
-        m.classList.add('flex');
-        S.viewBlock = id;
-        $('b-close').focus();
-    }
-    function closeBlock() { var m = $('modal-block'); m.classList.add('hidden'); m.classList.remove('flex'); }
 
     // ---------- adicionar tarefa (direto na coluna) ----------
     function footerOf(colId) {
@@ -833,15 +848,52 @@
 
     // ---------- editar tarefa ----------
     function autoGrow(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
-    function openTask(id) {
-        var t = S.tarefas[id];
-        if (!t || t.deleted) return;
+    // ---------- cartão aberto: tarefa (Listas) ou bloco (Agenda) ----------
+    // Checklist de bloco: cada item mantém o id e o que mais tiver (o app usa o id pra arrastar os itens).
+    function blockMbs(a) {
+        return (Array.isArray(a) ? a : []).filter(function (m) { return m && typeof m === 'object' && !Array.isArray(m); }).map(function (m) {
+            var o = Object.assign({}, m); o.title = String(o.title || '').trim(); o.done = !!o.done; return o;
+        }).filter(function (m) { return m.title; });
+    }
+    function mbsForSave(ed) {
+        if (ed.kind !== 'blocos') return normMbs(ed.mbs);
+        var n = Date.now();
+        return blockMbs(ed.mbs).map(function (m, i) { if (!m.id) m.id = 'mb_' + (n + i); return m; });
+    }
+    function parseClock(v) { var m = /^(\d{1,2}):(\d{2})$/.exec(String(v || '')); if (!m) return null; var t = +m[1] * 60 + +m[2]; return +m[1] < 24 && +m[2] < 60 ? t : null; }
+    function isYmd(v) { return /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && ymd(parseYmd(v)) === v; }
+    function nowMin() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+    // Mesmo critério do app: bloco de dia passado (ou de hoje que já terminou) é "past"; o resto é "focus".
+    function blockType(day, start, dur) { var t = todayStr(); return day < t || (day === t && start + dur <= nowMin()) ? 'past' : 'focus'; }
+    function dayLabel(day) { var d = parseYmd(day); return day === todayStr() ? 'hoje' : WD3[d.getDay()] + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1); }
+
+    function openCard(kind, id) {
+        var r = S[kind][id];
+        if (!r || r.deleted) return;
         closeComposer();
-        S.editing = { id: id, orig: JSON.parse(JSON.stringify(t)), tag: tagOf(t.tag_id) ? t.tag_id : null, mbs: normMbs(t.microblocks), color: hex6(t.color) };
-        $('f-title').value = t.title || '';
-        $('f-col').innerHTML = alive('listas').map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('');
-        $('f-col').value = colOf(t);
-        var d = Number(t.duration) || 30;
+        var isB = kind === 'blocos';
+        S.editing = { kind: kind, id: id, orig: JSON.parse(JSON.stringify(r)), tag: tagOf(r.tag_id) ? r.tag_id : null, mbs: isB ? blockMbs(r.microblocks) : normMbs(r.microblocks), color: hex6(r.color) };
+        $('f-title').value = r.title || '';
+        $('f-title').placeholder = isB ? 'Nome do bloco' : 'Nome da tarefa';
+        $('f-col-wrap').classList.toggle('hidden', isB);
+        ['f-date-wrap', 'f-start-wrap'].forEach(function (w) { $(w).classList.toggle('hidden', !isB); $(w).classList.toggle('block', isB); });
+        $('f-grid').classList.toggle('grid-cols-3', isB);
+        $('f-grid').classList.toggle('grid-cols-2', !isB);
+        $('f-done').classList.toggle('hidden', !isB);
+        $('f-schedule').classList.toggle('hidden', isB);
+        $('f-schedule').classList.toggle('inline-flex', !isB);
+        $('f-tolist').classList.toggle('hidden', !isB);
+        $('f-tolist').classList.toggle('inline-flex', isB);
+        $('f-delete').textContent = isB ? 'Apagar bloco' : 'Apagar tarefa';
+        $('f-sched').classList.add('hidden');
+        if (isB) {
+            $('f-date').value = String(r.date).slice(0, 10);
+            $('f-start').value = clock(r.start_min);
+        } else {
+            $('f-col').innerHTML = alive('listas').map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('');
+            $('f-col').value = colOf(r);
+        }
+        var d = Number(r.duration) || 30;
         var durs = DURATIONS.indexOf(d) >= 0 ? DURATIONS : DURATIONS.concat([d]).sort(function (a, b) { return a - b; });
         $('f-dur').innerHTML = durs.map(function (m) { return '<option value="' + m + '">' + fmtDur(m) + '</option>'; }).join('');
         $('f-dur').value = String(d);
@@ -849,17 +901,49 @@
         renderTagChips();
         renderMbs();
         renderColors();
+        renderDone();
         var m = $('modal-task');
         m.classList.remove('hidden');
         m.classList.add('flex');
         autoGrow($('f-title'));
         $('f-title').focus();
     }
+    function openTask(id) { openCard('tarefas', id); }
+    function openBlock(id) { openCard('blocos', id); }
     function closeTask() {
         var m = $('modal-task');
         m.classList.add('hidden');
         m.classList.remove('flex');
         S.editing = null;
+    }
+    // Concluído / atrasou (só bloco). Lê a linha atual: concluir vale na hora, sem precisar de "Salvar".
+    function renderDone() {
+        var ed = S.editing, b = ed && ed.kind === 'blocos' ? S.blocos[ed.id] : null, btn = $('f-done'), st = $('f-status'), ti = $('f-title');
+        var done = !!(b && b.completed);
+        ti.classList.toggle('line-through', done);
+        ti.classList.toggle('text-zinc-400', done);
+        ti.classList.toggle('text-zinc-900', !done);
+        st.classList.add('hidden');
+        if (!b) return;
+        var label = done ? 'Desmarcar concluído' : 'Marcar como concluído';
+        btn.setAttribute('aria-pressed', done ? 'true' : 'false');
+        btn.setAttribute('aria-label', label);
+        btn.title = label;
+        btn.classList.toggle('on', done);
+        btn.innerHTML = '<i class="' + (done ? 'ph-fill ph-check-circle' : 'ph ph-circle') + ' text-[26px]"></i>';
+        if (done || b.was_delayed) {
+            st.classList.remove('hidden');
+            st.className = 'mt-1 text-[12.5px] font-semibold ' + (done ? 'text-emerald-600' : 'text-amber-600');
+            st.textContent = done ? 'Concluído' : 'Atrasou';
+        }
+    }
+    function toggleDone(id) {
+        var b = S.blocos[id];
+        if (!b || b.deleted) return;
+        var done = !b.completed;
+        var p = patchRow('blocos', id, { completed: done }, done ? 'Bloco concluído' : 'Bloco reaberto');
+        var sync = function () { if (S.editing && S.editing.kind === 'blocos' && S.editing.id === id) { S.editing.orig.completed = !!S.blocos[id].completed; renderDone(); } };
+        sync(); p.then(sync);
     }
     function renderTagChips() {
         var ed = S.editing;
@@ -889,30 +973,119 @@
     async function saveTask() {
         var ed = S.editing;
         if (!ed) return;
-        var t = S.tarefas[ed.id];
-        if (!t || t.deleted) { closeTask(); return toast('Essa tarefa foi apagada em outro aparelho.'); }
+        var isB = ed.kind === 'blocos', t = S[ed.kind][ed.id];
+        if (!t || t.deleted) { closeTask(); return toast(isB ? 'Esse bloco foi apagado em outro aparelho.' : 'Essa tarefa foi apagada em outro aparelho.'); }
         var title = $('f-title').value.trim();
-        if (!title) { $('f-title').focus(); return toast('Dê um nome pra tarefa.'); }
-        var fields = {};
+        if (!title) { $('f-title').focus(); return toast(isB ? 'Dê um nome pro bloco.' : 'Dê um nome pra tarefa.'); }
+        var fields = {}, note = '';
         if (title !== (ed.orig.title || '')) fields.title = title;
-        var col = $('f-col').value;
-        if (col && col !== colOf(ed.orig)) { fields.column_id = col; fields.position = maxPos('tarefas') + STEP; }
         var dur = parseInt($('f-dur').value, 10);
-        if (Number.isFinite(dur) && dur !== Number(ed.orig.duration)) fields.duration = dur;
+        if (!Number.isFinite(dur)) dur = Number(ed.orig.duration) || 30;
+        if (isB) {
+            // dia, início e duração andam juntos: se o lugar pedido estiver ocupado, vai pro próximo horário livre
+            var day = $('f-date').value, st = parseClock($('f-start').value), day0 = String(ed.orig.date).slice(0, 10);
+            if (!isYmd(day) || st === null) return toast('Confira o dia e o horário.');
+            if (day !== day0 || st !== Number(ed.orig.start_min) || dur !== Number(ed.orig.duration)) {
+                var slot = freeSlot(day, st, dur, ed.id);
+                if (slot === null) return toast('Esse dia não tem um espaço livre desse tamanho.');
+                if (day !== day0) fields.date = day;
+                if (slot !== Number(ed.orig.start_min)) fields.start_min = slot;
+                if (dur !== Number(ed.orig.duration)) fields.duration = dur;
+                var ty = blockType(day, slot, dur);
+                if (ty !== ed.orig.type && (ed.orig.type === 'focus' || ed.orig.type === 'past')) fields.type = ty;
+                if (slot !== st) note = ': o horário pedido estava ocupado, ficou às ' + clock(slot);
+            }
+        } else {
+            var col = $('f-col').value;
+            if (col && col !== colOf(ed.orig)) { fields.column_id = col; fields.position = maxPos('tarefas') + STEP; }
+            if (dur !== Number(ed.orig.duration)) fields.duration = dur;
+        }
         if ((ed.tag || null) !== (ed.orig.tag_id || null)) fields.tag_id = ed.tag || null;
-        var mbs = normMbs(ed.mbs);
-        if (JSON.stringify(mbs) !== JSON.stringify(normMbs(ed.orig.microblocks))) fields.microblocks = mbs;
+        var mbs = mbsForSave(ed);
+        if (JSON.stringify(mbs) !== JSON.stringify(isB ? blockMbs(ed.orig.microblocks) : normMbs(ed.orig.microblocks))) fields.microblocks = mbs;
         if ((ed.color || null) !== hex6(ed.orig.color)) fields.color = ed.color || null;
         closeTask();
-        if (Object.keys(fields).length) patchRow('tarefas', ed.id, fields, 'Tarefa salva');
+        if (Object.keys(fields).length) patchRow(ed.kind, ed.id, fields, (isB ? 'Bloco salvo' : 'Tarefa salva') + note);
     }
     async function deleteTask() {
         var ed = S.editing;
         if (!ed) return;
-        var ok = await dialog({ title: 'Apagar esta tarefa?', text: 'Ela some daqui e do celular.', okLabel: 'Apagar tarefa', danger: true });
+        var isB = ed.kind === 'blocos';
+        var ok = await dialog({ title: isB ? 'Apagar este bloco?' : 'Apagar esta tarefa?', text: isB ? 'Ele some daqui e do celular.' : 'Ela some daqui e do celular.', okLabel: isB ? 'Apagar bloco' : 'Apagar tarefa', danger: true });
         if (!ok) return;
         closeTask();
-        patchRow('tarefas', ed.id, { deleted: true }, 'Tarefa apagada');
+        patchRow(ed.kind, ed.id, { deleted: true }, isB ? 'Bloco apagado' : 'Tarefa apagada');
+    }
+
+    // ---------- V40.11.0: Listas → Agenda ("Agendar") e Agenda → Listas ("Voltar pra lista") ----------
+    // Igual ao app: o cartão muda de lugar (some de um lado, aparece do outro) e a checklist recomeça desmarcada.
+    function schedDur() { var d = parseInt($('f-dur').value, 10); return Number.isFinite(d) && d > 0 ? d : 30; }
+    function suggestStart(day) {
+        var dur = schedDur(), from = day === todayStr() ? Math.min(Math.ceil(nowMin() / 5) * 5, 1440 - dur) : S.hours[0] * 60;
+        var slot = freeSlot(day, from, dur);
+        return slot !== null && slot >= from ? slot : from;
+    }
+    function renderSchedInfo() {
+        var day = $('f-sched-date').value, st = parseClock($('f-sched-time').value), dur = schedDur(), info = $('f-sched-info');
+        if (!isYmd(day) || st === null) { info.textContent = 'Escolha o dia e o horário de início.'; return; }
+        var slot = freeSlot(day, st, dur);
+        if (slot === null) info.textContent = 'Esse dia não tem um espaço livre de ' + fmtDur(dur) + '.';
+        else if (slot !== st) info.textContent = 'Às ' + clock(st) + ' já tem bloco. Vai ficar ' + dayLabel(day) + ', das ' + clock(slot) + ' às ' + clock(slot + dur) + '.';
+        else info.textContent = 'Vai ficar ' + dayLabel(day) + ', das ' + clock(slot) + ' às ' + clock(slot + dur) + '. A tarefa sai da lista.';
+    }
+    function openSched() {
+        var ed = S.editing;
+        if (!ed || ed.kind !== 'tarefas') return;
+        var day = todayStr();
+        $('f-sched-date').value = day;
+        $('f-sched-date').min = '';
+        $('f-sched-time').value = clock(suggestStart(day));
+        $('f-sched').classList.remove('hidden');
+        renderSchedInfo();
+        $('f-sched').scrollIntoView && $('f-sched').scrollIntoView({ block: 'nearest' });
+        $('f-sched-time').focus();
+    }
+    async function scheduleTask() {
+        var ed = S.editing;
+        if (!ed || ed.kind !== 'tarefas') return;
+        var t = S.tarefas[ed.id];
+        if (!t || t.deleted) { closeTask(); return toast('Essa tarefa foi apagada em outro aparelho.'); }
+        var title = $('f-title').value.trim();
+        if (!title) { $('f-title').focus(); return toast('Dê um nome pra tarefa.'); }
+        var day = $('f-sched-date').value, st = parseClock($('f-sched-time').value), dur = schedDur();
+        if (!isYmd(day) || st === null) return toast('Escolha o dia e o horário de início.');
+        var slot = freeSlot(day, st, dur);
+        if (slot === null) return toast('Esse dia não tem um espaço livre de ' + fmtDur(dur) + '.');
+        var n = Date.now();
+        var block = {
+            user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: slot, duration: dur, title: title,
+            type: blockType(day, slot, dur), theme: 'focus', tag_id: ed.tag || null,
+            microblocks: normMbs(ed.mbs).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: false }; }),
+            completed: false, was_delayed: false, linked_note_ids: [], color: ed.color || null, archived: false, deleted: false
+        };
+        closeTask();
+        if (!(await insertRow('blocos', block))) return; // não entrou na agenda: a tarefa continua na lista
+        await patchRow('tarefas', ed.id, { deleted: true },
+            'Agendado para ' + dayLabel(day) + ' às ' + clock(slot) + (slot !== st ? ' (às ' + clock(st) + ' já tinha bloco)' : ''));
+    }
+    async function blockToList() {
+        var ed = S.editing;
+        if (!ed || ed.kind !== 'blocos') return;
+        var b = S.blocos[ed.id];
+        if (!b || b.deleted) { closeTask(); return toast('Esse bloco foi apagado em outro aparelho.'); }
+        var title = $('f-title').value.trim();
+        if (!title) { $('f-title').focus(); return toast('Dê um nome pro bloco.'); }
+        var dur = parseInt($('f-dur').value, 10);
+        var listId = aliveListIds()[DEFAULT_COL] ? DEFAULT_COL : ((alive('listas')[0] || {}).id || DEFAULT_COL);
+        var task = {
+            user_id: S.uid, id: newId('bl_', 'tarefas'), column_id: listId, title: title, duration: Number.isFinite(dur) ? dur : (Number(b.duration) || 30),
+            tag_id: ed.tag || null, microblocks: normMbs(ed.mbs).map(function (m) { return { title: m.title, done: false }; }),
+            position: maxPos('tarefas') + STEP, color: ed.color || null, archived: false, deleted: false
+        };
+        closeTask();
+        if (!(await insertRow('tarefas', task))) return; // não entrou na lista: o bloco continua na agenda
+        var list = S.listas[listId];
+        await patchRow('blocos', ed.id, { deleted: true }, 'Voltou pra lista' + (list && list.name ? ' ' + list.name : ''));
     }
 
     // ---------- V40.9.0: arquivar / arquivados ----------
@@ -920,7 +1093,7 @@
         var ed = S.editing;
         if (!ed) return;
         closeTask();
-        patchRow('tarefas', ed.id, { archived: true }, 'Tarefa arquivada');
+        patchRow(ed.kind, ed.id, { archived: true }, ed.kind === 'blocos' ? 'Bloco arquivado' : 'Tarefa arquivada');
     }
     function archivedRows() {
         var out = [];
@@ -1033,10 +1206,12 @@
             if ((b = e.target.closest('.col-menu-btn'))) return openColMenu(b.dataset.col, b);
             if ((b = e.target.closest('.add-btn'))) return openComposer(b.dataset.col, '', true);
             if (e.target.closest('#btn-new-list')) return createList();
+            if ((b = e.target.closest('[data-sched]'))) { openTask(b.dataset.sched); return openSched(); } // V40.11.0
             var card = e.target.closest('.card');
             if (card) openTask(card.dataset.id);
         });
         wrap.addEventListener('keydown', function (e) {
+            if (e.target.closest && e.target.closest('[data-sched]')) return; // o botão de agendar cuida do próprio Enter
             var card = e.target.closest && e.target.closest('.card');
             if (card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openTask(card.dataset.id); }
         });
@@ -1085,6 +1260,16 @@
         $('f-cancel').addEventListener('click', closeTask);
         $('f-delete').addEventListener('click', deleteTask);
         $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this) closeTask(); });
+        // V40.11.0: concluir, agendar e voltar pra lista
+        $('f-done').addEventListener('click', function () { if (S.editing && S.editing.kind === 'blocos') toggleDone(S.editing.id); });
+        $('f-schedule').addEventListener('click', function () { if ($('f-sched').classList.contains('hidden')) openSched(); else $('f-sched-time').focus(); });
+        $('f-sched-cancel').addEventListener('click', function () { $('f-sched').classList.add('hidden'); });
+        $('f-sched-ok').addEventListener('click', scheduleTask);
+        $('f-tolist').addEventListener('click', blockToList);
+        $('f-sched-date').addEventListener('change', function () { if (isYmd(this.value)) $('f-sched-time').value = clock(suggestStart(this.value)); renderSchedInfo(); });
+        $('f-sched-time').addEventListener('input', renderSchedInfo);
+        $('f-dur').addEventListener('change', function () { if (!$('f-sched').classList.contains('hidden')) renderSchedInfo(); });
+        ['f-sched-date', 'f-sched-time'].forEach(function (id) { $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); scheduleTask(); } }); });
         $('f-tags').addEventListener('click', function (e) {
             var b = e.target.closest('button[data-tag]');
             if (!b || !S.editing) return;
@@ -1120,7 +1305,6 @@
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             if (!$('dialog').classList.contains('hidden')) return;
-            if (!$('modal-block').classList.contains('hidden')) return closeBlock();
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
             if (menuEl) return closeColMenu();
             if (S.editing) return closeTask();
@@ -1144,10 +1328,13 @@
         $('agenda').addEventListener('click', function (e) {
             var dayBtn = e.target.closest('.ag-day-btn');
             if (dayBtn) { S.agAnchor = dayBtn.dataset.day; S.agView = 'day'; S.agScrolled = null; return renderAgenda(); }
+            var dn = e.target.closest('[data-done]');
+            if (dn) return toggleDone(dn.dataset.done); // V40.11.0: concluir sem abrir o cartão
             var c = e.target.closest('[data-block]');
             if (c) openBlock(c.dataset.block);
         });
         $('agenda').addEventListener('keydown', function (e) {
+            if (e.target.closest && e.target.closest('[data-done]')) return;
             var c = e.target.closest && e.target.closest('[data-block]');
             if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openBlock(c.dataset.block); }
         });
@@ -1179,7 +1366,6 @@
             moveBlockToDay(id, day);
         });
         agCols.addEventListener('dragend', agEnd);
-        $('b-archive').addEventListener('click', function () { var id = S.viewBlock; closeBlock(); if (id) patchRow('blocos', id, { archived: true }, 'Bloco arquivado'); });
         $('btn-archive').addEventListener('click', openArchive);
         $('ar-close').addEventListener('click', closeArchive);
         $('modal-archive').addEventListener('mousedown', function (e) { if (e.target === this) closeArchive(); });
@@ -1199,8 +1385,6 @@
             S.editing.color = hex6(e.target.value);
             renderColors();
         });
-        $('b-close').addEventListener('click', closeBlock);
-        $('modal-block').addEventListener('mousedown', function (e) { if (e.target === this) closeBlock(); });
 
         // login
         $('login-form').addEventListener('submit', function (e) { e.preventDefault(); doLogin(); });
@@ -1308,7 +1492,6 @@
             unsubscribe();
             S.uid = null; S.listas = {}; S.tags = {}; S.tarefas = {}; S.blocos = {}; S.lastLoad = 0; S.composer = null;
             closeTask();
-            closeBlock();
             closeArchive();
             closeColMenu();
             show('view-login');

@@ -15,6 +15,18 @@ const SUITES = [
     ['Tela do PC (kanban.html)', 'test_kanban.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
+// A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.
+const fs = require('fs'), ler = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8'), acha = (txt, re) => (txt.match(re) || [])[1] || '?';
+const versoes = {
+    'index.html (selo)': acha(ler('index.html'), /select-none">v(\d+\.\d+\.\d+)<\/div>/),
+    'kanban.html (selo)': acha(ler('kanban.html'), /id="pc-version"[^>]*>v(\d+\.\d+\.\d+)</),
+    'sw.js (CACHE_NAME)': acha(ler('sw.js'), /CACHE_NAME = 'timeblock-v(\d+-\d+-\d+)'/).replace(/-/g, '.'),
+    'app.js (backup)': acha(ler('app.js'), /version: 'v(\d+\.\d+\.\d+)'/),
+    'package.json': JSON.parse(ler('package.json')).version,
+};
+const distintas = [...new Set(Object.values(versoes))];
+let versaoErrada = distintas.length !== 1 || distintas[0] === '?';
+console.log((versaoErrada ? '❌ Versão diferente entre os arquivos: ' + JSON.stringify(versoes) : '✅ Versão ' + distintas[0] + ' igual nos 5 lugares') + '\n');
 const tudo = process.argv.includes('--tudo');
 let passou = 0, falhou = 0, quebradas = 0;
 for (const [nome, arquivo, args] of SUITES) {
@@ -29,4 +41,4 @@ for (const [nome, arquivo, args] of SUITES) {
     if (tudo || !ok) console.log(out.split('\n').filter((l) => tudo || /FALHOU|ERRO|Error|^\s+at /.test(l)).slice(0, tudo ? 400 : 25).map((l) => '    ' + l).join('\n'));
 }
 console.log(`\n${falhou || quebradas ? '❌' : '✅'} TOTAL: ${passou} verificações passaram, ${falhou} falharam` + (quebradas ? `, ${quebradas} suíte(s) não terminaram` : ''));
-process.exit(falhou || quebradas ? 1 : 0);
+process.exit(falhou || quebradas || versaoErrada ? 1 : 0);

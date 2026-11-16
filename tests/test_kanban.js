@@ -189,6 +189,7 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   console.log('\nL) Aba Agenda — Semana:');
   const BLK = JSON.parse(backup.data.tb_master_db), cnt = (day) => BLK.filter((b) => b.date === day).length;
   const agCols = () => [...d.querySelectorAll('#ag-cols section')];
+  const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
   click($('tab-agenda'));
   ok(!$('agenda').classList.contains('hidden') && $('board').classList.contains('hidden') && $('tab-agenda').classList.contains('on'), 'aba Agenda abriu no lugar das Listas');
   ok(agCols().length === 7 && $('ag-label').textContent === '16 a 22 de nov', '7 dias a partir de hoje: "' + $('ag-label').textContent + '"');
@@ -217,9 +218,9 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   ok(Math.abs(parseFloat(blk.style.height) - Math.max(bdata.duration * 3.2 - 2, 14)) < 0.01, `altura proporcional à duração (${bdata.duration} min → ${blk.style.height})`);
   ok(d.querySelector('#ag-timeline span').textContent === '07:00', 'começa na janela do dia configurada no celular (07:00)');
   click(blk);
-  ok(!$('modal-block').classList.contains('hidden') && $('b-title').textContent === bdata.title && /Segunda, 16 de novembro/.test($('b-when').textContent), 'detalhe do bloco: ' + $('b-when').textContent);
-  click($('b-close'));
-  ok($('modal-block').classList.contains('hidden'), 'detalhe fecha');
+  ok(!$('modal-task').classList.contains('hidden') && $('f-title').value === bdata.title && $('f-date').value === '2026-11-16' && $('f-start').value === hhmm(bdata.start_min), 'clicar no bloco abre o cartão completo: ' + $('f-date').value + ' ' + $('f-start').value);
+  click($('f-cancel'));
+  ok($('modal-task').classList.contains('hidden'), 'cartão fecha');
   click($('ag-next'));
   ok($('ag-label').textContent === 'Terça, 17 de novembro', 'na visão Dia a seta anda 1 dia: "' + $('ag-label').textContent + '"');
   ok(!server.log.some((x) => x.t === 'blocos' && x.op !== 'select'), 'agenda no PC é só leitura: nenhuma gravação em blocos');
@@ -258,13 +259,126 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   dragEv('dragstart', agCols()[1].querySelector(`[data-block="${oid2}"]`)); await sleep(30); dragEv('drop', agCols()[3]);
   await waitFor(() => server.get('blocos', UID, oid2).date === '2026-11-19');
   ok(server.get('blocos', UID, oid2).start_min === st0 + du0, 'horário já ocupado no destino → entra logo depois, sem sobrepor');
-  click(agCols()[3].querySelector(`[data-block="${bid}"]`)); click($('b-archive'));
+  click(agCols()[3].querySelector(`[data-block="${bid}"]`)); click($('f-archive'));
   await waitFor(() => server.get('blocos', UID, bid).archived === true);
   ok(!d.querySelector(`#ag-cols [data-block="${bid}"]`) && !server.get('blocos', UID, bid).deleted, 'Arquivar bloco: some da agenda, não é apagado');
   click($('btn-archive')); click($('ar-list').querySelector(`[data-unarchive="blocos|${bid}"]`));
   await waitFor(() => server.get('blocos', UID, bid).archived === false);
   ok(server.get('blocos', UID, bid).archived === false && server.get('blocos', UID, bid).start_min === st0, 'Desarquivar bloco: volta pro mesmo horário');
   click($('ar-close')); click($('tab-listas'));
+
+  console.log('\nP) V40.11.0 — cartão do bloco aberto, concluir, agendar e voltar pra lista (PC):');
+  { // bloco próprio: os nomes daqui não brigam com os das outras seções
+  const B = (id) => server.get('blocos', UID, id), T = (id) => server.get('tarefas', UID, id);
+  const change = (el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', { bubbles: true })); el.dispatchEvent(new w.Event('change', { bubbles: true })); };
+  const visible = (id) => !$(id).classList.contains('hidden');
+  const dayBlocks = (day) => server.alive('blocos', UID).filter((b) => b.date === day && !b.archived).sort((a, b) => a.start_min - b.start_min);
+  const overlaps = (day, st, dur, skip) => dayBlocks(day).some((b) => b.id !== skip && st < b.start_min + b.duration && b.start_min < st + dur);
+  click($('tab-agenda')); click(d.querySelector('.ag-view[data-view="week"]')); click($('ag-today')); await sleep(80);
+  // 1) abrir e editar um bloco (o último de terça, pra duração nova caber sem empurrar ninguém)
+  const tue = dayBlocks('2026-11-17'), e1 = tue[tue.length - 1], e1mbs = JSON.parse(JSON.stringify(e1.microblocks || []));
+  server.patch('blocos', UID, e1.id, { microblocks: [{ id: 'mb_antigo', title: 'Item que já existia', done: true, extra: 7 }] }); await sleep(150);
+  click(agCols()[1].querySelector(`[data-block="${e1.id}"]`));
+  ok(visible('modal-task') && $('f-title').value === e1.title && $('f-date').value === '2026-11-17' && $('f-start').value === hhmm(e1.start_min) && $('f-dur').value === String(e1.duration), 'bloco abre no mesmo cartão das Listas, com nome, dia, início e duração');
+  ok(!visible('f-col-wrap') && visible('f-date-wrap') && visible('f-start-wrap') && visible('f-done') && !visible('f-schedule') && visible('f-tolist') && $('f-delete').textContent === 'Apagar bloco', 'campos de bloco no lugar dos de tarefa (sem "Lista"; com concluir e "Voltar pra lista")');
+  const otherTag = server.alive('tags', UID).find((t) => t.id !== e1.tag_id);
+  typeIn($('f-title'), 'Bloco editado no PC'); change($('f-dur'), '30');
+  click($('f-tags').querySelector(`button[data-tag="${otherTag.id}"]`));
+  click($('f-colors').querySelector('button[data-color="#3b82f6"]'));
+  $('f-mb-new').value = 'Item novo do PC'; key($('f-mb-new'), 'Enter');
+  server.log.length = 0; click($('f-save'));
+  await waitFor(() => B(e1.id).title === 'Bloco editado no PC');
+  const e1n = B(e1.id), up1 = lastLog('update', 'blocos');
+  ok(e1n.duration === 30 && e1n.tag_id === otherTag.id && e1n.color === '#3b82f6' && e1n.start_min === e1.start_min && e1n.date === '2026-11-17', 'salvar grava nome, duração, tag e cor; dia e horário ficam como estavam');
+  ok(e1n.microblocks.length === 2 && JSON.stringify(e1n.microblocks[0]) === JSON.stringify({ id: 'mb_antigo', title: 'Item que já existia', done: true, extra: 7 }) && /^mb_\d+$/.test(e1n.microblocks[1].id) && e1n.microblocks[1].title === 'Item novo do PC' && e1n.microblocks[1].done === false, 'checklist: item antigo intacto (id e marcação), item novo ganha id como no app');
+  ok(up1.fields.slice().sort().join() === 'color,duration,microblocks,tag_id,title' && /Bloco salvo/.test($('toast').textContent), 'só os campos alterados vão pra nuvem (' + up1.fields.join(', ') + ')');
+  // 2) concluir pelo círculo do cartão, sem abrir
+  const c1 = tue[0].id;
+  click(agCols()[1].querySelector(`[data-block="${c1}"] [data-done]`));
+  await waitFor(() => B(c1).completed === true);
+  ok(!visible('modal-task') && /Concluído/.test(agCols()[1].querySelector(`[data-block="${c1}"]`).textContent) && agCols()[1].querySelector(`[data-block="${c1}"] [data-done]`).getAttribute('aria-pressed') === 'true' && lastLog('update', 'blocos').fields.join() === 'completed', 'círculo do cartão conclui na hora, sem abrir o cartão (só o campo "completed" sobe)');
+  click(agCols()[1].querySelector(`[data-block="${c1}"] [data-done]`));
+  await waitFor(() => B(c1).completed === false);
+  ok(B(c1).completed === false && /Bloco reaberto/.test($('toast').textContent), 'clicar de novo reabre o bloco');
+  // 3) concluir por dentro do cartão
+  click(agCols()[1].querySelector(`[data-block="${c1}"]`)); click($('f-done'));
+  await waitFor(() => B(c1).completed === true);
+  ok(visible('modal-task') && $('f-done').getAttribute('aria-pressed') === 'true' && $('f-status').textContent === 'Concluído' && $('f-title').classList.contains('line-through'), 'dentro do cartão: concluir vale na hora e o cartão continua aberto');
+  server.patch('blocos', UID, c1, { completed: false }); await sleep(200);
+  ok($('f-done').getAttribute('aria-pressed') === 'false' && !visible('f-status'), 'se o celular reabrir o bloco, o cartão aberto no PC acompanha');
+  click($('f-cancel'));
+  // 4) mudar dia e horário pelo cartão
+  click(agCols()[1].querySelector(`[data-block="${c1}"]`));
+  change($('f-date'), '2026-11-20'); change($('f-start'), '14:30'); click($('f-save'));
+  await waitFor(() => B(c1).date === '2026-11-20');
+  ok(B(c1).start_min === 870 && B(c1).type === 'focus' && !!agCols()[4].querySelector(`[data-block="${c1}"]`) && /^Bloco salvo$/.test($('toast').textContent), 'dia e horário novos: sexta 20/11 às 14:30');
+  const c2 = tue[1].id;
+  click(agCols()[1].querySelector(`[data-block="${c2}"]`));
+  change($('f-date'), '2026-11-20'); change($('f-start'), '14:30'); click($('f-save'));
+  await waitFor(() => B(c2).date === '2026-11-20');
+  ok(B(c2).start_min === 870 + B(c1).duration && /ficou às/.test($('toast').textContent), 'horário ocupado → entra logo depois, e o aviso diz onde ficou: "' + $('toast').textContent + '"');
+  click(agCols()[4].querySelector(`[data-block="${c2}"]`));
+  change($('f-start'), ''); click($('f-save'));
+  ok(visible('modal-task') && /Confira o dia e o horário/.test($('toast').textContent), 'horário em branco não salva e o cartão continua aberto');
+  change($('f-date'), '2026-08-03'); change($('f-start'), '09:00'); click($('f-save')); // dia antigo e sem blocos nos dados de teste
+  await waitFor(() => B(c2).date === '2026-08-03');
+  ok(B(c2).type === 'past' && B(c2).start_min === 540, 'mandar pra um dia que já passou marca o bloco como passado (igual ao app)');
+  // 5) visão Dia: o círculo também conclui
+  click(agCols()[4].querySelector('.ag-day-btn')); await sleep(60);
+  click(d.querySelector(`#ag-timeline [data-block="${c1}"] [data-done]`));
+  await waitFor(() => B(c1).completed === true);
+  ok(!visible('modal-task') && /bg-emerald-50/.test(d.querySelector(`#ag-timeline [data-block="${c1}"]`).className), 'na visão Dia o círculo conclui e o bloco fica verde');
+  click(d.querySelector('.ag-view[data-view="week"]')); click($('ag-today')); await sleep(60);
+  // 6) voltar pra lista
+  const nTar = server.alive('tarefas', UID).length;
+  click(agCols()[1].querySelector(`[data-block="${e1.id}"]`)); click($('f-tolist'));
+  await waitFor(() => B(e1.id).deleted === true);
+  const back = server.alive('tarefas', UID).find((t) => t.title === 'Bloco editado no PC');
+  ok(!!back && /^bl_\d+$/.test(back.id) && back.column_id === 'col_geral' && back.duration === 30 && back.tag_id === otherTag.id && back.color === '#3b82f6' && server.alive('tarefas', UID).length === nTar + 1, '"Voltar pra lista": vira tarefa na lista padrão com nome, duração, tag e cor');
+  ok(JSON.stringify(back.microblocks) === JSON.stringify([{ title: 'Item que já existia', done: false }, { title: 'Item novo do PC', done: false }]) && !agCols()[1].querySelector(`[data-block="${e1.id}"]`) && /Voltou pra lista ALFA/.test($('toast').textContent), 'checklist vai junto, desmarcada (como no app), e o bloco sai da agenda');
+  // 7) apagar bloco
+  const del = tue[2] ? tue[2].id : dayBlocks('2026-11-16')[5].id, delDay = B(del).date;
+  click(d.querySelector(`#ag-cols [data-block="${del}"]`)); click($('f-delete'));
+  ok(/Apagar este bloco\?/.test($('dlg-title').textContent), 'apagar bloco pede confirmação');
+  click($('dlg-ok')); await waitFor(() => B(del).deleted === true);
+  ok(B(del).deleted === true && !d.querySelector(`#ag-cols [data-block="${del}"]`) && delDay === B(del).date, 'bloco apagado some da agenda');
+  // 8) Listas → Agenda
+  click($('tab-listas')); await sleep(60);
+  ok(!!d.querySelector(`.card[data-id="${back.id}"]`), 'a tarefa que voltou aparece no quadro');
+  const s1 = server.alive('tarefas', UID).find((t) => t.id !== back.id && !t.archived && t.tag_id && (t.microblocks || []).length > 0);
+  server.patch('tarefas', UID, s1.id, { color: '#ec4899', microblocks: s1.microblocks.map((m, i) => ({ title: m.title, done: i === 0 })) }); await sleep(150);
+  const s1row = { ...T(s1.id) }, nBl = server.alive('blocos', UID).length;
+  click(d.querySelector(`.card[data-id="${s1.id}"] [data-sched]`));
+  const sug = $('f-sched-time').value, sugMin = +sug.slice(0, 2) * 60 + +sug.slice(3);
+  ok(visible('modal-task') && visible('f-sched') && $('f-sched-date').value === '2026-11-16' && sugMin >= 440 && !overlaps('2026-11-16', sugMin, s1row.duration), `botão de agendar do cartão abre já sugerindo hoje, no primeiro horário livre a partir de agora (${sug})`);
+  ok(/Vai ficar hoje, das /.test($('f-sched-info').textContent) && /A tarefa sai da lista/.test($('f-sched-info').textContent), 'explica o que vai acontecer: "' + $('f-sched-info').textContent + '"');
+  change($('f-sched-date'), '2026-11-21');
+  ok($('f-sched-time').value === '07:00' && /Sáb 21\/11, das 07:00/.test($('f-sched-info').textContent), 'outro dia: sugere o começo do dia (07:00)');
+  change($('f-sched-time'), '10:00'); server.log.length = 0; click($('f-sched-ok'));
+  await waitFor(() => T(s1.id).deleted === true);
+  const nb1 = server.alive('blocos', UID).find((b) => b.title === s1row.title && b.date === '2026-11-21');
+  ok(!!nb1 && /^f_\d+$/.test(nb1.id) && nb1.start_min === 600 && nb1.duration === s1row.duration && nb1.tag_id === s1row.tag_id && nb1.color === '#ec4899' && nb1.type === 'focus' && nb1.theme === 'focus' && nb1.completed === false && Array.isArray(nb1.linked_note_ids) && nb1.linked_note_ids.length === 0, 'Agendar cria o bloco no dia e horário escolhidos, com nome, duração, tag e cor');
+  ok(nb1.microblocks.length === s1row.microblocks.length && nb1.microblocks.every((m, i) => /^mb_\d+$/.test(m.id) && m.title === s1row.microblocks[i].title && m.done === false) && new Set(nb1.microblocks.map((m) => m.id)).size === nb1.microblocks.length, 'checklist vai junto: cada item com id próprio e desmarcado (como no app)');
+  ok(T(s1.id).deleted === true && !d.querySelector(`.card[data-id="${s1.id}"]`) && server.alive('blocos', UID).length === nBl + 1 && /Agendado para Sáb 21\/11 às 10:00$/.test($('toast').textContent), 'a tarefa sai da lista e o aviso confirma: "' + $('toast').textContent + '"');
+  const ops = server.log.filter((l) => l.op !== 'select').map((l) => l.op + ':' + l.t);
+  ok(ops.join() === 'upsert:blocos,update:tarefas', 'ordem segura: primeiro cria o bloco, depois tira a tarefa (' + ops.join(' → ') + ')');
+  const s2 = server.alive('tarefas', UID).find((t) => t.id !== back.id && !t.archived);
+  click(d.querySelector(`.card[data-id="${s2.id}"]`));
+  ok(visible('modal-task') && !visible('f-sched') && visible('f-schedule') && visible('f-col-wrap') && !visible('f-date-wrap') && !visible('f-done') && $('f-delete').textContent === 'Apagar tarefa', 'tarefa aberta pelo clique normal: campos de tarefa e botão "Agendar" no rodapé');
+  click($('f-schedule'));
+  typeIn($('f-title'), 'Nome trocado antes de agendar'); change($('f-sched-date'), '2026-11-21'); change($('f-sched-time'), '10:00');
+  ok(/Às 10:00 já tem bloco/.test($('f-sched-info').textContent), 'avisa antes quando o horário já está ocupado: "' + $('f-sched-info').textContent + '"');
+  click($('f-sched-ok')); await waitFor(() => T(s2.id).deleted === true);
+  const nb2 = server.alive('blocos', UID).find((b) => b.title === 'Nome trocado antes de agendar');
+  ok(!!nb2 && nb2.start_min === 600 + nb1.duration && /já tinha bloco/.test($('toast').textContent), 'horário ocupado → entra logo depois; o que foi editado no cartão vai junto');
+  const s3 = server.alive('tarefas', UID).find((t) => t.id !== back.id && !t.archived);
+  click(d.querySelector(`.card[data-id="${s3.id}"] [data-sched]`)); change($('f-sched-date'), '2026-11-22'); change($('f-sched-time'), '08:00');
+  server.failNext = 1; click($('f-sched-ok')); await sleep(250);
+  ok(T(s3.id).deleted === false && !!d.querySelector(`.card[data-id="${s3.id}"]`) && !server.alive('blocos', UID).some((b) => b.date === '2026-11-22') && /Não foi possível salvar/.test($('toast').textContent), 'sem internet na hora de agendar: nada muda, a tarefa continua na lista');
+  click($('tab-agenda')); click($('ag-today')); await sleep(60);
+  ok(!!agCols()[5].querySelector(`[data-block="${nb1.id}"]`) && !!agCols()[5].querySelector(`[data-block="${nb2.id}"]`), 'os dois agendados aparecem no sábado da aba Agenda');
+  click($('tab-listas'));
+  }
 
   console.log('\nJ) Sair e entrar:');
   click($('btn-logout'));

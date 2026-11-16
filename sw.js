@@ -5,7 +5,8 @@
 // V10.10 - v40.9.0 (Cor livre do cartão na Lista e na agenda; Arquivados (arquivar/desarquivar) no app e no PC; PC arrasta bloco de um dia pro outro.)
 // V10.11 - v40.9.1 (Listas afastadas no celular: botão da lupa ou pinça mostram várias listas lado a lado; segurar e arrastar leva o cartão de uma lista pra outra, com rolagem automática nas bordas. Redesenhar com a Lista aberta não joga mais a lista pro topo.)
 // V10.12 - v40.10.0 (Fonte, ícones e Supabase passam a vir da pasta libs/ do próprio app, com versão travada, e entram no cache offline junto com um Tailwind já pronto (libs/tailwind.css): o app abre com o visual completo sem internet. O script do Tailwind pelo CDN continua, pra classe nova funcionar sem build.)
-const CACHE_NAME = 'timeblock-v40-10-0';
+// V10.13 - v40.11.0 (Tela do PC: o bloco da Agenda abre no cartão completo, com editar e concluir; botão "Agendar" leva a tarefa das Listas pra Agenda; "Voltar pra lista" faz o caminho contrário. No celular nada muda além do número da versão, que agora é o mesmo nas duas telas.)
+const CACHE_NAME = 'timeblock-v40-11-0';
 const ASSETS = [
   './',
   './index.html',

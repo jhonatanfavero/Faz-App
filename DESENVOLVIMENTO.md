@@ -23,11 +23,10 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
 1. **Dado do usuário é sagrado.** Nada sobrescreve dados sem confirmação e sem cópia de segurança.
    O service worker nunca apaga o `localStorage`. Dado ilegível é copiado para `tb__corrompido_*`
    antes de qualquer coisa.
-2. **Mudou qualquer arquivo do app, mude o `CACHE_NAME` do `sw.js`.** Vale para tudo que está na lista
-   `ASSETS` do `sw.js` e para o próprio `sw.js`. Sem isso os aparelhos continuam na versão antiga.
-   Não precisa para o `kanban.html` (a tela do PC não fica guardada no aparelho: basta atualizar a
-   página), nem para testes e documentação. Atualize junto o selo de versão no fim do `index.html` e a `version`
-   do backup no `app.js`.
+2. **Uma versão só, em cinco lugares.** Mudou o app (celular ou tela do PC)? Suba o número no
+   `CACHE_NAME` do `sw.js` (sem isso os aparelhos continuam na versão antiga), no selo do `index.html`,
+   no selo do `kanban.html`, na `version` do backup no `app.js` e no `package.json`. O `npm test`
+   reclama se algum ficar diferente. Mudança só em testes ou documentação não precisa de versão nova.
 3. **Texto digitado pelo usuário passa por `escapeHtml` antes de entrar em `innerHTML`.** Ids, cores e
    datas que vêm de backup ou da nuvem são validados na entrada (`sync.js` e importação).
 4. **Datas são sempre locais.** Nunca usar `toISOString()` para descobrir o dia: de noite, no Brasil,
@@ -43,10 +42,11 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
 
 ## Publicar uma versão
 
-1. Faça a mudança e suba a versão nos três lugares da regra 2.
+1. Faça a mudança e suba a versão nos cinco lugares da regra 2.
 2. `npm run build:css` (se mexeu em classes) e `npm test`.
 3. Envie para a branch `V-5.0`. O GitHub Pages publica em um ou dois minutos.
-4. No celular, feche e abra o app (às vezes duas vezes) e confira o selo de versão no canto.
+4. No celular, feche e abra o app (às vezes duas vezes) e confira o selo de versão no canto. No PC,
+   atualize a página: o selo fica no canto de baixo, à direita.
 
 ## Antes de vender o app
 

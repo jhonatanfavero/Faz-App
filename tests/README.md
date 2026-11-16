@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 11 suítes (cerca de 1 minuto)
+npm test        # confere o CSS pronto e roda as 13 suítes (cerca de 1 minuto)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -23,6 +23,8 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_kanban.js` | `kanban.html` de verdade | tela do PC: listas, agenda (semana e dia), arrastar, arquivados, tempo real |
 | `test_kanban_v4017.js` | `kanban.html` de verdade | abas Rotinas e Notas: criar, editar, apagar, rotina na Agenda, nota que salva sozinha, tempo real |
 | `test_kanban_v4018.js` | `kanban.html` de verdade | janela de Tags (criar, renomear, trocar cor, apagar e limpar quem usava), "Gerenciar tags" no cartão e na rotina, tags padrão de quem começa pelo PC, zoom das Listas e da Semana |
+| `test_kanban_v4019.js` | `kanban.html` de verdade | aba Finanças (mês a mês, totais, atrasadas, pagar, criar, editar com "só neste mês / próximos / todos", trocar tipo, apagar, tempo real) e setas ← → do teclado |
+| `test_v4019.js` | `index.html` + `app.js` de verdade | finanças do celular: editar só o nome de uma recorrente num mês com valor próprio não estraga os valores dos outros meses |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)

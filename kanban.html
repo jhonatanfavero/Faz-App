@@ -72,6 +72,16 @@
     .rt-theme { color: #71717a; }
     .rt-theme.on { background: #fff; color: #18181b; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
     .nt-item.on { background: #fff; box-shadow: 0 0 0 1.5px var(--focus); }
+    /* V40.19.0: Finanças */
+    .fn-grid { display: grid; grid-template-columns: 28px minmax(0, 1fr) 150px 130px 140px 32px; align-items: center; column-gap: 12px; }
+    .fn-row { box-shadow: inset 4px 0 0 var(--fn-tag, transparent); }
+    .fn-row.late { background: #fef2f2; }
+    .fn-row .fn-del { opacity: 0; }
+    .fn-row:hover .fn-del, .fn-row:focus-within .fn-del { opacity: 1; }
+    .fn-check { width: 24px; height: 24px; border-radius: 9999px; border: 2px solid #d4d4d8; background: #fff; display: inline-flex; align-items: center; justify-content: center; color: transparent; font-size: 12px; }
+    .fn-check.on, [aria-pressed="true"] > .fn-check { background: var(--focus); border-color: var(--focus); color: #fff; }
+    .fn-check:not(.on):hover { border-color: var(--focus); }
+    .fn-scope-opt:focus-visible { box-shadow: 0 0 0 2px var(--focus); }
     /* V40.18.0: Tags */
     .tg-dot { width: 28px; height: 28px; border-radius: 9999px; border: 2px solid #fff; box-shadow: 0 0 0 1px #d4d4d8; flex-shrink: 0; }
     .tg-dot.on { box-shadow: 0 0 0 2px #18181b; }
@@ -173,6 +183,8 @@
             <!-- V40.17.0: Rotinas e Notas, as mesmas do celular -->
             <button id="tab-rotinas" role="tab" data-tab="rotinas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Rotinas</button>
             <button id="tab-notas" role="tab" data-tab="notas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Notas</button>
+            <!-- V40.19.0: Finanças, as mesmas do celular -->
+            <button id="tab-financas" role="tab" data-tab="financas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Finanças</button>
         </nav>
         <p id="board-summary" class="hidden sm:block min-w-0 text-xs text-zinc-500 leading-tight truncate"></p>
         <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
@@ -296,6 +308,43 @@
             </div>
         </section>
     </main>
+
+    <!-- V40.19.0: Finanças (as mesmas do celular). Mês a mês: o que falta pagar, o que já foi pago e o que venceu. -->
+    <main id="financas" class="hidden relative flex-1 min-h-0 flex-col">
+        <div class="shrink-0 flex flex-wrap items-center gap-2 px-4 sm:px-5 pt-4">
+            <button id="fn-prev" class="w-9 h-9 rounded-lg flex items-center justify-center bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50" aria-label="Mês anterior"><i class="ph-bold ph-caret-left"></i></button>
+            <button id="fn-today" class="h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50">Este mês</button>
+            <button id="fn-next" class="w-9 h-9 rounded-lg flex items-center justify-center bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50" aria-label="Próximo mês"><i class="ph-bold ph-caret-right"></i></button>
+            <h2 id="fn-label" class="ml-1 text-[15px] font-bold text-zinc-900"></h2>
+            <button id="fn-new" class="ml-2 inline-flex items-center gap-1.5 bg-focus text-white text-[13px] font-semibold pl-2.5 pr-3 py-1.5 rounded-lg hover:opacity-90"><i class="ph-bold ph-plus"></i>Nova despesa</button>
+        </div>
+        <div class="flex-1 min-h-0 overflow-y-auto thin-scroll">
+            <div class="max-w-4xl mx-auto px-4 sm:px-5 pt-4 pb-8">
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="bg-white border border-zinc-200 rounded-xl px-4 py-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Total do mês</p>
+                        <p id="fn-total" class="mt-1 text-xl font-bold text-zinc-900 tabular-nums">R$ 0,00</p>
+                    </div>
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">Pago</p>
+                        <p id="fn-paid" class="mt-1 text-xl font-bold text-emerald-700 tabular-nums">R$ 0,00</p>
+                    </div>
+                    <div class="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-orange-700">Em aberto</p>
+                        <p id="fn-open" class="mt-1 text-xl font-bold text-orange-700 tabular-nums">R$ 0,00</p>
+                        <p id="fn-late" class="hidden mt-0.5 text-[12px] font-semibold text-red-600"></p>
+                    </div>
+                </div>
+                <div id="fn-list" class="mt-5"></div>
+                <div id="fn-empty" class="hidden px-6 py-14 text-center">
+                    <i class="ph ph-receipt text-4xl text-zinc-400"></i>
+                    <p id="fn-empty-text" class="mt-2 text-sm font-medium text-zinc-500"></p>
+                    <p id="fn-empty-hint" class="hidden mt-1.5 mx-auto max-w-md text-[12.5px] text-zinc-500 leading-relaxed">Usa o Faz no celular? Abra o app com internet (versão <b>v40.17.0</b> ou mais nova, o número fica no canto) e as despesas de lá aparecem aqui sozinhas.</p>
+                    <button id="fn-empty-new" class="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-zinc-700 border border-zinc-300 hover:bg-zinc-50 px-3.5 py-2 rounded-lg"><i class="ph ph-plus"></i>Nova despesa</button>
+                </div>
+            </div>
+        </div>
+    </main>
 </div>
 
 <!-- V40.18.0: Tags. Fica acima do cartão aberto (z-[55]) porque também abre de dentro dele. -->
@@ -315,6 +364,75 @@
                 <button id="tg-new-add" class="bg-focus text-white text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-90">Criar</button>
             </div>
             <div id="tg-new-colors" class="mt-2.5 flex flex-wrap gap-2" role="radiogroup" aria-label="Cor da tag nova"></div>
+        </div>
+    </div>
+</div>
+
+<!-- V40.19.0: criar / editar despesa -->
+<div id="modal-fin" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="fn-f-head">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div class="p-5 pb-3 overflow-y-auto thin-scroll">
+            <h3 id="fn-f-head" class="text-base font-bold text-zinc-900">Nova despesa</h3>
+            <p id="fn-f-sub" class="mt-0.5 text-[12px] text-zinc-500"></p>
+            <label class="block mt-4">
+                <span class="text-xs font-semibold text-zinc-500">Nome</span>
+                <input id="fn-f-title" maxlength="60" autocomplete="off" placeholder="Ex.: Luz, Internet, Mercado" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-800 outline-none">
+            </label>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+                <label class="block">
+                    <span class="text-xs font-semibold text-zinc-500">Valor</span>
+                    <span class="relative mt-1 block">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 pointer-events-none">R$</span>
+                        <input id="fn-f-amount" inputmode="decimal" autocomplete="off" placeholder="0,00" class="w-full border border-zinc-300 rounded-lg pl-9 pr-3 py-2 text-sm font-semibold text-zinc-800 outline-none tabular-nums">
+                    </span>
+                </label>
+                <label class="block">
+                    <span class="text-xs font-semibold text-zinc-500">Vence no dia <span class="font-normal text-zinc-400">(opcional)</span></span>
+                    <input id="fn-f-due" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="1 a 31" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-800 outline-none tabular-nums">
+                </label>
+            </div>
+            <div class="mt-4">
+                <span class="text-xs font-semibold text-zinc-500">Tipo</span>
+                <div id="fn-f-type" class="mt-1 flex p-1 bg-zinc-100 rounded-xl" role="radiogroup" aria-label="Tipo da despesa">
+                    <button type="button" data-type="oneshot" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Avulsa</button>
+                    <button type="button" data-type="recurring" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Recorrente</button>
+                    <button type="button" data-type="installment" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Parcelada</button>
+                </div>
+                <div id="fn-f-inst-wrap" class="hidden mt-2.5 items-center gap-2">
+                    <label for="fn-f-inst" class="text-sm text-zinc-600">Parcelas</label>
+                    <input id="fn-f-inst" inputmode="numeric" maxlength="2" autocomplete="off" class="w-16 border border-zinc-300 rounded-lg px-2 py-1.5 text-sm font-semibold text-center outline-none tabular-nums">
+                    <span class="text-[12px] text-zinc-500">(2 a 60)</span>
+                </div>
+                <p id="fn-f-range" class="mt-2 text-[12px] text-zinc-500"></p>
+            </div>
+            <button type="button" id="fn-f-paid" aria-pressed="false" class="mt-4 w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-left">
+                <span class="fn-check shrink-0"><i class="ph-bold ph-check"></i></span>
+                <span id="fn-f-paid-label" class="text-sm font-semibold text-zinc-700">Paga neste mês</span>
+            </button>
+            <p id="fn-f-note" class="hidden mt-3 text-[12px] text-zinc-500 leading-relaxed"></p>
+        </div>
+        <div class="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
+            <button id="fn-f-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar despesa</button>
+            <div class="ml-auto flex gap-2">
+                <button id="fn-f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
+                <button id="fn-f-save" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- V40.19.0: valor novo de despesa de vários meses: vale em quais meses? (igual ao app) -->
+<div id="fn-scope" class="hidden fixed inset-0 z-[60] items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="fn-scope-title">
+    <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-5">
+        <h3 id="fn-scope-title" class="text-base font-bold text-zinc-900">Aplicar o novo valor</h3>
+        <p id="fn-scope-text" class="mt-1.5 text-sm text-zinc-600 leading-relaxed"></p>
+        <div class="mt-4 flex flex-col gap-2">
+            <button data-scope="this" class="fn-scope-opt w-full text-left px-4 py-2.5 rounded-xl border border-zinc-200 hover:bg-zinc-50"><span class="block text-sm font-semibold text-zinc-900">Só neste mês</span><span class="block text-[12px] text-zinc-500">Os outros meses ficam como estão</span></button>
+            <button data-scope="future" class="fn-scope-opt w-full text-left px-4 py-2.5 rounded-xl border border-zinc-200 hover:bg-zinc-50"><span class="block text-sm font-semibold text-zinc-900">Neste mês e nos próximos</span><span class="block text-[12px] text-zinc-500">Os meses que já passaram ficam como estão</span></button>
+            <button data-scope="all" class="fn-scope-opt w-full text-left px-4 py-2.5 rounded-xl border border-zinc-200 hover:bg-zinc-50"><span class="block text-sm font-semibold text-zinc-900">Em todos os meses</span><span class="block text-[12px] text-zinc-500">Inclusive os que tinham um valor diferente</span></button>
+        </div>
+        <div class="mt-4 flex justify-end">
+            <button id="fn-scope-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
         </div>
     </div>
 </div>
@@ -486,7 +604,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.18.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.19.0</div>
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
@@ -513,6 +631,7 @@
     var S = {
         sb: null, uid: null, email: '', listas: {}, tags: {}, tarefas: {}, blocos: {}, rotinas: {}, notas: {}, financas: {},
         rtEdit: null, nt: null, ntQuery: '', agTag: '', agHideDone: false, zoom: { listas: 1, agenda: 1 },
+        fnMonth: null, fnEdit: null, fnScope: null, lsTarget: null, lsTargetAt: 0,
         tab: 'listas', agView: 'week', agAnchor: null, agScrolled: null, hours: [7, 24], recovery: false,
         channel: null, live: 'connecting', lastLoad: 0, loading: false,
         dragId: null, pendingRender: false, composer: null, editing: null, placing: null, agH0: 7
@@ -667,7 +786,7 @@
     // ---------- render ----------
     var renderT = null;
     function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); if (S.editing && S.editing.kind === 'blocos') renderDone(); }, 60); }
-    function renderSide() { renderRotinas(); renderNotas(); } // V40.17.0: cada uma só desenha se a aba dela estiver aberta
+    function renderSide() { renderRotinas(); renderNotas(); renderFinancas(); } // V40.17.0 (+ Finanças na V40.19.0): cada uma só desenha se a aba dela estiver aberta
 
     function cardHtml(t) {
         var tag = tagOf(t.tag_id);
@@ -1122,14 +1241,14 @@
         $('board-summary').textContent = S.agView === 'day' ? renderDay(S.agAnchor, map, today, nowMin()) : renderWeek(S.agAnchor, map, today, nowMin());
     }
 
-    var TABS = ['listas', 'agenda', 'rotinas', 'notas']; // V40.17.0: + Rotinas e Notas
+    var TABS = ['listas', 'agenda', 'rotinas', 'notas', 'financas']; // V40.17.0: + Rotinas e Notas; V40.19.0: + Finanças
     function setTab(tab) {
         var prev = S.tab;
         S.tab = TABS.indexOf(tab) >= 0 ? tab : 'listas';
         if (prev === 'notas' && S.tab !== 'notas') ntFlush(); // saindo das Notas: salva o que está escrito
         try { localStorage.setItem('faz_pc_tab', S.tab); } catch (e) {}
         $('board').classList.toggle('hidden', S.tab !== 'listas');
-        ['agenda', 'rotinas', 'notas'].forEach(function (t) {
+        ['agenda', 'rotinas', 'notas', 'financas'].forEach(function (t) {
             $(t).classList.toggle('hidden', S.tab !== t);
             $(t).classList.toggle('flex', S.tab === t);
         });
@@ -1920,6 +2039,263 @@
         renderNotas();
     }
 
+    // ---------- V40.19.0: FINANÇAS (as mesmas do celular). Mesmas regras do app.js: isItemInMonth, isPaidInMonth,
+    // getAmountInMonth, isFinancialOverdue, setOverrideForMonth, setOverrideThisAndFuture, setAmountAllMonths e
+    // cleanupOverridesOutsideRange. Aqui elas trabalham direto nas linhas da nuvem (start_month, paid_months...). ----------
+    var MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    var BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }), NUM2 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    function brl(n) { return BRL.format(Number(n) || 0); }
+    function isMonth(m) { return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(m || '')); }
+    function monthNow() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1); } // local, como o app (nunca UTC)
+    function monthAdd(m, n) { var p = String(m).split('-').map(Number), d = new Date(p[0], p[1] - 1 + n, 1); return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
+    function monthTitle(m) { var p = String(m).split('-'), n = MONTHS[Number(p[1]) - 1]; return n.charAt(0).toUpperCase() + n.slice(1) + ' ' + p[0]; } // "Novembro 2026"
+    function monthLong(m) { var p = String(m).split('-'); return MONTHS[Number(p[1]) - 1] + ' de ' + p[0]; }                                       // "novembro de 2026"
+    function monthShort(m) { var p = String(m).split('-'); return MONTHS[Number(p[1]) - 1].slice(0, 3) + '/' + p[0]; }                            // "nov/2026"
+    function fnDur(r) { var n = Math.round(Number(r.duration_months) || 1); return n >= 1 ? n : 1; }
+    function fnEnd(r) { return monthAdd(r.start_month, fnDur(r) - 1); }
+    function fnIn(r, m) { if (!isMonth(r.start_month)) return false; return fnDur(r) === 1 ? r.start_month === m : m >= r.start_month && m <= fnEnd(r); }
+    function fnPaid(r, m) { return Array.isArray(r.paid_months) && r.paid_months.indexOf(m) >= 0; }
+    function fnOverride(r, m) { // valor só daquele mês ({ amount } na nuvem; número solto também vale), ou null
+        var o = r.amount_overrides && typeof r.amount_overrides === 'object' ? r.amount_overrides[m] : null;
+        if (o == null) return null;
+        var a = Number(typeof o === 'object' ? o.amount : o);
+        return Number.isFinite(a) ? a : null;
+    }
+    function fnAmount(r, m) { var o = fnOverride(r, m); return o !== null ? o : (Number(r.amount) || 0); }
+    function fnOverrides(r) { // cópia limpa, com as chaves em ordem
+        var out = {};
+        Object.keys(r.amount_overrides || {}).sort().forEach(function (k) { var a = fnOverride(r, k); if (isMonth(k) && a !== null) out[k] = { amount: a }; });
+        return out;
+    }
+    function sortedKeys(o) { var out = {}; Object.keys(o).sort().forEach(function (k) { out[k] = o[k]; }); return out; }
+    function fnType(r) { return fnDur(r) === 1 ? 'oneshot' : r.is_recurring ? 'recurring' : 'installment'; }
+    function fnLate(r, m) { // sem vencimento nunca atrasa; mês que passou atrasa; no mês de hoje, depois do dia do vencimento
+        if (fnPaid(r, m) || !r.due_day) return false;
+        var now = monthNow();
+        return m < now || (m === now && r.due_day < new Date().getDate());
+    }
+    function fnSort(a, b) { // como o app: pelo dia do vencimento; quem não tem vai pro fim, das mais novas pras mais antigas
+        var ah = !!a.due_day, bh = !!b.due_day;
+        if (ah && bh) return (a.due_day - b.due_day) || ((Number(a.created_ms) || 0) - (Number(b.created_ms) || 0));
+        if (ah !== bh) return ah ? -1 : 1;
+        return (Number(b.created_ms) || 0) - (Number(a.created_ms) || 0);
+    }
+    function fnTypeLabel(r, m) {
+        var t = fnType(r);
+        if (t === 'oneshot') return 'Avulsa';
+        if (t === 'recurring') return 'Recorrente';
+        var i = (Number(m.slice(0, 4)) - Number(r.start_month.slice(0, 4))) * 12 + (Number(m.slice(5)) - Number(r.start_month.slice(5))) + 1;
+        return 'Parcela ' + i + '/' + fnDur(r);
+    }
+    function moneyField(n) { return NUM2.format(Number(n) || 0); } // 1234.5 → "1.234,50"
+    function parseMoney(v) { // aceita "1.234,56", "1234,56", "1234.56", "R$ 50"; devolve centavos certinhos ou null
+        var t = String(v == null ? '' : v).replace(/R\$|\s/g, '');
+        if (!t) return null;
+        if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
+        else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, ''); // "1.234" é mil duzentos e trinta e quatro
+        if (!/^\d+(\.\d+)?$/.test(t)) return null;
+        var n = Math.round(Number(t) * 100) / 100;
+        return Number.isFinite(n) ? n : null;
+    }
+    function fnRowHtml(r, m) {
+        var paid = fnPaid(r, m), late = fnLate(r, m), tag = tagOf(r.tag_id), ov = fnOverride(r, m), t = fnType(r);
+        var special = t !== 'oneshot' && ov !== null && Math.abs(ov - (Number(r.amount) || 0)) > 0.004;
+        return '<div class="fn-row fn-grid px-3 py-2.5 cursor-pointer hover:bg-zinc-50' + (late ? ' late' : '') + '"' + (tag ? ' style="--fn-tag:' + esc(safeColor(tag.color)) + '"' : '') + ' data-fn="' + esc(r.id) + '" tabindex="0">' +
+            '<button type="button" class="fn-check' + (paid ? ' on' : '') + '" data-fn-pay="' + esc(r.id) + '" aria-pressed="' + (paid ? 'true' : 'false') + '" title="' + (paid ? 'Paga. Clique pra voltar pra "a pagar"' : 'Marcar como paga') + '" aria-label="Paga em ' + monthLong(m) + '"><i class="ph-bold ph-check"></i></button>' +
+            '<div class="min-w-0"><p class="text-[14px] font-semibold truncate ' + (paid ? 'text-zinc-500' : 'text-zinc-800') + '" title="' + esc(r.title) + '">' + (esc(r.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
+            (tag ? '<p class="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-zinc-500"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</p>' : '') + '</div>' +
+            '<span class="text-[12.5px] text-zinc-600"' + (t !== 'oneshot' ? ' title="De ' + monthShort(r.start_month) + ' a ' + monthShort(fnEnd(r)) + '"' : '') + '>' + fnTypeLabel(r, m) + '</span>' +
+            '<span class="text-[12.5px] ' + (late ? 'font-semibold text-red-600' : 'text-zinc-600') + '">' + (r.due_day ? (late ? 'Venceu dia ' : 'Dia ') + r.due_day : '<span class="text-zinc-300">—</span>') + '</span>' +
+            '<div class="text-right"><span class="text-[14px] font-semibold tabular-nums ' + (paid ? 'line-through text-zinc-400' : late ? 'text-red-600' : 'text-zinc-900') + '">' + brl(fnAmount(r, m)) + '</span>' +
+            (special ? '<span class="block text-[11px] text-zinc-400" title="O valor normal é ' + brl(r.amount) + '">valor deste mês</span>' : '') + '</div>' +
+            '<button type="button" class="fn-del w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-600 hover:bg-red-50" data-fn-del="' + esc(r.id) + '" title="Apagar" aria-label="Apagar a despesa"><i class="ph ph-trash text-base"></i></button>' +
+            '</div>';
+    }
+    function fnSectionHtml(title, cls, rows, m) {
+        return '<section class="mb-5"><h3 class="px-1 text-[11px] font-bold uppercase tracking-wider ' + cls + '">' + title + ' (' + rows.length + ')</h3>' +
+            '<div class="mt-2 bg-white border border-zinc-200 rounded-xl overflow-hidden divide-y divide-zinc-100">' +
+            '<div class="fn-grid px-3 py-2 text-[10.5px] font-bold uppercase tracking-wider text-zinc-400 bg-zinc-50"><span></span><span>Despesa</span><span>Tipo</span><span>Vencimento</span><span class="text-right">Valor</span><span></span></div>' +
+            rows.map(function (r) { return fnRowHtml(r, m); }).join('') + '</div></section>';
+    }
+    function renderFinancas() {
+        if (!S.uid || S.tab !== 'financas') return;
+        var m = S.fnMonth || (S.fnMonth = monthNow());
+        var list = Object.keys(S.financas).map(function (k) { return S.financas[k]; }).filter(function (r) { return !r.deleted && fnIn(r, m); }).sort(fnSort);
+        var tot = { total: 0, paid: 0, open: 0, late: 0, lateAmt: 0 };
+        list.forEach(function (r) {
+            var a = fnAmount(r, m);
+            tot.total += a;
+            if (fnPaid(r, m)) tot.paid += a;
+            else { tot.open += a; if (fnLate(r, m)) { tot.late++; tot.lateAmt += a; } }
+        });
+        $('fn-label').textContent = monthTitle(m);
+        $('fn-today').classList.toggle('ag-filter-on', m !== monthNow()); // destaca o "Este mês" quando a tela está em outro mês
+        $('fn-total').textContent = brl(tot.total);
+        $('fn-paid').textContent = brl(tot.paid);
+        $('fn-open').textContent = brl(tot.open);
+        $('fn-late').textContent = tot.late ? (tot.late === 1 ? '1 atrasada: ' : tot.late + ' atrasadas: ') + brl(tot.lateAmt) : '';
+        $('fn-late').classList.toggle('hidden', !tot.late);
+        var unpaid = list.filter(function (r) { return !fnPaid(r, m); }), paid = list.filter(function (r) { return fnPaid(r, m); });
+        $('fn-list').innerHTML = (unpaid.length ? fnSectionHtml('A pagar', 'text-orange-600', unpaid, m) : '') + (paid.length ? fnSectionHtml('Pagas', 'text-emerald-600', paid, m) : '');
+        $('fn-empty').classList.toggle('hidden', list.length > 0 || !S.lastLoad);
+        $('fn-empty-text').textContent = 'Nenhuma despesa em ' + monthLong(m) + '.';
+        $('fn-empty-hint').classList.toggle('hidden', Object.keys(S.financas).length > 0); // nada nunca chegou do celular
+        $('board-summary').textContent = list.length ? list.length + (list.length === 1 ? ' despesa' : ' despesas') + ' em ' + MONTHS[Number(m.slice(5)) - 1] + (tot.late ? ' · ' + tot.late + (tot.late === 1 ? ' atrasada' : ' atrasadas') : '') : 'Nenhuma despesa em ' + MONTHS[Number(m.slice(5)) - 1];
+        if (S.fnEdit && S.fnEdit.id && !(S.financas[S.fnEdit.id] && !S.financas[S.fnEdit.id].deleted)) { closeFin(); toast('Essa despesa foi apagada em outro aparelho.'); }
+    }
+    function fnMove(n) { S.fnMonth = n === 0 ? monthNow() : monthAdd(S.fnMonth || monthNow(), n); renderFinancas(); }
+    function fnFormDur() {
+        var t = S.fnEdit.type;
+        if (t === 'recurring') return 12; // igual ao app: recorrente vale 12 meses
+        if (t !== 'installment') return 1;
+        var v = $('fn-f-inst').value.trim(), n = parseInt(v, 10);
+        return /^\d{1,2}$/.test(v) && n >= 2 && n <= 60 ? n : null;
+    }
+    function fnTypeUi() {
+        var t = S.fnEdit.type;
+        document.querySelectorAll('#fn-f-type [data-type]').forEach(function (b) { var on = b.dataset.type === t; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); });
+        $('fn-f-inst-wrap').classList.toggle('hidden', t !== 'installment');
+        $('fn-f-inst-wrap').classList.toggle('flex', t === 'installment');
+        fnRangeUi();
+    }
+    function fnRangeUi() {
+        var ed = S.fnEdit, d = fnFormDur(), st = ed.start;
+        $('fn-f-range').textContent = ed.type === 'oneshot' ? 'Só em ' + monthLong(st) + '.'
+            : !d ? 'As parcelas vão de 2 a 60.'
+            : (ed.type === 'recurring' ? 'Todo mês por 12 meses' : d + ' parcelas') + ': de ' + monthShort(st) + ' a ' + monthShort(monthAdd(st, d - 1)) + '.';
+    }
+    function fnPaidUi() {
+        var on = !!S.fnEdit.paid;
+        $('fn-f-paid').setAttribute('aria-pressed', on ? 'true' : 'false');
+        $('fn-f-paid-label').textContent = (on ? 'Paga em ' : 'Marcar como paga em ') + monthLong(S.fnMonth);
+    }
+    function openFin(id) {
+        var m = S.fnMonth || monthNow(), r = id ? S.financas[id] : null;
+        if (id && (!r || r.deleted)) return;
+        closeColMenu();
+        S.fnEdit = { id: id || null, type: r ? fnType(r) : 'oneshot', paid: r ? fnPaid(r, m) : false, start: r ? r.start_month : m };
+        $('fn-f-head').textContent = r ? 'Editar despesa' : 'Nova despesa';
+        $('fn-f-sub').textContent = !r ? 'Começa em ' + monthLong(m) + '.' : fnType(r) === 'oneshot' ? 'Em ' + monthLong(r.start_month) + '.' : 'O valor e o "paga" daqui são de ' + monthLong(m) + '.';
+        $('fn-f-title').value = r ? (r.title || '') : '';
+        $('fn-f-amount').value = r ? moneyField(fnAmount(r, m)) : '';
+        $('fn-f-due').value = r && r.due_day ? String(r.due_day) : '';
+        $('fn-f-inst').value = r && fnType(r) === 'installment' ? String(fnDur(r)) : '2';
+        $('fn-f-delete').classList.toggle('hidden', !r);
+        var ov = r ? fnOverride(r, m) : null, special = r && fnType(r) !== 'oneshot' && ov !== null && Math.abs(ov - (Number(r.amount) || 0)) > 0.004;
+        $('fn-f-note').textContent = special ? 'Neste mês o valor é diferente do normal (' + brl(r.amount) + ').' : '';
+        $('fn-f-note').classList.toggle('hidden', !special);
+        fnTypeUi();
+        fnPaidUi();
+        var box = $('modal-fin');
+        box.classList.remove('hidden');
+        box.classList.add('flex');
+        $('fn-f-title').focus();
+    }
+    function closeFin() {
+        if (S.fnScope) S.fnScope(null);
+        S.fnEdit = null;
+        $('modal-fin').classList.add('hidden');
+        $('modal-fin').classList.remove('flex');
+    }
+    // Valor novo de despesa de vários meses: "só neste mês", "neste e nos próximos" ou "em todos" (o modal de escopo do app).
+    function askScope(r, from, to) {
+        return new Promise(function (resolve) {
+            var box = $('fn-scope');
+            $('fn-scope-text').textContent = '"' + (r.title || 'Sem nome') + '": de ' + brl(from) + ' para ' + brl(to) + '. Em quais meses?';
+            box.classList.remove('hidden');
+            box.classList.add('flex');
+            box.querySelector('[data-scope="this"]').focus();
+            function done(v) {
+                box.classList.add('hidden');
+                box.classList.remove('flex');
+                box.removeEventListener('click', onClick);
+                box.removeEventListener('keydown', onKey);
+                box.removeEventListener('mousedown', onDown);
+                S.fnScope = null;
+                resolve(v);
+            }
+            function onClick(e) { var b = e.target.closest('[data-scope]'); if (b) done(b.dataset.scope); else if (e.target.closest('#fn-scope-cancel')) done(null); }
+            function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); done(null); } }
+            function onDown(e) { if (e.target === box) done(null); }
+            box.addEventListener('click', onClick);
+            box.addEventListener('keydown', onKey);
+            box.addEventListener('mousedown', onDown);
+            S.fnScope = done;
+        });
+    }
+    async function saveFin() {
+        var ed = S.fnEdit;
+        if (!ed || ed.busy) return;
+        var m = S.fnMonth, title = $('fn-f-title').value.trim();
+        if (!title) { $('fn-f-title').focus(); return toast('Dê um nome pra despesa.'); }
+        var amount = parseMoney($('fn-f-amount').value);
+        if (amount === null || amount <= 0 || amount > 1e12) { $('fn-f-amount').focus(); return toast('Informe um valor maior que zero.'); }
+        var dueRaw = $('fn-f-due').value.trim(), due = null;
+        if (dueRaw) {
+            due = parseInt(dueRaw, 10);
+            if (!/^\d{1,2}$/.test(dueRaw) || due < 1 || due > 31) { $('fn-f-due').focus(); return toast('O vencimento é um dia de 1 a 31.'); }
+        }
+        var dur = fnFormDur(), rec = ed.type === 'recurring';
+        if (!dur) { $('fn-f-inst').focus(); return toast('As parcelas vão de 2 a 60.'); }
+        if (!ed.id) { // nova: mesmo formato do app (id fin_<hora>, começa no mês da tela)
+            var row = { user_id: S.uid, id: newId('fin_', 'financas'), title: title, amount: amount, start_month: m, duration_months: dur, is_recurring: rec, due_day: due, tag_id: null, paid_months: ed.paid ? [m] : [], amount_overrides: {}, created_ms: Date.now(), deleted: false };
+            closeFin();
+            insertRow('financas', row, 'Despesa adicionada');
+            return;
+        }
+        var r = S.financas[ed.id];
+        if (!r || r.deleted) { closeFin(); return toast('Essa despesa foi apagada em outro aparelho.'); }
+        var typeChanged = fnDur(r) !== dur || !!r.is_recurring !== rec, oldAmt = fnAmount(r, m), changed = Math.abs(oldAmt - amount) > 0.004;
+        var base = Number(r.amount) || 0, ovr = fnOverrides(r), paidM = Array.isArray(r.paid_months) ? r.paid_months.slice() : [];
+        var start = r.start_month, end = monthAdd(start, dur - 1);
+        if (typeChanged) { paidM = []; ovr = {}; base = amount; } // igual ao app: trocou o tipo, recomeça (pagos e valores por mês)
+        else if (changed) {
+            var scope = 'all';
+            if (dur > 1) {
+                ed.busy = true;
+                scope = await askScope(r, oldAmt, amount);
+                ed.busy = false;
+                if (S.fnEdit !== ed) return;
+                if (!scope) return $('fn-f-amount').focus(); // desistiu: a janela continua aberta
+            }
+            if (scope === 'this') ovr[m] = { amount: amount };
+            else if (scope === 'future') { for (var c = m, g = 0; c <= end && g < 1200; c = monthAdd(c, 1), g++) ovr[c] = { amount: amount }; }
+            else { base = amount; ovr = {}; }
+        } // valor igual: nada muda nos valores (o app regravava o valor de todos os meses; corrigido nos dois na V40.19.0)
+        Object.keys(ovr).forEach(function (k) { if (k < start || k > end) delete ovr[k]; }); // parcelas 10 → 5: some o que ficou fora
+        var inRange = dur === 1 ? m === start : (m >= start && m <= end), has = paidM.indexOf(m) >= 0;
+        if (ed.paid && inRange && !has) paidM.push(m);
+        if (!ed.paid && has) paidM = paidM.filter(function (x) { return x !== m; });
+        var fields = {};
+        if (title !== (r.title || '')) fields.title = title;
+        if (due !== (r.due_day == null ? null : Number(r.due_day))) fields.due_day = due;
+        if (dur !== fnDur(r)) fields.duration_months = dur;
+        if (rec !== !!r.is_recurring) fields.is_recurring = rec;
+        if (Math.abs(base - (Number(r.amount) || 0)) > 0.004) fields.amount = base;
+        if (JSON.stringify(sortedKeys(ovr)) !== JSON.stringify(fnOverrides(r))) fields.amount_overrides = sortedKeys(ovr);
+        if (JSON.stringify(paidM) !== JSON.stringify(r.paid_months || [])) fields.paid_months = paidM;
+        closeFin();
+        if (!Object.keys(fields).length) return;
+        var ok = await patchRow('financas', r.id, fields, 'Despesa salva');
+        if (ok && !inRange) toast(dur === 1 ? 'Despesa salva. Agora ela fica só em ' + monthLong(start) + '.' : 'Despesa salva. Agora ela vai de ' + monthShort(start) + ' a ' + monthShort(end) + '.', 5000);
+    }
+    function togglePaidFin(id) {
+        var r = S.financas[id], m = S.fnMonth;
+        if (!r || r.deleted) return;
+        var was = fnPaid(r, m), list = (Array.isArray(r.paid_months) ? r.paid_months : []).filter(function (x) { return x !== m; });
+        if (!was) list.push(m);
+        patchRow('financas', id, { paid_months: list }, was ? 'Voltou pra "a pagar"' : 'Paga em ' + monthLong(m));
+    }
+    async function deleteFin(id) {
+        var r = S.financas[id];
+        if (!r || r.deleted) return;
+        var multi = fnType(r) !== 'oneshot';
+        var yes = await dialog({ title: 'Apagar a despesa "' + (r.title || 'Sem nome') + '"?', text: (multi ? 'Ela sai de todos os meses (de ' + monthShort(r.start_month) + ' a ' + monthShort(fnEnd(r)) + '), ' : 'Ela sai ') + 'aqui e no celular.', okLabel: 'Apagar despesa', danger: true });
+        if (!yes || !S.financas[id] || S.financas[id].deleted) return;
+        if (S.fnEdit && S.fnEdit.id === id) closeFin();
+        patchRow('financas', id, { deleted: true }, 'Despesa apagada');
+    }
+
     // ---------- V40.18.0: TAGS (as mesmas do celular). O app só cria e apaga; aqui também renomeia e troca a cor. ----------
     var TAG_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6']; // as 8 cores do app
     var DEFAULT_TAGS = [['tag_1', 'Trabalho', '#ef4444'], ['tag_2', 'Pessoal', '#10b981'], ['tag_3', 'Estudo', '#f59e0b']]; // as que o app cria num aparelho novo
@@ -2522,6 +2898,8 @@
             if (!$('dialog').classList.contains('hidden')) return;
             if (!$('cal-pop').classList.contains('hidden')) return closeCal();
             if (!$('modal-tags').classList.contains('hidden')) return closeTags(); // V40.18.0: fica por cima do cartão
+            if (S.fnScope) return S.fnScope(null); // V40.19.0
+            if (S.fnEdit) return closeFin();
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
             if (S.rtEdit) return closeRoutine(); // V40.17.0
             if (menuEl) return closeColMenu();
@@ -2552,6 +2930,31 @@
             renderAgenda();
         });
         function agMove(sign) { S.agAnchor = addDays(S.agAnchor || todayStr(), sign * (S.agView === 'week' ? 7 : 1)); S.agScrolled = null; renderAgenda(); }
+        // V40.19.0: setas ← → do teclado. Agenda: semana (ou dia) anterior/seguinte; Listas: uma lista pro lado; Finanças: mês.
+        // Não fazem nada com o cursor num campo, com janela, menu ou calendário aberto, no meio de um arraste ou com Alt/Ctrl/Shift.
+        function anyLayerOpen() {
+            return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
+        }
+        function listsStep(dir) {
+            var b = $('board'), cols = b.querySelectorAll('section.col');
+            if (cols.length < 2) return;
+            var pitch = cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left; // largura de uma lista + o espaço (já com o zoom)
+            if (!(pitch > 0)) return;
+            var from = S.lsTarget != null && Date.now() - S.lsTargetAt < 450 ? S.lsTarget : b.scrollLeft; // tecla segurada: soma a partir do alvo
+            var max = Math.max(0, b.scrollWidth - b.clientWidth), to = Math.max(0, Math.min(max, (Math.round(from / pitch) + dir) * pitch));
+            S.lsTarget = to; S.lsTargetAt = Date.now();
+            if (b.scrollTo) b.scrollTo({ left: to, behavior: 'smooth' }); else b.scrollLeft = to;
+        }
+        document.addEventListener('keydown', function (e) {
+            if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return;
+            if (!S.uid || $('view-board').classList.contains('hidden')) return;
+            var t = e.target, tag = t && t.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable) || anyLayerOpen()) return;
+            var dir = e.key === 'ArrowLeft' ? -1 : 1;
+            if (S.tab === 'agenda') { if (S.agDrag || DG) return; e.preventDefault(); agMove(dir); }
+            else if (S.tab === 'listas') { if (S.dragId) return; e.preventDefault(); listsStep(dir); }
+            else if (S.tab === 'financas') { e.preventDefault(); fnMove(dir); }
+        });
         $('ag-prev').addEventListener('click', function () { agMove(-1); });
         $('ag-next').addEventListener('click', function () { agMove(1); });
         $('ag-today').addEventListener('click', function () { S.agAnchor = todayStr(); S.agScrolled = null; renderAgenda(); });
@@ -2714,6 +3117,39 @@
         $('zoom-reset').addEventListener('click', function () { setZoom(0); });
         $('board').addEventListener('wheel', zoomWheel, { passive: false });
         $('ag-week').addEventListener('wheel', zoomWheel, { passive: false });
+        // V40.19.0: Finanças
+        $('fn-prev').addEventListener('click', function () { fnMove(-1); });
+        $('fn-next').addEventListener('click', function () { fnMove(1); });
+        $('fn-today').addEventListener('click', function () { fnMove(0); });
+        $('fn-new').addEventListener('click', function () { openFin(null); });
+        $('fn-empty-new').addEventListener('click', function () { openFin(null); });
+        $('fn-list').addEventListener('click', function (e) {
+            var b;
+            if ((b = e.target.closest('[data-fn-pay]'))) return togglePaidFin(b.dataset.fnPay);
+            if ((b = e.target.closest('[data-fn-del]'))) return void deleteFin(b.dataset.fnDel);
+            if ((b = e.target.closest('[data-fn]'))) openFin(b.dataset.fn);
+        });
+        $('fn-list').addEventListener('keydown', function (e) {
+            var row = e.target.closest && e.target.closest('[data-fn]');
+            if (row && e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openFin(row.dataset.fn); }
+        });
+        $('fn-f-type').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-type]');
+            if (!b || !S.fnEdit) return;
+            S.fnEdit.type = b.dataset.type;
+            fnTypeUi();
+            if (S.fnEdit.type === 'installment') { $('fn-f-inst').focus(); $('fn-f-inst').select(); }
+        });
+        $('fn-f-inst').addEventListener('input', function () { if (S.fnEdit) fnRangeUi(); });
+        $('fn-f-paid').addEventListener('click', function () { if (!S.fnEdit) return; S.fnEdit.paid = !S.fnEdit.paid; fnPaidUi(); });
+        $('fn-f-amount').addEventListener('blur', function () { var n = parseMoney(this.value); if (n !== null && n > 0) this.value = moneyField(n); });
+        ['fn-f-title', 'fn-f-amount', 'fn-f-due', 'fn-f-inst'].forEach(function (id) {
+            $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); saveFin(); } });
+        });
+        $('fn-f-save').addEventListener('click', function () { saveFin(); });
+        $('fn-f-cancel').addEventListener('click', closeFin);
+        $('fn-f-delete').addEventListener('click', function () { if (S.fnEdit && S.fnEdit.id) deleteFin(S.fnEdit.id); });
+        $('modal-fin').addEventListener('mousedown', function (e) { if (e.target === this) closeFin(); });
         $('ar-close').addEventListener('click', closeArchive);
         $('modal-archive').addEventListener('mousedown', function (e) { if (e.target === this) closeArchive(); });
         $('ar-list').addEventListener('click', function (e) {
@@ -2840,6 +3276,7 @@
             S.uid = null; S.listas = {}; S.tags = {}; S.tarefas = {}; S.blocos = {}; S.lastLoad = 0; S.composer = null;
             S.rotinas = {}; S.notas = {}; S.financas = {}; closeRoutine(); ntClose(); // V40.17.0
             closeTags(); // V40.18.0
+            closeFin(); // V40.19.0
             closeTask();
             S.placing = null;
             closeArchive();

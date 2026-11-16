@@ -1,7 +1,7 @@
 // Tela do PC com mouse de verdade. Agenda: arrastar o bloco na régua do Dia, puxar a borda de baixo pra mudar
 // a duração, rolagem automática, Esc, e os espaços livres que aparecem ao arrastar na Semana. Listas: os 3
 // pontinhos do cartão (Arquivar / Apagar) e o campo de arquivar que aparece no topo durante o arraste. V40.18.0: zoom
-// das Listas e da Semana (com arrastar) e a janela de Tags.
+// das Listas e da Semana (com arrastar) e a janela de Tags. V40.19.0: setas do teclado e aba Finanças.
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -343,6 +343,39 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(empilhadas, '"Gerenciar tags" abre a janela por cima do cartão, e ela recebe o clique');
   await foto(p, 'pc-tags-sobre-cartao.png');
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(100);
+
+  console.log('\nK) Setas do teclado e aba Finanças (V40.19.0):');
+  await p.locator('#tab-listas').click(); await p.waitForTimeout(200);
+  await p.evaluate(() => { document.getElementById('board').scrollLeft = 0; if (document.activeElement) document.activeElement.blur(); });
+  const passo = await p.evaluate(() => { const c = document.querySelectorAll('section.col'), b = document.getElementById('board'); return { pitch: c[1].getBoundingClientRect().left - c[0].getBoundingClientRect().left, max: b.scrollWidth - b.clientWidth }; });
+  const rolagemListas = () => p.evaluate(() => document.getElementById('board').scrollLeft);
+  await p.keyboard.press('ArrowRight'); await p.waitForTimeout(600);
+  const ls1 = await rolagemListas();
+  await p.keyboard.press('ArrowLeft'); await p.waitForTimeout(600);
+  const ls0 = await rolagemListas();
+  ok(passo.max > 0 && Math.abs(ls1 - Math.min(passo.pitch, passo.max)) <= 2 && ls0 <= 1, `Listas: → rola exatamente uma lista (${Math.round(ls1)}px) e ← volta`);
+  await p.keyboard.press('ArrowRight'); await p.keyboard.press('ArrowRight'); await p.waitForTimeout(700);
+  ok(Math.abs((await rolagemListas()) - Math.min(2 * passo.pitch, passo.max)) <= 2, 'apertar duas vezes seguidas anda duas listas (ou até o fim)');
+  await p.evaluate(() => { document.getElementById('board').scrollLeft = 0; });
+  await p.locator('#tab-financas').click(); await p.waitForTimeout(300);
+  const fin = await p.evaluate(() => {
+    const rows = [...document.querySelectorAll('#fn-list [data-fn]')];
+    const vals = rows.map((r) => r.children[4].getBoundingClientRect().right), cab = document.querySelector('#fn-list .fn-grid span.text-right').getBoundingClientRect().right;
+    return { n: rows.length, transborda: rows.some((r) => r.scrollWidth > r.clientWidth + 1), alinhado: vals.every((x) => Math.abs(x - cab) < 1.5), cartoes: [...document.querySelectorAll('#financas .grid-cols-3 > div')].map((c) => Math.round(c.getBoundingClientRect().width)) };
+  });
+  ok(fin.n > 10 && !fin.transborda && fin.alinhado && fin.cartoes.length === 3 && fin.cartoes.every((w) => w > 200), `Finanças: ${fin.n} despesas, colunas alinhadas com o cabeçalho, nada saindo da linha, 3 totais lado a lado`);
+  await foto(p, 'pc-financas.png');
+  await p.keyboard.press('ArrowLeft'); await p.waitForTimeout(150);
+  ok((await p.evaluate(() => document.getElementById('fn-label').textContent)) === 'Outubro 2026', 'Finanças: ← vai pro mês anterior');
+  await p.keyboard.press('ArrowRight'); await p.waitForTimeout(150);
+  await p.locator('#fn-list [data-fn="fin_1700001703000"]').click(); await p.waitForTimeout(150);
+  await foto(p, 'pc-financas-editar.png');
+  await p.locator('#fn-f-amount').fill('200'); await p.locator('#fn-f-save').click(); await p.waitForTimeout(200);
+  const escopo = await p.evaluate(() => { const b = document.querySelector('#fn-scope > div').getBoundingClientRect(); return { aberto: !document.getElementById('fn-scope').classList.contains('hidden'), dentro: b.top >= 0 && b.bottom <= innerHeight, foco: document.activeElement.dataset.scope }; });
+  ok(escopo.aberto && escopo.dentro && escopo.foco === 'this', 'valor novo numa recorrente: a pergunta "Em quais meses?" abre por cima, inteira, com "Só neste mês" escolhido');
+  await foto(p, 'pc-financas-escopo.png');
+  await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+  ok(await p.evaluate(() => document.getElementById('modal-fin').classList.contains('hidden') && document.getElementById('fn-scope').classList.contains('hidden')), 'Esc, Esc: fecha a pergunta e depois a despesa, sem gravar');
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));
   await fim();

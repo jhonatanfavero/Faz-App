@@ -2137,7 +2137,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.18.0',
+            version: 'v40.19.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -5694,9 +5694,11 @@ window.saveFinancialForm = function() {
         }
         
         // Caminho normal: avulsa, valor não mudou, ou tipo mudou
+        // V40.19.0: valor igual → 'keep'. Antes ia 'all', que gravava o valor DESTE mês como o de todos e apagava os
+        // valores por mês (editar só o nome de uma recorrente num mês com valor diferente estragava os outros meses).
         applyFinancialItemUpdate(item, {
             title, amount, dueDay, durationMonths, isRecurring,
-            typeChanged, scopeForAmount: 'all', // se chegou aqui, atualiza o item.amount diretamente
+            typeChanged, scopeForAmount: valueChanged ? 'all' : 'keep',
             paidNow: currentFinPaid
         });
         showToast('Despesa atualizada!');
@@ -5749,9 +5751,9 @@ function applyFinancialItemUpdate(item, payload) {
             setOverrideForMonth(item, currentFinanceMonth, amount);
         } else if (scopeForAmount === 'future') {
             setOverrideThisAndFuture(item, currentFinanceMonth, amount);
-        } else { // 'all'
+        } else if (scopeForAmount === 'all') {
             setAmountAllMonths(item, amount);
-        }
+        } // 'keep' (V40.19.0): o valor não mudou, os valores ficam como estão
     }
     
     // F3/F10: limpa overrides fora do range (se durationMonths reduziu)

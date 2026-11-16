@@ -9,7 +9,8 @@
 // V10.14 - v40.12.0 (Tela do PC: calendário e hora próprios, sempre em português e em 24h; botão da "mão" leva a tarefa pra aba Agenda pra clicar no dia e horário livre onde quer colocar, como no app. No celular só muda o número da versão.)
 // V10.15 - v40.13.0 (Tela do PC: criar bloco novo direto na Agenda — botão "Novo bloco", "Adicionar bloco" em cada dia da semana e clique num horário vazio na visão Dia. No celular só muda o número da versão.)
 // V10.16 - v40.14.0 (Tela do PC, aba Agenda: na visão Dia dá pra arrastar o bloco pra outro horário e puxar a borda de baixo pra mudar a duração, com as regras do app (de 5 em 5 min, sem sobrepor); na Semana, ao arrastar, os espaços livres de cada dia viram lugar de soltar. No celular só muda o número da versão.)
-const CACHE_NAME = 'timeblock-v40-14-0';
+// V10.17 - v40.15.0 (Tela do PC: 3 pontinhos no cartão das Listas e no bloco da Semana, com Arquivar e Apagar sem abrir o cartão; ao arrastar um cartão ou bloco aparece no topo o campo "Solte aqui pra arquivar". No celular só muda o número da versão.)
+const CACHE_NAME = 'timeblock-v40-15-0';
 const ASSETS = [
   './',
   './index.html',

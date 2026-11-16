@@ -70,6 +70,12 @@
     .ag-drop.over { background: var(--focus); color: #fff; border-style: solid; }
     .card .card-sched { opacity: 0; }
     .card:hover .card-sched, .card:focus-within .card-sched { opacity: 1; }
+    /* V40.15.0: 3 pontinhos (Arquivar / Apagar) também nos blocos da Semana, e campo de arquivar que aparece ao arrastar */
+    .ag-card .ag-more { opacity: 0; }
+    .ag-card:hover .ag-more, .ag-card:focus-within .ag-more, .ag-more:focus { opacity: 1; }
+    #drop-archive { background: #fff; border-color: #a1a1aa; color: #52525b; box-shadow: 0 6px 18px rgba(0,0,0,.14); }
+    #drop-archive * { pointer-events: none; } /* quem recebe o cartão é sempre o campo inteiro */
+    #drop-archive.over { background: var(--focus); border-color: var(--focus); border-style: solid; color: #fff; }
     .swatch.on { box-shadow: 0 0 0 2px #18181b; }
     .now-line { position: absolute; left: 56px; right: 0; height: 2px; background: #ef4444; z-index: 5; pointer-events: none; }
     .now-line::before { content: ''; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
@@ -168,6 +174,10 @@
             <button id="btn-logout" class="text-xs font-semibold text-zinc-600 hover:text-zinc-900 px-2.5 py-2 rounded-lg hover:bg-zinc-100">Sair</button>
         </div>
     </header>
+    <!-- V40.15.0: campo de arquivar. Fica por cima do cabeçalho só enquanto um cartão (ou bloco da Semana) é arrastado. -->
+    <div id="drop-archive" class="hidden fixed top-1 left-1/2 -translate-x-1/2 z-30 h-12 w-[min(520px,60vw)] items-center justify-center gap-2.5 rounded-xl border-2 border-dashed text-[13.5px] font-semibold" aria-hidden="true">
+        <i class="ph ph-archive text-xl"></i><span>Solte aqui pra arquivar</span>
+    </div>
     <main id="board" class="relative flex-1 min-h-0 overflow-x-auto overflow-y-hidden thin-scroll">
         <div id="columns" class="h-full inline-flex items-start gap-4 p-4 sm:p-5"></div>
         <div id="board-empty" class="hidden absolute inset-0 flex items-center justify-center p-6">
@@ -336,7 +346,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.14.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.15.0</div>
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
@@ -520,9 +530,12 @@
             'style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" draggable="true" tabindex="0" data-id="' + esc(t.id) + '">' +
             '<div class="flex items-start gap-1">' +
             '<p class="min-w-0 flex-1 text-[13.5px] font-semibold text-zinc-800 leading-snug break-words">' + (esc(t.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
-            '<button type="button" class="card-sched shrink-0 -mt-1 w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-sched="' + esc(t.id) + '" title="Agendar" aria-label="Agendar esta tarefa"><i class="ph ph-calendar-plus text-base"></i></button>' +
-            '<button type="button" class="card-sched shrink-0 -mr-1.5 -mt-1 w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-hand="' + esc(t.id) + '" title="Levar pra Agenda e clicar onde quer colocar" aria-label="Levar esta tarefa pra Agenda"><i class="ph ph-hand-pointing text-base"></i></button>' +
-            '</div>' +
+            // V40.15.0: os botões do cartão ficam colados (sem espaço entre eles) pra não roubar largura do nome
+            '<div class="shrink-0 flex -mr-1.5 -mt-1">' +
+            '<button type="button" class="card-sched w-6 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-sched="' + esc(t.id) + '" title="Agendar" aria-label="Agendar esta tarefa"><i class="ph ph-calendar-plus text-base"></i></button>' +
+            '<button type="button" class="card-sched w-6 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-hand="' + esc(t.id) + '" title="Levar pra Agenda e clicar onde quer colocar" aria-label="Levar esta tarefa pra Agenda"><i class="ph ph-hand-pointing text-base"></i></button>' +
+            '<button type="button" class="card-sched w-6 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-more="' + esc(t.id) + '" title="Arquivar ou apagar" aria-label="Mais opções desta tarefa" aria-haspopup="menu"><i class="ph-bold ph-dots-three text-base"></i></button>' +
+            '</div></div>' +
             '<div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">' +
             (tag ? '<span class="inline-flex items-center gap-1.5 font-medium text-zinc-600"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
             '<span class="inline-flex items-center gap-1"><i class="ph ph-clock"></i>' + fmtDur(t.duration) + '</span>' +
@@ -617,7 +630,9 @@
         return '<article draggable="true" class="ag-card ' + paint.cls + 'bg-white border border-zinc-200 border-l-4 rounded-lg px-2.5 py-1.5 cursor-pointer hover:border-zinc-300' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
             '" style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
             '<div class="flex items-start gap-1.5">' + doneBtnHtml(b, 'mt-0.5 -ml-0.5') + '<div class="min-w-0 flex-1">' +
-            '<p class="text-[11px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + '<span class="font-medium text-zinc-400"> · ' + fmtDur(b.duration) + '</span></p>' +
+            '<div class="flex items-center"><p class="min-w-0 flex-1 text-[11px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + '<span class="font-medium text-zinc-400"> · ' + fmtDur(b.duration) + '</span></p>' +
+            // V40.15.0: 3 pontinhos (Arquivar / Apagar) sem abrir o cartão; com tarefa na mão os blocos não são mexidos
+            (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100" data-more="' + esc(b.id) + '" title="Arquivar ou apagar" aria-label="Mais opções deste bloco" aria-haspopup="menu"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
             '<p class="text-[13px] font-semibold leading-snug break-words ' + (b.completed ? 'line-through text-zinc-400' : 'text-zinc-800') + '">' + (esc(b.title) || 'Sem nome') + '</p>' +
             ((tag || mb.n || b.completed) ? '<div class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-zinc-500">' +
                 (b.completed ? '<span class="inline-flex items-center gap-1 text-emerald-600 font-medium"><i class="ph-fill ph-check-circle"></i>Concluído</span>' : '') +
@@ -1034,9 +1049,48 @@
 
     var menuEl = null;
     function closeColMenu() {
-        if (menuEl) { menuEl.remove(); menuEl = null; document.removeEventListener('pointerdown', outsideMenu, true); }
+        if (menuEl) { menuEl.remove(); menuEl = null; document.removeEventListener('pointerdown', outsideMenu, true); document.removeEventListener('scroll', closeColMenu, true); }
     }
     function outsideMenu(e) { if (menuEl && !menuEl.contains(e.target)) closeColMenu(); }
+    // V40.15.0: 3 pontinhos do cartão (tarefa das Listas ou bloco da Semana): Arquivar ou Apagar sem abrir o cartão.
+    function openCardMenu(kind, id, btn) {
+        var same = menuEl && menuEl.dataset.card === kind + '|' + id;
+        closeColMenu();
+        var row = S[kind][id];
+        if (same || !row || row.deleted) return; // clicar de novo nos 3 pontinhos fecha
+        var r = btn.getBoundingClientRect();
+        menuEl = document.createElement('div');
+        menuEl.dataset.card = kind + '|' + id;
+        menuEl.setAttribute('role', 'menu');
+        menuEl.className = 'fixed z-40 w-44 bg-white border border-zinc-200 rounded-xl shadow-lg p-1';
+        menuEl.innerHTML = '<button type="button" role="menuitem" data-act="archive" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-archive"></i>Arquivar</button>' +
+            '<button type="button" role="menuitem" data-act="delete" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-red-600 hover:bg-red-50"><i class="ph ph-trash"></i>Apagar</button>';
+        menuEl.addEventListener('click', async function (e) {
+            var b = e.target.closest('button');
+            if (!b) return;
+            closeColMenu();
+            if (b.dataset.act === 'archive') archiveRow(kind, id);
+            else if (await askDelete(kind === 'blocos')) patchRow(kind, id, { deleted: true }, kind === 'blocos' ? 'Bloco apagado' : 'Tarefa apagada');
+        });
+        document.body.appendChild(menuEl);
+        var h = menuEl.offsetHeight || 84, top = r.bottom + 6;
+        if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - 6 - h); // cartão no fim da tela: o menu abre pra cima
+        menuEl.style.top = Math.round(top) + 'px';
+        menuEl.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 184, r.right - 176))) + 'px';
+        menuEl.querySelector('button').focus();
+        setTimeout(function () { document.addEventListener('pointerdown', outsideMenu, true); document.addEventListener('scroll', closeColMenu, true); }, 0); // rolar a lista fecha o menu (ele ficaria solto)
+    }
+    function archiveRow(kind, id) { return patchRow(kind, id, { archived: true }, kind === 'blocos' ? 'Bloco arquivado' : 'Tarefa arquivada'); }
+    function askDelete(isB) {
+        return dialog({ title: isB ? 'Apagar este bloco?' : 'Apagar esta tarefa?', text: isB ? 'Ele some daqui e do celular.' : 'Ela some daqui e do celular.', okLabel: isB ? 'Apagar bloco' : 'Apagar tarefa', danger: true });
+    }
+    // V40.15.0: campo de arquivar no topo, visível só durante o arraste de um cartão ou de um bloco da Semana
+    function archiveZone(on) {
+        var z = $('drop-archive');
+        z.classList.toggle('hidden', !on);
+        z.classList.toggle('flex', !!on);
+        if (!on) z.classList.remove('over');
+    }
     function openColMenu(colId, btn) {
         closeColMenu();
         var c = S.listas[colId];
@@ -1057,7 +1111,7 @@
             if (b.dataset.act === 'rename') renameList(colId); else deleteList(colId);
         });
         document.body.appendChild(menuEl);
-        setTimeout(function () { document.addEventListener('pointerdown', outsideMenu, true); }, 0); // pointerdown: também dispara em toque no iPad/iPhone
+        setTimeout(function () { document.addEventListener('pointerdown', outsideMenu, true); document.addEventListener('scroll', closeColMenu, true); }, 0); // pointerdown: também dispara em toque no iPad/iPhone; rolar fecha o menu
     }
 
     // ---------- diálogo genérico ----------
@@ -1299,7 +1353,7 @@
         var ed = S.editing;
         if (!ed || ed.isNew) return;
         var isB = ed.kind === 'blocos';
-        var ok = await dialog({ title: isB ? 'Apagar este bloco?' : 'Apagar esta tarefa?', text: isB ? 'Ele some daqui e do celular.' : 'Ela some daqui e do celular.', okLabel: isB ? 'Apagar bloco' : 'Apagar tarefa', danger: true });
+        var ok = await askDelete(isB);
         if (!ok) return;
         closeTask();
         patchRow(ed.kind, ed.id, { deleted: true }, isB ? 'Bloco apagado' : 'Tarefa apagada');
@@ -1476,7 +1530,7 @@
         var ed = S.editing;
         if (!ed || ed.isNew) return;
         closeTask();
-        patchRow(ed.kind, ed.id, { archived: true }, ed.kind === 'blocos' ? 'Bloco arquivado' : 'Tarefa arquivada');
+        archiveRow(ed.kind, ed.id);
     }
     function archivedRows() {
         var out = [];
@@ -1545,6 +1599,7 @@
     }
     function endDrag(skipRender) {
         clearDropMarks();
+        archiveZone(false);
         document.querySelectorAll('.card.dragging').forEach(function (el) { el.classList.remove('dragging'); });
         S.dragId = null;
         if (S.pendingRender && !skipRender) render();
@@ -1589,13 +1644,14 @@
             if ((b = e.target.closest('.col-menu-btn'))) return openColMenu(b.dataset.col, b);
             if ((b = e.target.closest('.add-btn'))) return openComposer(b.dataset.col, '', true);
             if (e.target.closest('#btn-new-list')) return createList();
+            if ((b = e.target.closest('[data-more]'))) return openCardMenu('tarefas', b.dataset.more, b); // V40.15.0
             if ((b = e.target.closest('[data-hand]'))) return startPlacingFromTask(b.dataset.hand); // V40.12.0
             if ((b = e.target.closest('[data-sched]'))) { openTask(b.dataset.sched); return openSched(); } // V40.11.0
             var card = e.target.closest('.card');
             if (card) openTask(card.dataset.id);
         });
         wrap.addEventListener('keydown', function (e) {
-            if (e.target.closest && e.target.closest('[data-sched], [data-hand]')) return; // os botões do cartão cuidam do próprio Enter
+            if (e.target.closest && e.target.closest('[data-sched], [data-hand], [data-more]')) return; // os botões do cartão cuidam do próprio Enter
             var card = e.target.closest && e.target.closest('.card');
             if (card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openTask(card.dataset.id); }
         });
@@ -1606,7 +1662,7 @@
             closeColMenu();
             e.dataTransfer.effectAllowed = 'move';
             try { e.dataTransfer.setData('text/plain', S.dragId); } catch (err) {}
-            requestAnimationFrame(function () { card.classList.add('dragging'); });
+            requestAnimationFrame(function () { if (S.dragId !== card.dataset.id) return; card.classList.add('dragging'); archiveZone(true); });
         });
         wrap.addEventListener('dragover', function (e) {
             if (!S.dragId) return;
@@ -1756,6 +1812,8 @@
             if (dn) return toggleDone(dn.dataset.done); // V40.11.0: concluir sem abrir o cartão
             var add = e.target.closest('[data-add-day]');
             if (add) return openNewBlock(add.dataset.addDay); // V40.13.0
+            var more = e.target.closest('[data-more]');
+            if (more) return openCardMenu('blocos', more.dataset.more, more); // V40.15.0: arquivar ou apagar sem abrir o cartão
             if (S.placing) { // com a tarefa na mão, clicar num bloco não abre o cartão; na visão Dia, clicar no horário coloca
                 var tl = e.target.closest('#ag-timeline');
                 if (tl && !e.target.closest('[data-block]')) return placeHere(S.agAnchor, (S.agH0 || 0) * 60 + Math.round(((e.clientY - tl.getBoundingClientRect().top) / PXM) / 5) * 5);
@@ -1767,7 +1825,7 @@
             if (ruler) openNewBlock(S.agAnchor, (S.agH0 || 0) * 60 + Math.floor(((e.clientY - ruler.getBoundingClientRect().top) / PXM) / 5) * 5);
         });
         $('agenda').addEventListener('keydown', function (e) {
-            if (e.target.closest && e.target.closest('[data-done]')) return;
+            if (e.target.closest && e.target.closest('[data-done], [data-more]')) return;
             var c = e.target.closest && e.target.closest('[data-block]');
             if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openBlock(c.dataset.block); }
         });
@@ -1782,6 +1840,7 @@
             agClear();
             agCols.querySelectorAll('.ag-card.dragging').forEach(function (el) { el.classList.remove('dragging'); });
             agCols.querySelectorAll('.ag-drop').forEach(function (el) { el.remove(); });
+            archiveZone(false);
             S.agDrag = null;
             if (S.agPending) renderAgenda();
         }
@@ -1814,9 +1873,10 @@
             var c = e.target.closest('[data-block]');
             if (!c) return;
             S.agDrag = c.dataset.block;
+            closeColMenu();
             e.dataTransfer.effectAllowed = 'move';
             try { e.dataTransfer.setData('text/plain', S.agDrag); } catch (err) {}
-            requestAnimationFrame(function () { if (S.agDrag !== c.dataset.block) return; c.classList.add('dragging'); agShowDrops(); });
+            requestAnimationFrame(function () { if (S.agDrag !== c.dataset.block) return; c.classList.add('dragging'); agShowDrops(); archiveZone(true); });
         });
         agCols.addEventListener('dragover', function (e) {
             var sec = S.agDrag && e.target.closest('section');
@@ -1846,6 +1906,24 @@
             moveBlockToDay(id, day);
         });
         agCols.addEventListener('dragend', agEnd);
+        // V40.15.0: campo de arquivar. Recebe tanto o cartão das Listas quanto o bloco da Semana.
+        var dz = $('drop-archive');
+        dz.addEventListener('dragover', function (e) {
+            if (!S.dragId && !S.agDrag) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (dz.classList.contains('over')) return;
+            dz.classList.add('over');
+            clearDropMarks(); agClear(); // o cartão não vai mais pra lista nem pro dia que estavam marcados
+        });
+        dz.addEventListener('dragleave', function () { dz.classList.remove('over'); });
+        dz.addEventListener('drop', function (e) {
+            if (!S.dragId && !S.agDrag) return;
+            e.preventDefault();
+            var kind = S.dragId ? 'tarefas' : 'blocos', id = S.dragId || S.agDrag;
+            if (S.dragId) endDrag(false); else agEnd();
+            archiveRow(kind, id);
+        });
         $('btn-archive').addEventListener('click', openArchive);
         $('ar-close').addEventListener('click', closeArchive);
         $('modal-archive').addEventListener('mousedown', function (e) { if (e.target === this) closeArchive(); });

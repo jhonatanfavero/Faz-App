@@ -749,6 +749,120 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
     click(d.querySelector('.ag-view[data-view="week"]')); click($('ag-today')); click($('tab-listas'));
   }
 
+  console.log('\nT) V40.15.0 — 3 pontinhos (Arquivar / Apagar) e campo de arquivar ao arrastar (PC):');
+  {
+    const T = (id) => server.get('tarefas', UID, id), B = (id) => server.get('blocos', UID, id);
+    const visible = (id) => !$(id).classList.contains('hidden');
+    const menu = () => d.querySelector('div.fixed.z-40[role="menu"]');
+    const updates = (t) => server.log.filter((x) => x.op === 'update' && x.t === t);
+    const zone = $('drop-archive'), cardEl = (id) => d.querySelector(`.card[data-id="${id}"]`), more = (id) => cardEl(id).querySelector('[data-more]');
+    click($('tab-listas')); await sleep(40);
+    const col = cols().find((sec) => sec.querySelectorAll('.card').length >= 5), other = cols().find((sec) => sec !== col);
+    const [k1, k2, k3, k4, k5] = [...col.querySelectorAll('.card')].map((c) => c.dataset.id);
+    const listOf = (sec) => d.querySelector(`section.col[data-col="${sec.dataset.col}"] .col-list`); // o quadro é redesenhado a cada gravação: busca a lista de novo
+    ok([...col.querySelectorAll('.card')].every((c) => c.querySelector('[data-sched]') && c.querySelector('[data-hand]') && c.querySelector('[data-more]')), 'cada cartão das Listas tem agendar, mão e os 3 pontinhos');
+
+    // 1) o menu
+    click(more(k1));
+    ok(!!menu() && [...menu().querySelectorAll('button')].map((b) => b.textContent).join('|') === 'Arquivar|Apagar' && !visible('modal-task'), 'os 3 pontinhos abrem um menu com Arquivar e Apagar, sem abrir o cartão');
+    ok(d.activeElement === menu().querySelector('button'), 'o foco vai pro primeiro item (dá pra usar pelo teclado)');
+    click(more(k1));
+    ok(!menu(), 'clicar de novo nos 3 pontinhos fecha o menu');
+    click(more(k1)); key(d.activeElement, 'Escape');
+    ok(!menu() && !visible('modal-task'), 'Esc fecha o menu');
+    click(more(k1)); await sleep(15); d.body.dispatchEvent(new w.Event('pointerdown', { bubbles: true }));
+    ok(!menu(), 'clicar fora fecha o menu');
+    click(more(k1)); await sleep(15); col.querySelector('.col-list').dispatchEvent(new w.Event('scroll'));
+    ok(!menu(), 'rolar a lista fecha o menu (ele não fica solto na tela)');
+    key(more(k1), 'Enter');
+    ok(!visible('modal-task'), 'Enter em cima dos 3 pontinhos não abre o cartão por trás');
+
+    // 2) Arquivar
+    server.log.length = 0;
+    click(more(k1)); click(menu().querySelector('[data-act="archive"]'));
+    await waitFor(() => T(k1).archived === true);
+    ok(T(k1).archived === true && T(k1).deleted === false && updates('tarefas').length === 1 && updates('tarefas')[0].fields.join() === 'archived', 'Arquivar pelo menu: só o campo "archived" sobe e a tarefa não é apagada');
+    ok(!cardEl(k1) && !menu() && /^Tarefa arquivada$/.test($('toast').textContent), 'o cartão sai do quadro; aviso: "' + $('toast').textContent + '"');
+    click($('btn-archive'));
+    ok(!!$('ar-list').querySelector(`[data-unarchive="tarefas|${k1}"]`), 'e aparece em Arquivados, de onde dá pra trazer de volta');
+    click($('ar-close'));
+
+    // 3) Apagar (com confirmação)
+    click(more(k2)); click(menu().querySelector('[data-act="delete"]')); await sleep(20);
+    ok(visible('dialog') && $('dlg-title').textContent === 'Apagar esta tarefa?' && !menu(), 'Apagar pergunta antes: "' + $('dlg-title').textContent + '"');
+    click($('dlg-cancel')); await sleep(40);
+    ok(T(k2).deleted === false && !!cardEl(k2), 'Cancelar não apaga');
+    click(more(k2)); click(menu().querySelector('[data-act="delete"]')); await sleep(20); click($('dlg-ok'));
+    await waitFor(() => T(k2).deleted === true);
+    ok(T(k2).deleted === true && !cardEl(k2) && /^Tarefa apagada$/.test($('toast').textContent), 'confirmando, a tarefa é apagada (aqui e no celular)');
+
+    // 4) campo de arquivar: aparece ao arrastar um cartão
+    ok(zone.classList.contains('hidden'), 'parado, o campo de arquivar não aparece');
+    click(more(k3)); dragEv('dragstart', cardEl(k3)); await sleep(40);
+    ok(!zone.classList.contains('hidden') && zone.classList.contains('flex') && /Solte aqui pra arquivar/.test(zone.textContent) && !menu(), 'ao arrastar um cartão o campo "Solte aqui pra arquivar" aparece (e o menu aberto fecha)');
+    dragEv('dragover', listOf(col));
+    ok(!!d.querySelector('.drop-line') && !zone.classList.contains('over'), 'em cima de uma lista vale a linha da lista');
+    dragEv('dragover', zone);
+    ok(zone.classList.contains('over') && !d.querySelector('.drop-line') && !d.querySelector('.col.drag-over'), 'em cima do campo ele acende e a linha da lista some');
+    dragEv('dragleave', zone);
+    ok(!zone.classList.contains('over'), 'saiu de cima, apaga');
+    dragEv('dragover', zone); server.log.length = 0; dragEv('drop', zone);
+    await waitFor(() => T(k3).archived === true);
+    ok(T(k3).archived === true && T(k3).deleted === false && updates('tarefas').length === 1 && updates('tarefas')[0].fields.join() === 'archived' && !cardEl(k3), 'soltar no campo arquiva a tarefa (não muda lista nem ordem)');
+    ok(zone.classList.contains('hidden') && !zone.classList.contains('over') && !cardEl(k4).classList.contains('dragging') && /^Tarefa arquivada$/.test($('toast').textContent), 'o campo some depois de soltar; aviso: "' + $('toast').textContent + '"');
+    dragEv('dragstart', cardEl(k4)); await sleep(40); dragEv('dragend', cardEl(k4));
+    ok(zone.classList.contains('hidden') && T(k4).archived === false, 'desistir do arraste esconde o campo e não arquiva nada');
+    server.log.length = 0;
+    dragEv('dragstart', cardEl(k4)); await sleep(40); dragEv('dragover', zone); dragEv('dragover', listOf(other)); dragEv('drop', listOf(other));
+    await waitFor(() => T(k4).column_id === other.dataset.col);
+    ok(T(k4).column_id === other.dataset.col && T(k4).archived === false && zone.classList.contains('hidden'), 'passar por cima do campo e soltar numa lista só muda de lista (arrastar entre listas continua igual)');
+    server.failNext = 1; server.log.length = 0;
+    dragEv('dragstart', cardEl(k5)); await sleep(40); dragEv('drop', zone); await sleep(250);
+    ok(T(k5).archived === false && !!cardEl(k5) && /Não foi possível salvar/.test($('toast').textContent), 'sem internet: o cartão volta pro quadro e a tela avisa');
+    click($('btn-archive')); click($('ar-list').querySelector(`[data-unarchive="tarefas|${k1}"]`)); click($('ar-list').querySelector(`[data-unarchive="tarefas|${k3}"]`));
+    await waitFor(() => T(k1).archived === false && T(k3).archived === false);
+    ok(!!cardEl(k1) && !!cardEl(k3), 'desarquivar devolve os dois cartões pro quadro');
+    click($('ar-close'));
+
+    // 5) blocos da Semana: mesmos 3 pontinhos e mesmo campo
+    const mkB = (id, st) => server.insert('blocos', UID, { id, date: '2026-11-19', start_min: st, duration: 30, title: 'Bloco ' + id.slice(-1), type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, deleted: false });
+    mkB('f_t_1', 1200); mkB('f_t_2', 1230); mkB('f_t_3', 1260);
+    click($('tab-agenda')); click(d.querySelector('.ag-view[data-view="week"]')); click($('ag-today'));
+    await waitFor(() => d.querySelector('#ag-cols [data-block="f_t_3"]'));
+    const wk = (id) => d.querySelector(`#ag-cols [data-block="${id}"]`);
+    ok([...d.querySelectorAll('#ag-cols [data-block]')].every((c) => c.querySelector('[data-more]')) && wk('f_t_1').querySelector('p').textContent.startsWith('20:00'), 'cada bloco da Semana também tem os 3 pontinhos');
+    server.log.length = 0;
+    click(wk('f_t_1').querySelector('[data-more]'));
+    ok(!!menu() && !visible('modal-task'), 'abrem o mesmo menu, sem abrir o cartão do bloco');
+    click(menu().querySelector('[data-act="archive"]'));
+    await waitFor(() => B('f_t_1').archived === true);
+    ok(B('f_t_1').archived === true && !B('f_t_1').deleted && updates('blocos')[0].fields.join() === 'archived' && !wk('f_t_1') && /^Bloco arquivado$/.test($('toast').textContent), 'Arquivar tira o bloco da agenda sem apagar; aviso: "' + $('toast').textContent + '"');
+    click(wk('f_t_2').querySelector('[data-more]')); click(menu().querySelector('[data-act="delete"]')); await sleep(20);
+    ok(visible('dialog') && $('dlg-title').textContent === 'Apagar este bloco?', 'Apagar bloco também pergunta antes');
+    click($('dlg-ok'));
+    await waitFor(() => B('f_t_2').deleted === true);
+    ok(B('f_t_2').deleted === true && !wk('f_t_2') && /^Bloco apagado$/.test($('toast').textContent), 'confirmando, o bloco é apagado');
+    key(wk('f_t_3').querySelector('[data-more]'), 'Enter');
+    ok(!visible('modal-task'), 'Enter nos 3 pontinhos do bloco não abre o cartão por trás');
+    server.log.length = 0;
+    dragEv('dragstart', wk('f_t_3')); await sleep(40);
+    ok(!zone.classList.contains('hidden') && d.querySelectorAll('#ag-cols .ag-drop').length > 0, 'arrastar um bloco da Semana mostra o campo de arquivar junto com os espaços livres');
+    dragEv('dragover', d.querySelector('#ag-cols .ag-list[data-day="2026-11-21"]')); dragEv('dragover', zone);
+    ok(zone.classList.contains('over') && d.querySelectorAll('#ag-cols .ag-over, #ag-cols .ag-drop.over').length === 0, 'em cima do campo, o dia que estava aceso apaga');
+    dragEv('drop', zone);
+    await waitFor(() => B('f_t_3').archived === true);
+    ok(B('f_t_3').archived === true && B('f_t_3').date === '2026-11-19' && B('f_t_3').start_min === 1260 && updates('blocos').length === 1 && updates('blocos')[0].fields.join() === 'archived', 'soltar no campo arquiva o bloco sem mexer em dia nem horário');
+    ok(zone.classList.contains('hidden') && d.querySelectorAll('#ag-cols .ag-drop').length === 0 && !wk('f_t_3'), 'campo e tracejados somem; o bloco sai da agenda');
+    click(d.querySelector('#ag-cols .ag-day-btn[data-day="2026-11-17"]')); await sleep(40);
+    ok(d.querySelectorAll('#ag-timeline [data-block]').length > 0 && d.querySelectorAll('#ag-timeline [data-more]').length === 0, 'na régua do Dia os blocos seguem sem os 3 pontinhos (lá o bloco é arrastado e esticado)');
+    click(d.querySelector('.ag-view[data-view="week"]')); click($('tab-listas')); await sleep(40);
+    click(cardEl(k1).querySelector('[data-hand]'));
+    ok(d.querySelectorAll('#ag-cols [data-block]').length > 0 && d.querySelectorAll('#ag-cols [data-more]').length === 0, 'com tarefa na mão, os blocos da Semana não mostram os 3 pontinhos');
+    click($('ag-place-cancel')); click($('tab-listas'));
+    for (const id of ['f_t_1', 'f_t_3']) server.patch('blocos', UID, id, { deleted: true });
+    await sleep(120);
+  }
+
   console.log('\nJ) Sair e entrar:');
   click($('btn-logout'));
   await sleep(20);

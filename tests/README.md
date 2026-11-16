@@ -48,7 +48,7 @@ Para isso existem três testes que abrem um Chrome de verdade:
 npm i -D playwright && npx playwright install chromium    # uma vez
 node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo
 node tests/navegador/offline.js         # o app abre completo sem internet?
-node tests/navegador/agenda_pc.js       # tela do PC: arrastar e esticar blocos na Agenda, com mouse
+node tests/navegador/tela_pc.js         # tela do PC com mouse: arrastar e esticar blocos, 3 pontinhos, campo de arquivar
 ```
 
 Com `CHROME=/caminho/do/chrome` eles usam um Chrome já instalado; com `FOTOS=/alguma/pasta` salvam

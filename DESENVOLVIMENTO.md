@@ -24,8 +24,9 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
    O service worker nunca apaga o `localStorage`. Dado ilegível é copiado para `tb__corrompido_*`
    antes de qualquer coisa.
 2. **Mudou qualquer arquivo do app, mude o `CACHE_NAME` do `sw.js`.** Vale para tudo que está na lista
-   `ASSETS` do `sw.js`, para o `kanban.html` e para o próprio `sw.js` (testes e documentação não contam).
-   Sem isso os aparelhos continuam na versão antiga. Atualize junto o selo de versão no fim do `index.html` e a `version`
+   `ASSETS` do `sw.js` e para o próprio `sw.js`. Sem isso os aparelhos continuam na versão antiga.
+   Não precisa para o `kanban.html` (a tela do PC não fica guardada no aparelho: basta atualizar a
+   página), nem para testes e documentação. Atualize junto o selo de versão no fim do `index.html` e a `version`
    do backup no `app.js`.
 3. **Texto digitado pelo usuário passa por `escapeHtml` antes de entrar em `innerHTML`.** Ids, cores e
    datas que vêm de backup ou da nuvem são validados na entrada (`sync.js` e importação).

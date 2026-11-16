@@ -74,7 +74,7 @@ const sortApp = (a, b) => (a.due_day && b.due_day ? a.due_day - b.due_day || a.c
   await waitFor(() => d.querySelectorAll('section.col').length === 5);
 
   console.log('F) Aba Finanças — o mês de hoje:');
-  ok([...d.querySelectorAll('.tab')].map((b) => b.textContent).join(',') === 'Listas,Agenda,Rotinas,Notas,Finanças', 'abas: Listas, Agenda, Rotinas, Notas e Finanças');
+  ok([...d.querySelectorAll('.tab')].map((b) => b.textContent.trim()).join(',').endsWith('Listas,Agenda,Rotinas,Notas,Finanças'), 'abas: Listas, Agenda, Rotinas, Notas e Finanças (o Assistente vem na frente desde a V40.20.0)');
   click($('tab-financas'));
   ok(visible('financas') && !visible('board') && $('tab-financas').classList.contains('on') && w.localStorage.getItem('faz_pc_tab') === 'financas', 'Finanças abre e fica lembrada');
   ok($('fn-label').textContent === 'Novembro 2026' && !visible('zoom-ctl'), 'abre no mês de hoje (Novembro 2026), sem zoom');

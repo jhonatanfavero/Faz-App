@@ -14,7 +14,8 @@
 // V10.19 - v40.17.0 (Rotinas, Notas e Finanças vão pra nuvem nos dois sentidos (tabelas rotinas, notas e financas). Tela do PC ganha as abas Rotinas e Notas (criar, editar, apagar; rotina vai pra Agenda pela mão; nota salva sozinha) e, na Agenda, filtro por tag e "Ocultar concluídos". No celular, as rotinas de exemplo só nascem em aparelho novo.)
 // V10.20 - v40.18.0 (Tela do PC: janela de Tags — criar, renomear, trocar a cor e apagar (quem usava a tag fica sem tag), também pelo "Gerenciar tags" de dentro do cartão e da rotina; quem começa pelo computador ganha as tags Trabalho, Pessoal e Estudo, com os mesmos ids do app. Zoom das Listas e da Semana (−, 100%, + e Ctrl + rodinha), cada um guardado no computador. No celular só muda o número da versão.)
 // V10.21 - v40.19.0 (Tela do PC: aba Finanças — mês a mês, total, pago, em aberto e atrasadas; pagar, criar, editar com "só neste mês / neste e nos próximos / em todos", trocar o tipo e apagar, com as regras do app. Setas ← → do teclado: Agenda passa a semana ou o dia, Listas rolam uma lista, Finanças trocam o mês. Celular: editar uma despesa de vários meses sem mudar o valor não apaga mais os valores por mês.)
-const CACHE_NAME = 'timeblock-v40-19-0';
+// V10.22 - v40.20.0 (Assistente, a primeira aba no celular e no PC: versão padrão, sem IA paga e sem internet — lê agenda, listas, rotinas, notas e finanças e responde sobre o dia, agora, amanhã, a semana, o que ficou pra trás, contas, rotinas, notas e listas; o "cérebro" é o assistente.js, novo no cache. PC: zoom vira "listas por tela" / "dias por tela" (colunas mais largas em vez de tudo maior) e, na Semana com menos dias, as setas andam um dia por vez.)
+const CACHE_NAME = 'timeblock-v40-20-0';
 const ASSETS = [
   './',
   './index.html',
@@ -22,6 +23,7 @@ const ASSETS = [
   './app.js',
   './faz-config.js',
   './sync.js',
+  './assistente.js',
   './libs/tailwind.css',
   './libs/inter/inter.css',
   './libs/inter/inter-latin-wght-normal.woff2',

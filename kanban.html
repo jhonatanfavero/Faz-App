@@ -72,6 +72,21 @@
     .rt-theme { color: #71717a; }
     .rt-theme.on { background: #fff; color: #18181b; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
     .nt-item.on { background: #fff; box-shadow: 0 0 0 1.5px var(--focus); }
+    /* V40.20.0: zoom = colunas por tela (largura calculada no applyZoom) */
+    #columns.zoomed > .col { width: var(--zw); }
+    #columns.zoomed > #btn-new-list { width: min(var(--zw), 296px); }
+    #ag-cols.zoomed > section { flex: none; width: var(--zw); min-width: 0; }
+    /* V40.20.0: Assistente */
+    .as-item { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; padding: 8px 12px; }
+    button.as-item:hover { background: #f4f4f5; }
+    .as-dot { width: 8px; height: 8px; border-radius: 9999px; margin-top: 6px; flex-shrink: 0; background: #d4d4d8; }
+    .as-now .as-dot { background: #10b981; box-shadow: 0 0 0 3px #d1fae5; }
+    .as-next .as-dot { background: var(--focus); }
+    .as-late .as-dot { background: #dc2626; }
+    .as-late .as-label { color: #b91c1c; }
+    .as-done .as-dot { background: #10b981; }
+    .as-chip { border: 1px solid #e4e4e7; background: #fff; color: #3f3f46; }
+    .as-chip:hover { background: #f4f4f5; border-color: #d4d4d8; }
     /* V40.19.0: Finanças */
     .fn-grid { display: grid; grid-template-columns: 28px minmax(0, 1fr) 150px 130px 140px 32px; align-items: center; column-gap: 12px; }
     .fn-row { box-shadow: inset 4px 0 0 var(--fn-tag, transparent); }
@@ -178,6 +193,8 @@
         <img src="icon-192.png" alt="" class="w-8 h-8 rounded-lg">
         <!-- V40.8.0: abas Listas | Agenda -->
         <nav class="inline-flex p-1 bg-zinc-100 rounded-xl shrink-0" role="tablist" aria-label="Seções">
+            <!-- V40.20.0: Assistente, a primeira aba (versão padrão, sem IA paga) -->
+            <button id="tab-assistente" role="tab" data-tab="assistente" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold inline-flex items-center gap-1.5"><i class="ph-fill ph-sparkle"></i>Assistente</button>
             <button id="tab-listas" role="tab" data-tab="listas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Listas</button>
             <button id="tab-agenda" role="tab" data-tab="agenda" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Agenda</button>
             <!-- V40.17.0: Rotinas e Notas, as mesmas do celular -->
@@ -193,9 +210,9 @@
             </span>
             <!-- V40.18.0: zoom das Listas e da Semana (cada uma lembra o seu) -->
             <div id="zoom-ctl" class="hidden items-center h-9 rounded-lg border border-zinc-200 bg-white" role="group" aria-label="Zoom">
-                <button id="zoom-out" class="w-8 h-full rounded-l-lg flex items-center justify-center text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent" title="Diminuir (ver mais)" aria-label="Diminuir o zoom"><i class="ph-bold ph-minus"></i></button>
-                <button id="zoom-reset" class="h-full px-1 min-w-[48px] text-[12px] font-semibold text-zinc-700 tabular-nums hover:bg-zinc-100" title="Voltar pra 100%" aria-label="Voltar o zoom pra 100%">100%</button>
-                <button id="zoom-in" class="w-8 h-full rounded-r-lg flex items-center justify-center text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent" title="Aumentar" aria-label="Aumentar o zoom"><i class="ph-bold ph-plus"></i></button>
+                <button id="zoom-out" class="w-8 h-full rounded-l-lg flex items-center justify-center text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent" title="Mostrar mais" aria-label="Mostrar mais colunas (mais estreitas)"><i class="ph-bold ph-minus"></i></button>
+                <button id="zoom-reset" class="h-full px-2 min-w-[64px] text-[12px] font-semibold text-zinc-700 tabular-nums whitespace-nowrap hover:bg-zinc-100" title="Voltar ao normal" aria-label="Quantas colunas por tela (clique pra voltar ao normal)">4 listas</button>
+                <button id="zoom-in" class="w-8 h-full rounded-r-lg flex items-center justify-center text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent" title="Mostrar menos, mais largas" aria-label="Mostrar menos colunas (mais largas)"><i class="ph-bold ph-plus"></i></button>
             </div>
             <!-- V40.18.0: tags (criar, renomear, trocar cor, apagar) -->
             <button id="btn-tags" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Tags" aria-label="Tags"><i class="ph ph-tag text-lg"></i></button>
@@ -307,6 +324,26 @@
                 </div>
             </div>
         </section>
+    </main>
+
+    <!-- V40.20.0: Assistente. Lê a agenda, as listas, as rotinas, as notas e as finanças e responde com frases prontas. -->
+    <main id="assistente" class="hidden relative flex-1 min-h-0 flex-col">
+        <div class="flex-1 min-h-0 w-full max-w-3xl mx-auto flex flex-col px-4 sm:px-5 pt-4 pb-4">
+            <div class="shrink-0 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-focus text-white flex items-center justify-center shrink-0"><i class="ph-fill ph-sparkle text-xl"></i></div>
+                <div class="min-w-0 flex-1">
+                    <h2 id="as-name" class="text-[15px] font-bold text-zinc-900 leading-tight">Assistente</h2>
+                    <p class="text-[12px] text-zinc-500 leading-tight">Seu dia, compromissos, contas, rotinas, notas e listas</p>
+                </div>
+                <button id="as-restart" class="shrink-0 inline-flex items-center gap-1.5 text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3 py-2 rounded-lg" title="Começar de novo, com o resumo de agora"><i class="ph ph-arrow-counter-clockwise"></i>Recomeçar</button>
+            </div>
+            <div id="as-feed" class="flex-1 min-h-0 overflow-y-auto thin-scroll mt-4 flex flex-col gap-4 pr-1" aria-live="polite"></div>
+            <div id="as-chips" class="shrink-0 flex flex-wrap gap-1.5 pt-3"></div>
+            <form id="as-form" class="shrink-0 mt-2.5 flex items-center gap-2" autocomplete="off">
+                <input id="as-input" maxlength="300" placeholder="Pergunte do seu jeito: o que tenho amanhã? o que vence esta semana?" aria-label="Pergunta pro assistente" class="flex-1 min-w-0 bg-white border border-zinc-300 rounded-xl px-4 py-2.5 text-sm outline-none">
+                <button type="submit" class="shrink-0 inline-flex items-center gap-1.5 bg-focus text-white text-[13px] font-semibold px-4 py-2.5 rounded-xl hover:opacity-90"><i class="ph-bold ph-paper-plane-right"></i>Enviar</button>
+            </form>
+        </div>
     </main>
 
     <!-- V40.19.0: Finanças (as mesmas do celular). Mês a mês: o que falta pagar, o que já foi pago e o que venceu. -->
@@ -604,10 +641,11 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.19.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.20.0</div>
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
+<script src="assistente.js"></script>
 <script src="libs/supabase-js/supabase.js"></script>
 <script>
 (function () {
@@ -630,8 +668,8 @@
     };
     var S = {
         sb: null, uid: null, email: '', listas: {}, tags: {}, tarefas: {}, blocos: {}, rotinas: {}, notas: {}, financas: {},
-        rtEdit: null, nt: null, ntQuery: '', agTag: '', agHideDone: false, zoom: { listas: 1, agenda: 1 },
-        fnMonth: null, fnEdit: null, fnScope: null, lsTarget: null, lsTargetAt: 0,
+        rtEdit: null, nt: null, ntQuery: '', agTag: '', agHideDone: false, zoom: { listas: 0, agenda: 0 },
+        fnMonth: null, fnEdit: null, fnScope: null, step: null, as: { msgs: [], auto: true },
         tab: 'listas', agView: 'week', agAnchor: null, agScrolled: null, hours: [7, 24], recovery: false,
         channel: null, live: 'connecting', lastLoad: 0, loading: false,
         dragId: null, pendingRender: false, composer: null, editing: null, placing: null, agH0: 7
@@ -786,7 +824,7 @@
     // ---------- render ----------
     var renderT = null;
     function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); if (S.editing && S.editing.kind === 'blocos') renderDone(); }, 60); }
-    function renderSide() { renderRotinas(); renderNotas(); renderFinancas(); } // V40.17.0 (+ Finanças na V40.19.0): cada uma só desenha se a aba dela estiver aberta
+    function renderSide() { renderRotinas(); renderNotas(); renderFinancas(); renderAssistente(); } // V40.17.0 (+ Finanças na V40.19.0): cada uma só desenha se a aba dela estiver aberta
 
     function cardHtml(t) {
         var tag = tagOf(t.tag_id);
@@ -1241,14 +1279,14 @@
         $('board-summary').textContent = S.agView === 'day' ? renderDay(S.agAnchor, map, today, nowMin()) : renderWeek(S.agAnchor, map, today, nowMin());
     }
 
-    var TABS = ['listas', 'agenda', 'rotinas', 'notas', 'financas']; // V40.17.0: + Rotinas e Notas; V40.19.0: + Finanças
+    var TABS = ['assistente', 'listas', 'agenda', 'rotinas', 'notas', 'financas']; // V40.17.0: + Rotinas e Notas; V40.19.0: + Finanças; V40.20.0: Assistente na frente
     function setTab(tab) {
         var prev = S.tab;
         S.tab = TABS.indexOf(tab) >= 0 ? tab : 'listas';
         if (prev === 'notas' && S.tab !== 'notas') ntFlush(); // saindo das Notas: salva o que está escrito
         try { localStorage.setItem('faz_pc_tab', S.tab); } catch (e) {}
         $('board').classList.toggle('hidden', S.tab !== 'listas');
-        ['agenda', 'rotinas', 'notas', 'financas'].forEach(function (t) {
+        ['assistente', 'agenda', 'rotinas', 'notas', 'financas'].forEach(function (t) {
             $(t).classList.toggle('hidden', S.tab !== t);
             $(t).classList.toggle('flex', S.tab === t);
         });
@@ -2039,6 +2077,79 @@
         renderNotas();
     }
 
+    // ---------- V40.20.0: ASSISTENTE (primeira aba). O "cérebro" fica no assistente.js, igual no celular e no PC:
+    // aqui só se monta o retrato dos dados e se desenha a conversa. Versão padrão: frases prontas, sem IA paga. ----------
+    function asSnap() {
+        var tagInfo = function (id) { var t = tagOf(id); return t ? { name: t.name, color: t.color } : null; };
+        var ids = aliveListIds(), tasks = [];
+        alive('listas').forEach(function (c) { // na ordem das listas
+            alive('tarefas').filter(function (t) { return colOf(t, ids) === c.id; }).forEach(function (t) {
+                tasks.push({ id: t.id, title: t.title, dur: Number(t.duration) || 0, list: c.name || 'Sem nome', tag: tagInfo(t.tag_id) });
+            });
+        });
+        var live = function (kind) { return Object.keys(S[kind]).map(function (k) { return S[kind][k]; }).filter(function (r) { return !r.deleted; }); };
+        return {
+            now: new Date(), hours: S.hours,
+            blocks: live('blocos').filter(function (b) { return !b.archived; }).map(function (b) {
+                return { id: b.id, title: b.title, date: String(b.date).slice(0, 10), start: Number(b.start_min) || 0, dur: Number(b.duration) || 0, done: !!b.completed, tag: tagInfo(b.tag_id) };
+            }),
+            tasks: tasks,
+            routines: live('rotinas').map(function (r) { return { id: r.id, title: r.title, emoji: r.emoji, dur: Number(r.duration) || 0 }; }),
+            notes: live('notas').map(function (n) { return { id: n.id, title: n.title, content: n.content, ms: Number(n.updated_ms || n.created_ms) || 0 }; }),
+            expenses: live('financas').map(function (f) {
+                return { id: f.id, title: f.title, amount: Number(f.amount) || 0, start: f.start_month, months: fnDur(f), recurring: !!f.is_recurring, dueDay: f.due_day || null, paid: Array.isArray(f.paid_months) ? f.paid_months : [], overrides: f.amount_overrides || {} };
+            })
+        };
+    }
+    function asMsgHtml(m) {
+        if (m.who === 'me') return '<div class="flex justify-end"><p class="max-w-[80%] bg-focus text-white text-[14px] leading-relaxed px-4 py-2.5 rounded-2xl rounded-br-md whitespace-pre-wrap break-words">' + esc(m.text) + '</p></div>';
+        var a = m.a;
+        return '<div class="flex items-start gap-2.5">' +
+            '<div class="w-8 h-8 rounded-full bg-focus text-white flex items-center justify-center shrink-0 mt-0.5"><i class="ph-fill ph-sparkle"></i></div>' +
+            '<div class="min-w-0 flex-1 max-w-[90%]"><div class="bg-white border border-zinc-200 rounded-2xl rounded-tl-md px-4 py-3 shadow-sm">' +
+            '<p class="text-[14px] leading-relaxed text-zinc-800">' + esc(a.text) + '</p>' +
+            (a.items.length ? '<div class="mt-2.5 -mx-1.5 border border-zinc-100 rounded-xl overflow-hidden divide-y divide-zinc-100">' + a.items.map(function (it) {
+                var cls = 'as-item' + (it.tone ? ' as-' + esc(it.tone) : ''), inner = '<span class="as-dot"></span><span class="min-w-0"><span class="as-label block text-[13.5px] font-semibold text-zinc-800 break-words">' + esc(it.label) + '</span>' +
+                    (it.sub ? '<span class="block text-[12px] text-zinc-500">' + esc(it.sub) + '</span>' : '') + '</span>';
+                return it.ref ? '<button type="button" class="' + cls + '" data-as-kind="' + esc(it.ref.kind) + '" data-as-id="' + esc(it.ref.id) + '"' + (it.ref.month ? ' data-as-month="' + esc(it.ref.month) + '"' : '') + ' title="Abrir">' + inner + '</button>'
+                    : '<div class="' + cls + '">' + inner + '</div>';
+            }).join('') + '</div>' : '') +
+            (a.footer ? '<p class="mt-2.5 text-[12.5px] text-zinc-500 leading-relaxed">' + esc(a.footer) + '</p>' : '') +
+            '</div></div></div>';
+    }
+    function renderAssistente(scroll) {
+        if (!S.uid || S.tab !== 'assistente') return;
+        $('board-summary').textContent = 'Versão padrão: lê seus dados e responde com frases prontas';
+        if (!window.FazAssistente) { $('as-feed').innerHTML = '<p class="text-sm text-zinc-500">Não consegui carregar o assistente. Recarregue a página.</p>'; return; }
+        var A = window.FazAssistente;
+        $('as-name').textContent = A.NAME;
+        if (!$('as-chips').firstChild) $('as-chips').innerHTML = A.CHIPS.map(function (c) { return '<button type="button" class="as-chip text-[12.5px] font-medium px-3 py-1.5 rounded-full" data-as-chip="' + esc(c.id) + '">' + esc(c.label) + '</button>'; }).join('');
+        if (!S.lastLoad) { $('as-feed').innerHTML = '<p class="text-sm text-zinc-500">Carregando seus dados…</p>'; return; }
+        if (S.as.auto || !S.as.msgs.length) { S.as.msgs = [{ who: 'as', a: A.briefing(asSnap()) }]; S.as.auto = true; } // o resumo inicial acompanha os dados até a pessoa perguntar algo
+        var feed = $('as-feed'), atEnd = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40;
+        feed.innerHTML = S.as.msgs.map(asMsgHtml).join('');
+        if (scroll || atEnd) feed.scrollTop = feed.scrollHeight;
+    }
+    function asAsk(text, intent) {
+        if (!window.FazAssistente || !S.lastLoad) return;
+        var A = window.FazAssistente, snap = asSnap();
+        var a = intent ? A.reply(intent, snap) : A.ask(text, snap);
+        if (!a) return;
+        S.as.auto = false;
+        S.as.msgs.push({ who: 'me', text: text });
+        S.as.msgs.push({ who: 'as', a: a });
+        if (S.as.msgs.length > 60) S.as.msgs = S.as.msgs.slice(-60); // a conversa fica só nesta tela
+        renderAssistente(true);
+    }
+    function asOpen(kind, id, month) {
+        if (kind === 'bloco' && S.blocos[id] && !S.blocos[id].deleted) return openBlock(id);
+        if (kind === 'tarefa' && S.tarefas[id] && !S.tarefas[id].deleted) return openTask(id);
+        if (kind === 'rotina' && S.rotinas[id] && !S.rotinas[id].deleted) return openRoutine(id);
+        if (kind === 'nota' && S.notas[id] && !S.notas[id].deleted) { setTab('notas'); return openNote(id); }
+        if (kind === 'despesa' && S.financas[id] && !S.financas[id].deleted) { if (isMonth(month)) S.fnMonth = month; setTab('financas'); return openFin(id); }
+        toast('Esse item não existe mais.');
+    }
+
     // ---------- V40.19.0: FINANÇAS (as mesmas do celular). Mesmas regras do app.js: isItemInMonth, isPaidInMonth,
     // getAmountInMonth, isFinancialOverdue, setOverrideForMonth, setOverrideThisAndFuture, setAmountAllMonths e
     // cleanupOverridesOutsideRange. Aqui elas trabalham direto nas linhas da nuvem (start_month, paid_months...). ----------
@@ -2454,35 +2565,69 @@
         render(); renderAgenda(); renderSide(); renderTags();
     }
 
-    // ---------- V40.18.0: ZOOM das Listas e da Semana (cada uma lembra o seu, neste computador) ----------
-    var ZOOMS = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.25, 1.5];
-    var ZOOM_EL = { listas: ['board', 'columns'], agenda: ['ag-week', 'ag-cols'] }; // [quem rola, quem encolhe]
+    // ---------- V40.20.0: ZOOM = quantas listas (ou dias da Semana) cabem na tela, como as "listas por tela" do celular.
+    // "+" mostra menos, cada uma mais larga, com a letra um pouco maior; "−" mostra mais. As colunas preenchem a largura
+    // da tela, com uma beiradinha da próxima aparecendo. Cada uma lembra a sua, neste computador.
+    // (Na V40.18.0 era um zoom de tudo, que só aumentava a letra e quebrava os nomes.) ----------
+    var ZOOM = {
+        listas: { el: 'columns', sc: 'board', key: 'faz_pc_listas_por_tela', gap: 16, minW: 190, word: ['lista', 'listas'] },
+        agenda: { el: 'ag-cols', sc: 'ag-week', key: 'faz_pc_dias_por_tela', gap: 12, minW: 150, word: ['dia', 'dias'] }
+    };
+    var ZOOM_MIN = 2, ZOOM_MAX = 7, PEEK = 36; // PEEK: pedaço da próxima coluna que fica à vista (mostra que tem mais pro lado)
     function zoomArea() { return S.tab === 'listas' ? 'listas' : (S.tab === 'agenda' && S.agView === 'week') ? 'agenda' : null; }
-    function zoomOf(area) { var z = Number(S.zoom && S.zoom[area]); return ZOOMS.indexOf(z) >= 0 ? z : 1; }
+    function zoomPad() { return window.innerWidth >= 640 ? 20 : 16; } // p-4 / sm:p-5 das colunas
+    function zoomWidth(area) { return $(ZOOM[area].sc).clientWidth || 0; }
+    function zoomDefault(area) { // Semana: os 7 dias; Listas: quantas cabem com a largura de sempre (296 px)
+        if (area === 'agenda') return 7;
+        var w = zoomWidth('listas') - 2 * zoomPad() - PEEK;
+        return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.floor((w + 16) / (296 + 16)))) || 4;
+    }
+    function zoomFit(area) { // no máximo quantas cabem sem ficar estreita demais
+        var c = ZOOM[area], w = zoomWidth(area) - 2 * zoomPad() - PEEK;
+        return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.floor((w + c.gap) / (c.minW + c.gap))));
+    }
+    function zoomN(area) {
+        var n = Math.round(Number(S.zoom[area]));
+        if (!(n >= ZOOM_MIN && n <= ZOOM_MAX)) n = zoomDefault(area);
+        return Math.min(n, zoomFit(area));
+    }
+    function zoomScale(area, n) { return Math.max(0.86, Math.min(1.24, 1 + 0.06 * (zoomDefault(area) - n))); } // letra: ±6% por coluna
     function applyZoom() {
-        Object.keys(ZOOM_EL).forEach(function (area) {
-            var z = zoomOf(area), el = $(ZOOM_EL[area][1]);
-            el.style.zoom = z === 1 ? '' : String(z);
+        Object.keys(ZOOM).forEach(function (area) {
+            var c = ZOOM[area], el = $(c.el), W = zoomWidth(area);
+            if (!W) return; // escondida: arruma quando aparecer
+            var n = zoomN(area), z = zoomScale(area, n), classic = area === 'agenda' && n >= 7; // Semana com 7 dias: como sempre foi
+            var avail = W - 2 * zoomPad() * z - (classic ? 0 : PEEK);
+            var colW = (avail - (n - 1) * c.gap * z - (classic ? 0 : c.gap * z)) / n; // largura que aparece na tela
+            el.style.zoom = z === 1 ? '' : String(Math.round(z * 1000) / 1000);
+            el.style.setProperty('--zw', (colW / z).toFixed(2) + 'px'); // dentro do zoom, a largura é dividida por ele
+            el.classList.toggle('zoomed', !classic);
         });
         var area = zoomArea(), ctl = $('zoom-ctl');
         ctl.classList.toggle('hidden', !area);
         ctl.classList.toggle('inline-flex', !!area);
         if (!area) return;
-        var z = zoomOf(area), i = ZOOMS.indexOf(z);
-        $('zoom-reset').textContent = Math.round(z * 100) + '%';
-        $('zoom-out').disabled = i <= 0;
-        $('zoom-in').disabled = i >= ZOOMS.length - 1;
+        var n = zoomN(area), w = ZOOM[area].word;
+        $('zoom-reset').textContent = n + ' ' + (n === 1 ? w[0] : w[1]);
+        $('zoom-reset').title = 'Quantas ' + w[1] + ' cabem na tela. Clique pra voltar ao normal (' + zoomDefault(area) + ').';
+        $('zoom-out').title = 'Mostrar mais ' + w[1] + ' (mais estreitas)';
+        $('zoom-in').title = 'Mostrar menos ' + w[1] + ', mais largas';
+        $('zoom-out').disabled = n >= zoomFit(area);
+        $('zoom-in').disabled = n <= ZOOM_MIN;
     }
-    function setZoom(step) { // step: -1 (ver mais), +1 (ver maior) ou 0 (volta pra 100%)
+    function setZoom(step) { // step: +1 = "+" (menos colunas, mais largas), -1 = "−" (mais colunas), 0 = volta ao normal
         var area = zoomArea();
         if (!area) return;
-        var oz = zoomOf(area), i = ZOOMS.indexOf(oz), j = step === 0 ? ZOOMS.indexOf(1) : Math.max(0, Math.min(ZOOMS.length - 1, i + step));
-        if (ZOOMS[j] === oz) return;
-        var sc = $(ZOOM_EL[area][0]), left = sc.scrollLeft;
-        S.zoom[area] = ZOOMS[j];
-        try { localStorage.setItem('faz_pc_zoom_' + area, String(ZOOMS[j])); } catch (e) {}
+        var c = ZOOM[area], sc = $(c.sc), cols = $(c.el).children, n0 = zoomN(area);
+        var n = step === 0 ? zoomDefault(area) : Math.max(ZOOM_MIN, Math.min(zoomFit(area), n0 - step));
+        if (n === n0 && step !== 0) return;
+        var pitch0 = cols.length > 1 ? cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left : 0;
+        var first = pitch0 > 0 ? Math.round(sc.scrollLeft / pitch0) : 0; // a coluna que estava no começo da tela
+        S.zoom[area] = n;
+        try { if (n === zoomDefault(area)) localStorage.removeItem(c.key); else localStorage.setItem(c.key, String(n)); } catch (e) {}
         applyZoom();
-        sc.scrollLeft = left * ZOOMS[j] / oz; // continua vendo as mesmas listas (ou dias) do começo da tela
+        var pitch1 = cols.length > 1 ? cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left : 0;
+        if (pitch1 > 0) sc.scrollLeft = first * pitch1; // continua vendo a mesma lista (ou dia) no começo
     }
     var wheelAcc = 0, wheelT = null;
     function zoomWheel(e) { // Ctrl + rodinha (ou pinça no touchpad) em cima das Listas ou da Semana: zoom delas, não da página
@@ -2935,15 +3080,17 @@
         function anyLayerOpen() {
             return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
         }
-        function listsStep(dir) {
-            var b = $('board'), cols = b.querySelectorAll('section.col');
-            if (cols.length < 2) return;
-            var pitch = cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left; // largura de uma lista + o espaço (já com o zoom)
-            if (!(pitch > 0)) return;
-            var from = S.lsTarget != null && Date.now() - S.lsTargetAt < 450 ? S.lsTarget : b.scrollLeft; // tecla segurada: soma a partir do alvo
-            var max = Math.max(0, b.scrollWidth - b.clientWidth), to = Math.max(0, Math.min(max, (Math.round(from / pitch) + dir) * pitch));
-            S.lsTarget = to; S.lsTargetAt = Date.now();
-            if (b.scrollTo) b.scrollTo({ left: to, behavior: 'smooth' }); else b.scrollLeft = to;
+        function colStep(sc, cols, dir) { // rola uma coluna (lista ou dia) pro lado; false = já está na beirada
+            if (cols.length < 2) return false;
+            var pitch = cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left; // largura de uma coluna + o espaço
+            var max = Math.max(0, sc.scrollWidth - sc.clientWidth);
+            if (!(pitch > 0) || max < 2) return false;
+            var from = S.step && S.step.el === sc && Date.now() - S.step.at < 450 ? S.step.to : sc.scrollLeft; // tecla segurada: soma a partir do alvo
+            if ((dir > 0 && from >= max - 2) || (dir < 0 && from <= 2)) return false;
+            var to = Math.max(0, Math.min(max, (Math.round(from / pitch) + dir) * pitch));
+            S.step = { el: sc, to: to, at: Date.now() };
+            if (sc.scrollTo) sc.scrollTo({ left: to, behavior: 'smooth' }); else sc.scrollLeft = to;
+            return true;
         }
         document.addEventListener('keydown', function (e) {
             if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return;
@@ -2951,8 +3098,16 @@
             var t = e.target, tag = t && t.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable) || anyLayerOpen()) return;
             var dir = e.key === 'ArrowLeft' ? -1 : 1;
-            if (S.tab === 'agenda') { if (S.agDrag || DG) return; e.preventDefault(); agMove(dir); }
-            else if (S.tab === 'listas') { if (S.dragId) return; e.preventDefault(); listsStep(dir); }
+            if (S.tab === 'agenda') {
+                if (S.agDrag || DG) return;
+                e.preventDefault();
+                // Semana com menos dias por tela (zoom): anda um dia; na beirada, passa pra semana seguinte (ou anterior)
+                if (S.agView === 'week' && $('ag-cols').classList.contains('zoomed') && colStep($('ag-week'), $('ag-cols').children, dir)) return;
+                S.step = null;
+                agMove(dir);
+                if (S.agView === 'week') { var wk = $('ag-week'); wk.scrollLeft = dir > 0 ? 0 : wk.scrollWidth; }
+            }
+            else if (S.tab === 'listas') { if (S.dragId) return; e.preventDefault(); colStep($('board'), $('columns').querySelectorAll('section.col'), dir); }
             else if (S.tab === 'financas') { e.preventDefault(); fnMove(dir); }
         });
         $('ag-prev').addEventListener('click', function () { agMove(-1); });
@@ -3116,7 +3271,26 @@
         $('zoom-in').addEventListener('click', function () { setZoom(1); });
         $('zoom-reset').addEventListener('click', function () { setZoom(0); });
         $('board').addEventListener('wheel', zoomWheel, { passive: false });
+        var zoomResizeT = null; // V40.20.0: as colunas preenchem a largura: mudou o tamanho da janela, recalcula
+        window.addEventListener('resize', function () { clearTimeout(zoomResizeT); zoomResizeT = setTimeout(applyZoom, 120); });
         $('ag-week').addEventListener('wheel', zoomWheel, { passive: false });
+        // V40.20.0: Assistente
+        $('as-chips').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-as-chip]');
+            if (b) asAsk(b.textContent, b.dataset.asChip);
+        });
+        $('as-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var v = $('as-input').value.trim();
+            if (!v) return;
+            $('as-input').value = '';
+            asAsk(v);
+        });
+        $('as-feed').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-as-kind]');
+            if (b) asOpen(b.dataset.asKind, b.dataset.asId, b.dataset.asMonth);
+        });
+        $('as-restart').addEventListener('click', function () { S.as = { msgs: [], auto: true }; renderAssistente(true); $('as-input').focus(); });
         // V40.19.0: Finanças
         $('fn-prev').addEventListener('click', function () { fnMove(-1); });
         $('fn-next').addEventListener('click', function () { fnMove(1); });
@@ -3293,7 +3467,10 @@
         var savedTab = 'listas';
         try { savedTab = localStorage.getItem('faz_pc_tab') || 'listas'; S.agView = localStorage.getItem('faz_pc_agview') === 'day' ? 'day' : 'week'; } catch (e) {}
         try { S.agTag = localStorage.getItem('faz_pc_ag_tag') || ''; S.agHideDone = localStorage.getItem('faz_pc_ag_hidedone') === '1'; } catch (e) {} // V40.17.0
-        try { S.zoom = { listas: Number(localStorage.getItem('faz_pc_zoom_listas')) || 1, agenda: Number(localStorage.getItem('faz_pc_zoom_agenda')) || 1 }; } catch (e) {} // V40.18.0
+        try { // V40.20.0: colunas por tela (o zoom de tudo da V40.18.0 ficou pra trás)
+            S.zoom = { listas: Number(localStorage.getItem('faz_pc_listas_por_tela')) || 0, agenda: Number(localStorage.getItem('faz_pc_dias_por_tela')) || 0 };
+            localStorage.removeItem('faz_pc_zoom_listas'); localStorage.removeItem('faz_pc_zoom_agenda');
+        } catch (e) {}
         setTab(savedTab);
         loadAll();
         subscribe();

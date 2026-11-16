@@ -52,7 +52,7 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   await waitFor(() => d.querySelectorAll('section.col').length === 5);
 
   console.log('U) Abas novas no topo:');
-  ok([...d.querySelectorAll('.tab')].map((b) => b.textContent).join(',').startsWith('Listas,Agenda,Rotinas,Notas'), 'abas: Listas, Agenda, Rotinas e Notas (e Finanças desde a V40.19.0)');
+  ok([...d.querySelectorAll('.tab')].map((b) => b.textContent.trim()).join(',').includes('Listas,Agenda,Rotinas,Notas'), 'abas: Listas, Agenda, Rotinas e Notas (+ Finanças na V40.19.0 e Assistente na frente na V40.20.0)');
   click($('tab-rotinas'));
   ok(visible('rotinas') && !visible('board') && !visible('agenda') && !visible('notas') && $('tab-rotinas').classList.contains('on') && w.localStorage.getItem('faz_pc_tab') === 'rotinas', 'Rotinas abre sozinha na tela e fica lembrada');
 

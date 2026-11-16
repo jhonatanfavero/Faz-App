@@ -1,7 +1,7 @@
 // Tela do PC com mouse de verdade. Agenda: arrastar o bloco na régua do Dia, puxar a borda de baixo pra mudar
 // a duração, rolagem automática, Esc, e os espaços livres que aparecem ao arrastar na Semana. Listas: os 3
-// pontinhos do cartão (Arquivar / Apagar) e o campo de arquivar que aparece no topo durante o arraste. V40.18.0: zoom
-// das Listas e da Semana (com arrastar) e a janela de Tags. V40.19.0: setas do teclado e aba Finanças.
+// pontinhos do cartão (Arquivar / Apagar) e o campo de arquivar que aparece no topo durante o arraste. V40.18.0: janela de Tags.
+// V40.20.0: zoom das Listas e da Semana como colunas por tela (com arrastar e setas). V40.19.0: setas do teclado e aba Finanças.
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -234,69 +234,75 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   const arqB = await p.evaluate(([uid, id]) => { const b = window.__nuvem.get('blocos', uid, id); return { arq: b.archived, st: b.start_min, date: b.date }; }, [UID, bl.id]);
   ok(campo2.visivel && arqB.arq === true && arqB.st === bl.st && arqB.date === '2026-11-17' && /^Bloco arquivado$/.test(await aviso()), 'arrastar um bloco da Semana pro campo arquiva o bloco, sem mexer no horário | "' + (await aviso()) + '"');
 
-  console.log('\nI) Zoom das Listas e da Semana (V40.18.0):');
+  console.log('\nI) Zoom das Listas e da Semana (V40.20.0: colunas por tela):');
   await p.locator('#tab-listas').click(); await p.waitForTimeout(250);
   const medeListas = () => p.evaluate(() => {
     const b = document.getElementById('board').getBoundingClientRect(), cols = [...document.querySelectorAll('section.col')];
     const rs = cols.map((c) => c.getBoundingClientRect());
     const pe = [...document.querySelectorAll('section.col footer')].map((f) => f.getBoundingClientRect().bottom);
-    return { inteiras: rs.filter((r) => r.left >= b.left - 1 && r.right <= b.right + 1).length, w: Math.round(rs[0].width), fundo: Math.round(b.bottom - Math.max(...rs.map((r) => r.bottom))), rodapes: pe.every((y) => y <= b.bottom + 1), z: document.getElementById('zoom-reset').textContent };
+    const tit = [...document.querySelectorAll('section.col .card p')];
+    const lh = tit.length ? parseFloat(getComputedStyle(tit[0]).lineHeight) * (parseFloat(document.getElementById('columns').style.zoom) || 1) : 1;
+    const proxima = rs.find((r) => r.right > b.right + 1);
+    return { inteiras: rs.filter((r) => r.left >= b.left - 1 && r.right <= b.right + 1).length, w: Math.round(rs[0].width), beirada: proxima ? Math.round(b.right - proxima.left) : 0,
+      fundo: Math.round(b.bottom - Math.max(...rs.map((r) => r.bottom))), rodapes: pe.every((y) => y <= b.bottom + 1), z: document.getElementById('zoom-reset').textContent,
+      quebrados: tit.filter((t) => t.getBoundingClientRect().height > lh * 1.5).length, linha: Math.round(lh * 10) / 10 };
   });
-  const z100 = await medeListas();
-  for (let i = 0; i < 3; i++) await p.locator('#zoom-out').click();
-  await p.waitForTimeout(150);
-  const z70 = await medeListas();
-  ok(z70.z === '70%' && Math.abs(z70.w - Math.round(296 * 0.7)) <= 1 && z70.inteiras > z100.inteiras, `70%: lista com ${z70.w}px, cabem ${z70.inteiras} inteiras na tela (eram ${z100.inteiras})`);
-  ok(z70.fundo >= 0 && z70.fundo <= 20 && z70.rodapes, 'a lista mais cheia continua indo até o pé da tela, com o "Adicionar tarefa" à vista (sobra ' + z70.fundo + 'px)');
-  await foto(p, 'pc-listas-zoom-70.png');
-  // arrastar com zoom: a conta do lugar de soltar usa o tamanho que aparece na tela
+  const L4 = await medeListas();
+  ok(L4.z === '4 listas' && L4.inteiras === 4 && L4.beirada >= 15 && L4.beirada <= 60, `normal em 1440 px: "4 listas" inteiras (${L4.w} px cada) e uma beiradinha da próxima (${L4.beirada} px)`);
+  await p.locator('#zoom-in').click(); await p.waitForTimeout(150);
+  const L3 = await medeListas();
+  ok(L3.z === '3 listas' && L3.inteiras === 3 && L3.w > 420 && L3.linha > L4.linha && L3.quebrados <= L4.quebrados, `+: "3 listas" de ${L3.w} px, letra um pouco maior; nomes quebrados: ${L3.quebrados} (eram ${L4.quebrados})`);
+  ok(L3.fundo >= 0 && L3.fundo <= 24 && L3.rodapes, 'a lista mais cheia continua indo até o pé da tela, com o "Adicionar tarefa" à vista (sobra ' + L3.fundo + 'px)');
+  await foto(p, 'pc-listas-3-por-tela.png');
+  // arrastar com as colunas largas: a conta do lugar de soltar usa o tamanho que aparece na tela
   const idsZ = await p.evaluate(() => [...document.querySelectorAll('section.col')[0].querySelectorAll('.card')].map((c) => c.dataset.id));
   cb = await cartao(idsZ[0]).boundingBox();
   const terceira = await p.locator('section.col').nth(2).locator('header').boundingBox(), terceiraId = await p.locator('section.col').nth(2).getAttribute('data-col');
   await p.mouse.move(cb.x + 40, cb.y + 14); await p.mouse.down(); await p.mouse.move(cb.x + 60, cb.y + 40, { steps: 4 }); await p.waitForTimeout(200);
   await p.mouse.move(terceira.x + terceira.width / 2, terceira.y + terceira.height / 2, { steps: 10 }); await p.mouse.move(terceira.x + terceira.width / 2 + 2, terceira.y + terceira.height / 2 + 1); await p.mouse.move(terceira.x + terceira.width / 2 + 3, terceira.y + terceira.height / 2 + 2); await p.waitForTimeout(120);
   await solta();
-  ok((await tarefa(idsZ[0])).lista === terceiraId, 'com 70%, arrastar um cartão pra outra lista continua caindo na lista certa');
-  // os 3 pontinhos com zoom: o menu (que fica fora da área com zoom) abre colado no botão
+  ok((await tarefa(idsZ[0])).lista === terceiraId, 'com 3 por tela, arrastar um cartão pra outra lista continua caindo na lista certa');
   const cz = await cartao(idsZ[1]).boundingBox();
   await p.mouse.move(cz.x + 30, cz.y + 10); await p.waitForTimeout(120);
   await cartao(idsZ[1]).locator('[data-more]').click(); await p.waitForTimeout(150);
   const mz = await p.evaluate((id) => { const b = document.querySelector(`.card[data-id="${id}"] [data-more]`).getBoundingClientRect(), m = document.querySelector('[role="menu"]'); if (!m) return null; const r = m.getBoundingClientRect(); return { dy: r.top - b.bottom, dx: Math.min(Math.abs(r.right - b.right), Math.abs(r.left - b.left)) }; }, idsZ[1]);
-  ok(!!mz && mz.dy >= 0 && mz.dy <= 10 && mz.dx <= 12, 'com 70%, o menu dos 3 pontinhos abre logo abaixo do botão (' + (mz ? Math.round(mz.dy) + 'px' : 'não abriu') + ')');
+  ok(!!mz && mz.dy >= 0 && mz.dy <= 10 && mz.dx <= 12, 'o menu dos 3 pontinhos abre logo abaixo do botão (' + (mz ? Math.round(mz.dy) + 'px' : 'não abriu') + ')');
   await p.keyboard.press('Escape');
   const bb = await p.locator('#board').boundingBox();
   await p.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
   await p.keyboard.down('Control'); await p.mouse.wheel(0, 100); await p.keyboard.up('Control'); await p.waitForTimeout(200);
-  ok((await medeListas()).z === '60%' && (await p.evaluate(() => window.visualViewport.scale)) === 1, 'Ctrl + rodinha diminui as listas, não a página');
-  await p.locator('#zoom-reset').click();
+  ok((await medeListas()).z === '4 listas' && (await p.evaluate(() => window.visualViewport.scale)) === 1, 'Ctrl + rodinha mostra mais listas, sem dar zoom na página');
+  await p.locator('#zoom-out').click(); await p.locator('#zoom-out').click(); await p.waitForTimeout(150);
+  const L6 = await medeListas();
+  const nListas = await p.evaluate(() => document.querySelectorAll('section.col').length);
+  ok(L6.z === '6 listas' && L6.inteiras === Math.min(6, nListas) && L6.w >= 190 && (await p.evaluate(() => document.getElementById('zoom-out').disabled)), `−: até "6 listas" (${L6.w} px), o máximo que cabe sem ficar estreita demais`);
+  await foto(p, 'pc-listas-6-por-tela.png');
+  await p.locator('#zoom-reset').click(); await p.locator('#zoom-in').click(); // fica em 3 pra conferir depois de recarregar
+  await p.locator('#tab-agenda').click(); await p.waitForTimeout(250);
+  const medeSemana = () => p.evaluate(() => {
+    const s = [...document.querySelectorAll('#ag-cols section')], wk = document.getElementById('ag-week'), w = wk.getBoundingClientRect();
+    return { inteiros: s.filter((x) => { const r = x.getBoundingClientRect(); return r.left >= w.left - 1 && r.right <= w.right + 1; }).length, w: Math.round(s[0].getBoundingClientRect().width), z: document.getElementById('zoom-reset').textContent, rol: Math.round(wk.scrollLeft), max: wk.scrollWidth - wk.clientWidth, rotulo: document.getElementById('ag-label').textContent, zoomed: document.getElementById('ag-cols').classList.contains('zoomed') };
+  });
+  const S7 = await medeSemana();
+  ok(S7.z === '7 dias' && S7.inteiros === 7 && !S7.zoomed, 'Semana: o normal são os 7 dias na tela, do jeito de sempre');
   for (let i = 0; i < 3; i++) await p.locator('#zoom-in').click();
   await p.waitForTimeout(150);
-  const z150 = await medeListas();
-  ok(z150.z === '150%' && z150.fundo >= 0 && z150.rodapes, '150%: nada passa do pé da tela e o "Adicionar tarefa" continua à vista');
-  await foto(p, 'pc-listas-zoom-150.png');
-  await p.locator('#zoom-reset').click();
-  for (let i = 0; i < 3; i++) await p.locator('#zoom-out').click(); // fica em 70% pra conferir depois de recarregar
-  await p.locator('#tab-agenda').click(); await p.waitForTimeout(250);
-  // Na Semana os dias se esticam até a largura da tela: diminuir o zoom deixa os blocos menores (cabe mais bloco em cada
-  // dia) e, em tela estreita, faz caber a semana inteira sem rolar pro lado.
-  const medeSemana = () => p.evaluate(() => {
-    const s = [...document.querySelectorAll('#ag-cols section')], w = document.getElementById('ag-week').getBoundingClientRect();
-    const cheio = s.map((x) => x.querySelector('.ag-list')).sort((a, b) => b.querySelectorAll('[data-block]').length - a.querySelectorAll('[data-block]').length)[0], lr = cheio.getBoundingClientRect();
-    const cards = [...cheio.querySelectorAll('[data-block]')].map((c) => c.getBoundingClientRect());
-    return { inteiros: s.filter((x) => { const r = x.getBoundingClientRect(); return r.left >= w.left - 1 && r.right <= w.right + 1; }).length, aVista: cards.filter((r) => r.top >= lr.top - 1 && r.bottom <= lr.bottom + 1).length, h: Math.round(cards[0].height), z: document.getElementById('zoom-reset').textContent };
-  });
-  const s100 = await medeSemana();
-  await p.locator('#zoom-out').click(); await p.locator('#zoom-out').click(); await p.waitForTimeout(150);
-  const s80 = await medeSemana();
-  ok(s100.z === '100%' && s80.z === '80%' && Math.abs(s80.h - s100.h * 0.8) <= 1.5 && s80.aVista > s100.aVista, `Semana tem o zoom dela: 100% → 80% (bloco de ${s100.h}px vira ${s80.h}px; no dia mais cheio cabem ${s80.aVista} blocos à vista, eram ${s100.aVista})`);
-  await p.setViewportSize({ width: 1100, height: 900 }); await p.waitForTimeout(150);
-  const e80 = await medeSemana();
-  await p.locator('#zoom-reset').click(); await p.waitForTimeout(150);
-  const e100 = await medeSemana();
-  ok(e100.inteiros < 7 && e80.inteiros === 7, `tela estreita (1100px): em 100% cabem ${e100.inteiros} dias inteiros; em 80%, a semana toda`);
-  await p.locator('#zoom-out').click(); await p.locator('#zoom-out').click();
-  await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(150);
-  await foto(p, 'pc-semana-zoom-80.png');
+  const S4 = await medeSemana();
+  ok(S4.z === '4 dias' && S4.inteiros === 4 && S4.w > 300, `+ 3 vezes: "4 dias" de ${S4.w} px por tela`);
+  await foto(p, 'pc-semana-4-dias.png');
+  await p.evaluate(() => { if (document.activeElement) document.activeElement.blur(); });
+  await p.keyboard.press('ArrowRight'); await p.waitForTimeout(500);
+  const sr1 = await medeSemana();
+  await p.keyboard.press('ArrowRight'); await p.keyboard.press('ArrowRight'); await p.waitForTimeout(700); // 7 dias, 4 na tela: 3 passos até o fim
+  const sr3 = await medeSemana();
+  await p.keyboard.press('ArrowRight'); await p.waitForTimeout(400);
+  const sr4 = await medeSemana();
+  ok(sr1.rol > 250 && sr1.rotulo === S4.rotulo && sr3.rol >= sr3.max - 2 && sr3.rotulo === S4.rotulo && sr4.rotulo !== S4.rotulo && sr4.rol <= 2, `→ anda um dia por vez (${sr1.rol} px); no fim da tela passa pra semana seguinte (${sr4.rotulo}) e volta pro começo`);
+  await p.keyboard.press('ArrowLeft'); await p.waitForTimeout(400);
+  const sl = await medeSemana();
+  ok(sl.rotulo === S4.rotulo && sl.rol >= sl.max - 2, '← no começo volta pra semana anterior, já no fim dela');
+  await p.locator('#ag-today').click(); await p.waitForTimeout(150);
+  await p.evaluate(() => { document.getElementById('ag-week').scrollLeft = 0; });
   dia = await blocos('2026-11-17');
   const bz = dia[0];
   c = await p.locator(`#ag-cols [data-block="${bz.id}"]`).first().boundingBox();
@@ -305,15 +311,22 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await p.mouse.move(quinta.x + quinta.width / 2, quinta.y + 18, { steps: 10 }); await p.mouse.move(quinta.x + quinta.width / 2 + 2, quinta.y + 19); await p.mouse.move(quinta.x + quinta.width / 2 + 3, quinta.y + 20); await p.waitForTimeout(120);
   await solta();
   g = await nuvem(bz.id);
-  ok(g.date === '2026-11-19' && g.st === bz.st, 'com 80%, arrastar um bloco pro nome de outro dia continua funcionando (' + g.date + ' ' + hhmm(g.st) + ')');
+  ok(g.date === '2026-11-19' && g.st === bz.st, 'com 4 dias por tela, arrastar um bloco pro nome de outro dia continua funcionando (' + g.date + ' ' + hhmm(g.st) + ')');
   await p.locator('.ag-view[data-view="day"]').click(); await p.waitForTimeout(150);
   ok(await p.evaluate(() => document.getElementById('zoom-ctl').classList.contains('hidden')), 'na visão Dia o zoom some');
   await p.locator('.ag-view[data-view="week"]').click();
   await p.reload(); await p.waitForSelector('#ag-cols section'); await p.waitForTimeout(400);
   const semRec = await medeSemana();
   await p.locator('#tab-listas').click(); await p.waitForTimeout(200);
-  ok(semRec.z === '80%' && (await medeListas()).z === '70%', 'recarregou a página: Semana em 80% e Listas em 70%, cada uma como estava');
+  ok(semRec.z === '4 dias' && (await medeListas()).z === '3 listas', 'recarregou a página: Semana em 4 dias e Listas em 3 listas, cada uma como estava');
   await p.locator('#zoom-reset').click();
+  await p.locator('#tab-agenda').click(); await p.locator('#zoom-reset').click();
+  await p.setViewportSize({ width: 1100, height: 900 }); await p.waitForTimeout(300);
+  const SE = await medeSemana();
+  ok(SE.z === '6 dias' && SE.inteiros === 6, `tela estreita (1100 px): mostra os ${SE.inteiros} dias que cabem inteiros (o resto, rolando pro lado)`);
+  await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(300);
+  ok((await medeSemana()).z === '7 dias', 'janela larga de novo: volta aos 7 dias');
+  await p.locator('#tab-listas').click(); await p.waitForTimeout(200);
 
   console.log('\nJ) Janela de Tags com mouse e teclado (V40.18.0):');
   const tagNuvem = (id) => p.evaluate(([uid, id]) => { const t = window.__nuvem.get('tags', uid, id); return { nome: t.name, cor: t.color, apagada: t.deleted }; }, [UID, id]);
@@ -376,6 +389,23 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await foto(p, 'pc-financas-escopo.png');
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(150);
   ok(await p.evaluate(() => document.getElementById('modal-fin').classList.contains('hidden') && document.getElementById('fn-scope').classList.contains('hidden')), 'Esc, Esc: fecha a pergunta e depois a despesa, sem gravar');
+
+  console.log('\nL) Aba Assistente (V40.20.0):');
+  await p.locator('#tab-assistente').click(); await p.waitForTimeout(300);
+  const asg = await p.evaluate(() => {
+    const f = document.getElementById('as-feed').getBoundingClientRect(), i = document.getElementById('as-input').getBoundingClientRect(), t = document.querySelector('.tab[data-tab="assistente"]').getBoundingClientRect(), l = document.querySelector('.tab[data-tab="listas"]').getBoundingClientRect();
+    return { primeiro: t.right <= l.left, input: i.bottom <= innerHeight - 4 && i.top > f.bottom, msgs: document.querySelectorAll('#as-feed > div').length, txt: document.getElementById('as-feed').textContent.slice(0, 32) };
+  });
+  ok(asg.primeiro && asg.input && asg.msgs === 1 && /^Bom dia! Hoje é segunda, 16/.test(asg.txt), 'a aba Assistente vem antes das Listas, abre com o resumo e o campo de perguntar fica embaixo, à vista');
+  for (const id of ['dia', 'atrasado', 'contas']) { await p.locator(`[data-as-chip="${id}"]`).click(); await p.waitForTimeout(150); }
+  const conv = await p.evaluate(() => { const f = document.getElementById('as-feed'); return { n: f.querySelectorAll(':scope > div').length, fim: f.scrollHeight - f.scrollTop - f.clientHeight < 4, rola: f.scrollHeight > f.clientHeight }; });
+  ok(conv.n === 7 && conv.rola && conv.fim, 'três perguntas seguidas: a conversa cresce, rola sozinha até a última resposta e a página não se mexe');
+  await foto(p, 'pc-assistente.png');
+  await p.locator('#as-input').fill('o que vence essa semana?'); await p.keyboard.press('Enter'); await p.waitForTimeout(150);
+  ok((await p.evaluate(() => document.querySelectorAll('#as-feed > div').length)) === 9 && (await p.evaluate(() => document.getElementById('as-input').value)) === '', 'Enter no campo envia a pergunta');
+  await p.locator('#as-feed > div:last-child [data-as-kind="despesa"]').first().click(); await p.waitForTimeout(200);
+  ok(await p.evaluate(() => !document.getElementById('modal-fin').classList.contains('hidden') && !document.getElementById('financas').classList.contains('hidden')), 'clicar numa conta da resposta abre a despesa');
+  await p.keyboard.press('Escape');
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));
   await fim();

@@ -2137,7 +2137,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.19.0',
+            version: 'v40.20.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -3511,17 +3511,18 @@ let editingNoteId = null;
 window.switchListTab = function(tabName) {
     activeListTab = tabName;
     
-    // V40.4.1: tabs agora inclui 'financial'
-    const TABS = ['backlog', 'routines', 'notes', 'financial'];
+    // V40.4.1: tabs agora inclui 'financial'. V40.20.0: + 'assistant' na frente (pílula só com o ícone, mais estreita)
+    const TABS = ['assistant', 'backlog', 'routines', 'notes', 'financial'];
     
     // Atualizar pills
     TABS.forEach(t => {
         const btn = document.getElementById(`btn-list-${t}`);
         if (!btn) return;
+        const size = t === 'assistant' ? 'flex-none w-9' : 'flex-1';
         if (t === tabName) {
-            btn.className = 'flex-1 py-1.5 rounded-lg bg-white shadow-sm text-zinc-800 text-xs font-bold transition border border-black/5 flex items-center justify-center gap-1';
+            btn.className = size + ' py-1.5 rounded-lg bg-white shadow-sm text-zinc-800 text-xs font-bold transition border border-black/5 flex items-center justify-center gap-1';
         } else {
-            btn.className = 'flex-1 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50 text-xs font-bold transition border border-transparent flex items-center justify-center gap-1';
+            btn.className = size + ' py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50 text-xs font-bold transition border border-transparent flex items-center justify-center gap-1';
         }
     });
     
@@ -3534,7 +3535,11 @@ window.switchListTab = function(tabName) {
     });
     
     // Render dinâmico ao trocar
-    if (tabName === 'notes') {
+    if (tabName === 'assistant') {
+        notesFormOpen = false;
+        editingNoteId = null;
+        renderAssistant();
+    } else if (tabName === 'notes') {
         notesFormOpen = false; // ao entrar na aba, sempre começa fechado
         editingNoteId = null;  // V40.1.2: garantir que não está em modo edição
         renderNotes();
@@ -3561,6 +3566,85 @@ window.switchListTab = function(tabName) {
     }
     if (tabName === 'backlog') renderBacklog();
 }
+
+// =====================================================
+// V40.20.0 — ASSISTENTE (primeira aba). O "cérebro" fica no assistente.js (o mesmo do PC): aqui só se monta o
+// retrato dos dados do aparelho e se desenha a conversa. Versão padrão: frases prontas, sem IA paga e sem internet.
+// A conversa fica só na memória (some ao fechar o app); "Recomeçar" volta pro resumo de agora.
+// =====================================================
+let assistantMsgs = [];
+let assistantAuto = true; // só tem o resumo automático: ele se refaz com os dados de agora sempre que a aba abre
+function assistantSnap() {
+    const tagInfo = (id) => { const t = (tagsDb || []).find(x => x.id === id); return t ? { name: t.name, color: t.color } : null; };
+    const cols = (backlogColumnsDb || []), colName = {};
+    cols.forEach(c => { colName[c.id] = c.name; });
+    const tasks = [];
+    cols.forEach(c => (backlogDb || []).filter(it => getItemColumn(it) === c.id).forEach(it => tasks.push({ id: it.id, title: it.title, dur: Number(it.duration) || 0, list: c.name || 'Geral', tag: tagInfo(it.tagId) })));
+    (backlogDb || []).filter(it => !colName[getItemColumn(it)]).forEach(it => tasks.push({ id: it.id, title: it.title, dur: Number(it.duration) || 0, list: 'Geral', tag: tagInfo(it.tagId) }));
+    return {
+        now: new Date(), hours: [START_HOUR, END_HOUR],
+        blocks: (db || []).filter(b => b && b.date).map(b => ({ id: b.id, title: b.title, date: String(b.date).slice(0, 10), start: Number(b.startMin) || 0, dur: Number(b.duration) || 0, done: !!b.completed, tag: tagInfo(b.tagId) })),
+        tasks: tasks,
+        routines: (routinesDb || []).map(r => ({ id: r.id, title: r.title, emoji: r.emoji, dur: Number(r.duration) || 0 })),
+        notes: (notesDb || []).map(n => ({ id: n.id, title: n.title, content: n.content, ms: Number(n.updatedAt || n.createdAt) || 0 })),
+        expenses: (financialDb || []).map(f => {
+            const ov = {};
+            Object.keys(f.paidMonthsOverrides || {}).forEach(m => { const v = f.paidMonthsOverrides[m]; ov[m] = v && typeof v === 'object' ? v.amount : v; });
+            return { id: f.id, title: f.title, amount: Number(f.amount) || 0, start: getItemStartMonth(f), months: f.durationMonths || 1, recurring: !!f.isRecurring, dueDay: f.dueDay || null,
+                paid: Array.isArray(f.paidMonths) ? f.paidMonths : (f.paid === true ? [getItemStartMonth(f)] : []), overrides: ov };
+        })
+    };
+}
+function assistantMsgHtml(m) {
+    if (m.who === 'me') return `<div class="flex justify-end"><p class="max-w-[85%] bg-app-focus text-white text-sm leading-relaxed px-3.5 py-2 rounded-2xl rounded-br-md break-words">${escapeHtml(m.text)}</p></div>`;
+    const a = m.a;
+    const items = a.items.length ? `<div class="mt-2 -mx-1 border border-zinc-100 rounded-xl overflow-hidden divide-y divide-zinc-100">${a.items.map(it => {
+        const dot = it.tone === 'now' ? 'bg-emerald-500' : it.tone === 'next' ? 'bg-app-focus' : it.tone === 'late' ? 'bg-red-500' : it.tone === 'done' ? 'bg-emerald-500' : 'bg-zinc-300';
+        return `<div class="flex items-start gap-2.5 px-2.5 py-2"><span class="w-2 h-2 rounded-full mt-1.5 shrink-0 ${dot}"></span><span class="min-w-0"><span class="block text-[13px] font-bold ${it.tone === 'late' ? 'text-red-700' : 'text-zinc-800'} break-words">${escapeHtml(it.label)}</span>${it.sub ? `<span class="block text-[11px] text-zinc-500">${escapeHtml(it.sub)}</span>` : ''}</span></div>`;
+    }).join('')}</div>` : '';
+    return `<div class="flex items-start gap-2"><div class="w-7 h-7 rounded-full bg-app-focus text-white flex items-center justify-center shrink-0 mt-0.5"><i class="ph-fill ph-sparkle text-sm"></i></div>` +
+        `<div class="min-w-0 flex-1 bg-white border border-zinc-200 rounded-2xl rounded-tl-md px-3.5 py-2.5 shadow-sm"><p class="text-sm leading-relaxed text-zinc-800">${escapeHtml(a.text)}</p>${items}` +
+        `${a.footer ? `<p class="mt-2 text-[11.5px] text-zinc-500 leading-relaxed">${escapeHtml(a.footer)}</p>` : ''}</div></div>`;
+}
+window.renderAssistant = function() {
+    const feed = document.getElementById('assistant-feed');
+    if (!feed) return;
+    const A = window.FazAssistente;
+    if (!A) { feed.innerHTML = '<p class="text-sm text-zinc-500">Não consegui abrir o assistente. Feche e abra o app de novo.</p>'; return; }
+    document.getElementById('assistant-name').innerText = A.NAME;
+    const chips = document.getElementById('assistant-chips');
+    if (!chips.firstChild) chips.innerHTML = A.CHIPS.map(c => `<button type="button" onclick="assistantChip('${c.id}')" class="shrink-0 whitespace-nowrap bg-white border border-zinc-200 text-zinc-700 text-xs font-bold px-3 py-1.5 rounded-full active:scale-95 transition">${escapeHtml(c.label)}</button>`).join('');
+    if (assistantAuto || !assistantMsgs.length) { assistantMsgs = [{ who: 'as', a: A.briefing(assistantSnap()) }]; assistantAuto = true; }
+    feed.innerHTML = assistantMsgs.map(assistantMsgHtml).join('');
+    feed.scrollTop = feed.scrollHeight;
+};
+function assistantAsk(text, intent) {
+    const A = window.FazAssistente;
+    if (!A) return;
+    const snap = assistantSnap(), a = intent ? A.reply(intent, snap) : A.ask(text, snap);
+    if (!a) return;
+    assistantAuto = false;
+    assistantMsgs.push({ who: 'me', text: text }, { who: 'as', a: a });
+    if (assistantMsgs.length > 60) assistantMsgs = assistantMsgs.slice(-60);
+    renderAssistant();
+}
+window.assistantChip = function(id) {
+    const c = window.FazAssistente && window.FazAssistente.CHIPS.find(x => x.id === id);
+    if (c) assistantAsk(c.label, c.id);
+};
+window.assistantSend = function(e) {
+    if (e) e.preventDefault();
+    const input = document.getElementById('assistant-input');
+    const v = input.value.trim();
+    if (!v) return;
+    input.value = '';
+    assistantAsk(v);
+};
+window.assistantRestart = function() {
+    assistantMsgs = [];
+    assistantAuto = true;
+    renderAssistant();
+};
 
 // V40.1.1: abre o form (Estado B) — modo criar
 window.openNoteForm = function() {

@@ -18,6 +18,8 @@ const SUITES = [
     ['Tela do PC: Tags e zoom', 'test_kanban_v4018.js', [ROOT, DADOS]],
     ['Tela do PC: Finanças e setas do teclado', 'test_kanban_v4019.js', [ROOT, DADOS]],
     ['Finanças do celular: editar sem estragar os valores por mês', 'test_v4019.js', [ROOT, DADOS]],
+    ['Assistente: o cérebro e a aba do celular', 'test_assistente.js', [ROOT, DADOS]],
+    ['Tela do PC: aba Assistente', 'test_kanban_v4020.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

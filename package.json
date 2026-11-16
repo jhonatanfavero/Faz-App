@@ -1,6 +1,6 @@
 {
   "name": "faz-app",
-  "version": "40.19.0",
+  "version": "40.20.0",
   "private": true,
   "description": "Faz / TimeBlock — PWA de agenda por blocos. O app em si não tem build: este arquivo só serve pros testes e pra gerar o libs/tailwind.css.",
   "scripts": {

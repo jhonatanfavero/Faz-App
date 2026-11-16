@@ -1,5 +1,6 @@
 // V40.18.0 — tela do PC (kanban.html): janela de Tags (criar, renomear, trocar cor, apagar), "Gerenciar tags" de dentro
-// do cartão e da rotina, tags padrão pra quem começa pelo computador, e zoom das Listas e da Semana.
+// do cartão e da rotina, tags padrão pra quem começa pelo computador, e zoom das Listas e da Semana (desde a V40.20.0,
+// colunas por tela).
 // Uso: TZ='America/Sao_Paulo' node test_kanban_v4018.js <repo> <backup.json>
 const fs = require('fs');
 const path = require('path');
@@ -174,51 +175,60 @@ server.insert('financas', UID, { id: 'fin_tag4', title: 'Despesa com tag', amoun
   key(d.body, 'Escape'); key(d.body, 'Escape');
   ok(!visible('modal-tags') && !visible('modal-task'), 'Esc, Esc: fecha as duas janelas');
 
-  console.log('\nZ) Zoom das Listas e da Semana:');
+  console.log('\nZ) Zoom das Listas e da Semana (V40.20.0: colunas por tela):');
+  // o jsdom não mede a tela: finge uma janela de 1440 px pra conta das colunas
+  Object.defineProperty(w, 'innerWidth', { value: 1440, configurable: true });
+  Object.defineProperty($('board'), 'clientWidth', { get: () => 1440, configurable: true });
+  Object.defineProperty($('ag-week'), 'clientWidth', { get: () => 1440, configurable: true });
+  click($('tab-agenda')); click($('tab-listas'));
   const zl = () => $('columns').style.zoom || '', za = () => $('ag-cols').style.zoom || '', lbl = () => $('zoom-reset').textContent;
-  ok(visible('zoom-ctl') && lbl() === '100%' && zl() === '', 'nas Listas aparece o zoom, em 100%');
+  const zw = (id) => parseFloat($(id).style.getPropertyValue('--zw'));
+  ok(visible('zoom-ctl') && lbl() === '4 listas' && zl() === '' && $('columns').classList.contains('zoomed') && Math.abs(zw('columns') - 325) < 0.01, 'em 1440 px: "4 listas", cada uma com 325 px (preenchem a tela, com uma beiradinha da próxima), letra normal');
   click($('zoom-out'));
-  ok(zl() === '0.9' && lbl() === '90%' && w.localStorage.getItem('faz_pc_zoom_listas') === '0.9', '− diminui pra 90% e fica lembrado neste computador');
-  for (let i = 0; i < 6; i++) click($('zoom-out'));
-  ok(zl() === '0.5' && lbl() === '50%' && $('zoom-out').disabled && !$('zoom-in').disabled, 'vai até 50% (aí o − desliga)');
+  ok(lbl() === '5 listas' && zl() === '0.94' && zw('columns') * 0.94 < 325 && w.localStorage.getItem('faz_pc_listas_por_tela') === '5', '− mostra mais (5 listas, mais estreitas, letra 6% menor) e fica lembrado neste computador');
+  click($('zoom-out'));
+  ok(lbl() === '6 listas' && $('zoom-out').disabled, 'até onde cabe sem ficar estreita demais (6 em 1440 px; aí o − desliga)');
   click($('zoom-reset'));
-  ok(zl() === '' && lbl() === '100%', 'clicar no número volta pra 100%');
-  for (let i = 0; i < 4; i++) click($('zoom-in'));
-  ok(zl() === '1.5' && lbl() === '150%' && $('zoom-in').disabled, '+ vai até 150% (aí o + desliga)');
+  ok(lbl() === '4 listas' && zl() === '' && w.localStorage.getItem('faz_pc_listas_por_tela') === null, 'clicar no número volta ao normal (e esquece a escolha)');
+  click($('zoom-in')); click($('zoom-in'));
+  ok(lbl() === '2 listas' && zl() === '1.12' && zw('columns') * 1.12 > 600 && $('zoom-in').disabled, '+ mostra menos e mais largas: 2 listas de mais de 600 px, letra 12% maior (aí o + desliga)');
   click($('zoom-reset'));
   const wheel = (el, dy, ctrl) => { const e = new w.WheelEvent('wheel', { deltaY: dy, ctrlKey: !!ctrl, bubbles: true, cancelable: true }); el.dispatchEvent(e); return e.defaultPrevented; };
-  ok(!wheel($('board'), 100, false) && zl() === '', 'rodinha sem Ctrl continua só rolando');
-  ok(wheel($('board'), 100, true) && zl() === '0.9', 'Ctrl + rodinha pra baixo diminui (e a página não dá zoom)');
-  ok(wheel($('board'), -100, true) && zl() === '', 'Ctrl + rodinha pra cima aumenta');
+  ok(!wheel($('board'), 100, false) && lbl() === '4 listas', 'rodinha sem Ctrl continua só rolando');
+  ok(wheel($('board'), 100, true) && lbl() === '5 listas', 'Ctrl + rodinha pra baixo mostra mais (e a página não dá zoom)');
+  ok(wheel($('board'), -100, true) && lbl() === '4 listas', 'Ctrl + rodinha pra cima mostra menos, mais largas');
   [15, 15, 15].forEach((dy) => wheel($('board'), dy, true));
-  const pinchMid = zl();
+  const pinchMid = lbl();
   wheel($('board'), 15, true);
-  ok(pinchMid === '' && zl() === '0.9', 'pinça do touchpad (passinhos pequenos) também: junta os passinhos antes de mudar');
+  ok(pinchMid === '4 listas' && lbl() === '5 listas', 'pinça do touchpad (passinhos pequenos) também: junta os passinhos antes de mudar');
   click($('zoom-reset'));
   click($('tab-agenda'));
-  ok(visible('zoom-ctl') && lbl() === '100%', 'na Semana o zoom é separado (100%)');
-  click($('zoom-out')); click($('zoom-out'));
-  ok(za() === '0.8' && zl() === '' && w.localStorage.getItem('faz_pc_zoom_agenda') === '0.8', 'diminuir na Semana não mexe nas Listas');
-  ok(wheel($('ag-week'), 100, true) && za() === '0.7', 'Ctrl + rodinha também na Semana');
+  ok(visible('zoom-ctl') && lbl() === '7 dias' && !$('ag-cols').classList.contains('zoomed') && za() === '', 'na Semana o normal são os 7 dias, do jeito de sempre');
+  click($('zoom-in'));
+  ok(lbl() === '6 dias' && $('ag-cols').classList.contains('zoomed') && za() === '1.06' && w.localStorage.getItem('faz_pc_dias_por_tela') === '6' && $('columns').style.zoom === '', '+ na Semana: 6 dias por tela, mais largos; as Listas não mudam');
+  click($('zoom-in')); click($('zoom-in')); click($('zoom-in'));
+  ok(lbl() === '3 dias' && za() === '1.24', '3 dias por tela (letra no máximo de 24% maior)');
+  ok(wheel($('ag-week'), 100, true) && lbl() === '4 dias', 'Ctrl + rodinha também na Semana');
   click(d.querySelector('.ag-view[data-view="day"]'));
   ok(!visible('zoom-ctl') && !wheel($('ag-day'), 100, true), 'na visão Dia não tem zoom (a régua das horas usa o tamanho real)');
   click(d.querySelector('.ag-view[data-view="week"]'));
-  ok(visible('zoom-ctl') && lbl() === '70%', 'voltando pra Semana, continua em 70%');
+  ok(visible('zoom-ctl') && lbl() === '4 dias', 'voltando pra Semana, continua em 4 dias');
   click($('tab-rotinas')); const zr = visible('zoom-ctl');
   click($('tab-notas')); const zn = visible('zoom-ctl');
   ok(!zr && !zn, 'Rotinas e Notas não têm zoom');
   click($('tab-listas'));
-  ok(visible('zoom-ctl') && lbl() === '100%', 'de volta nas Listas: 100%, como estava');
+  ok(visible('zoom-ctl') && lbl() === '4 listas', 'de volta nas Listas: 4 listas, como estava');
 
   console.log('\nS) Sócio que só usa o computador: começar do zero:');
   click($('btn-logout')); await confirmDialog(); await waitFor(() => visible('view-login'));
-  w.localStorage.setItem('faz_pc_zoom_listas', '0.7'); w.localStorage.setItem('faz_pc_zoom_agenda', '0.33'); w.localStorage.setItem('faz_pc_tab', 'listas');
+  w.localStorage.setItem('faz_pc_listas_por_tela', '3'); w.localStorage.setItem('faz_pc_dias_por_tela', '9'); w.localStorage.setItem('faz_pc_tab', 'listas');
+  w.localStorage.setItem('faz_pc_zoom_listas', '0.7'); // zoom antigo (V40.18.0)
   server.addUser('socio@teste.com', 'senha456', UID2);
   $('login-email').value = 'socio@teste.com'; $('login-pass').value = 'senha456';
   $('login-form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
   await waitFor(() => visible('view-board') && visible('board-empty'));
   ok(visible('board-empty') && d.querySelectorAll('section.col').length === 0, 'conta nova: quadro vazio com o convite');
-  ok(zl() === '0.7' && lbl() === '70%', 'o zoom lembrado neste computador volta ao entrar (70%)');
+  ok(lbl() === '3 listas' && w.localStorage.getItem('faz_pc_zoom_listas') === null, 'a escolha lembrada neste computador volta ao entrar (3 listas); o zoom antigo é esquecido');
   click($('btn-start-empty'));
   await waitFor(() => server.alive('tags', UID2).length === 3);
   const tg2 = server.alive('tags', UID2).sort((a, b) => a.position - b.position);
@@ -226,7 +236,7 @@ server.insert('financas', UID, { id: 'fin_tag4', title: 'Despesa com tag', amoun
   await waitFor(() => /^Pronto/.test(toast()));
   ok(toast() === 'Pronto: lista Geral e as tags Trabalho, Pessoal e Estudo' && d.querySelectorAll('section.col').length === 1, 'avisa: "' + toast() + '"');
   click($('tab-agenda'));
-  ok(lbl() === '100%' && za() === '', 'zoom guardado com valor estranho (0.33) vira 100%');
+  ok(lbl() === '7 dias' && za() === '', 'valor estranho guardado (9 dias) vira o normal (7 dias)');
   ok(errors.length === 0, 'nenhum erro de página' + (errors.length ? ': ' + errors[0].slice(0, 300) : ''));
 
   console.log(`\n==== RESULTADO: ${pass} passaram, ${fail} falharam ====`);

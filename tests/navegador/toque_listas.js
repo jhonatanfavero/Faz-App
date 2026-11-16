@@ -214,5 +214,28 @@ const { abrir } = require('./apoio');
   const one = await m.evaluate(() => { const w = document.getElementById('backlog-columns-wrapper'); return { col: Math.round(w.children[0].getBoundingClientRect().width), area: Math.round(w.getBoundingClientRect().width), n: w.children.length }; });
   ok(one.n === 1 && one.col === one.area - 20, `quem tem uma lista só vê ela compacta na largura toda (${one.col}px de ${one.area}px)`);
   await foto(m, 'z_one.png');
+  console.log('\nG) Aba Assistente (V40.20.0):');
+  const abas = () => m.evaluate(() => {
+    const box = document.getElementById('btn-list-assistant').parentElement.getBoundingClientRect();
+    return [...document.querySelectorAll('[id^="btn-list-"]')].map((b) => { const r = b.getBoundingClientRect(); return { id: b.id, dentro: r.left >= box.left - 0.5 && r.right <= box.right + 0.5, cabe: b.scrollWidth <= b.clientWidth + 1, alto: Math.round(r.height) }; });
+  });
+  for (const largura of [390, 360]) {
+    await m.setViewportSize({ width: largura, height: 844 }); await m.waitForTimeout(250);
+    const ab = await abas();
+    ok(ab.length === 5 && ab[0].id === 'btn-list-assistant' && ab.every((a) => a.dentro && a.cabe && a.alto === ab[1].alto), `tela de ${largura} px: as 5 abas cabem, sem cortar o texto (Assistente primeiro, só o ícone)`);
+  }
+  await m.setViewportSize({ width: 390, height: 844 }); await m.waitForTimeout(200);
+  await m.tap('#btn-list-assistant'); await m.waitForTimeout(300);
+  const as = await m.evaluate(() => {
+    const f = document.getElementById('assistant-feed').getBoundingClientRect(), i = document.getElementById('assistant-input').getBoundingClientRect(), c = document.getElementById('assistant-chips');
+    return { msgs: document.querySelectorAll('#assistant-feed > div').length, txt: document.getElementById('assistant-feed').textContent.slice(0, 40), inputNaTela: i.bottom <= innerHeight && i.top > f.top, chipsRolam: c.scrollWidth > c.clientWidth, feedH: Math.round(f.height) };
+  });
+  ok(as.msgs === 1 && /^(Bom dia|Boa tarde|Boa noite)! Hoje é /.test(as.txt) && as.inputNaTela && as.chipsRolam && as.feedH > 250, `abre com o resumo ("${as.txt}…"), sugestões rolando pro lado e o campo de perguntar à vista`);
+  await foto(m, 'cel-assistente.png');
+  const chip = await m.evaluate(() => { const c = document.getElementById('assistant-chips'), b = [...c.querySelectorAll('button')].find((x) => x.textContent === 'Minhas contas'); c.scrollLeft = b.offsetLeft - 20; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await m.touchscreen.tap(chip.x, chip.y); await m.waitForTimeout(300);
+  const depois = await m.evaluate(() => { const f = document.getElementById('assistant-feed'); return { n: f.querySelectorAll(':scope > div').length, fim: f.scrollHeight - f.scrollTop - f.clientHeight < 4 }; });
+  ok(depois.n === 3 && depois.fim, 'tocar em "Minhas contas": pergunta e resposta aparecem e a conversa rola até o fim');
+  await foto(m, 'cel-assistente-contas.png');
   await fim(errs.length ? '\nERROS DE PÁGINA: ' + errs.slice(0, 3).join(' | ') : '');
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

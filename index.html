@@ -241,6 +241,10 @@
             
             <!-- V40.1: Super Gabinete - Pills de navegação entre abas -->
             <div class="flex gap-1 bg-zinc-100 p-1 rounded-xl mb-4 shrink-0">
+                <!-- V40.20.0: Assistente, a primeira aba (só o ícone, pra caber 5 abas na tela do celular) -->
+                <button id="btn-list-assistant" onclick="switchListTab('assistant')" aria-label="Assistente" title="Assistente" class="flex-none w-9 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50 text-xs font-bold transition border border-transparent flex items-center justify-center gap-1">
+                    <i class="ph-fill ph-sparkle text-sm"></i>
+                </button>
                 <button id="btn-list-backlog" onclick="switchListTab('backlog')" class="flex-1 py-1.5 rounded-lg bg-white shadow-sm text-zinc-800 text-xs font-bold transition border border-black/5 flex items-center justify-center gap-1">
                     <i class="ph ph-tray text-sm"></i> Listas
                 </button>
@@ -254,6 +258,24 @@
                 <button id="btn-list-financial" onclick="switchListTab('financial')" class="flex-1 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50 text-xs font-bold transition border border-transparent flex items-center justify-center gap-1">
                     <i class="ph ph-currency-circle-dollar text-sm"></i> Finanças
                 </button>
+            </div>
+
+            <!-- V40.20.0: Assistente (versão padrão: lê os dados do aparelho e responde com frases prontas; o "cérebro" é o assistente.js) -->
+            <div id="view-assistant" class="flex-1 flex flex-col min-h-0 hidden">
+                <div class="flex items-center gap-2.5 shrink-0 pb-3">
+                    <div class="w-9 h-9 rounded-full bg-app-focus text-white flex items-center justify-center shrink-0"><i class="ph-fill ph-sparkle text-lg"></i></div>
+                    <div class="min-w-0 flex-1">
+                        <h2 id="assistant-name" class="text-base font-bold text-zinc-900 leading-tight">Assistente</h2>
+                        <p class="text-[11px] text-zinc-500 leading-tight truncate">Seu dia, compromissos, contas, rotinas e notas</p>
+                    </div>
+                    <button onclick="assistantRestart()" aria-label="Recomeçar" title="Recomeçar" class="w-9 h-9 flex items-center justify-center text-zinc-500 hover:bg-zinc-100 rounded-full transition active:scale-90 shrink-0"><i class="ph ph-arrow-counter-clockwise text-lg"></i></button>
+                </div>
+                <div id="assistant-feed" class="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-3 pb-2"></div>
+                <div id="assistant-chips" class="shrink-0 flex gap-1.5 overflow-x-auto no-scrollbar py-2"></div>
+                <form id="assistant-form" onsubmit="assistantSend(event)" autocomplete="off" class="shrink-0 flex items-center gap-2 pt-1">
+                    <input id="assistant-input" type="text" maxlength="300" enterkeyhint="send" placeholder="Pergunte: o que tenho amanhã?" aria-label="Pergunta pro assistente" class="flex-1 min-w-0 h-11 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm outline-none focus:border-app-focus focus:bg-white transition">
+                    <button type="submit" aria-label="Enviar" class="w-11 h-11 shrink-0 rounded-xl bg-app-focus text-white flex items-center justify-center active:scale-95 transition"><i class="ph-bold ph-paper-plane-right text-base"></i></button>
+                </form>
             </div>
 
             <!-- V40.1: View 1 - Banco (conteúdo original do backlog) -->
@@ -1288,13 +1310,14 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.19.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.20.0</div>
 
     </div>
 
     <script src="app.js"></script>
     <!-- V40.7.0: sincronização opcional das Listas. Só baixa a biblioteca do Supabase pra quem fizer login. -->
     <script src="faz-config.js"></script>
+    <script src="assistente.js"></script>
     <script src="sync.js"></script>
 </body>
 </html>

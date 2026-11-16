@@ -72,6 +72,10 @@
     .rt-theme { color: #71717a; }
     .rt-theme.on { background: #fff; color: #18181b; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
     .nt-item.on { background: #fff; box-shadow: 0 0 0 1.5px var(--focus); }
+    /* V40.18.0: Tags */
+    .tg-dot { width: 28px; height: 28px; border-radius: 9999px; border: 2px solid #fff; box-shadow: 0 0 0 1px #d4d4d8; flex-shrink: 0; }
+    .tg-dot.on { box-shadow: 0 0 0 2px #18181b; }
+    .tg-name:focus { background: #f4f4f5; }
     /* V40.17.0: filtro da Agenda ligado; bloco escondido pelo filtro na régua do Dia (o horário continua ocupado) */
     .ag-filter-on { box-shadow: 0 0 0 2px var(--focus); border-color: transparent !important; }
     .ag-hidden { position: absolute; left: 56px; right: 0; border: 1.5px dashed #d4d4d8; border-radius: 6px; background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(0,0,0,.025) 6px 12px); pointer-events: none; }
@@ -175,6 +179,14 @@
             <span id="sync-pill" class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 px-2.5 py-1 rounded-full bg-zinc-100" title="Mudanças do celular aparecem aqui sozinhas">
                 <span id="sync-dot" class="w-2 h-2 rounded-full bg-amber-400"></span><span id="sync-label">Conectando</span>
             </span>
+            <!-- V40.18.0: zoom das Listas e da Semana (cada uma lembra o seu) -->
+            <div id="zoom-ctl" class="hidden items-center h-9 rounded-lg border border-zinc-200 bg-white" role="group" aria-label="Zoom">
+                <button id="zoom-out" class="w-8 h-full rounded-l-lg flex items-center justify-center text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent" title="Diminuir (ver mais)" aria-label="Diminuir o zoom"><i class="ph-bold ph-minus"></i></button>
+                <button id="zoom-reset" class="h-full px-1 min-w-[48px] text-[12px] font-semibold text-zinc-700 tabular-nums hover:bg-zinc-100" title="Voltar pra 100%" aria-label="Voltar o zoom pra 100%">100%</button>
+                <button id="zoom-in" class="w-8 h-full rounded-r-lg flex items-center justify-center text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent" title="Aumentar" aria-label="Aumentar o zoom"><i class="ph-bold ph-plus"></i></button>
+            </div>
+            <!-- V40.18.0: tags (criar, renomear, trocar cor, apagar) -->
+            <button id="btn-tags" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Tags" aria-label="Tags"><i class="ph ph-tag text-lg"></i></button>
             <button id="btn-archive" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Arquivados" aria-label="Arquivados"><i class="ph ph-archive text-lg"></i></button>
             <button id="btn-refresh" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Atualizar agora" aria-label="Atualizar agora">
                 <i class="ph ph-arrows-clockwise text-lg"></i>
@@ -284,6 +296,27 @@
             </div>
         </section>
     </main>
+</div>
+
+<!-- V40.18.0: Tags. Fica acima do cartão aberto (z-[55]) porque também abre de dentro dele. -->
+<div id="modal-tags" class="hidden fixed inset-0 z-[55] items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="tg-title">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[85vh]">
+        <div class="px-5 pt-5 pb-3 flex items-center gap-3">
+            <h3 id="tg-title" class="text-base font-bold text-zinc-900">Tags</h3>
+            <span id="tg-count" class="text-xs text-zinc-500"></span>
+            <button id="tg-close" class="ml-auto text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Fechar</button>
+        </div>
+        <p id="tg-hint" class="px-5 -mt-1 pb-3 text-[12px] text-zinc-500">Clique no nome pra renomear e na bolinha pra trocar a cor. Vale aqui e no celular.</p>
+        <div id="tg-list" class="px-5 pb-1 overflow-y-auto thin-scroll flex flex-col gap-2"></div>
+        <div class="px-5 pt-3 pb-5 mt-2 border-t border-zinc-100">
+            <p class="text-xs font-semibold text-zinc-500">Nova tag</p>
+            <div class="mt-2 flex items-center gap-2">
+                <input id="tg-new-name" maxlength="40" placeholder="Nome da tag" aria-label="Nome da tag nova" class="flex-1 min-w-0 border border-zinc-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-zinc-500">
+                <button id="tg-new-add" class="bg-focus text-white text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-90">Criar</button>
+            </div>
+            <div id="tg-new-colors" class="mt-2.5 flex flex-wrap gap-2" role="radiogroup" aria-label="Cor da tag nova"></div>
+        </div>
+    </div>
 </div>
 
 <!-- V40.17.0: editar rotina -->
@@ -453,7 +486,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.17.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.18.0</div>
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
@@ -479,7 +512,7 @@
     };
     var S = {
         sb: null, uid: null, email: '', listas: {}, tags: {}, tarefas: {}, blocos: {}, rotinas: {}, notas: {}, financas: {},
-        rtEdit: null, nt: null, ntQuery: '', agTag: '', agHideDone: false,
+        rtEdit: null, nt: null, ntQuery: '', agTag: '', agHideDone: false, zoom: { listas: 1, agenda: 1 },
         tab: 'listas', agView: 'week', agAnchor: null, agScrolled: null, hours: [7, 24], recovery: false,
         channel: null, live: 'connecting', lastLoad: 0, loading: false,
         dragId: null, pendingRender: false, composer: null, editing: null, placing: null, agH0: 7
@@ -578,6 +611,7 @@
             render();
             renderAgenda();
             renderSide();
+            renderTags(); // V40.18.0
         } catch (e) {
             console.error('[Faz kanban] load', e);
             if (!S.lastLoad) toast('Não consegui carregar suas Listas. Confira a internet.');
@@ -610,9 +644,9 @@
 
     async function insertRow(kind, row, okMsg) {
         S[kind][row.id] = row;
-        render(); renderAgenda(); renderSide();
+        render(); renderAgenda(); renderSide(); renderTags();
         var res = await S.sb.from(kind).upsert(row, { onConflict: 'user_id,id' });
-        if (res.error) { delete S[kind][row.id]; render(); renderAgenda(); renderSide(); fail(res.error); return false; }
+        if (res.error) { delete S[kind][row.id]; render(); renderAgenda(); renderSide(); renderTags(); fail(res.error); return false; }
         if (okMsg) toast(okMsg);
         return true;
     }
@@ -623,16 +657,16 @@
         if (!row) return false;
         var prev = Object.assign({}, row);
         Object.assign(row, fields);
-        render(); renderAgenda(); renderArchive(); renderSide();
+        render(); renderAgenda(); renderArchive(); renderSide(); renderTags();
         var res = await S.sb.from(kind).update(fields).eq('user_id', S.uid).eq('id', id);
-        if (res.error) { S[kind][id] = prev; render(); renderAgenda(); renderArchive(); renderSide(); fail(res.error); return false; }
+        if (res.error) { S[kind][id] = prev; render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); fail(res.error); return false; }
         if (okMsg) toast(okMsg);
         return true;
     }
 
     // ---------- render ----------
     var renderT = null;
-    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderSide(); if (S.editing && S.editing.kind === 'blocos') renderDone(); }, 60); }
+    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); if (S.editing && S.editing.kind === 'blocos') renderDone(); }, 60); }
     function renderSide() { renderRotinas(); renderNotas(); } // V40.17.0: cada uma só desenha se a aba dela estiver aberta
 
     function cardHtml(t) {
@@ -1081,6 +1115,7 @@
         $('ag-tip').textContent = pl ? '' : S.agView === 'day' ? 'Arraste um bloco pra mudar o horário. Puxe a borda de baixo pra mudar a duração.'
             : 'Arraste um bloco pra outro dia ou pra um espaço livre. Horário exato e duração: clique no nome do dia.';
         document.querySelectorAll('.ag-view').forEach(function (b) { b.classList.toggle('on', b.dataset.view === S.agView); });
+        applyZoom(); // V40.18.0: na visão Dia não tem zoom (a régua das horas depende do tamanho real)
         renderAgFilter();
         $('ag-week').classList.toggle('hidden', S.agView !== 'week');
         $('ag-day').classList.toggle('hidden', S.agView !== 'day');
@@ -1102,6 +1137,7 @@
             b.classList.toggle('on', b.dataset.tab === S.tab);
             b.setAttribute('aria-selected', b.dataset.tab === S.tab ? 'true' : 'false');
         });
+        applyZoom(); // V40.18.0: o zoom só aparece nas Listas e na Semana
         if (S.tab === 'agenda') { closeComposer(); closeColMenu(); S.agScrolled = null; renderAgenda(); return; }
         if (S.placing) cancelPlacing(); // saiu da Agenda com algo na mão: nada é agendado
         if (S.tab === 'listas') render();
@@ -1196,8 +1232,10 @@
         }
         toast('Lista apagada');
     }
-    function startFromScratch() {
-        insertRow('listas', { user_id: S.uid, id: DEFAULT_COL, name: 'Geral', is_default: true, position: STEP, created_ms: Date.now(), deleted: false }, 'Lista criada');
+    async function startFromScratch() { // V40.18.0: quem começa pelo computador ganha também as 3 tags que o app cria
+        if (!(await insertRow('listas', { user_id: S.uid, id: DEFAULT_COL, name: 'Geral', is_default: true, position: STEP, created_ms: Date.now(), deleted: false }))) return;
+        var tags = !alive('tags').length && await createDefaultTags();
+        toast(tags ? 'Pronto: lista Geral e as tags Trabalho, Pessoal e Estudo' : 'Lista criada');
     }
 
     var menuEl = null;
@@ -1440,6 +1478,9 @@
         var sync = function () { if (S.editing && S.editing.kind === 'blocos' && S.editing.id === id) { S.editing.orig.completed = !!S.blocos[id].completed; renderDone(); } };
         sync(); p.then(sync);
     }
+    function tagManageChip() { // V40.18.0: dá pra criar e arrumar tags sem sair do cartão (quem só usa o computador não tinha como)
+        return '<button type="button" data-manage-tags class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed border-zinc-300 text-[12.5px] font-medium text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50" title="Criar, renomear, trocar a cor ou apagar tags"><i class="ph ph-pencil-simple"></i>' + (alive('tags').length ? 'Gerenciar tags' : 'Criar tag') + '</button>';
+    }
     function renderTagChips() {
         var ed = S.editing;
         var chip = function (id, label, color) {
@@ -1447,7 +1488,9 @@
             return '<button type="button" data-tag="' + esc(id || '') + '" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50' + (on ? ' chip-on' : '') + '">' +
                 (color ? '<span class="w-2.5 h-2.5 rounded-full" style="background:' + esc(safeColor(color)) + '"></span>' : '<i class="ph ph-prohibit text-zinc-400"></i>') + esc(label) + '</button>';
         };
-        $('f-tags').innerHTML = chip(null, 'Sem tag', null) + alive('tags').map(function (t) { return chip(t.id, t.name, t.color); }).join('');
+        if (ed.tag && !tagOf(ed.tag)) ed.tag = null; // V40.18.0: a tag escolhida foi apagada
+        var html = chip(null, 'Sem tag', null) + alive('tags').map(function (t) { return chip(t.id, t.name, t.color); }).join('') + tagManageChip();
+        if ($('f-tags')._html !== html) { $('f-tags').innerHTML = html; $('f-tags')._html = html; }
     }
     function renderColors() {
         var cur = S.editing.color, custom = cur && CARD_COLORS.indexOf(cur) < 0;
@@ -1687,7 +1730,9 @@
             return '<button type="button" data-tag="' + esc(id || '') + '" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50' + (on ? ' chip-on' : '') + '">' +
                 (color ? '<span class="w-2.5 h-2.5 rounded-full" style="background:' + esc(safeColor(color)) + '"></span>' : '<i class="ph ph-prohibit text-zinc-400"></i>') + esc(label) + '</button>';
         };
-        $('rt-f-tags').innerHTML = chip(null, 'Sem tag', null) + alive('tags').map(function (t) { return chip(t.id, t.name, t.color); }).join('');
+        if (ed.tag && !tagOf(ed.tag)) ed.tag = null; // V40.18.0: a tag escolhida foi apagada
+        var html = chip(null, 'Sem tag', null) + alive('tags').map(function (t) { return chip(t.id, t.name, t.color); }).join('') + tagManageChip();
+        if ($('rt-f-tags')._html !== html) { $('rt-f-tags').innerHTML = html; $('rt-f-tags')._html = html; }
     }
     function renderRtMbs() {
         $('rt-f-mbs').innerHTML = S.rtEdit.mbs.map(function (t, i) {
@@ -1873,6 +1918,206 @@
         ntClose();
         await patchRow('notas', id, { deleted: true }, 'Nota apagada');
         renderNotas();
+    }
+
+    // ---------- V40.18.0: TAGS (as mesmas do celular). O app só cria e apaga; aqui também renomeia e troca a cor. ----------
+    var TAG_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6']; // as 8 cores do app
+    var DEFAULT_TAGS = [['tag_1', 'Trabalho', '#ef4444'], ['tag_2', 'Pessoal', '#10b981'], ['tag_3', 'Estudo', '#f59e0b']]; // as que o app cria num aparelho novo
+    var TAG_KINDS = [['tarefas', 'tarefa', 'tarefas'], ['blocos', 'bloco da agenda', 'blocos da agenda'], ['rotinas', 'rotina', 'rotinas'], ['financas', 'despesa', 'despesas']];
+    var TG = { color: TAG_COLORS[0], picking: null, rendering: false };
+    function tagUseCounts(id) { // quantos de cada tipo usam a tag (o que já foi apagado não conta)
+        return TAG_KINDS.map(function (k) {
+            return Object.keys(S[k[0]]).filter(function (x) { var r = S[k[0]][x]; return !r.deleted && r.tag_id === id; }).length;
+        });
+    }
+    function tagUseText(counts) {
+        var parts = [];
+        counts.forEach(function (n, i) { if (n) parts.push(n + ' ' + (n === 1 ? TAG_KINDS[i][1] : TAG_KINDS[i][2])); });
+        return parts.length > 1 ? parts.slice(0, -1).join(', ') + ' e ' + parts[parts.length - 1] : (parts[0] || '');
+    }
+    function renderTagPickers() { if (S.editing) renderTagChips(); if (S.rtEdit) renderRtTags(); } // cartão ou rotina aberta: as tags dela acompanham
+    function tagRowHtml(t, open) {
+        // O nome não entra no HTML (vai direto no campo): renomear não redesenha a linha nem engole o clique seguinte.
+        var counts = tagUseCounts(t.id), uses = counts.reduce(function (a, n) { return a + n; }, 0), color = String(t.color || '').toLowerCase();
+        return '<div class="rounded-xl border border-zinc-200" data-tg="' + esc(t.id) + '">' +
+            '<div class="flex items-center gap-2 p-2">' +
+            '<button type="button" class="tg-dot shrink-0" style="background:' + esc(safeColor(t.color)) + '" data-tg-pick="' + esc(t.id) + '" title="Trocar a cor" aria-label="Trocar a cor" aria-expanded="' + (open ? 'true' : 'false') + '"></button>' +
+            '<input class="tg-name min-w-0 flex-1 rounded-md px-1.5 py-1 text-sm font-semibold text-zinc-800 outline-none hover:bg-zinc-50" maxlength="40" placeholder="Sem nome" data-tg-name="' + esc(t.id) + '" aria-label="Nome da tag (clique pra renomear)" title="Clique pra renomear">' +
+            '<span class="shrink-0 text-[11.5px] text-zinc-500"' + (uses ? ' title="' + esc(tagUseText(counts)) + '"' : '') + '>' + (uses ? uses + (uses === 1 ? ' uso' : ' usos') : 'sem uso') + '</span>' +
+            '<button type="button" class="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-600 hover:bg-red-50" data-tg-del="' + esc(t.id) + '" title="Apagar a tag" aria-label="Apagar a tag"><i class="ph ph-trash text-base"></i></button>' +
+            '</div>' +
+            (open ? '<div class="flex flex-wrap gap-2 px-2 pb-2.5 pl-11" role="radiogroup" aria-label="Cor da tag">' + TAG_COLORS.map(function (c) {
+                return '<button type="button" class="tg-dot' + (color === c ? ' on' : '') + '" style="background:' + c + '" data-tg-set="' + esc(t.id) + '" data-color="' + c + '" role="radio" aria-checked="' + (color === c ? 'true' : 'false') + '" aria-label="Cor ' + c + '"></button>';
+            }).join('') + '</div>' : '') +
+            '</div>';
+    }
+    function renderTags() {
+        renderTagPickers();
+        if ($('modal-tags').classList.contains('hidden')) return;
+        var list = alive('tags'), box = $('tg-list');
+        $('tg-count').textContent = list.length ? list.length + (list.length === 1 ? ' tag' : ' tags') : '';
+        $('tg-hint').classList.toggle('hidden', !list.length);
+        TG.rendering = true; // campo que sai da tela ao redesenhar não conta como "terminou de renomear"
+        if (!list.length) {
+            if (!$('tg-defaults')) box.innerHTML = '<div class="py-6 text-center">' +
+                '<p class="text-sm text-zinc-500">Você ainda não tem tags.</p>' +
+                '<button type="button" id="tg-defaults" class="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-zinc-700 border border-zinc-300 hover:bg-zinc-50 px-3.5 py-2 rounded-lg"><i class="ph ph-sparkle"></i>Criar as tags padrão (Trabalho, Pessoal, Estudo)</button></div>';
+        } else {
+            if ($('tg-defaults')) box.innerHTML = '';
+            var old = {}, prev = null;
+            Array.prototype.forEach.call(box.children, function (el) { if (el.dataset.tg) old[el.dataset.tg] = el; });
+            list.forEach(function (t) {
+                var html = tagRowHtml(t, TG.picking === t.id), el = old[t.id], act = document.activeElement;
+                delete old[t.id];
+                if (!el || el._tg !== html) { // só a linha que mudou é trocada
+                    var keep = el && el.contains(act) && act.dataset.tgName ? { v: act.value, a: act.selectionStart, b: act.selectionEnd } : null;
+                    var tmp = document.createElement('div');
+                    tmp.innerHTML = html;
+                    var nu = tmp.firstElementChild;
+                    nu._tg = html;
+                    if (el) el.replaceWith(nu); else box.appendChild(nu);
+                    el = nu;
+                    if (keep) { var ni = el.querySelector('[data-tg-name]'); ni.value = keep.v; ni.focus(); try { ni.setSelectionRange(keep.a, keep.b); } catch (e) {} }
+                }
+                var inp = el.querySelector('[data-tg-name]');
+                if (inp !== document.activeElement && inp.value !== String(t.name || '')) inp.value = String(t.name || ''); // quem está digitando não é atropelado
+                var want = prev ? prev.nextElementSibling : box.firstElementChild;
+                if (want !== el) box.insertBefore(el, want);
+                prev = el;
+            });
+            Object.keys(old).forEach(function (k) { old[k].remove(); }); // apagadas (aqui ou no celular)
+        }
+        TG.rendering = false;
+        $('tg-new-colors').innerHTML = TAG_COLORS.map(function (c) {
+            return '<button type="button" class="tg-dot' + (TG.color === c ? ' on' : '') + '" style="background:' + c + '" data-tg-new-color="' + c + '" role="radio" aria-checked="' + (TG.color === c ? 'true' : 'false') + '" aria-label="Cor ' + c + '"></button>';
+        }).join('');
+    }
+    function openTags() {
+        closeColMenu();
+        TG.picking = null;
+        $('tg-new-name').value = '';
+        var m = $('modal-tags');
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+        renderTags();
+        $('tg-new-name').focus();
+    }
+    function closeTags() {
+        var m = $('modal-tags');
+        if (m.classList.contains('hidden')) return;
+        var a = document.activeElement;
+        if (a && a.dataset && a.dataset.tgName) a.blur(); // salva o nome que estava sendo digitado
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+        TG.picking = null;
+        var back = S.rtEdit ? $('rt-f-tags').querySelector('[data-manage-tags]') : S.editing ? $('f-tags').querySelector('[data-manage-tags]') : S.uid ? $('btn-tags') : null;
+        if (back) back.focus();
+    }
+    function tagNameTaken(name, exceptId) {
+        var n = name.toLowerCase();
+        return alive('tags').some(function (t) { return t.id !== exceptId && String(t.name || '').trim().toLowerCase() === n; });
+    }
+    async function createTag() {
+        var inp = $('tg-new-name'), name = inp.value.trim();
+        if (!name) { inp.focus(); return toast('Dê um nome pra tag.'); }
+        if (tagNameTaken(name)) { inp.focus(); return toast('Já existe uma tag "' + name + '".'); }
+        inp.value = '';
+        inp.focus();
+        var row = { user_id: S.uid, id: newId('tag_', 'tags'), name: name, color: TG.color, position: maxPos('tags') + STEP, deleted: false };
+        if (!(await insertRow('tags', row, 'Tag "' + name + '" criada'))) { if (!inp.value) inp.value = name; return; } // não salvou: o nome volta pro campo
+        var el = $('tg-list').querySelector('[data-tg="' + CSS.escape(row.id) + '"]');
+        if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+    }
+    async function createDefaultTags() {
+        var pos = maxPos('tags');
+        for (var i = 0; i < DEFAULT_TAGS.length; i++) {
+            var d = DEFAULT_TAGS[i];
+            if (tagOf(d[0]) || tagNameTaken(d[1])) continue;
+            pos += STEP;
+            if (!(await insertRow('tags', { user_id: S.uid, id: d[0], name: d[1], color: d[2], position: pos, deleted: false }))) return false;
+        }
+        return true;
+    }
+    async function renameTag(id, value) {
+        var t = S.tags[id], name = String(value || '').trim();
+        if (!t || t.deleted) return;
+        var back = function (msg) { var inp = $('tg-list').querySelector('[data-tg-name="' + CSS.escape(id) + '"]'); if (inp && inp !== document.activeElement) inp.value = t.name || ''; toast(msg); };
+        if (name === String(t.name || '')) return;
+        if (!name) return back('A tag precisa de um nome.');
+        if (tagNameTaken(name, id)) return back('Já existe uma tag "' + name + '".');
+        await patchRow('tags', id, { name: name }, 'Tag renomeada');
+        renderTags(); // se não salvou, o nome antigo volta pro campo
+    }
+    function recolorTag(id, color) {
+        var t = S.tags[id];
+        TG.picking = null;
+        if (!t || t.deleted || String(t.color || '').toLowerCase() === color) return renderTags();
+        patchRow('tags', id, { color: color }); // patchRow já redesenha (e desfaz se não salvar)
+    }
+    // Apagar: quem usava a tag fica sem tag. O app limpa os blocos e o sync limpa o resto; aqui limpa tudo de uma vez,
+    // pra o computador já mostrar certo.
+    async function deleteTag(id) {
+        var t = S.tags[id];
+        if (!t || t.deleted) return;
+        var used = tagUseText(tagUseCounts(id));
+        var yes = await dialog({
+            title: 'Apagar a tag "' + (t.name || 'Sem nome') + '"?',
+            text: (used ? 'Fica sem tag: ' + used + '. ' : 'Ela não está em uso. ') + 'Vale aqui e no celular.',
+            okLabel: 'Apagar tag', danger: true
+        });
+        if (!yes || !S.tags[id] || S.tags[id].deleted) return;
+        if (TG.picking === id) TG.picking = null;
+        if (!(await patchRow('tags', id, { deleted: true }, 'Tag apagada'))) return;
+        for (var i = 0; i < TAG_KINDS.length; i++) {
+            var k = TAG_KINDS[i][0], ids = Object.keys(S[k]).filter(function (x) { return S[k][x].tag_id === id; });
+            if (!ids.length) continue;
+            ids.forEach(function (x) { S[k][x].tag_id = null; });
+            var res = await S.sb.from(k).update({ tag_id: null }).eq('user_id', S.uid).eq('tag_id', id);
+            if (res.error) fail(res.error);
+        }
+        render(); renderAgenda(); renderSide(); renderTags();
+    }
+
+    // ---------- V40.18.0: ZOOM das Listas e da Semana (cada uma lembra o seu, neste computador) ----------
+    var ZOOMS = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.25, 1.5];
+    var ZOOM_EL = { listas: ['board', 'columns'], agenda: ['ag-week', 'ag-cols'] }; // [quem rola, quem encolhe]
+    function zoomArea() { return S.tab === 'listas' ? 'listas' : (S.tab === 'agenda' && S.agView === 'week') ? 'agenda' : null; }
+    function zoomOf(area) { var z = Number(S.zoom && S.zoom[area]); return ZOOMS.indexOf(z) >= 0 ? z : 1; }
+    function applyZoom() {
+        Object.keys(ZOOM_EL).forEach(function (area) {
+            var z = zoomOf(area), el = $(ZOOM_EL[area][1]);
+            el.style.zoom = z === 1 ? '' : String(z);
+        });
+        var area = zoomArea(), ctl = $('zoom-ctl');
+        ctl.classList.toggle('hidden', !area);
+        ctl.classList.toggle('inline-flex', !!area);
+        if (!area) return;
+        var z = zoomOf(area), i = ZOOMS.indexOf(z);
+        $('zoom-reset').textContent = Math.round(z * 100) + '%';
+        $('zoom-out').disabled = i <= 0;
+        $('zoom-in').disabled = i >= ZOOMS.length - 1;
+    }
+    function setZoom(step) { // step: -1 (ver mais), +1 (ver maior) ou 0 (volta pra 100%)
+        var area = zoomArea();
+        if (!area) return;
+        var oz = zoomOf(area), i = ZOOMS.indexOf(oz), j = step === 0 ? ZOOMS.indexOf(1) : Math.max(0, Math.min(ZOOMS.length - 1, i + step));
+        if (ZOOMS[j] === oz) return;
+        var sc = $(ZOOM_EL[area][0]), left = sc.scrollLeft;
+        S.zoom[area] = ZOOMS[j];
+        try { localStorage.setItem('faz_pc_zoom_' + area, String(ZOOMS[j])); } catch (e) {}
+        applyZoom();
+        sc.scrollLeft = left * ZOOMS[j] / oz; // continua vendo as mesmas listas (ou dias) do começo da tela
+    }
+    var wheelAcc = 0, wheelT = null;
+    function zoomWheel(e) { // Ctrl + rodinha (ou pinça no touchpad) em cima das Listas ou da Semana: zoom delas, não da página
+        if (!e.ctrlKey || !zoomArea()) return;
+        e.preventDefault();
+        wheelAcc += e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+        clearTimeout(wheelT);
+        wheelT = setTimeout(function () { wheelAcc = 0; }, 300);
+        if (Math.abs(wheelAcc) < 50) return;
+        setZoom(wheelAcc > 0 ? -1 : 1);
+        wheelAcc = 0;
     }
 
     // ---------- V40.12.0: calendário e hora próprios, sempre em português e em 24h ----------
@@ -2148,6 +2393,7 @@
             renderRtTheme();
         });
         $('rt-f-tags').addEventListener('click', function (e) {
+            if (e.target.closest('[data-manage-tags]')) return openTags(); // V40.18.0
             var b = e.target.closest('button[data-tag]');
             if (!b || !S.rtEdit) return;
             S.rtEdit.tag = b.dataset.tag || null;
@@ -2238,6 +2484,7 @@
         $('modal-task').querySelector('.overflow-y-auto').addEventListener('scroll', closeCal);
         window.addEventListener('resize', closeCal);
         $('f-tags').addEventListener('click', function (e) {
+            if (e.target.closest('[data-manage-tags]')) return openTags(); // V40.18.0
             var b = e.target.closest('button[data-tag]');
             if (!b || !S.editing) return;
             S.editing.tag = b.dataset.tag || null;
@@ -2274,6 +2521,7 @@
             if (DG) return dgStop(false, 'esc'); // V40.14.0: Esc no meio do arraste devolve o bloco pro lugar
             if (!$('dialog').classList.contains('hidden')) return;
             if (!$('cal-pop').classList.contains('hidden')) return closeCal();
+            if (!$('modal-tags').classList.contains('hidden')) return closeTags(); // V40.18.0: fica por cima do cartão
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
             if (S.rtEdit) return closeRoutine(); // V40.17.0
             if (menuEl) return closeColMenu();
@@ -2431,6 +2679,41 @@
             archiveRow(kind, id);
         });
         $('btn-archive').addEventListener('click', openArchive);
+        // V40.18.0: Tags
+        $('btn-tags').addEventListener('click', function () { openTags(); });
+        $('tg-close').addEventListener('click', closeTags);
+        $('modal-tags').addEventListener('mousedown', function (e) { if (e.target === this) closeTags(); });
+        $('tg-new-add').addEventListener('click', function () { createTag(); });
+        $('tg-new-name').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); createTag(); } });
+        $('tg-new-colors').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-tg-new-color]');
+            if (!b) return;
+            TG.color = b.dataset.tgNewColor;
+            renderTags();
+        });
+        $('tg-list').addEventListener('click', function (e) {
+            var b;
+            if ((b = e.target.closest('[data-tg-pick]'))) { TG.picking = TG.picking === b.dataset.tgPick ? null : b.dataset.tgPick; return renderTags(); }
+            if ((b = e.target.closest('[data-tg-set]'))) return recolorTag(b.dataset.tgSet, b.dataset.color);
+            if ((b = e.target.closest('[data-tg-del]'))) return void deleteTag(b.dataset.tgDel);
+            if (e.target.closest('#tg-defaults')) createDefaultTags().then(function (ok) { if (ok) toast('Tags criadas: Trabalho, Pessoal e Estudo'); });
+        });
+        $('tg-list').addEventListener('focusout', function (e) { // renomeia ao sair do campo (Enter também)
+            var id = e.target.dataset && e.target.dataset.tgName;
+            if (id && !TG.rendering) renameTag(id, e.target.value);
+        });
+        $('tg-list').addEventListener('keydown', function (e) {
+            var id = e.target.dataset && e.target.dataset.tgName;
+            if (!id) return;
+            if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+            else if (e.key === 'Escape') { e.stopPropagation(); var t = S.tags[id]; e.target.value = t ? t.name || '' : ''; e.target.blur(); } // desiste do nome novo
+        });
+        // V40.18.0: zoom das Listas e da Semana
+        $('zoom-out').addEventListener('click', function () { setZoom(-1); });
+        $('zoom-in').addEventListener('click', function () { setZoom(1); });
+        $('zoom-reset').addEventListener('click', function () { setZoom(0); });
+        $('board').addEventListener('wheel', zoomWheel, { passive: false });
+        $('ag-week').addEventListener('wheel', zoomWheel, { passive: false });
         $('ar-close').addEventListener('click', closeArchive);
         $('modal-archive').addEventListener('mousedown', function (e) { if (e.target === this) closeArchive(); });
         $('ar-list').addEventListener('click', function (e) {
@@ -2556,6 +2839,7 @@
             unsubscribe();
             S.uid = null; S.listas = {}; S.tags = {}; S.tarefas = {}; S.blocos = {}; S.lastLoad = 0; S.composer = null;
             S.rotinas = {}; S.notas = {}; S.financas = {}; closeRoutine(); ntClose(); // V40.17.0
+            closeTags(); // V40.18.0
             closeTask();
             S.placing = null;
             closeArchive();
@@ -2572,6 +2856,7 @@
         var savedTab = 'listas';
         try { savedTab = localStorage.getItem('faz_pc_tab') || 'listas'; S.agView = localStorage.getItem('faz_pc_agview') === 'day' ? 'day' : 'week'; } catch (e) {}
         try { S.agTag = localStorage.getItem('faz_pc_ag_tag') || ''; S.agHideDone = localStorage.getItem('faz_pc_ag_hidedone') === '1'; } catch (e) {} // V40.17.0
+        try { S.zoom = { listas: Number(localStorage.getItem('faz_pc_zoom_listas')) || 1, agenda: Number(localStorage.getItem('faz_pc_zoom_agenda')) || 1 }; } catch (e) {} // V40.18.0
         setTab(savedTab);
         loadAll();
         subscribe();

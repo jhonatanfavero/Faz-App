@@ -16,7 +16,8 @@
 // V10.21 - v40.19.0 (Tela do PC: aba Finanças — mês a mês, total, pago, em aberto e atrasadas; pagar, criar, editar com "só neste mês / neste e nos próximos / em todos", trocar o tipo e apagar, com as regras do app. Setas ← → do teclado: Agenda passa a semana ou o dia, Listas rolam uma lista, Finanças trocam o mês. Celular: editar uma despesa de vários meses sem mudar o valor não apaga mais os valores por mês.)
 // V10.22 - v40.20.0 (Assistente, a primeira aba no celular e no PC: versão padrão, sem IA paga e sem internet — lê agenda, listas, rotinas, notas e finanças e responde sobre o dia, agora, amanhã, a semana, o que ficou pra trás, contas, rotinas, notas e listas; o "cérebro" é o assistente.js, novo no cache. PC: zoom vira "listas por tela" / "dias por tela" (colunas mais largas em vez de tudo maior) e, na Semana com menos dias, as setas andam um dia por vez.)
 // V10.23 - v40.21.0 (Metas, etapa 1, no celular e no PC: listas Pessoal, Profissional, Financeiro e as que a pessoa criar; metas por dia, semana ou mês contadas em vezes, minutos ou reais; botão + em cada meta; ⭐ estrelas, 🔥 sequência, pontos e níveis (Iniciante → Lenda). As regras ficam no metas.js, novo no cache. Vão pra nuvem nas tabelas metas_listas, metas e metas_dias. O Assistente passa a falar das metas.)
-const CACHE_NAME = 'timeblock-v40-21-0';
+// V10.24 - v40.22.0 (Tela do PC: notas vinculadas no cartão do bloco da Agenda, as mesmas do app — vincular existente com busca, criar já vinculada, abrir, desvincular, ícone no bloco; apagar a nota solta o vínculo. Visão Dia com "Compactar vagos": horários vagos de 30 min ou mais viram uma faixa clicável e o resto continua arrastável. No celular: saiu o chip "Metas (em breve)" do botão + (as Metas ficam na aba 🎯).)
+const CACHE_NAME = 'timeblock-v40-22-0';
 const ASSETS = [
   './',
   './index.html',

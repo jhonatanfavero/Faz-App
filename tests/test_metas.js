@@ -99,6 +99,7 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   const lastToast = () => toasts()[toasts().length - 1];
   const ev = (x) => w.eval(x);
   ok(L('tb_goal_lists') === null && ev('goalListsDb.length') === 0, 'aparelho que nunca abriu as Metas não ganha nada (nenhuma lista criada só por atualizar)');
+  ok(![...d.querySelectorAll('#bottom-sheet button')].some((b) => /Metas/.test(b.textContent)) && typeof w.comingSoonMetas === 'undefined', 'o botão + não tem mais o chip "Metas (em breve)" (V40.22.0)');
   w.openListSheet();
   w.switchListTab('goals');
   ok(!$('view-goals').classList.contains('hidden') && $('view-backlog').classList.contains('hidden') && $('btn-list-goals').className.includes('bg-white') && $('btn-list-goals').className.includes('w-9'), 'a pílula do alvo (última, só o ícone) abre as Metas');

@@ -87,6 +87,13 @@
     .as-done .as-dot { background: #10b981; }
     .as-chip { border: 1px solid #e4e4e7; background: #fff; color: #3f3f46; }
     .as-chip:hover { background: #f4f4f5; border-color: #d4d4d8; }
+    /* V40.22.0: Dia com os horários vagos compactados: cada trecho livre longo vira uma faixa baixa (clicável) */
+    .ag-cgap { position: absolute; left: 56px; right: 0; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1.5px dashed #d4d4d8; border-radius: 8px; background: repeating-linear-gradient(135deg, rgba(255,255,255,.65) 0 6px, rgba(255,255,255,.25) 6px 12px); color: #71717a; font-size: 12px; font-weight: 600; text-align: left; white-space: nowrap; overflow: hidden; }
+    .ag-cgap:hover, .ag-cgap:focus-visible { border-color: var(--focus); color: var(--focus); background: #fff; }
+    .ag-cgap .ag-cgap-time { font-variant-numeric: tabular-nums; color: #52525b; }
+    .ag-cgap:hover .ag-cgap-time { color: inherit; }
+    #ag-timeline.placing .ag-cgap { border-color: var(--focus); color: var(--focus); }
+    .ag-cline { position: absolute; left: 0; width: 48px; text-align: right; font-size: 11px; font-weight: 500; color: #a1a1aa; font-variant-numeric: tabular-nums; }
     /* V40.21.0: Metas */
     .mt-card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
     .mt-card .mt-minus { opacity: .55; }
@@ -265,6 +272,8 @@
                 <select id="ag-tag" class="max-w-[150px] bg-transparent outline-none text-[13px] font-semibold text-zinc-700 pr-1 cursor-pointer" aria-label="Filtrar a agenda por tag"></select>
             </label>
             <button id="ag-hide-done" type="button" aria-pressed="false" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50" title="Esconder os blocos já concluídos"><i class="ph ph-eye-slash"></i>Ocultar concluídos</button>
+            <!-- V40.22.0: só na visão Dia: encolhe os horários vagos (lembrado neste computador) -->
+            <button id="ag-compact" type="button" aria-pressed="false" class="hidden items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50" title="Encolher os horários vagos do dia (30 min ou mais)"><i class="ph ph-arrows-in-line-vertical"></i>Compactar vagos</button>
             <div class="ml-auto inline-flex p-1 bg-white border border-zinc-200 rounded-xl" role="tablist" aria-label="Visualização">
                 <button data-view="week" class="ag-view px-3 py-1.5 rounded-lg text-[13px] font-semibold">Semana</button>
                 <button data-view="day" class="ag-view px-3 py-1.5 rounded-lg text-[13px] font-semibold">Dia</button>
@@ -666,6 +675,22 @@
                     <input id="f-mb-new" maxlength="200" placeholder="Novo item (Enter)" class="flex-1 text-sm outline-none py-1.5 bg-transparent">
                 </div>
             </div>
+            <!-- V40.22.0: notas vinculadas ao bloco (as mesmas do app: linked_note_ids). Vincular e desvincular valem na hora. -->
+            <div id="f-notes-wrap" class="hidden mt-4">
+                <span class="text-xs font-semibold text-zinc-500">Notas</span>
+                <div id="f-notes" class="mt-1.5 flex flex-col gap-1.5"></div>
+                <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <button id="f-note-link" type="button" aria-expanded="false" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50"><i class="ph ph-link-simple"></i>Vincular nota</button>
+                    <button id="f-note-new" type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50"><i class="ph ph-note-pencil"></i>Nova nota</button>
+                </div>
+                <div id="f-note-pick" class="hidden mt-2 p-2 rounded-xl border border-zinc-200 bg-zinc-50">
+                    <label class="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-zinc-400 focus-within:border-zinc-400">
+                        <i class="ph ph-magnifying-glass"></i>
+                        <input id="f-note-q" maxlength="80" autocomplete="off" placeholder="Buscar nota" aria-label="Buscar nota pra vincular" class="min-w-0 flex-1 text-[13px] text-zinc-800 outline-none bg-transparent">
+                    </label>
+                    <div id="f-note-opts" class="mt-1.5 max-h-48 overflow-y-auto thin-scroll flex flex-col"></div>
+                </div>
+            </div>
             <!-- Agendar (só tarefa): aparece ao clicar em "Agendar" -->
             <div id="f-sched" class="hidden mt-4 p-3.5 rounded-xl border border-zinc-200 bg-zinc-50">
                 <p class="text-[13px] font-semibold text-zinc-800">Agendar esta tarefa</p>
@@ -737,7 +762,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.21.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.22.0</div>
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
@@ -757,7 +782,7 @@
         tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,deleted',
         listas: 'id,name,is_default,position,created_ms,deleted',
         tags: 'id,name,color,position,deleted',
-        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,color,archived,deleted',
+        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,deleted', // V40.22.0: + linked_note_ids (notas vinculadas)
         // V40.17.0: rotinas, notas e finanças (as mesmas do celular)
         rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,deleted',
         notas: 'id,title,content,created_ms,updated_ms,deleted',
@@ -770,7 +795,7 @@
     var S = {
         sb: null, uid: null, email: '', listas: {}, tags: {}, tarefas: {}, blocos: {}, rotinas: {}, notas: {}, financas: {},
         metas_listas: {}, metas: {}, metas_dias: {}, mtEdit: null, mtQueue: {}, mtWant: {}, mtSeedAt: 0,
-        rtEdit: null, nt: null, ntQuery: '', agTag: '', agHideDone: false, zoom: { listas: 0, agenda: 0 },
+        rtEdit: null, nt: null, ntQuery: '', agTag: '', agHideDone: false, agCompact: false, agSegs: null, zoom: { listas: 0, agenda: 0 },
         fnMonth: null, fnEdit: null, fnScope: null, step: null, as: { msgs: [], auto: true },
         tab: 'listas', agView: 'week', agAnchor: null, agScrolled: null, hours: [7, 24], recovery: false,
         channel: null, live: 'connecting', lastLoad: 0, loading: false,
@@ -928,7 +953,7 @@
 
     // ---------- render ----------
     var renderT = null;
-    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); if (S.editing && S.editing.kind === 'blocos') renderDone(); }, 60); }
+    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); if (S.editing && S.editing.kind === 'blocos') { renderDone(); renderNoteLinks(); } }, 60); }
     function renderSide() { renderRotinas(); renderNotas(); renderFinancas(); renderMetas(); renderAssistente(); } // V40.17.0 (+ Finanças na V40.19.0, Metas na V40.21.0): cada uma só desenha se a aba dela estiver aberta
 
     function cardHtml(t) {
@@ -1005,6 +1030,54 @@
     var WD3 = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     var MES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
     var PXM = 3.2; // pixels por minuto na visão Dia (5 min = 16px)
+    // V40.22.0: "Compactar vagos" — a régua do Dia vira trechos: os ocupados (e os vagos curtos, até 25 min) na escala normal e
+    // cada vago de CGAP_MIN (30 min) ou mais numa faixa de CGAP_PX. agY (minuto → pixel) e agMin (pixel → minuto) valem pros dois jeitos,
+    // então arrastar, esticar, clicar pra criar e colocar a tarefa na mão continuam funcionando.
+    var CGAP_MIN = 30, CGAP_PX = 30;
+    function agSegments(list, lo, hi) {
+        if (!S.agCompact) return [{ a: lo, b: hi, px: (hi - lo) * PXM, gap: false }];
+        var segs = [], cur = lo;
+        function add(a, b, gap) {
+            if (b <= a) return;
+            var last = segs[segs.length - 1];
+            if (!gap && last && !last.gap) { last.b = b; last.px += (b - a) * PXM; return; } // trechos normais seguidos viram um só
+            segs.push({ a: a, b: b, px: gap ? CGAP_PX : (b - a) * PXM, gap: gap });
+        }
+        list.forEach(function (b) { // todos os blocos do dia (os escondidos pelo filtro também ocupam o horário)
+            var a = Math.max(lo, b.start_min), z = Math.min(hi, b.start_min + b.duration);
+            if (z <= cur) return;
+            if (a > cur) add(cur, a, a - cur >= CGAP_MIN);
+            add(Math.max(a, cur), z, false);
+            cur = z;
+        });
+        if (cur < hi) add(cur, hi, hi - cur >= CGAP_MIN);
+        return segs.length ? segs : [{ a: lo, b: hi, px: (hi - lo) * PXM, gap: false }];
+    }
+    // Fora das faixas a conta é a de sempre ((minuto − início) × PXM, sem arredondar diferente) e, antes ou depois da
+    // régua, continua na escala normal: quem arrasta além do fim ainda é avisado de que a régua acabou.
+    function agY(min) {
+        var segs = S.agSegs || [], y = 0;
+        if (!segs.length) return 0;
+        if (min < segs[0].a) return (min - segs[0].a) * PXM;
+        for (var i = 0; i < segs.length; i++) {
+            var s = segs[i];
+            if (min <= s.b) return y + (s.gap ? (min - s.a) / (s.b - s.a) * s.px : (min - s.a) * PXM);
+            y += s.px;
+        }
+        return y + (min - segs[segs.length - 1].b) * PXM;
+    }
+    function agMin(y) {
+        var segs = S.agSegs || [], acc = 0;
+        if (!segs.length) return 0;
+        if (y < 0) return segs[0].a + y / PXM;
+        for (var i = 0; i < segs.length; i++) {
+            var s = segs[i];
+            if (y <= acc + s.px) return s.a + (s.gap ? (y - acc) / s.px * (s.b - s.a) : (y - acc) / PXM);
+            acc += s.px;
+        }
+        return segs[segs.length - 1].b + (y - acc) / PXM;
+    }
+    function inGap(m) { return (S.agSegs || []).some(function (s) { return s.gap && m >= s.a && m <= s.b; }); }
     function pad(n) { return String(n).padStart(2, '0'); }
     function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
     // Datas sempre no fuso LOCAL e ao meio-dia (imune a UTC e a horário de verão).
@@ -1036,7 +1109,7 @@
             '" aria-label="' + label + '" title="' + label + '"><i class="' + (b.completed ? 'ph-fill ph-check-circle' : 'ph ph-circle') + ' text-[17px]"></i></button>';
     }
     function agCardHtml(b, day, today, nm) {
-        var tag = tagOf(b.tag_id), mb = mbCount(b), paint = paintOf(b.completed ? null : b.color);
+        var tag = tagOf(b.tag_id), mb = mbCount(b), paint = paintOf(b.completed ? null : b.color), nn = linkedNotes(b).length; // V40.22.0: notas vinculadas
         return '<article draggable="true" class="ag-card ' + paint.cls + 'bg-white border border-zinc-200 border-l-4 rounded-lg px-2.5 py-1.5 cursor-pointer hover:border-zinc-300' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
             '" style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
             '<div class="flex items-start gap-1.5">' + doneBtnHtml(b, 'mt-0.5 -ml-0.5') + '<div class="min-w-0 flex-1">' +
@@ -1044,10 +1117,11 @@
             // V40.15.0: 3 pontinhos (Arquivar / Apagar) sem abrir o cartão; com tarefa na mão os blocos não são mexidos
             (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100" data-more="' + esc(b.id) + '" title="Arquivar ou apagar" aria-label="Mais opções deste bloco" aria-haspopup="menu"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
             '<p class="text-[13px] font-semibold leading-snug break-words ' + (b.completed ? 'line-through text-zinc-400' : 'text-zinc-800') + '">' + (esc(b.title) || 'Sem nome') + '</p>' +
-            ((tag || mb.n || b.completed) ? '<div class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-zinc-500">' +
+            ((tag || mb.n || b.completed || nn) ? '<div class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-zinc-500">' +
                 (b.completed ? '<span class="inline-flex items-center gap-1 text-emerald-600 font-medium"><i class="ph-fill ph-check-circle"></i>Concluído</span>' : '') +
                 (tag ? '<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
-                (mb.n ? '<span class="inline-flex items-center gap-1"><i class="ph ph-check-square"></i>' + mb.done + '/' + mb.n + '</span>' : '') + '</div>' : '') +
+                (mb.n ? '<span class="inline-flex items-center gap-1"><i class="ph ph-check-square"></i>' + mb.done + '/' + mb.n + '</span>' : '') +
+                (nn ? '<span class="ag-notes inline-flex items-center gap-1" title="' + nn + (nn === 1 ? ' nota vinculada' : ' notas vinculadas') + '"><i class="ph ph-note"></i>' + nn + '</span>' : '') + '</div>' : '') +
             '</div></div></article>';
     }
 
@@ -1133,7 +1207,7 @@
     // V40.14.0: miolo do bloco na régua do Dia. Fica separado pra redesenhar só o bloco enquanto ele é arrastado ou
     // esticado ("note" é o aviso que aparece no meio do gesto: horário ocupado, limite). A alça de baixo muda a duração.
     function dayInnerHtml(b, note) {
-        var tag = tagOf(b.tag_id), compact = b.duration < 20;
+        var tag = tagOf(b.tag_id), compact = b.duration < 20, nn = linkedNotes(b).length; // V40.22.0: notas vinculadas
         var titleCls = b.completed ? 'line-through text-zinc-400' : 'text-zinc-800';
         var warn = note ? '<span class="ag-note"> · ' + esc(note) + '</span>' : '';
         return doneBtnHtml(b, '') +
@@ -1142,7 +1216,8 @@
                   '<span class="text-[11.5px] leading-none font-semibold truncate ' + titleCls + '">' + (esc(b.title) || 'Sem nome') + '</span>' +
                   '<span class="ml-auto text-[10.5px] leading-none text-zinc-400 shrink-0">' + fmtDur(b.duration) + warn + '</span>'
                 : '<span class="min-w-0 flex-1 flex flex-col justify-center">' +
-                  '<span class="text-[10.5px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration) + (tag ? ' · ' + esc(tag.name) : '') + warn + '</span>' +
+                  '<span class="text-[10.5px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration) + (tag ? ' · ' + esc(tag.name) : '') +
+                  (nn ? '<span class="ag-notes" title="' + nn + (nn === 1 ? ' nota vinculada' : ' notas vinculadas') + '"> · <i class="ph ph-note"></i>' + nn + '</span>' : '') + warn + '</span>' +
                   '<span class="text-[13px] font-semibold truncate ' + titleCls + '">' + (esc(b.title) || 'Sem nome') + '</span></span>') +
             '<span class="ag-rz' + (b.duration < 10 ? ' s' : '') + '" title="Puxe pra mudar a duração" aria-hidden="true"></span>';
     }
@@ -1152,16 +1227,24 @@
         var h1 = list.reduce(function (m, b) { return Math.max(m, Math.ceil((b.start_min + b.duration) / 60)); }, S.hours[1]);
         h0 = Math.max(0, Math.min(h0, 23));
         h1 = Math.min(24, Math.max(h1, h0 + 1));
+        S.agSegs = agSegments(list, h0 * 60, h1 * 60); // V40.22.0: escala da régua (normal ou com os vagos compactados)
         var html = '';
         for (var h = h0; h <= h1; h++) {
-            var y = (h - h0) * 60 * PXM;
+            if (inGap(h * 60)) continue; // dentro de um vago compactado: a faixa já diz o horário
+            var y = agY(h * 60);
             html += '<div class="absolute left-0 right-0 border-t border-zinc-200" style="top:' + y + 'px"></div>' +
                 '<span class="absolute left-0 w-12 text-right text-[11px] font-medium text-zinc-400 tabular-nums" style="top:' + (y - 7) + 'px">' + pad(h) + ':00</span>';
         }
+        S.agSegs.forEach(function (sg) { // V40.22.0: faixa de cada vago compactado (clicar cria um bloco ali, ou coloca a tarefa na mão)
+            if (!sg.gap) return;
+            var len = sg.b - sg.a, y = agY(sg.a);
+            html += '<button type="button" class="ag-cgap" data-cgap="' + sg.a + '" style="top:' + (y + 2) + 'px;height:' + (CGAP_PX - 4) + 'px" title="' + (S.placing ? 'Colocar a tarefa às ' + clock(sg.a) : 'Clique pra criar um bloco às ' + clock(sg.a)) + '">' +
+                '<i class="ph ' + (S.placing ? 'ph-hand-pointing' : 'ph-arrows-out-line-vertical') + '"></i><span class="ag-cgap-time">' + clock(sg.a) + '–' + clock(sg.b) + '</span><span>· livre ' + fmtDur(len) + '</span></button>';
+        });
         var shownN = 0, shownMin = 0;
         list.forEach(function (b) {
             var tag = tagOf(b.tag_id), paint = paintOf(b.completed ? null : b.color);
-            var top = (b.start_min - h0 * 60) * PXM + 1, height = Math.max(b.duration * PXM - 2, 14);
+            var top = agY(b.start_min) + 1, height = Math.max(agY(b.start_min + b.duration) - agY(b.start_min) - 2, 14);
             // V40.17.0: escondido pelo filtro → só um contorno apagado (o horário continua ocupado)
             if (!agVisible(b)) { html += '<div class="ag-hidden" style="top:' + top + 'px;height:' + height + 'px" title="Escondido pelo filtro"></div>'; return; }
             shownN++; shownMin += Number(b.duration) || 0;
@@ -1170,10 +1253,10 @@
                 '" style="left:56px;right:0;top:' + top + 'px;height:' + height + 'px;' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
                 dayInnerHtml(b) + '</div>';
         });
-        if (day === today && nm >= h0 * 60 && nm <= h1 * 60) html += '<div class="now-line" style="top:' + ((nm - h0 * 60) * PXM) + 'px"></div>';
-        if (!list.length) html += '<p class="absolute left-14 right-0 top-10 text-center text-sm text-zinc-500 pointer-events-none">Nada agendado neste dia.' + (S.placing ? '' : ' Clique num horário pra criar um bloco.') + '</p>';
+        if (day === today && nm >= h0 * 60 && nm <= h1 * 60) html += '<div class="now-line" style="top:' + agY(nm) + 'px"></div>';
+        if (!list.length) html += '<p class="absolute left-14 right-0 ' + (S.agCompact ? 'top-12' : 'top-10') + ' text-center text-sm text-zinc-500 pointer-events-none">Nada agendado neste dia.' + (S.placing ? '' : S.agCompact ? ' Clique na faixa pra criar um bloco.' : ' Clique num horário pra criar um bloco.') + '</p>';
         else if (!shownN) html += '<p class="absolute left-14 right-0 top-10 text-center text-sm text-zinc-500 pointer-events-none">Nenhum bloco com esse filtro neste dia.</p>';
-        box.style.height = ((h1 - h0) * 60 * PXM + 12) + 'px';
+        box.style.height = (agY(h1 * 60) + 12) + 'px';
         box.innerHTML = html;
         box.classList.toggle('placing', !!S.placing);
         S.agH0 = h0;
@@ -1182,7 +1265,7 @@
         if (S.agScrolled !== day) { // ao abrir o dia: rola pro horário atual ou pro primeiro bloco
             S.agScrolled = day;
             var focusMin = day === today ? nm : (list.length ? list[0].start_min : h0 * 60);
-            $('ag-day').scrollTop = Math.max(0, (focusMin - h0 * 60) * PXM - 120);
+            $('ag-day').scrollTop = Math.max(0, agY(focusMin) - 120);
         }
         if (agFiltering() && shownN < list.length) return shownN + ' de ' + countLabel(list.length) + (shownN ? ' · ' + fmtDur(shownMin) : '') + ' · ' + (list.length - shownN) + (list.length - shownN === 1 ? ' escondido pelo filtro' : ' escondidos pelo filtro');
         return list.length ? countLabel(list.length) + ' · ' + fmtDur(sumMin(list)) + ' planejados' : 'Dia livre';
@@ -1247,7 +1330,7 @@
         var b = S.blocos[card.dataset.block];
         if (!b || b.deleted) return;
         var size = !!e.target.closest('.ag-rz'), y = e.clientY - $('ag-timeline').getBoundingClientRect().top;
-        var edge = ((size ? b.start_min + b.duration : b.start_min) - S.agH0 * 60) * PXM; // a borda que vai acompanhar o mouse
+        var edge = agY(size ? b.start_min + b.duration : b.start_min); // a borda que vai acompanhar o mouse
         DG = { mode: size ? 'size' : 'move', id: b.id, day: S.agAnchor, st0: b.start_min, dur0: b.duration, start: b.start_min, dur: b.duration, grab: y - edge, y0: e.clientY, y: e.clientY, on: false };
         document.addEventListener('mousemove', dgMove);
         document.addEventListener('mouseup', dgUp);
@@ -1281,7 +1364,7 @@
         var g = DG, b = g && S.blocos[g.id];
         if (!g || !g.on || !b) return;
         var h0 = S.agH0 * 60, h1 = S.agH1 * 60, y = g.y - $('ag-timeline').getBoundingClientRect().top;
-        var at = h0 + (y - g.grab) / PXM, note = ''; // minuto do dia onde está a borda arrastada
+        var at = agMin(y - g.grab), note = ''; // minuto do dia onde está a borda arrastada (V40.22.0: vale também com os vagos compactados)
         if (g.mode === 'move') {
             g.start = Math.max(h0, Math.min(Math.round(at / 5) * 5, h1 - g.dur0)); // de 5 em 5 min, sem sair da régua
             g.clash = hits(g.others, g.start, g.dur0);
@@ -1292,8 +1375,8 @@
             g.over = want > g.max; // tentou passar do limite
             if (g.over) note = g.next ? 'o próximo começa às ' + clock(g.next.start_min) : 'fim da régua';
         }
-        g.el.style.top = ((g.start - h0) * PXM + 1) + 'px';
-        g.el.style.height = Math.max(g.dur * PXM - 2, 14) + 'px';
+        g.el.style.top = (agY(g.start) + 1) + 'px';
+        g.el.style.height = (g.mode === 'move' ? Math.max(g.dur0 * PXM - 2, 14) : Math.max(agY(g.st0 + g.dur) - agY(g.st0) - 2, 14)) + 'px'; // movendo, o bloco não muda de tamanho
         g.el.classList.toggle('ag-clash', !!g.clash);
         g.el.classList.toggle('ag-limit', !!g.over);
         var key = g.start + '|' + g.dur + '|' + note;
@@ -1381,6 +1464,13 @@
         renderAgFilter();
         $('ag-week').classList.toggle('hidden', S.agView !== 'week');
         $('ag-day').classList.toggle('hidden', S.agView !== 'day');
+        var cb = $('ag-compact'); // V40.22.0: "Compactar vagos", só no Dia
+        cb.classList.toggle('hidden', S.agView !== 'day');
+        cb.classList.toggle('inline-flex', S.agView === 'day');
+        cb.classList.toggle('ag-filter-on', !!S.agCompact);
+        cb.setAttribute('aria-pressed', S.agCompact ? 'true' : 'false');
+        cb.title = S.agCompact ? 'Mostrar o dia inteiro, com os horários vagos' : 'Encolher os horários vagos do dia (30 min ou mais)';
+        cb.innerHTML = S.agCompact ? '<i class="ph ph-arrows-out-line-vertical"></i>Mostrar vagos' : '<i class="ph ph-arrows-in-line-vertical"></i>Compactar vagos';
         $('board-summary').textContent = S.agView === 'day' ? renderDay(S.agAnchor, map, today, nowMin()) : renderWeek(S.agAnchor, map, today, nowMin());
     }
 
@@ -1669,6 +1759,9 @@
         renderMbs();
         renderColors();
         renderDone();
+        $('f-notes-wrap').classList.toggle('hidden', !isB || isNew); // V40.22.0: só bloco que já existe
+        notePick(false);
+        renderNoteLinks();
         var m = $('modal-task');
         m.classList.remove('hidden');
         m.classList.add('flex');
@@ -1704,6 +1797,80 @@
         closeTask();
         await insertRow('blocos', row, 'Bloco criado para ' + dayLabel(day) + ' às ' + clock(slot) + (slot !== st ? ' (às ' + clock(st) + ' já tinha bloco)' : ''));
     }
+    // ---------- V40.22.0: notas vinculadas ao bloco (igual ao app: o vínculo mora no bloco, em linked_note_ids) ----------
+    function noteIdsOf(b) { return (Array.isArray(b && b.linked_note_ids) ? b.linked_note_ids : []).filter(function (x) { return typeof x === 'string'; }); }
+    function linkedNotes(b) { return noteIdsOf(b).map(function (id) { return S.notas[id]; }).filter(function (n) { return n && !n.deleted; }); } // nota apagada não aparece
+    function noteShort(n) { var t = noteLabel(n); return t.length > 60 ? t.slice(0, 60) + '…' : t; }
+    function renderNoteLinks() {
+        var ed = S.editing, b = ed && ed.kind === 'blocos' && ed.id ? S.blocos[ed.id] : null;
+        if (!b) return;
+        var list = linkedNotes(b);
+        $('f-notes').innerHTML = list.length ? list.map(function (n) {
+            return '<div class="flex items-center gap-2 pl-2.5 pr-1 py-1 rounded-lg bg-zinc-50 border border-zinc-200">' +
+                '<i class="ph ph-note text-zinc-500 shrink-0"></i>' +
+                '<button type="button" class="min-w-0 flex-1 text-left text-[13px] font-medium text-zinc-800 truncate hover:underline" data-note-open="' + esc(n.id) + '" title="Abrir a nota">' + esc(noteShort(n)) + '</button>' +
+                '<button type="button" class="shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-600 hover:bg-red-50" data-note-unlink="' + esc(n.id) + '" title="Desvincular (a nota continua na aba Notas)" aria-label="Desvincular a nota ' + esc(noteShort(n)) + '"><i class="ph ph-x"></i></button></div>';
+        }).join('') : '<p class="text-[12.5px] text-zinc-400 px-1">Nenhuma nota vinculada.</p>';
+        if (!$('f-note-pick').classList.contains('hidden')) renderNotePick();
+    }
+    function notePick(on) {
+        $('f-note-pick').classList.toggle('hidden', !on);
+        $('f-note-link').setAttribute('aria-expanded', on ? 'true' : 'false');
+        if (!on) return;
+        $('f-note-q').value = '';
+        renderNotePick();
+        $('f-note-q').focus();
+    }
+    function renderNotePick() {
+        var ed = S.editing, b = ed && ed.id ? S.blocos[ed.id] : null;
+        if (!b) return;
+        var have = {}, q = $('f-note-q').value.trim().toLowerCase();
+        noteIdsOf(b).forEach(function (id) { have[id] = true; });
+        var all = aliveNewest('notas').filter(function (n) { return !have[n.id]; });
+        var list = q ? all.filter(function (n) { return (String(n.title || '') + '\n' + String(n.content || '')).toLowerCase().indexOf(q) >= 0; }) : all;
+        $('f-note-opts').innerHTML = list.slice(0, 50).map(function (n) {
+            return '<button type="button" class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white text-[13px] text-zinc-800" data-note-pick="' + esc(n.id) + '"><i class="ph ph-note text-zinc-400 shrink-0"></i><span class="min-w-0 flex-1 truncate">' + esc(noteShort(n)) + '</span><span class="shrink-0 text-[11px] text-zinc-400">' + esc(fmtWhen(n.updated_ms || n.created_ms)) + '</span></button>';
+        }).join('') || '<p class="px-2 py-2 text-[12.5px] text-zinc-500">' + (q ? 'Nenhuma nota com "' + esc($('f-note-q').value.trim()) + '".' : all.length ? '' : 'Todas as notas já estão vinculadas, ou ainda não há notas.') + '</p>';
+    }
+    function setNoteLinks(blockId, ids, okMsg) { // grava só o vínculo (o resto do bloco não é tocado)
+        return patchRow('blocos', blockId, { linked_note_ids: ids }, okMsg);
+    }
+    function linkNote(noteId) {
+        var ed = S.editing, b = ed && ed.id ? S.blocos[ed.id] : null, n = S.notas[noteId];
+        if (!b || b.deleted || !n || n.deleted) return;
+        var ids = noteIdsOf(b);
+        if (ids.indexOf(noteId) >= 0) return;
+        notePick(false);
+        setNoteLinks(b.id, ids.concat([noteId]), 'Nota vinculada').then(renderNoteLinks);
+        renderNoteLinks();
+    }
+    function unlinkNote(noteId) {
+        var ed = S.editing, b = ed && ed.id ? S.blocos[ed.id] : null;
+        if (!b || b.deleted) return;
+        setNoteLinks(b.id, noteIdsOf(b).filter(function (x) { return x !== noteId; }), 'Nota desvinculada (ela continua na aba Notas)').then(renderNoteLinks);
+        renderNoteLinks();
+    }
+    async function newLinkedNote() {
+        var ed = S.editing, b = ed && ed.id ? S.blocos[ed.id] : null;
+        if (!b || b.deleted) return;
+        var title = await dialog({ title: 'Nova nota neste bloco', input: { value: '', placeholder: 'Título da nota', max: 120 }, okLabel: 'Criar nota' });
+        if (!title || !S.editing || S.editing !== ed) return;
+        var now = Date.now(), row = { user_id: S.uid, id: 'note_' + now + '_' + Math.random().toString(36).slice(2, 9), title: title.trim(), content: '', created_ms: now, updated_ms: now, deleted: false };
+        if (!(await insertRow('notas', row))) return;
+        var cur = S.blocos[b.id];
+        if (!cur || cur.deleted) return;
+        await setNoteLinks(b.id, noteIdsOf(cur).concat([row.id]), 'Nota criada e vinculada. Clique nela pra escrever.');
+        renderNoteLinks();
+    }
+    async function openLinkedNote(noteId) { // vai pra aba Notas com a nota aberta (o que mudou no cartão é salvo antes)
+        var ed = S.editing;
+        if (!ed) return;
+        await saveTask();
+        if (S.editing) return; // não deu pra salvar (ex.: sem nome): o cartão continua aberto
+        setTab('notas');
+        openNote(noteId);
+    }
+
     function closeTask() {
         closeCal();
         var m = $('modal-task');
@@ -2180,6 +2347,11 @@
         ntClose();
         await patchRow('notas', id, { deleted: true }, 'Nota apagada');
         renderNotas();
+        // V40.22.0: igual ao app, os blocos que vinculavam a nota soltam o vínculo
+        Object.keys(S.blocos).forEach(function (k) {
+            var b = S.blocos[k];
+            if (b && !b.deleted && noteIdsOf(b).indexOf(id) >= 0) setNoteLinks(b.id, noteIdsOf(b).filter(function (x) { return x !== id; }));
+        });
     }
 
     // ---------- V40.20.0: ASSISTENTE (primeira aba). O "cérebro" fica no assistente.js, igual no celular e no PC:
@@ -3436,6 +3608,12 @@
             try { localStorage.setItem('faz_pc_ag_tag', S.agTag); } catch (e) {}
             renderAgenda();
         });
+        $('ag-compact').addEventListener('click', function () { // V40.22.0
+            S.agCompact = !S.agCompact;
+            try { localStorage.setItem('faz_pc_ag_compact', S.agCompact ? '1' : '0'); } catch (e) {}
+            S.agScrolled = null; // reposiciona no horário de agora (ou no primeiro bloco)
+            renderAgenda();
+        });
         $('ag-hide-done').addEventListener('click', function () {
             S.agHideDone = !S.agHideDone;
             try { localStorage.setItem('faz_pc_ag_hidedone', S.agHideDone ? '1' : '0'); } catch (e) {}
@@ -3494,15 +3672,17 @@
             if (add) return openNewBlock(add.dataset.addDay); // V40.13.0
             var more = e.target.closest('[data-more]');
             if (more) return openCardMenu('blocos', more.dataset.more, more); // V40.15.0: arquivar ou apagar sem abrir o cartão
+            var cg = e.target.closest('[data-cgap]'); // V40.22.0: faixa de um vago compactado → o começo dele
+            if (cg) return S.placing ? placeHere(S.agAnchor, Number(cg.dataset.cgap)) : openNewBlock(S.agAnchor, Number(cg.dataset.cgap));
             if (S.placing) { // com a tarefa na mão, clicar num bloco não abre o cartão; na visão Dia, clicar no horário coloca
                 var tl = e.target.closest('#ag-timeline');
-                if (tl && !e.target.closest('[data-block]')) return placeHere(S.agAnchor, (S.agH0 || 0) * 60 + Math.round(((e.clientY - tl.getBoundingClientRect().top) / PXM) / 5) * 5);
+                if (tl && !e.target.closest('[data-block]')) return placeHere(S.agAnchor, Math.round(agMin(e.clientY - tl.getBoundingClientRect().top) / 5) * 5);
                 if (e.target.closest('[data-block]')) return toast('Clique num espaço livre pra colocar a tarefa.');
             }
             var c = e.target.closest('[data-block]');
             if (c) return openBlock(c.dataset.block);
             var ruler = e.target.closest('#ag-timeline'); // V40.13.0: visão Dia → clicar num horário vazio cria um bloco ali
-            if (ruler) openNewBlock(S.agAnchor, (S.agH0 || 0) * 60 + Math.floor(((e.clientY - ruler.getBoundingClientRect().top) / PXM) / 5) * 5);
+            if (ruler) openNewBlock(S.agAnchor, Math.floor(agMin(e.clientY - ruler.getBoundingClientRect().top) / 5) * 5);
         });
         $('agenda').addEventListener('keydown', function (e) {
             if (e.target.closest && e.target.closest('[data-done], [data-more]')) return;
@@ -3737,6 +3917,20 @@
             if (u) unarchive(v[0], v.slice(1).join('|')); else if (x) deleteArchived(v[0], v.slice(1).join('|'));
         });
         $('f-archive').addEventListener('click', archiveTask);
+        // V40.22.0: notas vinculadas ao bloco
+        $('f-note-link').addEventListener('click', function () { notePick($('f-note-pick').classList.contains('hidden')); });
+        $('f-note-new').addEventListener('click', function () { notePick(false); newLinkedNote(); });
+        $('f-note-q').addEventListener('input', renderNotePick);
+        $('f-note-q').addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { e.stopPropagation(); notePick(false); $('f-note-link').focus(); }
+            else if (e.key === 'Enter') { e.preventDefault(); var first = $('f-note-opts').querySelector('[data-note-pick]'); if (first) linkNote(first.dataset.notePick); }
+        });
+        $('f-note-opts').addEventListener('click', function (e) { var b = e.target.closest('[data-note-pick]'); if (b) linkNote(b.dataset.notePick); });
+        $('f-notes').addEventListener('click', function (e) {
+            var b;
+            if ((b = e.target.closest('[data-note-unlink]'))) return unlinkNote(b.dataset.noteUnlink);
+            if ((b = e.target.closest('[data-note-open]'))) openLinkedNote(b.dataset.noteOpen);
+        });
         $('f-colors').addEventListener('click', function (e) {
             var b = e.target.closest('button[data-color]');
             if (!b || !S.editing) return;
@@ -3874,6 +4068,7 @@
         var savedTab = 'listas';
         try { savedTab = localStorage.getItem('faz_pc_tab') || 'listas'; S.agView = localStorage.getItem('faz_pc_agview') === 'day' ? 'day' : 'week'; } catch (e) {}
         try { S.agTag = localStorage.getItem('faz_pc_ag_tag') || ''; S.agHideDone = localStorage.getItem('faz_pc_ag_hidedone') === '1'; } catch (e) {} // V40.17.0
+        try { S.agCompact = localStorage.getItem('faz_pc_ag_compact') === '1'; } catch (e) {} // V40.22.0
         try { // V40.20.0: colunas por tela (o zoom de tudo da V40.18.0 ficou pra trás)
             S.zoom = { listas: Number(localStorage.getItem('faz_pc_listas_por_tela')) || 0, agenda: Number(localStorage.getItem('faz_pc_dias_por_tela')) || 0 };
             localStorage.removeItem('faz_pc_zoom_listas'); localStorage.removeItem('faz_pc_zoom_agenda');

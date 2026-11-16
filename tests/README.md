@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 17 suítes (cerca de 1 minuto)
+npm test        # confere o CSS pronto e roda as 18 suítes (cerca de 1 minuto)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -28,6 +28,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_assistente.js` | `assistente.js` sozinho + `index.html` + `app.js` de verdade | o "cérebro" do Assistente (cada pergunta, frases escritas do jeito de cada um, sem dados) e a aba dele no celular |
 | `test_kanban_v4020.js` | `kanban.html` de verdade | aba Assistente no PC: resumo do dia com os dados da nuvem, sugestões, perguntar, abrir o item da resposta, tempo real |
 | `test_metas.js` | `metas.js` sozinho + `index.html` + `app.js` + `sync.js` de verdade | as regras das metas (período, estrelas, sequência, pontos, níveis, alvo da época), a aba Metas no celular (criar, +/−, editar, apagar, listas), a ida e volta pela nuvem e o Assistente falando das metas |
+| `test_kanban_v4022.js` | `kanban.html` de verdade | notas vinculadas no cartão do bloco (ver, buscar e vincular, criar já vinculada, desvincular, abrir salvando o cartão, apagar a nota solta o vínculo, tempo real) e o Dia com "Compactar vagos" (faixas, escala por trechos, clicar na faixa cria o bloco ou coloca a tarefa na mão) |
 | `test_kanban_v4021.js` | `kanban.html` de verdade | aba Metas no PC: listas padrão, meta nova com sugestões, +/− (cliques seguidos = um envio), editar, recomeçar a contagem, apagar, listas de metas, tempo real e o Assistente abrindo a meta |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 

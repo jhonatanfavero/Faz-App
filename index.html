@@ -196,9 +196,7 @@
                 <button onclick="commitSpecialIntent('Descanso', 'rest')" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 text-sm font-medium hover:bg-emerald-100 transition whitespace-nowrap">
                     <i class="ph ph-tree text-lg"></i> Descanso
                 </button>
-                <button onclick="comingSoonMetas()" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-zinc-200 text-zinc-400 bg-zinc-50 text-sm font-medium hover:bg-zinc-100 transition whitespace-nowrap" title="Em breve">
-                    <i class="ph ph-target text-lg"></i> Metas
-                </button>
+                <!-- V40.22.0: o chip "Metas (em breve)" saiu daqui: as Metas moram na aba 🎯, junto das outras abas -->
                 <button onclick="openConfigSheet()" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition whitespace-nowrap">
                     <i class="ph ph-gear text-lg"></i> Config
                 </button>
@@ -1453,7 +1451,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.21.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.22.0</div>
 
     </div>
 

@@ -2,6 +2,7 @@
 // a duração, rolagem automática, Esc, e os espaços livres que aparecem ao arrastar na Semana. Listas: os 3
 // pontinhos do cartão (Arquivar / Apagar) e o campo de arquivar que aparece no topo durante o arraste. V40.18.0: janela de Tags.
 // V40.20.0: zoom das Listas e da Semana como colunas por tela (com arrastar e setas). V40.19.0: setas do teclado e aba Finanças.
+// V40.21.0: aba Metas. V40.22.0: Dia com os horários vagos compactados (arrastar e esticar continuam certos) e notas no cartão do bloco.
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -431,6 +432,45 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await foto(p, 'pc-metas.png');
   await p.keyboard.press('ArrowRight'); await p.waitForTimeout(100);
   ok(await p.evaluate(() => !document.getElementById('metas').classList.contains('hidden')), 'as setas não tiram da aba Metas');
+
+  console.log('\nN) Dia com os horários vagos compactados e notas no bloco (V40.22.0):');
+  await p.evaluate((uid) => {
+    const n = window.__nuvem, notas = n.alive('notas', uid).map((x) => x.id);
+    const mk = (id, h, m, title, extra) => n.insert('blocos', uid, Object.assign({ id, date: '2026-11-18', start_min: h * 60 + m, duration: 30, title, type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false }, extra || {}));
+    mk('f_n1', 12, 0, 'CAR JULIANA', { completed: true, linked_note_ids: [notas[0]] }); mk('f_n2', 12, 30, 'MEMORIAL MARILENE', { completed: true });
+    mk('f_n3', 15, 25, 'PAGAR CONTAS PESSOAIS'); mk('f_n4', 16, 35, 'LORENE'); mk('f_n5', 17, 20, 'COMPRAR PÃO');
+  }, UID);
+  await p.locator('#tab-agenda').click(); await p.locator('.ag-view[data-view="week"]').click(); await p.waitForTimeout(250);
+  await p.locator('#ag-cols .ag-day-btn[data-day="2026-11-18"]').click(); await p.waitForTimeout(300);
+  const altura = () => p.evaluate(() => Math.round(document.getElementById('ag-timeline').getBoundingClientRect().height));
+  const h1 = await altura();
+  await p.locator('#ag-compact').click(); await p.waitForTimeout(300);
+  const cg = await p.evaluate(() => [...document.querySelectorAll('#ag-timeline .ag-cgap')].map((g) => { const r = g.getBoundingClientRect(); return { t: g.innerText.replace(/\s+/g, ' ').trim(), h: Math.round(r.height), cabe: g.scrollWidth <= g.clientWidth + 1 }; }));
+  const h2 = await altura();
+  ok(cg.length === 4 && cg.every((g) => g.h === 26 && g.cabe) && h1 > 3000 && h2 < 700, `"Compactar vagos": 4 faixas (${cg.map((g) => g.t).join(' | ')}) e o dia de ${h1}px vira ${h2}px`);
+  await p.evaluate(() => { document.getElementById('ag-day').scrollTop = 0; }); await p.waitForTimeout(100);
+  await foto(p, 'pc-dia-compacto.png');
+  let bx = await caixa('f_n3');
+  await p.mouse.move(bx.x + 300, bx.y + 12); await p.mouse.down();
+  await p.mouse.move(bx.x + 300, bx.y + 12 + 32, { steps: 6 }); await p.mouse.move(bx.x + 300, bx.y + 12 + 32.5, { steps: 1 });
+  await solta();
+  ok((await nuvem('f_n3')).st === 15 * 60 + 35, 'arrastar 10 min pra baixo com os vagos compactados: 15:25 → 15:35 (a régua continua certa)');
+  bx = await caixa('f_n4');
+  await p.mouse.move(bx.x + 300, bx.y + bx.h - 2); await p.mouse.down();
+  await p.mouse.move(bx.x + 300, bx.y + bx.h - 2 + 16, { steps: 5 }); await p.mouse.move(bx.x + 300, bx.y + bx.h - 2 + 16.5, { steps: 1 });
+  await solta();
+  ok((await nuvem('f_n4')).dur === 35, 'puxar a borda de baixo 5 min: LORENE fica com 35 min');
+  await p.locator('#ag-timeline .ag-cgap[data-cgap="780"]').click(); await p.waitForTimeout(250);
+  ok(await p.evaluate(() => !document.getElementById('modal-task').classList.contains('hidden') && document.getElementById('f-start').value === '13:00'), 'clicar na faixa 13:00–15:25 abre um bloco novo às 13:00');
+  await p.locator('#f-cancel').click(); await p.waitForTimeout(150);
+  bx = await caixa('f_n1');
+  await p.mouse.click(bx.x + 300, bx.y + 10); await p.waitForTimeout(250);
+  await p.locator('#f-note-link').click(); await p.waitForTimeout(150);
+  const nt = await p.evaluate(() => { const m = document.querySelector('#modal-task > div').getBoundingClientRect(); return { n: document.querySelectorAll('#f-notes [data-note-open]').length, opts: document.querySelectorAll('#f-note-opts [data-note-pick]').length, cabe: m.bottom <= innerHeight && m.top >= 0, foco: document.activeElement.id }; });
+  ok(nt.n === 1 && nt.opts >= 1 && nt.cabe && nt.foco === 'f-note-q', 'no cartão do bloco: a nota vinculada, "Vincular nota" com a busca e o cursor nela; o cartão cabe na tela');
+  await foto(p, 'pc-bloco-notas.png');
+  await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(100);
+  await p.locator('#ag-compact').click(); await p.waitForTimeout(150);
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));
   await fim();

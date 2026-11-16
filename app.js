@@ -1981,11 +1981,6 @@ window.openPeriodSelectSheet = () => {
     pushNavState(); // V40.5.0-fix7
 }
 
-window.comingSoonMetas = () => {
-    // V40.1.6: Placeholder para futuro recurso de Metas
-    showToast("Metas chegando em breve! 🎯");
-}
-
 window.openConfigSheet = () => {
     clearFilters(); // V40.2.1: limpa filtros pra não confundir
     sheet.classList.add('translate-y-full'); 
@@ -2146,7 +2141,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.21.0',
+            version: 'v40.22.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

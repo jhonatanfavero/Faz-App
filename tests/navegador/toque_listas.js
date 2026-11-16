@@ -47,8 +47,34 @@ const { abrir } = require('./apoio');
   ok(await formOpen(), 'toque simples continua abrindo o cartão');
   await m.evaluate(() => closeBacklogForm()); await m.waitForTimeout(300);
 
-  console.log('\nB) Afastar pelo botão:');
-  await m.tap('#backlog-zoom-btn'); await m.waitForTimeout(400);
+  console.log('\nB) Afastar pelo botão (V40.16.0: a lupa abre o menu com 1, 1½, 2 e 3 listas por tela):');
+  // geometria do quadro: listas inteiras na tela, quanto aparece da primeira lista cortada e o tamanho da letra
+  const geo = () => m.evaluate(() => {
+    const w = document.getElementById('backlog-columns-wrapper'), wr = w.getBoundingClientRect(), cs = [...w.children];
+    const cut = cs.find((c) => c.getBoundingClientRect().right > wr.right + 1), cr = cut && cut.getBoundingClientRect();
+    const h4 = w.querySelector('[data-bl-card] h4'), p = w.querySelector('[data-bl-card] p');
+    const badge = document.querySelector('#backlog-zoom-btn .zoom-badge');
+    return { zoom: w.classList.contains('lists-zoom'), sl: w.scrollLeft, larg: Math.round(cs[0].getBoundingClientRect().width), wl: Math.round(wr.width),
+      inteiras: cs.filter((c) => { const r = c.getBoundingClientRect(); return r.left >= wr.left - 1 && r.right <= wr.right + 1; }).length,
+      peek: cr ? Math.round(wr.right - cr.left) : 0, meia: cr ? (wr.right - cr.left) / cr.width : 0,
+      letra: parseFloat(getComputedStyle(h4).fontSize), detalhe: getComputedStyle(p).display, badge: badge ? badge.textContent : '', ativa: activeColumnId };
+  });
+  const escolher = async (n) => { await m.tap('#backlog-zoom-btn'); await m.waitForTimeout(250); await m.tap(`#backlog-zoom-menu [data-zoom="${n}"]`); await m.waitForTimeout(400); };
+  await m.tap('#backlog-zoom-btn'); await m.waitForTimeout(300);
+  const mb = await m.evaluate(() => { const mn = document.getElementById('backlog-zoom-menu'), r = mn.getBoundingClientRect(); const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { vis: !mn.classList.contains('hidden') && r.width > 150 && r.height > 60, topo: !!el && mn.contains(el), dentro: r.left >= 0 && r.right <= innerWidth, zoom: document.getElementById('backlog-columns-wrapper').classList.contains('lists-zoom') }; });
+  ok(mb.vis && mb.topo && mb.dentro && !mb.zoom, 'a lupa abre o menu inteiro na tela, por cima das listas (ainda sem mudar o zoom)');
+  await foto(m, 'z_menu.png');
+  await m.tap('#backlog-zoom-menu [data-zoom="1.5"]'); await m.waitForTimeout(400);
+  const g15 = await geo();
+  ok(g15.zoom && g15.inteiras === 1 && g15.meia > 0.4 && g15.meia < 0.75 && g15.sl === 0 && g15.badge === '1½', `1½: uma lista inteira (${g15.larg}px) e ${Math.round(g15.meia * 100)}% da próxima; a lupa mostra "1½"`);
+  ok(g15.letra === 14 && g15.detalhe !== 'none' && g15.ativa === cols[0], `no 1½ o nome do cartão fica com ${g15.letra}px (como no modo normal) e a lista ativa não muda`);
+  await foto(m, 'z_zoom15.png');
+  await escolher(3);
+  const g3 = await geo();
+  ok(g3.zoom && g3.inteiras === 3 && g3.peek > 8 && g3.sl === 0 && g3.badge === '3', `3: três listas inteiras (${g3.larg}px cada) e a ponta da 4ª aparecendo (${g3.peek}px)`);
+  ok(g3.letra === 11 && g3.detalhe === 'none', 'no 3 o cartão mostra só o nome (11px)');
+  await foto(m, 'z_zoom3.png');
+  await escolher(2);
   const info = await m.evaluate(() => { const w = document.getElementById('backlog-columns-wrapper'); const cs = [...w.children]; const wr = w.getBoundingClientRect(); return { zoom: w.classList.contains('lists-zoom'), sl: w.scrollLeft, visiveis: cs.filter((c) => { const r = c.getBoundingClientRect(); return r.left >= wr.left - 1 && r.right <= wr.right + 1; }).length, peek: Math.round(wr.right - cs[2].getBoundingClientRect().left), larg: Math.round(cs[0].getBoundingClientRect().width), wl: Math.round(wr.width), heads: cs.map((c) => c.querySelector('.zoom-col-head').textContent.trim().replace(/\s+/g, ' ')).join(' | '), botoes: getComputedStyle(cs[0].querySelector('[data-bl-card] .shrink-0')).display, ativa: activeColumnId, titulo: document.getElementById('backlog-column-title').innerText }; });
   ok(info.zoom && info.visiveis === 2 && info.sl === 0, `2 listas inteiras na tela (${info.larg}px cada, área de ${info.wl}px) e a ponta da 3ª aparecendo (${info.peek}px)`);
   ok(info.botoes === 'none', 'cartões compactos (sem os botões): ' + info.heads);
@@ -151,20 +177,39 @@ const { abrir } = require('./apoio');
   for (let i = 1; i <= 8; i++) { await touch('touchMove', { x: c.x - 120, y: c.y + 150 }, { x: c.x + 60, y: c.y - 150 + i * 35 }); await m.waitForTimeout(25); }
   await touch('touchEnd'); await m.waitForTimeout(300);
   ok(await m.evaluate(() => document.getElementById('backlog-columns-wrapper').classList.contains('lists-zoom')), 'um dedo parado e outro rolando a lista não conta como pinça');
+  const nivel = () => m.evaluate(() => backlogZoomLevel());
   await pinch(50, 120);
-  ok(await m.evaluate(() => !document.getElementById('backlog-columns-wrapper').classList.contains('lists-zoom') && localStorage.getItem('tb__lista_afastada') === '0'), 'abrir os dedos aproxima (uma lista por tela)');
+  ok(await nivel() === 1.5 && (await geo()).inteiras === 1, 'abrir os dedos aproxima um nível (2 → 1½)');
+  await pinch(50, 120);
+  ok(await m.evaluate(() => !document.getElementById('backlog-columns-wrapper').classList.contains('lists-zoom') && localStorage.getItem('tb__lista_afastada') === '0'), 'abrir de novo: 1½ → uma lista por tela');
   ok(await m.evaluate(() => { const w = document.getElementById('backlog-columns-wrapper'); return Math.round(w.children[0].getBoundingClientRect().width) === Math.round(w.getBoundingClientRect().width) && getComputedStyle(w.querySelector('.zoom-col-head')).display === 'none' && !!w.querySelector('[data-bl-card] .shrink-0') && getComputedStyle(w.querySelector('[data-bl-card] .shrink-0')).display !== 'none'; }), 'modo normal de volta: lista na largura toda, botões dos cartões e sem títulos extras');
   ok(!(await formOpen()) && await m.evaluate(() => !_dragState), 'a pinça não abre cartão nem começa arrasto');
+  await pinch(50, 120);
+  ok(await nivel() === 1, 'no normal, abrir os dedos não faz nada (não dá a volta)');
   await pinch(120, 50);
-  ok(await m.evaluate(() => document.getElementById('backlog-columns-wrapper').classList.contains('lists-zoom') && localStorage.getItem('tb__lista_afastada') === '1'), 'fechar os dedos afasta (várias listas)');
+  ok(await m.evaluate(() => document.getElementById('backlog-columns-wrapper').classList.contains('lists-zoom') && localStorage.getItem('tb__lista_afastada') === '1') && await nivel() === 1.5, 'fechar os dedos afasta um nível (normal → 1½)');
+  await pinch(120, 50);
+  const p2 = await geo();
+  ok(await nivel() === 2 && p2.inteiras === 2, 'fechar de novo: 1½ → 2');
+  await pinch(120, 50);
+  const p3 = await geo();
+  ok(await nivel() === 3 && p3.inteiras === 3 && p3.badge === '3', 'e de novo: 2 → 3');
+  await pinch(120, 50);
+  ok(await nivel() === 3, 'no 3, fechar os dedos não faz nada');
+  ok(!(await formOpen()) && await m.evaluate(() => !_dragState && document.getElementById('backlog-zoom-menu').classList.contains('hidden')), 'nenhuma pinça abriu cartão, começou arrasto ou abriu o menu');
 
   console.log('\nF) A escolha fica guardada no aparelho:');
   await m.reload(); await m.waitForTimeout(900);
   await m.evaluate(() => openListSheet()); await m.waitForTimeout(600);
   ok(await m.evaluate(() => document.getElementById('backlog-columns-wrapper').classList.contains('lists-zoom') && !!document.querySelector('#backlog-zoom-btn .ph-magnifying-glass-plus')), 'ao abrir o app de novo as listas já vêm afastadas, com o botão de aproximar');
-  ok(await m.evaluate(() => !Object.keys(collectFazData ? (collectFazData().data || collectFazData()) : {}).some((k) => /lista_afastada/.test(k))), 'a preferência não entra no backup');
-  await m.tap('#backlog-zoom-btn'); await m.waitForTimeout(350);
-  ok(await m.evaluate(() => !document.getElementById('backlog-columns-wrapper').classList.contains('lists-zoom')), 'botão aproxima de volta');
+  ok(await nivel() === 3 && (await geo()).inteiras === 3, 'e no mesmo nível em que estavam (3)');
+  ok(await m.evaluate(() => !Object.keys(collectFazData ? (collectFazData().data || collectFazData()) : {}).some((k) => /lista_afastada|lista_zoom/.test(k))), 'a preferência não entra no backup');
+  await m.tap('#backlog-zoom-btn'); await m.waitForTimeout(250);
+  const fora = await rect(`[data-column-id="${cols[0]}"] [data-bl-card]`);
+  await m.touchscreen.tap(fora.x, fora.y); await m.waitForTimeout(350);
+  ok(await m.evaluate(() => document.getElementById('backlog-zoom-menu').classList.contains('hidden')) && !(await formOpen()), 'menu aberto + toque num cartão: só fecha o menu, não abre o cartão');
+  await escolher(1);
+  ok(await m.evaluate(() => !document.getElementById('backlog-columns-wrapper').classList.contains('lists-zoom') && !document.querySelector('#backlog-zoom-btn .zoom-badge')), 'escolher 1 no menu aproxima de volta (e a lupa fica sem número)');
   await m.evaluate(() => { backlogColumnsDb.splice(1); backlogZoomOut = true; activeColumnId = backlogColumnsDb[0].id; renderBacklog(); }); await m.waitForTimeout(300);
   const one = await m.evaluate(() => { const w = document.getElementById('backlog-columns-wrapper'); return { col: Math.round(w.children[0].getBoundingClientRect().width), area: Math.round(w.getBoundingClientRect().width), n: w.children.length }; });
   ok(one.n === 1 && one.col === one.area - 20, `quem tem uma lista só vê ela compacta na largura toda (${one.col}px de ${one.area}px)`);

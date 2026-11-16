@@ -272,7 +272,20 @@
                             <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider shrink-0" id="backlog-count">0</span>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
-                            <button onclick="toggleBacklogZoom()" id="backlog-zoom-btn" aria-label="Afastar ou aproximar as listas" title="Afastar (ver várias listas)" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 active:scale-95 transition"><i class="ph ph-magnifying-glass-minus text-lg"></i></button>
+                            <!-- V40.16.0: a lupa abre o menu de zoom (1, 1½, 2 ou 3 listas por tela); a pinça faz o mesmo, um nível por gesto -->
+                            <div class="relative">
+                                <button onclick="toggleBacklogZoomMenu()" id="backlog-zoom-btn" aria-label="Zoom das listas" aria-haspopup="true" aria-expanded="false" title="Zoom das listas (uma por tela)" class="relative w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 active:scale-95 transition"><i class="ph ph-magnifying-glass-minus text-lg"></i></button>
+                                <div id="backlog-zoom-menu" class="zoom-menu hidden" role="menu" aria-label="Zoom das listas">
+                                    <p class="zoom-menu-title">Listas por tela</p>
+                                    <div class="zoom-menu-opts">
+                                        <button type="button" role="menuitemradio" aria-checked="true" data-zoom="1" onclick="chooseBacklogZoom(1)">1</button>
+                                        <button type="button" role="menuitemradio" aria-checked="false" data-zoom="1.5" onclick="chooseBacklogZoom(1.5)">1½</button>
+                                        <button type="button" role="menuitemradio" aria-checked="false" data-zoom="2" onclick="chooseBacklogZoom(2)">2</button>
+                                        <button type="button" role="menuitemradio" aria-checked="false" data-zoom="3" onclick="chooseBacklogZoom(3)">3</button>
+                                    </div>
+                                    <p class="zoom-menu-hint">ou faça pinça com dois dedos nas listas</p>
+                                </div>
+                            </div>
                             <button onclick="openColumnMenuFromHeader()" id="backlog-column-menu-btn" aria-label="Opções da lista" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 transition active:scale-90">
                                 <i class="ph-bold ph-dots-three-vertical text-base"></i>
                             </button>
@@ -1275,7 +1288,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.15.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.16.0</div>
 
     </div>
 

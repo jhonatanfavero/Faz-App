@@ -279,6 +279,10 @@ body { overflow-x: hidden; max-width: 100vw; }
     padding: 0 6px 8px 6px !important; scroll-snap-align: none !important;
     background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 14px;
 }
+/* V40.16.0 — níveis: .zoom-15 = 1½ lista por tela, sem classe = 2 (o de antes), .zoom-3 = 3.
+   Ficam antes do :only-child, que tem o mesmo peso e precisa ganhar (uma lista só = largura toda). */
+.lists-zoom.zoom-15 > [data-column-id] { width: 64% !important; }
+.lists-zoom.zoom-3 > [data-column-id] { width: 30% !important; padding: 0 4px 6px 4px !important; }
 .lists-zoom > [data-column-id]:only-child { width: 100% !important; } /* uma lista só: compacta, na largura toda */
 .lists-zoom > [data-column-id].zoom-active { border-color: var(--theme-color, #4f46e5); }
 .lists-zoom .zoom-col-head {
@@ -296,6 +300,16 @@ body { overflow-x: hidden; max-width: 100vw; }
 .lists-zoom [data-bl-card] p, .bl-ghost p { font-size: 10px !important; }
 .lists-zoom [data-bl-card] .shrink-0, .lists-zoom [data-bl-card] > .h-px, .lists-zoom [data-bl-card] > .flex.flex-col,
 .bl-ghost .shrink-0, .bl-ghost > .h-px, .bl-ghost > .flex.flex-col { display: none !important; }
+/* V40.16.0 — 1½ por tela: letra quase do tamanho normal. 3 por tela: só o nome, letra um pouco menor.
+   O .bl-ghost (cartão que acompanha o dedo) leva a mesma classe do nível pra não mudar de tamanho ao levantar. */
+.lists-zoom.zoom-15 .zoom-col-head { font-size: 12px; }
+.lists-zoom.zoom-15 [data-bl-card], .bl-ghost.zoom-15 { padding: 9px 11px !important; margin-bottom: 7px !important; }
+.lists-zoom.zoom-15 [data-bl-card] h4, .bl-ghost.zoom-15 h4 { font-size: 14px !important; }
+.lists-zoom.zoom-15 [data-bl-card] p, .bl-ghost.zoom-15 p { font-size: 11px !important; }
+.lists-zoom.zoom-3 .zoom-col-head { font-size: 10px; padding: 7px 2px 5px; }
+.lists-zoom.zoom-3 [data-bl-card], .bl-ghost.zoom-3 { padding: 6px 7px !important; margin-bottom: 5px !important; border-radius: 8px !important; }
+.lists-zoom.zoom-3 [data-bl-card] h4, .bl-ghost.zoom-3 h4 { font-size: 11px !important; }
+.lists-zoom.zoom-3 [data-bl-card] p, .bl-ghost.zoom-3 p { display: none !important; }
 .lists-zoom [data-column-id] > .opacity-50 { padding: 14px 4px !important; }
 .lists-zoom [data-column-id] > .opacity-50 i { font-size: 20px !important; }
 .lists-zoom [data-column-id] > .opacity-50 p:last-child { display: none; }
@@ -316,3 +330,25 @@ body { overflow-x: hidden; max-width: 100vw; }
     border: 2px dashed var(--theme-color, #4f46e5); background: rgba(0, 0, 0, 0.04);
 }
 .lists-zoom [data-column-id]:has(> .zoom-slot) > .opacity-50 { display: none; } /* lista vazia recebendo cartão */
+
+/* V40.16.0 — lupa: número de listas por tela (só quando afastado) e o menu com os níveis.
+   O menu fica dentro da sheet (z-index local da sheet), por cima dos cartões e dos títulos das listas. */
+.zoom-badge {
+    position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px;
+    border-radius: 9px; border: 2px solid #fff; background: var(--theme-color, #4f46e5); color: #fff;
+    font-size: 9px; font-weight: 800; line-height: 13px; text-align: center; pointer-events: none;
+}
+.zoom-menu {
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; width: max-content;
+    background: #fff; border: 1px solid #e4e4e7; border-radius: 14px; padding: 10px 10px 9px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+}
+.zoom-menu-title { margin: 0 2px 8px; font-size: 10px; font-weight: 700; color: #71717a; text-transform: uppercase; letter-spacing: 0.04em; }
+.zoom-menu-opts { display: flex; gap: 6px; }
+.zoom-menu-opts button {
+    width: 44px; height: 38px; border-radius: 10px; background: #f4f4f5; color: #3f3f46;
+    font-size: 15px; font-weight: 700; transition: transform 0.1s;
+}
+.zoom-menu-opts button:active { transform: scale(0.95); }
+.zoom-menu-opts button.on { background: var(--theme-color, #4f46e5); color: #fff; }
+.zoom-menu-hint { margin: 8px 2px 0; font-size: 10px; color: #a1a1aa; }

@@ -17,7 +17,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_app.js` | `index.html` + `app.js` + `sync.js` de verdade | app sem login, login, ida e volta com a nuvem, backup e restauração |
 | `test_v408.js` | idem | agenda na nuvem, blocos de 5 e 10 min, dado corrompido, iOS, esqueci a senha |
 | `test_v409.js` | idem | cor livre do cartão, arquivar e desarquivar |
-| `test_v4091.js` | idem | listas afastadas, arrastar entre listas, pinça, sync do movimento |
+| `test_v4091.js` | idem | listas afastadas e seus níveis (1, 1½, 2, 3), menu da lupa, arrastar entre listas, pinça, sync do movimento |
 | `test_atualizacao.js` | idem, partindo do estado gravado pela V40.7.0 | quem já sincronizava numa versão antiga abre a atual: nada se perde, nada é reenviado à toa, nenhuma pergunta aparece |
 | `test_kanban.js` | `kanban.html` de verdade | tela do PC: listas, agenda (semana e dia), arrastar, arquivados, tempo real |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |

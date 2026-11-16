@@ -2135,7 +2135,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.15.0',
+            version: 'v40.16.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -2586,8 +2586,9 @@ function renderBacklog() {
         Array.from(wrapper.children).forEach(el => { if (el.scrollTop) keepTop[el.dataset.columnId] = el.scrollTop; });
     }
     wrapper.classList.toggle('lists-zoom', !!backlogZoomOut);
-    const zoomBtn = document.getElementById('backlog-zoom-btn');
-    if (zoomBtn) { zoomBtn.innerHTML = `<i class="ph ${backlogZoomOut ? 'ph-magnifying-glass-plus' : 'ph-magnifying-glass-minus'} text-lg"></i>`; zoomBtn.title = backlogZoomOut ? 'Aproximar (uma lista por vez)' : 'Afastar (ver várias listas)'; }
+    wrapper.classList.toggle('zoom-15', backlogZoomLevel() === 1.5); // V40.16.0: nível do afastado (o 2 não tem classe)
+    wrapper.classList.toggle('zoom-3', backlogZoomLevel() === 3);
+    backlogZoomUi();
     wrapper.innerHTML = backlogColumnsDb.map((col, idx) => {
         const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
         let cardsHtml;
@@ -2764,22 +2765,83 @@ function backlogDragOnTouchStart(e) {
 
 // =====================================================
 // V40.9.1 — LISTAS AFASTADAS: várias listas lado a lado, pra arrastar o cartão de uma pra outra.
-// A escolha fica em tb__lista_afastada (preferência do aparelho: fora do backup e da nuvem).
+// V40.16.0 — três níveis de afastado: 1½, 2 ou 3 listas por tela (o 2 é o afastado de antes).
+// A pinça muda um nível por gesto; a lupa abre o menu com os quatro (1 = modo normal).
+// A escolha fica em tb__lista_afastada ('1' = afastado) e tb__lista_zoom (o nível): preferências do
+// aparelho, fora do backup e da nuvem. Quem vem de antes com '1' e sem nível abre no 2, como era.
 // =====================================================
 var backlogZoomOut = false;   // var (não let): renderBacklog pode rodar antes desta linha
+var backlogZoomCols = 2;      // nível do afastado: 1.5, 2 ou 3 listas por tela
 var _zoomAlignActive = false; // true = no próximo desenho, encosta a lista ativa na esquerda
 var _zoomLastActive = null;   // lista ativa no último desenho afastado
 var _pinchState = null;       // { d0, pts, done } enquanto dois dedos estão na tela
 var _blClickBlockUntil = 0;   // depois de um arrasto, o "clique" que sobra não abre o cartão
-try { backlogZoomOut = localStorage.getItem('tb__lista_afastada') === '1'; } catch (e) {}
+try {
+    backlogZoomOut = localStorage.getItem('tb__lista_afastada') === '1';
+    const z = Number(localStorage.getItem('tb__lista_zoom'));
+    if (z === 1.5 || z === 2 || z === 3) backlogZoomCols = z;
+} catch (e) {}
 
-window.toggleBacklogZoom = function() {
+// Listas por tela agora: 1 (normal), 1.5, 2 ou 3. Funciona mesmo antes das linhas de cima rodarem.
+function backlogZoomLevel() { return backlogZoomOut ? (backlogZoomCols || 2) : 1; }
+function backlogZoomLabel(n) { return n === 1.5 ? '1½' : String(n); }
+
+window.setBacklogZoom = function(n) {
+    n = Number(n);
+    if ([1, 1.5, 2, 3].indexOf(n) < 0 || n === backlogZoomLevel()) return;
     backlogDragAbort();
-    backlogZoomOut = !backlogZoomOut;
-    _zoomAlignActive = backlogZoomOut;
-    try { localStorage.setItem('tb__lista_afastada', backlogZoomOut ? '1' : '0'); } catch (e) {}
+    backlogZoomOut = n > 1;
+    if (backlogZoomOut) backlogZoomCols = n;
+    _zoomAlignActive = backlogZoomOut; // entrar no afastado ou trocar de nível: encosta a lista ativa na esquerda
+    try {
+        localStorage.setItem('tb__lista_afastada', backlogZoomOut ? '1' : '0');
+        if (backlogZoomOut) localStorage.setItem('tb__lista_zoom', String(n));
+    } catch (e) {}
     renderBacklog();
 };
+// Liga/desliga o afastado voltando pro último nível usado (a tela usa o menu; fica pros testes e atalhos).
+window.toggleBacklogZoom = function() { setBacklogZoom(backlogZoomOut ? 1 : (backlogZoomCols || 2)); };
+
+// Lupa: mostra o nível quando afastado; o menu marca o nível atual.
+function backlogZoomUi() {
+    const zl = backlogZoomLevel();
+    const btn = document.getElementById('backlog-zoom-btn');
+    if (btn) {
+        btn.innerHTML = `<i class="ph ${zl > 1 ? 'ph-magnifying-glass-plus' : 'ph-magnifying-glass-minus'} text-lg"></i>` + (zl > 1 ? `<span class="zoom-badge">${backlogZoomLabel(zl)}</span>` : '');
+        btn.title = zl > 1 ? `Zoom das listas (${backlogZoomLabel(zl)} por tela)` : 'Zoom das listas (uma por tela)';
+    }
+    document.querySelectorAll('#backlog-zoom-menu [data-zoom]').forEach(b => {
+        const on = Number(b.dataset.zoom) === zl;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+}
+window.toggleBacklogZoomMenu = function() {
+    const menu = document.getElementById('backlog-zoom-menu');
+    if (!menu) return;
+    const open = menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', !open);
+    const btn = document.getElementById('backlog-zoom-btn');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) backlogZoomUi();
+};
+function closeBacklogZoomMenu() {
+    const menu = document.getElementById('backlog-zoom-menu');
+    if (!menu || menu.classList.contains('hidden')) return;
+    menu.classList.add('hidden');
+    const btn = document.getElementById('backlog-zoom-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+window.chooseBacklogZoom = function(n) { closeBacklogZoomMenu(); setBacklogZoom(n); };
+// Menu aberto: tocar fora só fecha o menu (o toque não abre cartão nem aperta outro botão).
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('backlog-zoom-menu');
+    if (!menu || menu.classList.contains('hidden')) return;
+    if (e.target && e.target.closest && e.target.closest('#backlog-zoom-menu, #backlog-zoom-btn')) return;
+    e.stopPropagation();
+    e.preventDefault();
+    closeBacklogZoomMenu();
+}, true);
 window.setActiveColumnFromZoom = function(colId) {
     if (!backlogColumnsDb.some(c => c.id === colId)) return;
     activeColumnId = colId;
@@ -2807,7 +2869,8 @@ function backlogZoomSyncActive() {
     if (first) setActiveColumnFromZoom(first.dataset.columnId);
 }
 
-// Pinça com dois dedos: fechar os dedos afasta (várias listas), abrir aproxima (uma lista).
+// Pinça com dois dedos: fechar os dedos afasta, abrir aproxima. V40.16.0: um nível por gesto
+// (1 → 1½ → 2 → 3 e de volta), sem dar a volta: no 3 fechar não faz nada, no 1 abrir não faz nada.
 function backlogPinchDist(touches) {
     return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
 }
@@ -2819,9 +2882,12 @@ function backlogPinchOnTouchMove(e) {
     const moved = (i) => Math.hypot(e.touches[i].clientX - p.pts[i][0], e.touches[i].clientY - p.pts[i][1]) >= 12;
     if (!moved(0) || !moved(1)) return true;
     const ratio = backlogPinchDist(e.touches) / p.d0;
-    if ((ratio < 0.75 && !backlogZoomOut) || (ratio > 1.33 && backlogZoomOut)) {
+    const steps = [1, 1.5, 2, 3], i = steps.indexOf(backlogZoomLevel());
+    const next = ratio < 0.75 ? i + 1 : ratio > 1.33 ? i - 1 : -1;
+    if (i >= 0 && next >= 0 && next < steps.length) {
         p.done = true; // uma troca por gesto
-        toggleBacklogZoom();
+        closeBacklogZoomMenu();
+        setBacklogZoom(steps[next]);
     }
     return true;
 }
@@ -2839,6 +2905,8 @@ function backlogDragBegin(card) {
     ghost.removeAttribute('onclick');
     ghost.classList.remove('opacity-60', 'scale-105', 'z-10', 'relative'); // 'relative' do Tailwind ganharia do position: fixed
     ghost.classList.add('bl-ghost');
+    if (backlogZoomLevel() === 1.5) ghost.classList.add('zoom-15'); // V40.16.0: mesmo tamanho de letra do nível
+    else if (backlogZoomLevel() === 3) ghost.classList.add('zoom-3');
     ghost.style.width = w + 'px';
     ghost.style.left = left + 'px';
     ghost.style.top = top + 'px';

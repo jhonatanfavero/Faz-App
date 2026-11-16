@@ -10,7 +10,8 @@
 // V10.15 - v40.13.0 (Tela do PC: criar bloco novo direto na Agenda — botão "Novo bloco", "Adicionar bloco" em cada dia da semana e clique num horário vazio na visão Dia. No celular só muda o número da versão.)
 // V10.16 - v40.14.0 (Tela do PC, aba Agenda: na visão Dia dá pra arrastar o bloco pra outro horário e puxar a borda de baixo pra mudar a duração, com as regras do app (de 5 em 5 min, sem sobrepor); na Semana, ao arrastar, os espaços livres de cada dia viram lugar de soltar. No celular só muda o número da versão.)
 // V10.17 - v40.15.0 (Tela do PC: 3 pontinhos no cartão das Listas e no bloco da Semana, com Arquivar e Apagar sem abrir o cartão; ao arrastar um cartão ou bloco aparece no topo o campo "Solte aqui pra arquivar". No celular só muda o número da versão.)
-const CACHE_NAME = 'timeblock-v40-15-0';
+// V10.18 - v40.16.0 (Celular, Listas: o zoom ganhou níveis — 1, 1½, 2 ou 3 listas por tela. A lupa abre o menu com os quatro; a pinça muda um nível por gesto. O nível fica guardado no aparelho (tb__lista_zoom), fora do backup e da nuvem. Na tela do PC só muda o número da versão.)
+const CACHE_NAME = 'timeblock-v40-16-0';
 const ASSETS = [
   './',
   './index.html',

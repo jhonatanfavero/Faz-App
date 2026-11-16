@@ -452,6 +452,71 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
     click($('f-cancel')); click($('tab-listas'));
   }
 
+  console.log('\nR) V40.13.0 — criar bloco novo direto na Agenda (PC):');
+  {
+    const visible = (id) => !$(id).classList.contains('hidden');
+    const sel = (id, cls) => d.querySelector(`[data-time-for="${id}"] .${cls}`);
+    const pickSel = (el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', { bubbles: true })); };
+    const change = (el, v) => { el.value = v; el.dispatchEvent(new w.Event('input', { bubbles: true })); el.dispatchEvent(new w.Event('change', { bubbles: true })); };
+    const overlap = (day, st, dur) => server.alive('blocos', UID).some((b) => b.date === day && !b.archived && st < b.start_min + b.duration && b.start_min < st + dur);
+    const toMin = (v) => +v.slice(0, 2) * 60 + +v.slice(3);
+    click($('tab-agenda')); click(d.querySelector('.ag-view[data-view="week"]')); click($('ag-today')); await sleep(60);
+    ok(d.querySelectorAll('#ag-cols .ag-add[data-add-day]').length === 7 && d.querySelectorAll('#ag-cols .ag-add-top[data-add-day]').length === 7 && /Novo bloco/.test($('ag-new').textContent), 'a Agenda tem "Novo bloco" em cima e, em cada um dos 7 dias, um "+" no topo e "Adicionar bloco" no fim');
+    click(d.querySelector('#ag-cols .ag-add-top[data-add-day="2026-11-19"]'));
+    ok(visible('modal-task') && $('f-date').value === '2026-11-19' && $('f-save').textContent === 'Criar bloco', 'o "+" do topo do dia abre o cartão novo naquele dia');
+    click($('f-cancel'));
+    click(d.querySelector('#ag-cols [data-add-day="2026-11-20"]'));
+    const st20 = toMin($('f-start').value);
+    ok(visible('modal-task') && $('f-title').value === '' && $('f-title').placeholder === 'Nome do compromisso' && $('f-date').value === '2026-11-20' && st20 >= 420 && !overlap('2026-11-20', st20, 30) && $('f-dur').value === '30', `"Adicionar bloco" abre o cartão novo no dia clicado, no primeiro horário livre (${$('f-start').value}), com 30m`);
+    ok(!visible('f-done') && !visible('f-delete') && !visible('f-archive') && !visible('f-tolist') && !visible('f-schedule') && !visible('f-hand') && $('f-save').textContent === 'Criar bloco', 'o cartão novo só tem Cancelar e "Criar bloco"');
+    click($('f-save'));
+    ok(visible('modal-task') && /Dê um nome pro bloco/.test($('toast').textContent), 'sem nome não cria');
+    const n0 = server.alive('blocos', UID).length, tagR = server.alive('tags', UID)[0];
+    typeIn($('f-title'), 'Reunião criada no PC'); change($('f-dur'), '45');
+    click($('f-tags').querySelector(`button[data-tag="${tagR.id}"]`)); click($('f-colors').querySelector('button[data-color="#8b5cf6"]'));
+    $('f-mb-new').value = 'Levar contrato'; key($('f-mb-new'), 'Enter');
+    pickSel(sel('f-start', 'time-h'), '16'); pickSel(sel('f-start', 'time-m'), '30');
+    server.log.length = 0; click($('f-save'));
+    await waitFor(() => server.alive('blocos', UID).length === n0 + 1);
+    const nbR = server.alive('blocos', UID).find((b) => b.title === 'Reunião criada no PC');
+    ok(!!nbR && /^f_\d+$/.test(nbR.id) && nbR.date === '2026-11-20' && nbR.start_min === 990 && nbR.duration === 45 && nbR.tag_id === tagR.id && nbR.color === '#8b5cf6' && nbR.type === 'focus' && nbR.theme === 'focus' && nbR.completed === false, '"Criar bloco" grava dia, horário (16:30), duração, tag e cor');
+    ok(nbR.microblocks.length === 1 && /^mb_\d+$/.test(nbR.microblocks[0].id) && nbR.microblocks[0].title === 'Levar contrato' && nbR.microblocks[0].done === false && Array.isArray(nbR.linked_note_ids), 'checklist do bloco novo com id em cada item (como no app)');
+    ok(!visible('modal-task') && !!agCols()[4].querySelector(`[data-block="${nbR.id}"]`) && /Bloco criado para Sex 20\/11 às 16:30$/.test($('toast').textContent) && server.log.filter((l) => l.op !== 'select').map((l) => l.op + ':' + l.t).join() === 'upsert:blocos', 'aparece na sexta e avisa: "' + $('toast').textContent + '"');
+    click(d.querySelector('#ag-cols [data-add-day="2026-11-20"]'));
+    typeIn($('f-title'), 'Outro no mesmo horário'); pickSel(sel('f-start', 'time-h'), '16'); pickSel(sel('f-start', 'time-m'), '30'); click($('f-save'));
+    await waitFor(() => server.alive('blocos', UID).some((b) => b.title === 'Outro no mesmo horário'));
+    ok(server.alive('blocos', UID).find((b) => b.title === 'Outro no mesmo horário').start_min === 990 + 45 && /já tinha bloco/.test($('toast').textContent), 'horário ocupado → entra logo depois e avisa');
+    click($('ag-new'));
+    const stHoje = toMin($('f-start').value);
+    ok($('f-date').value === '2026-11-16' && stHoje >= 440 && !overlap('2026-11-16', stHoje, 30), `"Novo bloco" na Semana sugere hoje, a partir de agora (${$('f-start').value})`);
+    change($('f-date'), '2026-11-21');
+    const st21 = toMin($('f-start').value);
+    ok(st21 >= 420 && !overlap('2026-11-21', st21, 30) && st21 < stHoje, 'trocar o dia sugere o horário livre do dia novo (' + $('f-start').value + ')');
+    pickSel(sel('f-start', 'time-h'), '18'); change($('f-date'), '2026-11-22');
+    ok($('f-start').value.slice(0, 2) === '18', 'depois que a pessoa escolhe a hora, trocar o dia não mexe mais nela');
+    click($('f-cancel'));
+    ok(server.alive('blocos', UID).length === n0 + 2, 'Cancelar não cria nada');
+    click(d.querySelector('#ag-cols .ag-day-btn[data-day="2026-11-21"]')); await sleep(40);
+    click($('ag-new'));
+    ok($('f-date').value === '2026-11-21', 'na visão Dia, "Novo bloco" usa o dia que está aberto');
+    click($('f-cancel'));
+    const first21 = server.alive('blocos', UID).filter((b) => b.date === '2026-11-21' && !b.archived).sort((a, b) => a.start_min - b.start_min)[0];
+    const base = Math.min(7, first21 ? Math.floor(first21.start_min / 60) : 24) * 60;
+    $('ag-timeline').dispatchEvent(new w.MouseEvent('click', { bubbles: true, clientY: 3.2 * 243 })); // 243 min abaixo do começo da régua
+    ok(visible('modal-task') && $('f-date').value === '2026-11-21' && toMin($('f-start').value) === base + 240 && $('f-title').value === '' && $('f-save').textContent === 'Criar bloco', `clicar num horário vazio da régua abre o cartão novo naquele horário, de 5 em 5 min (${$('f-start').value})`);
+    change($('f-date'), '2026-11-22');
+    ok(toMin($('f-start').value) === base + 240, 'o horário clicado na régua não é trocado ao mudar o dia');
+    typeIn($('f-title'), 'Sem internet'); server.failNext = 1; click($('f-save')); await sleep(250);
+    ok(!server.alive('blocos', UID).some((b) => b.title === 'Sem internet') && /Não foi possível salvar/.test($('toast').textContent), 'sem internet: o bloco não é criado e a tela avisa');
+    click(d.querySelector('.ag-view[data-view="week"]')); click($('ag-today')); click($('tab-listas')); await sleep(40);
+    click(d.querySelector(`.card[data-id="${server.alive('tarefas', UID).filter((t) => !t.archived)[0].id}"] [data-hand]`));
+    ok(d.querySelectorAll('#ag-cols [data-add-day]').length === 0 && d.querySelectorAll('#ag-cols [data-gap-day]').length > 0, 'com tarefa na mão, os dias mostram os espaços livres no lugar do "Adicionar bloco"');
+    click($('ag-place-cancel')); click($('tab-listas'));
+    click($('tab-agenda')); click(d.querySelector('#ag-cols [data-block]'));
+    ok(visible('f-delete') && visible('f-archive') && visible('f-tolist') && visible('f-done') && $('f-save').textContent === 'Salvar', 'abrir um bloco que já existe continua com todos os botões');
+    click($('f-cancel')); click($('tab-listas'));
+  }
+
   console.log('\nJ) Sair e entrar:');
   click($('btn-logout'));
   await sleep(20);

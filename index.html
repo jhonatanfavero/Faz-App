@@ -112,11 +112,16 @@
                     <button id="tl-compact-btn" onclick="toggleTlCompact()" aria-pressed="false" class="bg-white border border-app-focus p-2 rounded-xl hover:bg-zinc-50 transition flex items-center justify-center shrink-0 shadow-sm" title="Ocultar os vagos">
                         <i class="ph-bold ph-arrows-in-line-vertical text-lg text-app-focus"></i>
                     </button>
+                    <!-- V40.26.0: agenda afastada (1, 2 ou 3 dias lado a lado; também pela pinça) -->
+                    <button id="tl-days-btn" onclick="cycleTlDays()" aria-pressed="false" class="relative bg-white border border-app-focus p-2 rounded-xl hover:bg-zinc-50 transition flex items-center justify-center shrink-0 shadow-sm" title="Ver 2 dias lado a lado (ou feche os dedos na agenda)" aria-label="Dias na tela">
+                        <i class="ph-bold ph-columns text-lg text-app-focus"></i>
+                        <span id="tl-days-badge" class="tl-days-badge hidden"></span>
+                    </button>
                     <button onclick="openTagsSheet()" class="bg-white border border-app-focus px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
                         <i class="ph ph-tag text-sm text-app-focus"></i> TAGs
                     </button>
-                    <button onclick="openReportsSheet()" class="bg-white border border-app-focus px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
-                        <i class="ph ph-chart-bar text-sm text-app-focus"></i> Relatórios
+                    <button onclick="openReportsSheet()" aria-label="Relatórios" title="Relatórios" class="bg-white border border-app-focus px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
+                        <i class="ph ph-chart-bar text-sm text-app-focus"></i> <span class="rel-txt">Relatórios</span>
                     </button>
                 </div>
             </div>
@@ -129,6 +134,8 @@
                     <div class="h-full bg-blue-500 rounded-full transition-all duration-700 ease-out" style="width: 0%" id="progress-bar"></div>
                 </div>
             </div>
+            <!-- V40.26.0: agenda afastada: o nome de cada dia, em cima da coluna dele (mesmas margens da agenda: 56 px de régua e 16 px na direita) -->
+            <div id="tl-dayhead" class="hidden grid ml-8 -mr-2 -mb-2 pointer-events-auto" aria-label="Dias na tela"></div>
         </header>
 
         <div id="floating-task" class="absolute bottom-6 left-1/2 w-[92%] bg-white border border-zinc-200 shadow-[0_20px_40px_rgba(0,0,0,0.1)] rounded-2xl p-4 z-50 hidden flex-col animate-float-bubble pointer-events-auto -translate-x-1/2">
@@ -1490,7 +1497,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.25.1</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.26.0</div>
 
     </div>
 

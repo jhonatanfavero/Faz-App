@@ -439,5 +439,63 @@ const { abrir } = require('./apoio');
   ok(/^Inserir às 1[01]:\d\d$/.test(await m.evaluate(() => document.getElementById('commit-intent-btn').textContent.trim())), 'no vago de baixo também: "' + await m.evaluate(() => document.getElementById('commit-intent-btn').textContent.trim()) + '"');
   await m.evaluate(() => { closeAllSheets(); db = db.filter((b) => b.date !== '2026-11-25'); saveDb(); renderTimeline(); });
   }
+
+  {
+  console.log('\nL) Agenda afastada: pinça de verdade, 2 e 3 dias (V40.26.0):');
+  await m.setViewportSize({ width: 390, height: 844 });
+  await m.evaluate(() => { closeAllSheets(); if (pendingIntent) cancelPendingTask(); setTlDays(1, '2026-11-15'); document.getElementById('timeline-scroll').scrollTop = 0; });
+  await m.waitForTimeout(300);
+  const pinca = async (de, para) => { // dois dedos na agenda, de 'de' px até 'para' px de distância
+    const cx = 210, y = 520;
+    await touch('touchStart', { x: cx - de / 2, y }, { x: cx + de / 2, y }); await m.waitForTimeout(40);
+    for (let i = 1; i <= 6; i++) { const dd = de + (para - de) * i / 6; await touch('touchMove', { x: cx - dd / 2, y: y + i }, { x: cx + dd / 2, y: y + i }); await m.waitForTimeout(30); }
+    await touch('touchEnd'); await m.waitForTimeout(450);
+  };
+  await pinca(220, 90);
+  const ver = () => m.evaluate(() => {
+    const cols = [...document.querySelectorAll('#blocks-container .tl-col')], heads = [...document.querySelectorAll('#tl-dayhead .tl-dh')];
+    const r = cols.map((c) => c.getBoundingClientRect());
+    return {
+      dias: tlDays, n: cols.length, datas: cols.map((c) => c.dataset.date),
+      iguais: r.every((x) => Math.abs(x.width - r[0].width) < 1), juntas: r.every((x, i) => !i || Math.abs(x.left - r[i - 1].right) < 1),
+      alinhados: heads.length === cols.length && heads.every((h, i) => { const hr = h.getBoundingClientRect(), mid = (hr.left + hr.right) / 2; return mid > r[i].left && mid < r[i].right; }),
+      nomesCabem: heads.every((h) => h.scrollWidth <= h.clientWidth + 1),
+      textoCabe: [...document.querySelectorAll('.tl-mini .tl-mini-title')].every((t) => t.scrollWidth <= t.clientWidth + 1),
+      dentroDaTela: r.every((x) => x.left >= 0 && x.right <= innerWidth),
+      reguaLivre: !r.length || r[0].left >= document.getElementById('y-axis').getBoundingClientRect().right - 1,
+      topoLivre: cols.length ? document.querySelector('#blocks-container .tl-mini').getBoundingClientRect().top >= document.querySelector('header').getBoundingClientRect().bottom - 1 : true,
+    };
+  });
+  let v = await ver();
+  ok(v.dias === 2 && v.n === 2 && v.datas.join() === '2026-11-15,2026-11-16', 'fechar dois dedos de verdade na agenda: 2 dias (15 e 16)');
+  ok(v.iguais && v.juntas && v.alinhados && v.nomesCabem && v.dentroDaTela && v.reguaLivre, 'colunas iguais, lado a lado, com o nome de cada dia em cima da coluna dele e a régua de horas livre');
+  ok(v.textoCabe && v.topoLivre, 'o nome dos blocos quebra dentro da coluna e nada fica escondido embaixo do topo');
+  await pinca(220, 90);
+  v = await ver();
+  ok(v.dias === 3 && v.n === 3 && v.iguais && v.alinhados && v.nomesCabem && v.textoCabe, 'de novo: 3 dias, tudo no lugar');
+  await foto(m, 'cel-agenda-3dias.png');
+  // arrastar um dedo pra esquerda: anda um dia
+  await touch('touchStart', { x: 320, y: 600 }); await m.waitForTimeout(30);
+  for (let i = 1; i <= 6; i++) { await touch('touchMove', { x: 320 - i * 25, y: 600 + i }); await m.waitForTimeout(20); }
+  await touch('touchEnd'); await m.waitForTimeout(400);
+  ok((await ver()).datas.join() === '2026-11-16,2026-11-17,2026-11-18', 'arrastar um dedo pra esquerda: anda um dia (16, 17 e 18)');
+  // 360 px
+  await m.setViewportSize({ width: 360, height: 740 }); await m.waitForTimeout(300);
+  v = await ver();
+  ok(v.n === 3 && v.iguais && v.alinhados && v.nomesCabem && v.textoCabe && v.dentroDaTela, 'numa tela de 360 px os 3 dias também cabem');
+  await foto(m, 'cel-agenda-3dias-360.png');
+  await m.setViewportSize({ width: 390, height: 844 }); await m.waitForTimeout(300);
+  // tocar num bloco: abre o dia dele, com o cartão aberto
+  const alvo = await m.evaluate(() => { const e = document.querySelector('#blocks-container .tl-col[data-date="2026-11-17"] .tl-mini'), r = e.getBoundingClientRect(); return { id: e.dataset.miniId, x: r.left + r.width / 2, y: r.top + Math.min(r.height / 2, 20) }; });
+  await m.touchscreen.tap(alvo.x, alvo.y); await m.waitForTimeout(500);
+  const ab = await m.evaluate((id) => ({ dias: tlDays, dia: getActiveDateStr(), aberto: !!(db.find((b) => b.id === id) || {}).expanded, naTela: (() => { const e = document.querySelector(`#blocks-container .block-item[data-block-id="${id}"]`); if (!e) return false; const r = e.getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight; })() }), alvo.id);
+  ok(ab.dias === 1 && ab.dia === '2026-11-17' && ab.aberto && ab.naTela, 'tocar num bloco do dia 17: abre o dia 17 com o cartão dele aberto, na tela');
+  await foto(m, 'cel-agenda-abriu-dia.png');
+  // abrir os dedos volta (pinça ao contrário a partir de 2 dias)
+  await m.evaluate(() => { collapseAllBlocks(); setTlDays(2); }); await m.waitForTimeout(300);
+  await pinca(90, 240);
+  ok((await ver()).dias === 1, 'abrir os dedos em 2 dias: volta pra 1 dia');
+  await m.evaluate(() => setTlDays(1)); await m.waitForTimeout(200);
+  }
   await fim(errs.length ? '\nERROS DE PÁGINA: ' + errs.slice(0, 3).join(' | ') : '');
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

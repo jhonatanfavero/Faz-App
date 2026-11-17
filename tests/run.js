@@ -28,6 +28,7 @@ const SUITES = [
     ['Desfazer e refazer no celular (e na nuvem)', 'test_desfazer.js', [ROOT, DADOS]],
     ['Tela do PC: Desfazer (Ctrl+Z) e Refazer; dois cliques no horário vazio', 'test_kanban_v4025.js', [ROOT, DADOS]],
     ['Dois toques no horário vazio (celular)', 'test_dois_toques.js', [ROOT, DADOS]],
+    ['Agenda afastada no celular: 2 ou 3 dias lado a lado', 'test_agenda_dias.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

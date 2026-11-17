@@ -681,13 +681,20 @@ function runRealTimeEngine() {
     // Limpa "-feira" e pontos: "segunda-feira, 15 de mai." → "Segunda, 15 mai"
     dateStr = dateStr.replace(/-feira/g, '').replace(/\./g, '').replace(/ de /g, ' ');
     dateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+    const mDays = tlMultiDays(); // V40.26.0: agenda afastada mostra o intervalo ("16 – 18 nov")
+    if (mDays.length) dateStr = tlRangeLabel(mDays);
+    const hasToday = isToday || mDays.includes(getTodayStr());
     
     document.getElementById('header-date').innerHTML = 
-        (isToday ? `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span> ` : `<i class="ph ph-calendar text-zinc-400 text-lg"></i> `) + 
+        (hasToday ? `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span> ` : `<i class="ph ph-calendar text-zinc-400 text-lg"></i> `) +
         `<span class="font-bold text-zinc-800">${dateStr}</span>`;
 
     const nowLine = document.getElementById('now-line');
-    if ((isToday && currentRealMins >= START_HOUR * 60 && currentRealMins <= END_HOUR * 60) && !showOnlyDelayed && !showOnlyCompleted) {
+    const nowMini = document.querySelector('#blocks-container .tl-now-mini');
+    if (nowMini) nowMini.style.top = `${tlY(currentRealMins)}px`;
+    if (mDays.length) {
+        nowLine.style.display = 'none'; // V40.26.0: com vários dias, a linha do agora fica só na coluna de hoje
+    } else if ((isToday && currentRealMins >= START_HOUR * 60 && currentRealMins <= END_HOUR * 60) && !showOnlyDelayed && !showOnlyCompleted) {
         const topPx = tlY(currentRealMins); // V40.24.0
         nowLine.style.top = `${topPx}px`;
         nowLine.style.display = 'flex';
@@ -775,6 +782,10 @@ const TL_GAP_MIN = 30, TL_GAP_PX = 36;
 let tlCompact = false;
 try { tlCompact = localStorage.getItem('tb__vagos_compactos') === '1'; } catch (e) {}
 let tlSegs = null; // trechos da régua do dia na tela; null = escala normal
+// V40.26.0: agenda afastada — 1, 2 ou 3 dias lado a lado (pinça ou o botão de colunas). Preferência do aparelho
+// (tb__agenda_dias, fora do backup). O primeiro dia da tela é o activeDateObj.
+var tlDays = 1;
+try { const n = Number(localStorage.getItem('tb__agenda_dias')); if (n === 2 || n === 3) tlDays = n; } catch (e) {}
 function tlBuildSegs(list, lo, hi) {
     const segs = [];
     const add = (a, b, gap) => {
@@ -828,6 +839,7 @@ window.toggleTlCompact = function() {
     try { localStorage.setItem('tb__vagos_compactos', tlCompact ? '1' : '0'); } catch (e) {}
     updateTlCompactBtn();
     renderTimeline();
+    if (tlCompact && tlMulti()) showToast('Ocultar vagos vale quando a agenda mostra 1 dia'); // V40.26.0
 };
 // Tocar 2 vezes numa faixa ou no Tempo Livre (sem tarefa na mão) abre o + já mirando ali: o que for criado entra direto lá (V40.25.1: eram 1 toque, só na faixa).
 let sheetSlot = null; // { date, start, dur }
@@ -837,31 +849,31 @@ function tlSlotLabel() {
 }
 // V40.25.1: gap = o vago inteiro { a, b } (pra encostar no fim quando a hora tocada não dá); exact = hora escolhida
 // pelo toque (não muda pra "agora" mesmo se o vago tiver o agora).
-window.openSheetAt = function(start, dur, gap, exact) {
+window.openSheetAt = function(start, dur, gap, exact, date) { // V40.26.0: date = coluna tocada na agenda afastada
     openSheet();
-    sheetSlot = { date: getActiveDateStr(), start: start, dur: dur, gap: gap || null, exact: !!exact };
+    sheetSlot = { date: date || getActiveDateStr(), start: start, dur: dur, gap: gap || null, exact: !!exact };
     tlSlotLabel();
 };
 // V40.25.1: 2 toques num horário vazio (Tempo Livre ou faixa do "ocultar vagos") abrem o + já mirando ali.
 // Tempo Livre: a hora tocada, de 15 em 15 min (dentro do vago). Faixa: o começo do vago. Um toque só não abre nada
 // (evita abrir sem querer rolando a agenda) e, nas 3 primeiras vezes, explica o gesto.
 var tlTapPrev = null, tlTapHintT = null;
-function tlEmptyTap(e, block) {
+function tlEmptyTap(e, block, date) {
     if (db.some(x => x.expanded)) return; // com um cartão aberto, o toque só fecha ele
-    const now = Date.now(), p = tlTapPrev, x = e.clientX || 0, y = e.clientY || 0;
+    const now = Date.now(), p = tlTapPrev, x = e.clientX || 0, y = e.clientY || 0, ds = date || getActiveDateStr();
     clearTimeout(tlTapHintT);
-    if (p && p.start === block.startMin && p.date === getActiveDateStr() && now - p.t < 450 && Math.abs(x - p.x) < 40 && Math.abs(y - p.y) < 40) {
+    if (p && p.start === block.startMin && p.date === ds && now - p.t < 450 && Math.abs(x - p.x) < 40 && Math.abs(y - p.y) < 40) {
         tlTapPrev = null;
         const end = block.startMin + block.duration, gap = { a: block.startMin, b: end };
-        if (tlGapAt(block.startMin)) return openSheetAt(block.startMin, block.duration, gap, false);
+        if (tlGapAt(block.startMin)) return openSheetAt(block.startMin, block.duration, gap, false, ds);
         const r = e.currentTarget && e.currentTarget.getBoundingClientRect ? e.currentTarget.getBoundingClientRect() : null;
         const min = r ? tlMin(tlY(block.startMin) + (y - r.top)) : block.startMin;
         let at = Math.round(min / 15) * 15;
         if (at >= end) at = Math.floor(min / 15) * 15; // perto do fim: o quarto de hora de antes (não sobra um vago de 5 min)
         at = Math.max(block.startMin, Math.min(at, end - 5));
-        return openSheetAt(at, end - at, gap, true);
+        return openSheetAt(at, end - at, gap, true, ds);
     }
-    tlTapPrev = { start: block.startMin, date: getActiveDateStr(), t: now, x: x, y: y };
+    tlTapPrev = { start: block.startMin, date: ds, t: now, x: x, y: y };
     tlTapHintT = setTimeout(() => { tlTapPrev = null; tlTapHint(); }, 460);
 }
 function tlTapHint() {
@@ -871,14 +883,220 @@ function tlTapHint() {
     try { localStorage.setItem('tb__dica_dois_toques', String(n + 1)); } catch (e) {}
     showToast('Toque 2 vezes no Tempo Livre pra pôr um cartão ali');
 }
+
+// =====================================================
+// V40.26.0: AGENDA AFASTADA — 2 ou 3 dias lado a lado, como as Listas afastadas.
+// Pinça (fechar os dedos mostra mais dias, abrir mostra menos; um nível por gesto) ou o botão de colunas na linha
+// dos filtros (1 → 2 → 3 → 1). A régua de horas é uma só; o nome de cada dia fica no topo, em cima da coluna dele.
+// Arrastar pro lado com um dedo anda um dia. Tocar num bloco (ou no nome do dia) abre aquele dia em 1 dia, já com o
+// cartão aberto. Dois toques num vazio abrem o + naquele dia e hora. Tarefa na mão: tocar num vazio onde ela cabe
+// solta ali (em qualquer um dos dias). Filtros e busca continuam em lista; "ocultar vagos" vale só em 1 dia.
+// Arrastar bloco de um dia pro outro fica pra uma próxima versão.
+// =====================================================
+const TL_WD = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const TL_MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+function tlMulti() { return tlDays > 1 && !showOnlyDelayed && !showOnlyCompleted && !(searchQuery && searchQuery.trim()); }
+function tlMultiDays() {
+    if (!tlMulti()) return [];
+    const out = [], first = getActiveDateStr();
+    for (let i = 0; i < tlDays; i++) out.push(addDaysToDateStr(first, i));
+    return out;
+}
+function tlDateObj(ds) { const p = String(ds).split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); }
+function tlRangeLabel(days) {
+    const a = tlDateObj(days[0]), z = tlDateObj(days[days.length - 1]);
+    return a.getMonth() === z.getMonth() ? `${a.getDate()}–${z.getDate()} ${TL_MES[z.getMonth()]}` : `${a.getDate()} ${TL_MES[a.getMonth()]}–${z.getDate()} ${TL_MES[z.getMonth()]}`;
+}
+// O topo (cabeçalho) muda de altura quando os nomes dos dias aparecem/somem: a agenda acompanha.
+function tlFixTop() {
+    setTimeout(() => {
+        const header = document.querySelector('header'), tl = document.getElementById('timeline-scroll');
+        if (header && tl) tl.style.paddingTop = (header.offsetHeight + 8) + 'px';
+    }, 50);
+}
+function updateTlDaysBtn() {
+    const b = document.getElementById('tl-days-btn');
+    if (!b) return;
+    const on = tlDays > 1;
+    b.classList.toggle('tl-days-on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.title = on ? `${tlDays} dias na tela (toque pra ${tlDays >= 3 ? '1 dia' : (tlDays + 1) + ' dias'}; ou use a pinça)` : 'Ver 2 dias lado a lado (ou feche os dedos na agenda)';
+    const badge = document.getElementById('tl-days-badge');
+    if (badge) { badge.textContent = on ? String(tlDays) : ''; badge.classList.toggle('hidden', !on); }
+}
+window.setTlDays = function(n, firstDate) {
+    n = Number(n);
+    if ([1, 2, 3].indexOf(n) < 0) return;
+    if (firstDate) activeDateObj = tlDateObj(firstDate);
+    if (n === tlDays && !firstDate) return;
+    if (n > 1) collapseAllBlocks();
+    tlDays = n;
+    try { localStorage.setItem('tb__agenda_dias', String(n)); } catch (e) {}
+    tlTapPrev = null;
+    updateTlDaysBtn();
+    applyHeaderState();
+    runRealTimeEngine();
+    renderTimeline();
+};
+window.cycleTlDays = function() { setTlDays(tlDays >= 3 ? 1 : tlDays + 1); };
+
+// Abre um dia em 1 dia (tocou no nome do dia ou num bloco). Com bloco: rola até ele e abre o cartão.
+window.tlOpenDay = function(ds, id) {
+    setTlDays(1, ds);
+    const b = id ? db.find(x => x.id === id) : null;
+    if (!b) return;
+    if (!pendingIntent && !b.expanded) toggleExpandBlock(id, { stopPropagation() {} });
+    const sc = document.getElementById('timeline-scroll');
+    if (sc) sc.scrollTop = Math.max(0, tlY(b.startMin) - 140);
+};
+function tlMiniTap(e, id, ds) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const b = db.find(x => x.id === id);
+    if (!b) return;
+    if (pendingIntent && isSublist(b) && subCanDrop()) return dropIntoSublist(id); // tarefa na mão → entra na sublista
+    tlOpenDay(ds, id);
+}
+function tlMiniBlock(b, ds) {
+    const top = tlY(b.startMin), h = Math.max(tlY(b.startMin + b.duration) - top - 2, 8);
+    const el = document.createElement('div');
+    const sub = isSublist(b), rest = b.theme === 'rest', card = b.completed ? null : fazCardColor(b.color);
+    el.className = 'tl-mini' + (b.completed ? ' done' : '') + (b.type === 'past' ? ' past' : '') + (rest && !b.completed ? ' rest' : '') + (sub && !b.completed ? ' sub' : '') +
+        (card && !fazIsDark(card) ? ' light' : '') + (h < 26 ? ' tiny' : '');
+    el.style.top = (top + 1) + 'px';
+    el.style.height = h + 'px';
+    if (card) el.style.backgroundColor = card;
+    const tag = getTagColor(b.tagId);
+    if (tag) el.style.borderLeft = '4px solid ' + tag;
+    el.dataset.miniId = b.id;
+    el.setAttribute('role', 'button');
+    const c = sub ? subCount(b) : null;
+    el.innerHTML = (h >= 26 ? `<span class="tl-mini-time">${formatClock(b.startMin)}</span>` : '') +
+        `<span class="tl-mini-title">${b.completed ? '<i class="ph-bold ph-check"></i> ' : ''}${escapeHtml(b.title || (sub ? 'Sublista' : 'Sem nome'))}</span>` +
+        (sub && c.total && h >= 40 ? `<span class="tl-mini-sub">${c.done}/${c.total}</span>` : '');
+    el.onclick = (e) => tlMiniTap(e, b.id, ds);
+    return el;
+}
+function tlMiniGap(ds, start, dur) {
+    const el = document.createElement('div'), top = tlY(start);
+    el.className = 'tl-mini-gap';
+    el.style.top = (top + 1) + 'px';
+    el.style.height = Math.max(tlY(start + dur) - top - 2, 4) + 'px';
+    el.dataset.gapDate = ds;
+    el.dataset.gapStart = String(start);
+    if (pendingIntent) {
+        if (dur >= pendingIntent.duration) {
+            el.classList.add('drop', 'animate-pulse-drop');
+            if (dur >= 25) el.innerHTML = '<i class="ph ph-hand-pointing"></i>';
+            el.onclick = (e) => { e.stopPropagation(); performEncaixeMatematico(start, dur, false, ds); };
+        } else el.classList.add('short');
+    } else {
+        el.onclick = (e) => tlEmptyTap(e, { startMin: start, duration: dur }, ds);
+    }
+    return el;
+}
+function tlDayhead(days) {
+    const row = document.getElementById('tl-dayhead');
+    if (!row) return;
+    const show = !!(days && days.length), was = !row.classList.contains('hidden');
+    row.classList.toggle('hidden', !show);
+    const pr = document.getElementById('header-progress-row'); // os nomes dos dias ficam no lugar da barra de "planejado"
+    if (pr && !headerHidden) pr.classList.toggle('hidden', show);
+    if (show) {
+        const today = getTodayStr();
+        row.style.gridTemplateColumns = `repeat(${days.length}, minmax(0, 1fr))`;
+        row.innerHTML = days.map(ds => {
+            const d = tlDateObj(ds);
+            return `<button type="button" class="tl-dh${ds === today ? ' today' : ''}" onclick="tlOpenDay('${ds}')" aria-label="Abrir ${TL_WD[d.getDay()]} ${d.getDate()}">${TL_WD[d.getDay()]} ${d.getDate()}</button>`;
+        }).join('');
+    }
+    if (show !== was) tlFixTop();
+}
+function tlRenderMulti() {
+    const days = tlMultiDays(), n = days.length, lo = START_HOUR * 60, hi = END_HOUR * 60, today = getTodayStr();
+    container.classList.add('tl-multi');
+    const nowLine = document.getElementById('now-line');
+    if (nowLine) nowLine.style.display = 'none';
+    let occupied = 0;
+    days.forEach((ds, i) => {
+        const col = document.createElement('div');
+        col.className = 'tl-col' + (ds === today ? ' tl-col-today' : '') + (i ? ' tl-col-next' : '');
+        col.style.left = `calc(${i} * 100% / ${n})`;
+        col.style.width = `calc(100% / ${n})`;
+        col.style.height = `${tlY(hi)}px`;
+        col.dataset.date = ds;
+        const list = db.filter(b => b.date === ds && b.startMin < hi && b.startMin + b.duration > lo).sort((a, b) => a.startMin - b.startMin);
+        let cur = lo;
+        list.forEach(b => {
+            if (b.startMin > cur) col.appendChild(tlMiniGap(ds, cur, b.startMin - cur));
+            col.appendChild(tlMiniBlock(b, ds));
+            cur = Math.max(cur, b.startMin + b.duration);
+            if (b.type !== 'past') occupied += b.duration;
+        });
+        if (cur < hi) col.appendChild(tlMiniGap(ds, cur, hi - cur));
+        if (ds === today && currentRealMins >= lo && currentRealMins <= hi) {
+            const nl = document.createElement('div');
+            nl.className = 'tl-now-mini';
+            nl.style.top = `${tlY(currentRealMins)}px`;
+            col.appendChild(nl);
+        }
+        container.appendChild(col);
+    });
+    const pct = Math.round((occupied / (TOTAL_MINS * n)) * 100) || 0;
+    document.getElementById('progress-bar').style.width = `${pct}%`;
+    document.getElementById('progress-text').innerText = `Planejado (${pct}%)`;
+    tlDayhead(days);
+    const hint = document.getElementById('floating-hint');
+    if (hint) hint.textContent = 'Toque num espaço livre de um dos dias';
+}
+
+// Pinça e arrastar pro lado na agenda. Dois dedos: um nível por gesto (só vale se os DOIS dedos se mexeram). Um dedo
+// pro lado (bem mais pro lado do que pra cima/baixo, rapidinho): anda um dia, só com vários dias na tela.
+(function () {
+    const sc = document.getElementById('timeline-scroll');
+    if (!sc) return;
+    let pinch = null, swipe = null;
+    const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    sc.addEventListener('touchstart', (e) => {
+        const t = e.touches || [];
+        if (t.length === 2) {
+            swipe = null;
+            const mx = (t[0].clientX + t[1].clientX) / 2;
+            let under = null; // o dia debaixo dos dedos (aproximar abre ele)
+            document.querySelectorAll('#blocks-container .tl-col').forEach(c => { const r = c.getBoundingClientRect(); if (mx >= r.left && mx <= r.right) under = c.dataset.date; });
+            pinch = { d0: dist(t), pts: [0, 1].map(i => [t[0 + i].clientX, t[0 + i].clientY]), done: false, under: under };
+            return;
+        }
+        pinch = null;
+        swipe = t.length === 1 && tlMulti() ? { x: t[0].clientX, y: t[0].clientY, lx: t[0].clientX, ly: t[0].clientY, t: Date.now() } : null; // com a tarefa na mão também (pra achar o dia)
+    }, { passive: true });
+    sc.addEventListener('touchmove', (e) => {
+        const t = e.touches || [];
+        if (swipe && t.length === 1) { swipe.lx = t[0].clientX; swipe.ly = t[0].clientY; }
+        const p = pinch;
+        if (!p || t.length !== 2 || p.done || p.d0 < 30 || mbDragActive || isPhysicsBusy) return;
+        const moved = (i) => Math.hypot(t[i].clientX - p.pts[i][0], t[i].clientY - p.pts[i][1]) >= 12;
+        if (!moved(0) || !moved(1)) return;
+        const ratio = dist(t) / p.d0;
+        if (ratio < 0.75 && tlDays < 3) { p.done = true; setTlDays(tlDays + 1); }
+        else if (ratio > 1.33 && tlDays > 1) { p.done = true; setTlDays(tlDays - 1, tlDays - 1 === 1 ? p.under : null); }
+    }, { passive: true });
+    sc.addEventListener('touchend', (e) => {
+        const s = swipe;
+        if ((e.touches || []).length === 0) { pinch = null; swipe = null; }
+        if (!s || !tlMulti()) return;
+        const dx = s.lx - s.x, dy = s.ly - s.y;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.6 || Date.now() - s.t > 700) return;
+        if (dx < 0) debugAdvanceDay(); else debugPreviousDay();
+    }, { passive: true });
+})();
 function tlTakeSlot() { const sl = sheetSlot; sheetSlot = null; tlSlotLabel(); return sl; }
 function tlPlaceAt(sl) {
-    if (!sl || !pendingIntent || sl.date !== getActiveDateStr()) return;
+    if (!sl || !pendingIntent || (sl.date !== getActiveDateStr() && !tlMultiDays().includes(sl.date))) return;
     let start = sl.start, room = sl.dur;
     const d = pendingIntent.duration;
     if (d > room && sl.gap && sl.gap.b - sl.gap.a >= d) { start = sl.gap.b - d; room = d; } // V40.25.1: tocou perto do fim do vago: encosta no próximo bloco
     if (d > room) { showToast('Não cabe nesse vago: toque onde quer colocar 👇'); return; }
-    performEncaixeMatematico(start, room, sl.exact);
+    performEncaixeMatematico(start, room, sl.exact, sl.date);
 }
 
 function renderGrid() {
@@ -921,9 +1139,12 @@ function renderTimeline() {
     // Variável declarada no topo do arquivo pra evitar TDZ.
     if (mbDragActive) return;
     container.innerHTML = ''; 
+    container.classList.remove('tl-multi'); // V40.26.0: volta a ser um dia só até saber se a agenda está afastada
     
     const timelineContainer = document.getElementById('timeline-container');
     const isSearching = !!(searchQuery && searchQuery.trim());
+    const multi = tlMulti(); // V40.26.0: 2 ou 3 dias lado a lado
+    if (!multi) tlDayhead(null);
     
     tlSegs = null; // V40.24.0: escala normal até saber se a agenda do dia mostra vagos ocultos
     // V40.2.6: busca pesquisa em TODOS os dias e renderiza lista especial
@@ -976,8 +1197,8 @@ function renderTimeline() {
         }
     }
 
-    // V40.24.0: vagos ocultos (só na agenda normal; nos filtros é lista)
-    if (tlCompact && !showOnlyDelayed && !showOnlyCompleted) {
+    // V40.24.0: vagos ocultos (só na agenda normal de 1 dia; nos filtros é lista)
+    if (tlCompact && !multi && !showOnlyDelayed && !showOnlyCompleted) {
         const lo = START_HOUR * 60, hi = END_HOUR * 60;
         tlSegs = tlBuildSegs(db.filter(b => b.date === getActiveDateStr() && b.startMin < hi && b.startMin + b.duration > lo).sort((a, b) => a.startMin - b.startMin), lo, hi);
     }
@@ -985,6 +1206,7 @@ function renderTimeline() {
     // V40.24.0: a régua pode ter mudado (vagos ocultos ou blocos novos): a linha do agora acompanha já
     const nowLineEl = document.getElementById('now-line');
     if (nowLineEl && nowLineEl.style.display !== 'none') nowLineEl.style.top = `${tlY(currentRealMins)}px`;
+    if (multi) { tlRenderMulti(); return; } // V40.26.0
 
     let dailyDb = db.filter(b => b.date === getActiveDateStr());
     
@@ -1758,9 +1980,10 @@ window.closeSubCard = function(keepOverlay) {
 };
 
 // --- 5. ENCAIXE MATEMÁTICO ---
-function performEncaixeMatematico(gapStart, gapDuration, exact) { // V40.25.1: exact = hora escolhida pelo toque (não puxa pra "agora")
+function performEncaixeMatematico(gapStart, gapDuration, exact, date) { // V40.25.1: exact = hora escolhida pelo toque (não puxa pra "agora")
+    const ds = date || getActiveDateStr(); // V40.26.0: na agenda afastada, o dia da coluna tocada
     let start = gapStart;
-    if (!exact && getActiveDateStr() === getTodayStr() && currentRealMins >= gapStart && currentRealMins <= gapStart + gapDuration) {
+    if (!exact && ds === getTodayStr() && currentRealMins >= gapStart && currentRealMins <= gapStart + gapDuration) {
         if (currentRealMins + pendingIntent.duration <= gapStart + gapDuration) {
             start = Math.round(currentRealMins / 5) * 5; 
             start = Math.max(gapStart, Math.min(start, gapStart + gapDuration - pendingIntent.duration));
@@ -1774,7 +1997,7 @@ function performEncaixeMatematico(gapStart, gapDuration, exact) { // V40.25.1: e
         title: pendingIntent.title, ...(fazCardColor(pendingIntent.color) ? { color: fazCardColor(pendingIntent.color) } : {}), 
         startMin: start, 
         duration: pendingIntent.duration,
-        date: getActiveDateStr(),
+        date: ds,
         microblocks: (pendingIntent.microblocks || []).map(mb => ({
             ...mb,
             id: 'mb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
@@ -2670,7 +2893,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.25.1',
+            version: 'v40.26.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -4939,6 +5162,7 @@ renderGrid();
 runRealTimeEngine();
 renderTimeline();
 updateTlCompactBtn(); // V40.24.0
+updateTlDaysBtn(); // V40.26.0
 renderBacklog();
 renderTagSelector();
 applyThemeColor(); // V2.0 - Aplicar tema salvo
@@ -5062,7 +5286,7 @@ function applyHeaderState() {
         if (btn) btn.innerHTML = '<i class="ph ph-caret-down text-base text-white"></i>';
     } else {
         filtersRow.classList.remove('hidden');
-        progressRow.classList.remove('hidden');
+        progressRow.classList.toggle('hidden', tlMulti()); // V40.26.0: com vários dias, os nomes dos dias ficam no lugar
         header.classList.remove('header-collapsed');
         // V40.3.6: idem
         if (btn) btn.innerHTML = '<i class="ph ph-caret-up text-base text-white"></i>';

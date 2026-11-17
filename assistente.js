@@ -14,7 +14,8 @@
  * Retrato (snap):
  *   now      Date (hora local)
  *   hours    [início, fim] da janela do dia (ex.: [7, 24])
- *   blocks   [{ id, title, date 'YYYY-MM-DD', start (min), dur (min), done, tag: { name, color } | null }]
+ *   blocks   [{ id, title, date 'YYYY-MM-DD', start (min), dur (min), done, tag: { name, color } | null,
+ *              cards: { done, total } | null }]   (V40.24.0: cards = sublista, com quantos cartões estão feitos)
  *   tasks    [{ id, title, dur, list (nome da lista), tag }]
  *   routines [{ id, title, emoji, dur }]
  *   notes    [{ id, title, content, ms }]                 (ms = última edição ou criação)
@@ -94,11 +95,15 @@
         return (snap.blocks || []).filter(function (b) { return b.date === day; })
             .sort(function (a, b) { return a.start - b.start || (a.id < b.id ? -1 : 1); });
     }
+    function cardsTxt(c) { // V40.24.0: sublista
+        if (!c || !c.total) return '';
+        return ' · ' + (c.done ? c.done + ' de ' + c.total + ' cartões feitos' : plural(c.total, 'cartão', 'cartões'));
+    }
     function blockItem(b, today, extra) {
         var tagTxt = b.tag && b.tag.name ? ' · ' + b.tag.name : '';
         return {
             label: clock(b.start) + ' ' + title(b),
-            sub: (b.date !== today ? dayLabel(b.date, today) + ' · ' : '') + dur(b.dur) + tagTxt + (extra ? ' · ' + extra : ''),
+            sub: (b.date !== today ? dayLabel(b.date, today) + ' · ' : '') + dur(b.dur) + tagTxt + cardsTxt(b.cards) + (extra ? ' · ' + extra : ''),
             tone: '', ref: { kind: 'bloco', id: b.id }
         };
     }

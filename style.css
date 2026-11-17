@@ -361,3 +361,57 @@ body { overflow-x: hidden; max-width: 100vw; }
 
 /* V40.21.0 — aviso de conquista das Metas (estrela, nível novo): amarelo, no lugar do vermelho dos avisos */
 #toast.toast-win { background-color: #fef3c7; border-color: #fcd34d; color: #92400e; white-space: nowrap; }
+
+/* V40.24.0 — SUBLISTA (bloco-grupo): um horário com vários cartões dentro. Amarelinho com borda tracejada pra
+   destacar dos blocos normais; com cor escolhida, a cor; concluída (todos os cartões feitos), verde como os blocos. */
+.sub-block { border-width: 2px !important; border-style: dashed !important; }
+.sub-block.sub-amber { background-color: #fffbeb; border-color: #f59e0b !important; box-shadow: 0 4px 12px -6px rgba(180, 83, 9, 0.35); }
+.sub-block.sub-custom { border-color: rgba(0, 0, 0, 0.22) !important; box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.3); }
+.sub-block.sub-custom.sub-dark { border-color: rgba(255, 255, 255, 0.55) !important; }
+.sub-block.sub-done { background-color: #10b981; border-color: rgba(255, 255, 255, 0.75) !important; }
+.sub-block .sub-title { color: #451a03; }
+.sub-block .sub-time { color: rgba(146, 64, 14, 0.85); }
+.sub-block .sub-ico { color: #b45309; }
+.sub-block .sub-count { font-size: 10px; font-weight: 800; line-height: 1; padding: 3px 6px; border-radius: 9999px; background: rgba(245, 158, 11, 0.22); color: #92400e; }
+.sub-block.sub-dark .sub-title { color: #fff; }
+.sub-block.sub-dark .sub-time { color: rgba(255, 255, 255, 0.7); }
+.sub-block.sub-dark .sub-ico { color: rgba(255, 255, 255, 0.75); }
+.sub-block.sub-dark .sub-count { background: rgba(0, 0, 0, 0.2); color: #fff; }
+/* cartões dentro da sublista */
+.sub-card { display: flex; align-items: center; gap: 6px; margin-top: 4px; min-height: 24px; padding: 2px 7px 2px 3px; border-radius: 8px; border-left: 3px solid transparent; background: rgba(255, 255, 255, 0.94); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06); }
+.sub-card .sub-ck { flex: none; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; }
+.sub-card .sub-ck i { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; border: 1.5px solid #d97706; color: transparent; font-size: 9px; background: #fff; }
+.sub-card.is-done .sub-ck i { background: #10b981; border-color: #10b981; color: #fff; }
+.sub-card .sub-card-title { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; color: #3f2a0a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.sub-card.is-done .sub-card-title { text-decoration: line-through; color: rgba(63, 42, 10, 0.45); }
+.sub-card.is-dark .sub-card-title { color: #fff; }
+.sub-card.is-dark.is-done .sub-card-title { color: rgba(255, 255, 255, 0.6); }
+.sub-card .sub-card-mb { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: #a16207; }
+.sub-card.is-dark .sub-card-mb { color: rgba(255, 255, 255, 0.75); }
+.sub-more { display: block; margin-top: 4px; padding: 2px 6px; font-size: 11px; font-weight: 700; color: #92400e; border-radius: 6px; background: rgba(245, 158, 11, 0.15); }
+.sub-dark .sub-more { color: #fff; background: rgba(0, 0, 0, 0.2); }
+.sub-empty { margin-top: 4px; font-size: 11px; font-weight: 500; color: rgba(146, 64, 14, 0.8); }
+.sub-dark .sub-empty { color: rgba(255, 255, 255, 0.75); }
+.sub-input { background: rgba(255, 255, 255, 0.75); color: #18181b; }
+.sub-input:focus { background: #fff; border-color: #f59e0b !important; }
+.sub-input::placeholder { color: #a16207; }
+.sub-return { display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%; margin-top: 6px; padding: 6px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; color: #065f46; background: #ecfdf5; border: 1px solid #a7f3d0; }
+/* com uma tarefa na mão, a sublista vira lugar de soltar */
+.sub-block.sub-target { cursor: pointer; outline: 3px solid #d97706; outline-offset: -2px; animation: subPulse 1.5s infinite; }
+@keyframes subPulse { 0%, 100% { outline-color: #d97706; } 50% { outline-color: rgba(217, 119, 6, 0.3); } }
+.sub-drop { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 8px; border-radius: 10px; border: 1.5px dashed #b45309; background: #fde68a; color: #78350f; font-size: 12px; font-weight: 800; }
+#sub-card-del.sub-armed { background: #ef4444; color: #fff; }
+
+/* V40.24.0 — OCULTAR VAGOS no celular: o vago de 30 min ou mais vira uma faixa (36 px) com o horário */
+.tl-gap { padding: 0 8px !important; }
+.tl-gap-txt { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; font-weight: 700; color: #71717a; }
+#tl-compact-btn.tl-compact-on { background-color: var(--theme-color, #4f46e5) !important; }
+#tl-compact-btn.tl-compact-on i { color: #fff !important; }
+
+/* V40.24.0 — barra Editar/Duplicar/Arquivar/Apagar do bloco aberto: com o "Arquivar" (V40.9.0) os 4 botões não
+   cabiam numa tela de celular e o "Apagar" ficava cortado. Abaixo de 440 px saem os ícones e o espaço encolhe. */
+@media (max-width: 439.98px) {
+    .blk-bar { gap: 4px !important; }
+    .blk-bar > button { padding-left: 4px !important; padding-right: 4px !important; min-width: 0; }
+    .blk-bar .bar-ico { display: none; }
+}

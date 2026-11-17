@@ -532,5 +532,54 @@ ok(big && big.amount === 1e9 && !('target' in big) && neg && neg.amount === 0 &&
 ok(mp.metas_listas.some((l) => l.id === 'gl_null' && l.name === ''), 'lista de metas com nome nulo vira nome vazio');
 ok(CORE.MAP.metas_dias.row({ id: 'x', goalId: 'meta_1', date: '16/11/2026', amount: 1 }) === null && CORE.MAP.metas_dias.row({ id: 'x', goalId: "a b", date: '2026-11-16', amount: 1 }) === null, 'dia com data ou meta fora do formato fica só no aparelho');
 
+console.log('\n41) V40.24.0 — Sublista: sobe do celular, o PC mexe nos cartões e o celular acompanha:');
+const sc = new Cloud(), sp = new Phone({ ...REAL, used: USED, blocos: blocks });
+sp.sync(sc);
+ok(sc.alive('blocos').length > 500 && sc.alive('blocos').every((r) => r.cards === null), 'blocos normais sobem com cards = null');
+const scard = (id, title, extra) => ({ id, title, done: false, microblocks: [], ...extra });
+sp.blocos.push({ id: 'f_sub1', date: '2026-11-18', startMin: 840, duration: 60, title: 'Pendências rápidas', type: 'focus', theme: 'focus', tagId: null, microblocks: [], completed: false, linkedNoteIds: [], expanded: false,
+  cards: [scard('cd_a', 'Pagar boleto', { tagId: REAL.tags[0].id, color: '#3b82f6', duration: 15, columnId: 'col_geral', microblocks: [{ title: 'Ver valor', done: true }] }), scard('cd_b', 'Ligar pro cartório')] });
+p = sp.sync(sc);
+let srow = sc.t.blocos.f_sub1;
+ok(pushes(p) === 1 && srow.cards.length === 2 && srow.cards[0].tagId === REAL.tags[0].id && srow.cards[0].color === '#3b82f6' && srow.cards[0].duration === 15 && srow.cards[0].columnId === 'col_geral' && srow.cards[0].microblocks[0].done === true, 'a sublista sobe sozinha (1 envio) com os cartões inteiros');
+ok(pushes(sp.sync(sc)) === 0, 'sincronizar de novo não envia nada');
+sc.patch('blocos', 'f_sub1', { cards: [{ ...srow.cards[0], done: true }, srow.cards[1], { id: 'cd_pc', title: 'Imprimir planta', done: false, microblocks: [] }] });
+p = sp.sync(sc);
+let sb = sp.blocos.find((b) => b.id === 'f_sub1');
+ok(pushes(p) === 0 && sb.cards.length === 3 && sb.cards[0].done === true && sb.cards[2].id === 'cd_pc' && sb.startMin === 840, 'o que o PC fez nos cartões chegou no celular');
+sb.startMin = 900;
+sc.patch('blocos', 'f_sub1', { cards: sc.t.blocos.f_sub1.cards.map((c) => c.id === 'cd_b' ? { ...c, done: true } : c) });
+p = sp.sync(sc);
+sb = sp.blocos.find((b) => b.id === 'f_sub1');
+ok(sb.startMin === 900 && sc.t.blocos.f_sub1.start_min === 900 && sb.cards.find((c) => c.id === 'cd_b').done === true && sc.t.blocos.f_sub1.cards.find((c) => c.id === 'cd_b').done === true, 'celular muda o horário e o PC marca um cartão ao mesmo tempo: fica com os dois');
+const oldBase = clone(sp.base); Object.values(oldBase.blocos).forEach((r) => { if (r.cards === null) delete r.cards; });
+sp.base = oldBase;
+const sup = sc.upserts; p = sp.sync(sc);
+ok(pushes(p) === 0 && sc.upserts === sup, 'base de antes da sublista (sem o campo) não reenvia a agenda');
+sc.patch('blocos', 'f_sub1', { cards: null });
+sp.sync(sc);
+ok(!('cards' in sp.blocos.find((b) => b.id === 'f_sub1')), 'se o PC tirar os cartões (cards = null), vira bloco normal no celular');
+sc.patch('blocos', 'f_sub1', { deleted: true }); sp.sync(sc);
+ok(!sp.blocos.some((b) => b.id === 'f_sub1'), 'sublista apagada no PC some do celular');
+
+console.log('\n42) V40.24.0 — Cartões estranhos ou maliciosos vindos da nuvem são neutralizados:');
+const evb = { date: '2026-11-19', duration: 60, title: 'x', type: 'focus', theme: 'focus', microblocks: [], linked_note_ids: [] };
+sc.insert('blocos', { ...evb, id: 'f_evil1', start_min: 600, cards: { a: 1 } });
+sc.insert('blocos', { ...evb, id: 'f_evil2', start_min: 700, cards: [null, 5, 'txt', [1], { id: "x');alert(1);('", title: 'id ruim', done: 'sim', tagId: "t'x", columnId: '<b>', color: 'red', duration: 'abc', microblocks: [{ id: "m'1", title: 'a' }, null] }, { id: 'cd_dup', title: 'A' }, { id: 'cd_dup', title: 'B' }, { id: 'cd_long', title: 'x'.repeat(5000), duration: 99999 }] });
+sc.insert('blocos', { ...evb, id: 'f_evil3', start_min: 800, cards: Array.from({ length: 150 }, (_, i) => ({ id: 'cd_' + i, title: 'c' + i })) });
+crashed = false; try { sp.sync(sc); } catch (e) { crashed = e; }
+ok(!crashed, 'não quebrou');
+const e1 = sp.blocos.find((b) => b.id === 'f_evil1'), e2 = sp.blocos.find((b) => b.id === 'f_evil2'), e3 = sp.blocos.find((b) => b.id === 'f_evil3');
+ok(e1 && !('cards' in e1), '"cards" que não é lista: vira bloco normal');
+ok(e2 && e2.cards.length === 4, 'só objetos viram cartão (null, número, texto e lista ficam de fora)');
+const k0 = e2.cards[0];
+ok(k0.id === 'cd_x0' && k0.done === true && !('tagId' in k0) && !('columnId' in k0) && !('color' in k0) && !('duration' in k0) && k0.microblocks.length === 1 && k0.microblocks[0].id === 'mb_x0', 'id, tag, lista, cor e tempo fora do formato saem; checklist limpa');
+ok(e2.cards[1].id === 'cd_dup' && e2.cards[2].id === 'cd_x2' && e2.cards[2].title === 'B', 'id repetido ganha outro id (os dois cartões ficam)');
+ok(e2.cards[3].title.length === 2000 && e2.cards[3].duration === 1440, 'nome limitado a 2000 letras e tempo a 24h');
+ok(e3 && e3.cards.length === 100, 'no máximo 100 cartões por sublista');
+ok(pushes(sp.sync(sc)) === 0, 'e a limpeza não vira envio (sincronizar de novo não manda nada)');
+ok(CORE.safeCards(null) === null && CORE.safeCards('x') === null && JSON.stringify(CORE.safeCards([])) === '[]' && CORE.MAX_CARDS === 100, 'unitário: sem lista = bloco normal; lista vazia = sublista vazia');
+ok(CORE.MAP.blocos.row({ id: 'f_1', date: '2026-11-18', startMin: 60, duration: 30, cards: [{ id: 'cd_1', title: 'a', tagId: "x'y" }] }).cards[0].tagId === undefined && CORE.MAP.blocos.row({ id: 'f_2', date: '2026-11-18', startMin: 60, duration: 30 }).cards === null, 'o que o celular manda também passa pela limpeza');
+
 console.log(`\n==== RESULTADO: ${pass} passaram, ${fail} falharam ====`);
 process.exit(fail ? 1 : 0);

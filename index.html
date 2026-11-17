@@ -108,6 +108,10 @@
                     <button id="filter-completed-btn" onclick="toggleFilterCompleted()" class="bg-emerald-50 border border-emerald-200 p-2 rounded-xl hover:bg-emerald-100 transition flex items-center justify-center shrink-0" title="Filtrar Concluídos">
                         <i class="ph-bold ph-check-circle text-lg text-emerald-500"></i>
                     </button>
+                    <!-- V40.24.0: ocultar os vagos (vago de 30 min ou mais vira uma faixa fininha; igual ao "Compactar vagos" do PC) -->
+                    <button id="tl-compact-btn" onclick="toggleTlCompact()" aria-pressed="false" class="bg-white border border-app-focus p-2 rounded-xl hover:bg-zinc-50 transition flex items-center justify-center shrink-0 shadow-sm" title="Ocultar os vagos">
+                        <i class="ph-bold ph-arrows-in-line-vertical text-lg text-app-focus"></i>
+                    </button>
                     <button onclick="openTagsSheet()" class="bg-white border border-app-focus px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
                         <i class="ph ph-tag text-sm text-app-focus"></i> TAGs
                     </button>
@@ -135,7 +139,7 @@
                     </div>
                     <div class="flex-1 min-w-0 pr-2">
                         <p id="floating-title" class="text-sm font-bold text-zinc-900 leading-tight truncate">Tarefa</p>
-                        <p class="text-[10px] text-app-neon font-bold mt-0.5 uppercase tracking-widest">Toque num espaço livre</p>
+                        <p id="floating-hint" class="text-[10px] text-app-neon font-bold mt-0.5 uppercase tracking-widest">Toque num espaço livre</p>
                     </div>
                 </div>
                 <button onclick="cancelPendingTask()" class="w-8 h-8 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-500 rounded-full transition shrink-0">
@@ -196,6 +200,10 @@
                 <button onclick="commitSpecialIntent('Descanso', 'rest')" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 text-sm font-medium hover:bg-emerald-100 transition whitespace-nowrap">
                     <i class="ph ph-tree text-lg"></i> Descanso
                 </button>
+                <!-- V40.24.0: sublista = um horário com vários cartões dentro (o nome e o tempo vêm do formulário abaixo) -->
+                <button onclick="commitSublistIntent()" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-dashed border-amber-400 text-amber-800 bg-amber-50 text-sm font-medium hover:bg-amber-100 transition whitespace-nowrap">
+                    <i class="ph ph-list-checks text-lg"></i> Sublista
+                </button>
                 <!-- V40.22.0: o chip "Metas (em breve)" saiu daqui: as Metas moram na aba 🎯, junto das outras abas -->
                 <button onclick="openConfigSheet()" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition whitespace-nowrap">
                     <i class="ph ph-gear text-lg"></i> Config
@@ -224,7 +232,7 @@
                 </div>
             </div>
 
-            <button onclick="commitIntent()" class="w-full bg-app-focus text-white font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition flex items-center justify-center gap-1.5 text-sm">
+            <button id="commit-intent-btn" onclick="commitIntent()" class="w-full bg-app-focus text-white font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition flex items-center justify-center gap-1.5 text-sm">
                 <i class="ph ph-calendar-plus text-base"></i> Inserir na Agenda
             </button>
         </div>
@@ -1212,7 +1220,7 @@
 
         <!-- MODAL 1: EDIÇÃO (COMBO A) -->
         <div id="edit-task-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
-            <h3 class="text-lg font-bold text-zinc-900 mb-4 text-center">Editar Tarefa</h3>
+            <h3 id="edit-task-heading" class="text-lg font-bold text-zinc-900 mb-4 text-center">Editar Tarefa</h3>
             <input type="text" id="edit-task-title" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-4 text-sm text-center">
             <p class="text-xs text-zinc-500 font-medium mb-2 uppercase tracking-wider text-center">Etiqueta</p>
             <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-2" id="edit-tag-selector-container"></div>
@@ -1225,16 +1233,38 @@
             </div>
         </div>
 
+        <!-- V40.24.0: CARTÃO DA SUBLISTA (os mesmos campos do formulário da Lista: nome, etiqueta, cor e checklist) -->
+        <div id="sub-card-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[88%] max-w-[340px] max-h-[86%] overflow-y-auto no-scrollbar bg-white rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100">
+            <p id="sub-card-from" class="text-[11px] font-bold text-amber-700 uppercase tracking-wider text-center mb-1 truncate"></p>
+            <h3 class="text-lg font-bold text-zinc-900 mb-3 text-center">Cartão da sublista</h3>
+            <input type="text" id="sub-card-title" maxlength="200" autocomplete="off" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-4 text-sm text-center">
+            <p class="text-xs text-zinc-500 font-medium mb-2 uppercase tracking-wider text-center">Etiqueta</p>
+            <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-2" id="sub-card-tags"></div>
+            <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Cor do cartão</p>
+            <div class="flex flex-wrap items-center gap-2 mb-4" id="sub-card-colors"></div>
+            <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Checklist</p>
+            <div id="sub-card-mbs" class="flex flex-col gap-0.5 mb-2"></div>
+            <input type="text" id="sub-card-mb-new" maxlength="200" autocomplete="off" placeholder="+ Adicionar check" class="w-full rounded-lg px-3 py-2 text-[12px] bg-zinc-50 border border-zinc-200 outline-none focus:border-app-focus mb-4" onkeypress="if(event.key==='Enter'){event.preventDefault();addSubCardMb();}">
+            <div class="flex gap-2 mb-2">
+                <button onclick="subCardToListFromModal()" class="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-[12px] border border-emerald-200 hover:bg-emerald-100 transition"><i class="ph ph-list-bullets text-base"></i>Voltar pra lista</button>
+                <button id="sub-card-del" onclick="deleteSubCardFromModal()" class="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-zinc-100 text-red-600 font-bold text-[12px] hover:bg-red-50 transition"><i class="ph ph-trash text-base"></i>Apagar cartão</button>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="closeSubCard()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
+                <button onclick="saveSubCard()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:opacity-90 shadow-md transition">Salvar</button>
+            </div>
+        </div>
+
         <!-- MODAL 2: EXCLUSÃO (COMBO A) -->
         <div id="delete-task-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
             <div class="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-3"><i class="ph ph-warning text-2xl"></i></div>
-            <h3 class="text-lg font-bold text-zinc-900 mb-6 text-center leading-tight">O que fazer com esta tarefa?</h3>
+            <h3 id="delete-task-heading" class="text-lg font-bold text-zinc-900 mb-6 text-center leading-tight">O que fazer com esta tarefa?</h3>
             <div class="flex flex-col gap-2">
-                <button onclick="moveToBacklog()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm hover:bg-emerald-100 border border-emerald-200 transition">
-                    <i class="ph ph-list-bullets text-lg"></i> Mover pra Lista
+                <button id="delete-task-move" onclick="moveToBacklog()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm hover:bg-emerald-100 border border-emerald-200 transition">
+                    <i class="ph ph-list-bullets text-lg"></i> <span id="delete-task-move-label">Mover pra Lista</span>
                 </button>
                 <button onclick="confirmKillTask()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] transition">
-                    <i class="ph ph-trash text-lg"></i> Excluir Definitivo
+                    <i class="ph ph-trash text-lg"></i> <span id="delete-task-kill-label">Excluir Definitivo</span>
                 </button>
                 <button onclick="cancelDelete()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
                     Cancelar
@@ -1451,7 +1481,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.23.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.24.0</div>
 
     </div>
 

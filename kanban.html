@@ -126,6 +126,34 @@
     #drop-archive * { pointer-events: none; } /* quem recebe o cartão é sempre o campo inteiro */
     #drop-archive.over { background: var(--focus); border-color: var(--focus); border-style: solid; color: #fff; }
     .swatch.on { box-shadow: 0 0 0 2px #18181b; }
+    /* V40.24.0: SUBLISTA — bloco com vários cartões dentro (amarelinho e tracejado, como no celular) */
+    .ag-sub { border: 2px dashed #f59e0b !important; background-color: #fffbeb; }
+    .ag-sub.done { background-color: #ecfdf5; border-color: #10b981 !important; }
+    .ag-sub .ag-sub-title { color: #451a03; }
+    .ag-sub .ag-sub-time { color: #92400e; }
+    .ag-sub-cards { margin-top: 4px; display: flex; flex-direction: column; gap: 3px; }
+    .ag-sub-card { display: flex; align-items: center; gap: 5px; min-height: 24px; padding: 1px 6px 1px 2px; border-radius: 6px; border-left: 3px solid transparent; background: rgba(255,255,255,.94); box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+    .ag-sub-ck { flex: none; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; }
+    .ag-sub-ck i { width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; border: 1.5px solid #d97706; color: transparent; font-size: 9px; background: #fff; }
+    .ag-sub-ck:hover i, .ag-sub-ck:focus-visible i { border-color: #059669; }
+    .done > .ag-sub-ck i { background: #10b981; border-color: #10b981; color: #fff; }
+    .ag-sub-t { flex: 1; min-width: 0; text-align: left; font-size: 12px; font-weight: 600; color: #3f2a0a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ag-sub-t:hover, .ag-sub-t:focus-visible { text-decoration: underline; }
+    .ag-sub-card.done .ag-sub-t { text-decoration: line-through; color: rgba(63,42,10,.45); }
+    .ag-sub-card.dark .ag-sub-t { color: #fff; }
+    .ag-sub-mb { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 10.5px; font-weight: 600; color: #a16207; }
+    .ag-sub-card.dark .ag-sub-mb { color: rgba(255,255,255,.8); }
+    .ag-sub-badge { display: inline-block; margin-left: 2px; padding: 1px 6px; border-radius: 9999px; font-size: 10.5px; font-weight: 800; line-height: 1.35; vertical-align: 1px; text-decoration: none; background: rgba(245,158,11,.22); color: #92400e; }
+    .ag-sub.done .ag-sub-badge { background: rgba(16,185,129,.18); color: #047857; }
+    .ag-sub-more { font-size: 11.5px; font-weight: 700; color: #92400e; text-align: left; padding: 1px 4px; }
+    .ag-sub-drop { margin-top: 5px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 8px; border-radius: 8px; border: 1.5px dashed #b45309; background: #fde68a; color: #78350f; font-size: 12px; font-weight: 800; }
+    .ag-sub-drop:hover, .ag-sub-drop:focus-visible { background: #fcd34d; }
+    #ag-timeline.placing .ag-sub { cursor: copy; }
+    .painted.dark .ag-sub-card i, .painted.dark .ag-sub-card .ag-sub-mb { color: #a16207 !important; }
+    .painted.dark .ag-sub-card .ag-sub-ck i { color: transparent !important; }
+    .painted.dark .ag-sub-card.done .ag-sub-ck i { color: #fff !important; }
+    .painted.dark .ag-sub-card.dark .ag-sub-mb, .painted.dark .ag-sub-card.dark .ag-sub-mb i { color: rgba(255,255,255,.8) !important; }
+    .fc-row.done .fc-t { text-decoration: line-through; color: #a1a1aa; }
     .now-line { position: absolute; left: 56px; right: 0; height: 2px; background: #ef4444; z-index: 5; pointer-events: none; }
     .now-line::before { content: ''; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
     input:focus, select:focus, textarea.field:focus { border-color: var(--focus) !important; }
@@ -631,6 +659,8 @@
 <div id="modal-task" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="f-title">
     <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
         <div class="p-5 pb-3 overflow-y-auto thin-scroll">
+            <!-- V40.24.0: cartão de uma sublista aberto: volta pra sublista -->
+            <button id="f-card-back" type="button" class="hidden mb-2 items-center gap-1.5 text-[12.5px] font-semibold text-amber-800 hover:underline"><i class="ph ph-arrow-left"></i><span></span></button>
             <div class="flex items-start gap-2">
                 <button id="f-done" type="button" class="ag-done hidden shrink-0 -ml-1 w-8 h-8 flex items-center justify-center hover:bg-emerald-50" aria-pressed="false"></button>
                 <textarea id="f-title" rows="1" maxlength="500" placeholder="Nome da tarefa" class="flex-1 min-w-0 resize-none text-lg font-bold text-zinc-900 leading-snug outline-none placeholder-zinc-300"></textarea>
@@ -661,6 +691,10 @@
                     <select id="f-dur" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
                 </label>
             </div>
+            <!-- V40.24.0: bloco novo pode ser uma sublista (um horário com vários cartões dentro, como no celular) -->
+            <label id="f-sub-wrap" class="hidden mt-3 items-center gap-2 px-2.5 py-1.5 rounded-lg border border-dashed border-amber-400 bg-amber-50 text-[12.5px] font-semibold text-amber-900 cursor-pointer select-none">
+                <input id="f-sub" type="checkbox" class="w-4 h-4 accent-amber-500"><i class="ph-bold ph-list-checks"></i>Sublista: vários cartões no mesmo horário
+            </label>
             <div class="mt-4">
                 <span class="text-xs font-semibold text-zinc-500">Tag</span>
                 <div id="f-tags" class="mt-1.5 flex flex-wrap gap-1.5"></div>
@@ -669,12 +703,33 @@
                 <span class="text-xs font-semibold text-zinc-500">Cor do cartão</span>
                 <div id="f-colors" class="mt-1.5 flex flex-wrap items-center gap-2"></div>
             </div>
-            <div class="mt-4">
+            <div id="f-mbs-wrap" class="mt-4">
                 <span class="text-xs font-semibold text-zinc-500">Checklist</span>
                 <div id="f-mbs" class="mt-1 flex flex-col"></div>
                 <div class="mt-1 flex items-center gap-2 px-1">
                     <i class="ph ph-plus text-zinc-400"></i>
                     <input id="f-mb-new" maxlength="200" placeholder="Novo item (Enter)" class="flex-1 text-sm outline-none py-1.5 bg-transparent">
+                </div>
+            </div>
+            <!-- V40.24.0: cartões da sublista. Marcar, abrir, voltar pra lista, tirar, criar e puxar da Lista valem na hora. -->
+            <div id="f-cards-wrap" class="hidden mt-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold text-zinc-500">Cartões da sublista</span>
+                    <span id="f-cards-count" class="text-xs text-zinc-400"></span>
+                    <button id="f-cards-return" type="button" class="hidden ml-auto items-center gap-1 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-50 px-2 py-1 rounded-lg"><i class="ph ph-arrow-u-up-left"></i><span></span></button>
+                </div>
+                <div id="f-cards" class="mt-1.5 flex flex-col gap-0.5"></div>
+                <div class="mt-1.5 flex items-center gap-2 px-1">
+                    <i class="ph ph-plus text-zinc-400"></i>
+                    <input id="f-card-new" maxlength="200" autocomplete="off" placeholder="Novo cartão (Enter)" class="min-w-0 flex-1 text-sm outline-none py-1.5 bg-transparent">
+                    <button id="f-card-pull" type="button" aria-expanded="false" class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50"><i class="ph ph-list-plus"></i>Puxar da Lista</button>
+                </div>
+                <div id="f-card-pick" class="hidden mt-2 p-2 rounded-xl border border-zinc-200 bg-zinc-50">
+                    <label class="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-zinc-400 focus-within:border-zinc-400">
+                        <i class="ph ph-magnifying-glass"></i>
+                        <input id="f-card-q" maxlength="80" autocomplete="off" placeholder="Buscar tarefa nas Listas" aria-label="Buscar tarefa pra pôr na sublista" class="min-w-0 flex-1 text-[13px] text-zinc-800 outline-none bg-transparent">
+                    </label>
+                    <div id="f-card-opts" class="mt-1.5 max-h-48 overflow-y-auto thin-scroll flex flex-col"></div>
                 </div>
             </div>
             <!-- V40.22.0: notas vinculadas ao bloco (as mesmas do app: linked_note_ids). Vincular e desvincular valem na hora. -->
@@ -744,6 +799,7 @@
         <input id="dlg-input" class="hidden mt-3 w-full border border-zinc-300 rounded-lg px-3 py-2.5 text-sm outline-none">
         <div class="mt-5 flex justify-end gap-2">
             <button id="dlg-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
+            <button id="dlg-alt" class="hidden text-[13px] font-semibold text-emerald-700 hover:bg-emerald-50 px-3.5 py-2 rounded-lg"></button>
             <button id="dlg-ok" class="text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90"></button>
         </div>
     </div>
@@ -764,7 +820,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.23.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.24.0</div>
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
@@ -784,7 +840,7 @@
         tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,deleted',
         listas: 'id,name,is_default,position,created_ms,deleted',
         tags: 'id,name,color,position,deleted',
-        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,deleted', // V40.22.0: + linked_note_ids (notas vinculadas)
+        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,deleted', // V40.22.0: + linked_note_ids (notas vinculadas); V40.24.0: + cards (sublista)
         // V40.17.0: rotinas, notas e finanças (as mesmas do celular)
         rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,deleted',
         notas: 'id,title,content,created_ms,updated_ms,deleted',
@@ -955,7 +1011,7 @@
 
     // ---------- render ----------
     var renderT = null;
-    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); if (S.editing && S.editing.kind === 'blocos') { renderDone(); renderNoteLinks(); } }, 60); }
+    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); if (S.editing && S.editing.kind === 'blocos') { renderDone(); renderNoteLinks(); renderSubCards(); } }, 60); }
     function renderSide() { renderRotinas(); renderNotas(); renderFinancas(); renderMetas(); renderAssistente(); } // V40.17.0 (+ Finanças na V40.19.0, Metas na V40.21.0): cada uma só desenha se a aba dela estiver aberta
 
     function cardHtml(t) {
@@ -1111,6 +1167,7 @@
             '" aria-label="' + label + '" title="' + label + '"><i class="' + (b.completed ? 'ph-fill ph-check-circle' : 'ph ph-circle') + ' text-[17px]"></i></button>';
     }
     function agCardHtml(b, day, today, nm) {
+        if (isSub(b)) return subWeekHtml(b, day, today, nm); // V40.24.0
         var tag = tagOf(b.tag_id), mb = mbCount(b), paint = paintOf(b.completed ? null : b.color), nn = linkedNotes(b).length; // V40.22.0: notas vinculadas
         return '<article draggable="true" class="ag-card ' + paint.cls + 'bg-white border border-zinc-200 border-l-4 rounded-lg px-2.5 py-1.5 cursor-pointer hover:border-zinc-300' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
             '" style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
@@ -1209,6 +1266,7 @@
     // V40.14.0: miolo do bloco na régua do Dia. Fica separado pra redesenhar só o bloco enquanto ele é arrastado ou
     // esticado ("note" é o aviso que aparece no meio do gesto: horário ocupado, limite). A alça de baixo muda a duração.
     function dayInnerHtml(b, note) {
+        if (isSub(b)) return subDayInnerHtml(b, note); // V40.24.0
         var tag = tagOf(b.tag_id), compact = b.duration < 20, nn = linkedNotes(b).length; // V40.22.0: notas vinculadas
         var titleCls = b.completed ? 'line-through text-zinc-400' : 'text-zinc-800';
         var warn = note ? '<span class="ag-note"> · ' + esc(note) + '</span>' : '';
@@ -1250,6 +1308,12 @@
             // V40.17.0: escondido pelo filtro → só um contorno apagado (o horário continua ocupado)
             if (!agVisible(b)) { html += '<div class="ag-hidden" style="top:' + top + 'px;height:' + height + 'px" title="Escondido pelo filtro"></div>'; return; }
             shownN++; shownMin += Number(b.duration) || 0;
+            if (isSub(b)) { // V40.24.0: sublista (amarelinha, com os cartões que couberem)
+                html += '<div class="ag-card ag-sub absolute rounded-md overflow-hidden cursor-pointer px-2 py-1 flex flex-col ' + paint.cls + (b.completed ? 'done' : '') + (isNow(b, day, today, nm) ? ' ag-now' : '') +
+                    '" style="left:56px;right:0;top:' + top + 'px;height:' + height + 'px;' + paint.css + (tag ? 'border-left:4px solid ' + esc(safeColor(tag.color)) + ' !important;' : '') + '" tabindex="0" data-block="' + esc(b.id) + '">' +
+                    dayInnerHtml(b) + '</div>';
+                return;
+            }
             html += '<div class="ag-card absolute rounded-md border border-l-4 overflow-hidden cursor-pointer px-2 flex items-center gap-2 ' +
                 paint.cls + (b.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-zinc-200') + (isNow(b, day, today, nm) ? ' ag-now' : '') +
                 '" style="left:56px;right:0;top:' + top + 'px;height:' + height + 'px;' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
@@ -1328,7 +1392,7 @@
     function dgDown(e) {
         if (e.button !== 0 || DG || S.placing || S.agView !== 'day') return;
         var card = e.target.closest('[data-block]');
-        if (!card || e.target.closest('[data-done]')) return;
+        if (!card || e.target.closest('[data-done], [data-sub-ck], [data-sub-open], [data-sub-drop]')) return; // V40.24.0
         var b = S.blocos[card.dataset.block];
         if (!b || b.deleted) return;
         var size = !!e.target.closest('.ag-rz'), y = e.clientY - $('ag-timeline').getBoundingClientRect().top;
@@ -1615,6 +1679,7 @@
             if (!b) return;
             closeColMenu();
             if (b.dataset.act === 'archive') archiveRow(kind, id);
+            else if (kind === 'blocos' && isSub(S[kind][id])) deleteSubFlow(S[kind][id]); // V40.24.0
             else if (await askDelete(kind === 'blocos')) patchRow(kind, id, { deleted: true }, kind === 'blocos' ? 'Bloco apagado' : 'Tarefa apagada');
         });
         document.body.appendChild(menuEl);
@@ -1662,13 +1727,15 @@
     // ---------- diálogo genérico ----------
     function dialog(o) {
         return new Promise(function (resolve) {
-            var d = $('dialog'), inp = $('dlg-input'), okB = $('dlg-ok'), cancelB = $('dlg-cancel');
+            var d = $('dialog'), inp = $('dlg-input'), okB = $('dlg-ok'), cancelB = $('dlg-cancel'), altB = $('dlg-alt'); // V40.24.0: 3ª opção (altLabel → 'alt')
             $('dlg-title').textContent = o.title;
             $('dlg-text').textContent = o.text || '';
             $('dlg-text').classList.toggle('hidden', !o.text);
             inp.classList.toggle('hidden', !o.input);
             if (o.input) { inp.value = o.input.value || ''; inp.placeholder = o.input.placeholder || ''; inp.maxLength = o.input.max || 100; }
             okB.textContent = o.okLabel || 'OK';
+            altB.textContent = o.altLabel || '';
+            altB.classList.toggle('hidden', !o.altLabel);
             okB.className = 'text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90 ' + (o.danger ? 'bg-red-600' : 'bg-focus');
             d.classList.remove('hidden');
             d.classList.add('flex');
@@ -1678,6 +1745,7 @@
                 d.classList.add('hidden');
                 d.classList.remove('flex');
                 okB.removeEventListener('click', onOk);
+                altB.removeEventListener('click', onAlt);
                 cancelB.removeEventListener('click', onCancel);
                 d.removeEventListener('keydown', onKey);
                 d.removeEventListener('mousedown', onBackdrop);
@@ -1689,12 +1757,14 @@
                 else finish(true);
             }
             function onCancel() { finish(o.input ? null : false); }
+            function onAlt() { finish('alt'); }
             function onKey(e) {
                 if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
                 else if (e.key === 'Enter' && (o.input || document.activeElement === okB)) { e.preventDefault(); onOk(); }
             }
             function onBackdrop(e) { if (e.target === d) onCancel(); }
             okB.addEventListener('click', onOk);
+            altB.addEventListener('click', onAlt);
             cancelB.addEventListener('click', onCancel);
             d.addEventListener('keydown', onKey);
             d.addEventListener('mousedown', onBackdrop);
@@ -1744,6 +1814,7 @@
         $('f-tolist').classList.toggle('hidden', !isB || isNew);
         $('f-tolist').classList.toggle('inline-flex', isB && !isNew);
         $('f-delete').textContent = isB ? 'Apagar bloco' : 'Apagar tarefa';
+        $('f-delete').classList.toggle('hidden', isNew);
         $('f-sched').classList.add('hidden');
         if (isB) {
             setDateVal('f-date', String(r.date).slice(0, 10));
@@ -1764,11 +1835,276 @@
         $('f-notes-wrap').classList.toggle('hidden', !isB || isNew); // V40.22.0: só bloco que já existe
         notePick(false);
         renderNoteLinks();
+        // V40.24.0: sublista (cartões no lugar da checklist) e opção "Sublista" no bloco novo
+        var sub = isB && isSub(r);
+        $('f-grid').classList.remove('hidden');
+        $('f-card-back').classList.add('hidden'); $('f-card-back').classList.remove('inline-flex');
+        $('f-sub').checked = false;
+        $('f-sub-wrap').classList.toggle('hidden', !(isB && isNew));
+        $('f-sub-wrap').classList.toggle('inline-flex', isB && isNew);
+        $('f-mbs-wrap').classList.toggle('hidden', sub);
+        if (sub) {
+            $('f-title').placeholder = 'Nome da sublista';
+            $('f-delete').textContent = 'Apagar sublista';
+            $('f-tolist').classList.add('hidden'); $('f-tolist').classList.remove('inline-flex'); // cada cartão volta sozinho
+        }
+        $('f-card-new').value = '';
+        cardPick(false);
+        renderSubCards();
         var m = $('modal-task');
         m.classList.remove('hidden');
         m.classList.add('flex');
         autoGrow($('f-title'));
         $('f-title').focus();
+    }
+    // ---------- V40.24.0: SUBLISTA (as mesmas regras do celular, no app.js) ----------
+    // Bloco com `cards` (lista, mesmo vazia) = sublista: o horário é dela e os cartões dentro não têm horário próprio.
+    // Cartão: { id 'cd_…', title, done, tagId?, color?, microblocks [{ title, done }], duration?, columnId? } (o mesmo
+    // JSON do celular). O PC grava só `cards` (e `completed`, quando muda) da sublista; o resto do bloco segue o
+    // salvar de sempre. Todos os cartões marcados = sublista concluída; sublista vazia conclui como um bloco.
+    var SUB_MAX = 100;
+    function isSub(b) { return !!b && Array.isArray(b.cards); }
+    function subCards(b) { return (isSub(b) ? b.cards : []).filter(function (c) { return c && typeof c === 'object' && !Array.isArray(c) && c.id != null; }); }
+    function subCount(b) { var a = subCards(b), d = a.filter(function (c) { return c.done; }).length; return { done: d, total: a.length, open: a.length - d }; }
+    function subCountTxt(b) { var c = subCount(b); return !c.total ? 'vazia' : c.done ? c.done + '/' + c.total + ' feitos' : (c.total === 1 ? '1 cartão' : c.total + ' cartões'); }
+    function subNewId() { return 'cd_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8); }
+    function subCanDrop() { return !!S.placing && S.placing.theme !== 'rest'; } // Descanso na mão não entra numa sublista
+    function subSave(b, cards, msg) {
+        var fields = { cards: cards };
+        if (cards.length) { var all = cards.every(function (c) { return c.done; }); if (all !== !!b.completed) fields.completed = all; }
+        return patchRow('blocos', b.id, fields, msg);
+    }
+    function subCardRowHtml(b, c, extra) {
+        var tag = tagOf(c.tagId), col = hex6(c.color), mbs = normMbs(c.microblocks), md = mbs.filter(function (m) { return m.done; }).length;
+        return '<div class="ag-sub-card' + (c.done ? ' done' : '') + (col && isDark(col) ? ' dark' : '') + '" style="border-left-color:' + (tag ? esc(safeColor(tag.color)) : 'transparent') + (col ? ';background-color:' + col : '') + '">' +
+            '<button type="button" class="ag-sub-ck" data-sub-ck="' + esc(b.id) + '" data-card="' + esc(c.id) + '" aria-pressed="' + (c.done ? 'true' : 'false') + '" aria-label="' + (c.done ? 'Desmarcar' : 'Marcar como feito') + '" title="' + (c.done ? 'Desmarcar' : 'Marcar como feito') + '"><i class="ph-bold ph-check"></i></button>' +
+            '<button type="button" class="ag-sub-t" data-sub-open="' + esc(b.id) + '" data-card="' + esc(c.id) + '" title="Abrir o cartão">' + (esc(c.title) || 'Sem nome') + '</button>' +
+            (mbs.length ? '<span class="ag-sub-mb"><i class="ph ph-check-square"></i>' + md + '/' + mbs.length + '</span>' : '') + (extra || '') + '</div>';
+    }
+    function subRowsHtml(b, max) {
+        var cards = subCards(b), shown = max != null && cards.length > max ? cards.slice(0, Math.max(0, max - 1)) : cards, more = cards.length - shown.length;
+        if (!cards.length) return '<p class="text-[11.5px] font-medium text-amber-800/80 px-1">Vazia: clique pra pôr cartões</p>';
+        return shown.map(function (c) { return subCardRowHtml(b, c); }).join('') +
+            (more > 0 ? '<span class="ag-sub-more">+' + more + (more === 1 ? ' cartão' : ' cartões') + '</span>' : '');
+    }
+    function subDropHtml(b) { return '<button type="button" class="ag-sub-drop" data-sub-drop="' + esc(b.id) + '"><i class="ph ph-hand-pointing"></i>Colocar na sublista</button>'; }
+    function subWeekHtml(b, day, today, nm) {
+        var tag = tagOf(b.tag_id), paint = paintOf(b.completed ? null : b.color), nn = linkedNotes(b).length;
+        return '<article draggable="true" class="ag-card ag-sub ' + paint.cls + (b.completed ? 'done ' : '') + 'rounded-lg px-2.5 py-1.5 cursor-pointer' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
+            '" style="' + paint.css + (tag ? 'border-left:4px solid ' + esc(safeColor(tag.color)) + ' !important;' : '') + '" tabindex="0" data-block="' + esc(b.id) + '">' +
+            '<div class="flex items-start gap-1.5">' + doneBtnHtml(b, 'mt-0.5 -ml-0.5') + '<div class="min-w-0 flex-1">' +
+            '<div class="flex items-center"><p class="min-w-0 flex-1 text-[11px] font-semibold ag-sub-time tabular-nums truncate">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) +
+            '<span class="font-medium"> · ' + fmtDur(b.duration) + '</span></p>' +
+            (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-amber-800/70 hover:text-amber-950 hover:bg-amber-100" data-more="' + esc(b.id) + '" title="Arquivar ou apagar" aria-label="Arquivar ou apagar"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
+            '<p class="text-[13px] font-semibold leading-snug break-words ag-sub-title' + (b.completed ? ' line-through' : '') + '"><i class="ph-bold ph-list-checks"></i> ' + (esc(b.title) || 'Sublista') +
+            ' <span class="ag-sub-badge" title="Cartões feitos">' + (subCount(b).total ? subCount(b).done + '/' + subCount(b).total : '0') + '</span>' +
+            (nn ? '<span class="ag-notes text-[11px] font-medium text-amber-800/80" title="' + nn + (nn === 1 ? ' nota vinculada' : ' notas vinculadas') + '"> · <i class="ph ph-note"></i>' + nn + '</span>' : '') + '</p>' +
+            (subCanDrop() ? subDropHtml(b) : '<div class="ag-sub-cards">' + subRowsHtml(b, 6) + '</div>') +
+            '</div></div></article>';
+    }
+    function subDayInnerHtml(b, note) {
+        var tag = tagOf(b.tag_id), h = b.duration * PXM - 2, compact = h < 50; // (blocos nunca ficam dentro de vago compactado: a altura é a de sempre)
+        var warn = note ? '<span class="ag-note"> · ' + esc(note) + '</span>' : '';
+        var title = '<span class="text-[13px] font-semibold ag-sub-title' + (b.completed ? ' line-through' : '') + '"><i class="ph-bold ph-list-checks"></i> ' + (esc(b.title) || 'Sublista') + '</span>';
+        var head = '<div class="flex items-center gap-2 min-w-0">' + doneBtnHtml(b, '') + '<span class="min-w-0 flex-1 truncate">' +
+            '<span class="text-[10.5px] font-semibold ag-sub-time tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration) + ' · ' + subCountTxt(b) + (tag ? ' · ' + esc(tag.name) : '') + warn + '</span>' +
+            (compact ? ' ' + title : '') + '</span></div>' + (compact ? '' : '<div class="truncate">' + title + '</div>');
+        var rows = compact ? 0 : Math.max(0, Math.floor((h - 50) / 27));
+        var body = subCanDrop() ? (compact ? '' : subDropHtml(b)) : (rows ? '<div class="ag-sub-cards">' + subRowsHtml(b, rows) + '</div>' : '');
+        return head + body + '<span class="ag-rz' + (b.duration < 10 ? ' s' : '') + '" title="Puxe pra mudar a duração" aria-hidden="true"></span>';
+    }
+    function subFind(bid, cid) {
+        var b = S.blocos[bid];
+        if (!b || b.deleted || !isSub(b)) return null;
+        var c = subCards(b).filter(function (x) { return x.id === cid; })[0];
+        return c ? { b: b, c: c } : null;
+    }
+    function subToggleCard(bid, cid) {
+        var f = subFind(bid, cid);
+        if (!f) return toast('Esse cartão não está mais na sublista.');
+        var was = !!f.b.completed, next = subCards(f.b).map(function (c) { return c.id === cid ? Object.assign({}, c, { done: !c.done }) : c; });
+        var all = next.every(function (c) { return c.done; });
+        var p = subSave(f.b, next, !was && all ? 'Sublista concluída! 🎉' : null);
+        renderSubCards();
+        p.then(renderSubCards);
+    }
+    function subToggleAll(b) {
+        var cards = subCards(b), all = cards.every(function (c) { return c.done; });
+        var p = subSave(b, cards.map(function (c) { return Object.assign({}, c, { done: !all }); }), all ? 'Cartões desmarcados' : 'Todos os cartões feitos');
+        var sync = function () { if (S.editing && S.editing.kind === 'blocos' && S.editing.id === b.id) { S.editing.orig.completed = !!S.blocos[b.id].completed; renderDone(); renderSubCards(); } };
+        sync(); p.then(sync);
+    }
+    // Cartão da Lista (ou rotina) → cartão da sublista
+    function subCardFromSrc(src) {
+        var c = { id: subNewId(), title: String(src.title || '').trim() || 'Sem nome', done: false, microblocks: normMbs(src.mbs).map(function (m) { return { title: m.title, done: false }; }) };
+        if (src.tag) c.tagId = src.tag;
+        if (hex6(src.color)) c.color = hex6(src.color);
+        if (Number(src.dur) > 0) c.duration = Math.round(Number(src.dur));
+        if (src.col) c.columnId = src.col;
+        return c;
+    }
+    // Primeiro entra o cartão na sublista, depois a tarefa sai da lista (se não der, nada se perde: no máximo fica nos dois)
+    async function subAddFromTask(b, t) {
+        if (subCards(b).length >= SUB_MAX) { toast('Uma sublista cabe até ' + SUB_MAX + ' cartões.'); return false; }
+        var card = subCardFromSrc({ title: t.title, tag: tagOf(t.tag_id) ? t.tag_id : null, color: t.color, mbs: t.microblocks, dur: t.duration, col: t.column_id });
+        if (!(await subSave(b, subCards(b).concat([card])))) return false;
+        await patchRow('tarefas', t.id, { deleted: true }, 'Entrou na sublista ' + (b.title || ''));
+        return true;
+    }
+    async function dropIntoSub(bid) {
+        var src = S.placing, b = S.blocos[bid];
+        if (!src || !b || b.deleted || !isSub(b)) return;
+        if (!subCanDrop()) return toast('Descanso não entra numa sublista: clique num espaço livre.');
+        if (!placingAlive(src)) { S.placing = null; renderAgenda(); return toast(src.kind === 'rotinas' ? 'Essa rotina foi apagada em outro aparelho.' : 'Essa tarefa foi apagada em outro aparelho.'); }
+        if (subCards(b).length >= SUB_MAX) return toast('Uma sublista cabe até ' + SUB_MAX + ' cartões.');
+        S.placing = null;
+        renderAgenda();
+        var col = src.kind === 'rotinas' ? null : ((S.tarefas[src.id] || {}).column_id || null);
+        var card = subCardFromSrc({ title: src.title, tag: src.tag, color: src.color, mbs: src.mbs, dur: src.dur, col: col });
+        if (!(await subSave(b, subCards(b).concat([card])))) { if (placingAlive(src)) { S.placing = src; renderAgenda(); } return; } // não deu: volta pra mão
+        if (src.kind === 'rotinas') return toast('Rotina na sublista ' + (b.title || '')); // a rotina continua existindo
+        await patchRow('tarefas', src.id, { deleted: true }, 'Entrou na sublista ' + (b.title || ''));
+    }
+    // Cartão volta pra Lista: primeiro a tarefa entra na lista (a de origem, se ainda existir), depois sai da sublista
+    async function subCardToList(bid, cid, quiet) {
+        var f = subFind(bid, cid);
+        if (!f) { toast('Esse cartão não está mais na sublista.'); return false; }
+        var ids = aliveListIds(), listId = f.c.columnId && ids[f.c.columnId] ? f.c.columnId : (ids[DEFAULT_COL] ? DEFAULT_COL : ((alive('listas')[0] || {}).id || DEFAULT_COL));
+        var task = {
+            user_id: S.uid, id: newId('bl_', 'tarefas'), column_id: listId, title: f.c.title || 'Sem nome', duration: Number(f.c.duration) > 0 ? Number(f.c.duration) : 30,
+            tag_id: tagOf(f.c.tagId) ? f.c.tagId : null, microblocks: normMbs(f.c.microblocks).map(function (m) { return { title: m.title, done: false }; }),
+            position: maxPos('tarefas') + STEP, color: hex6(f.c.color), archived: false, deleted: false
+        };
+        if (!(await insertRow('tarefas', task))) return false;
+        var cur = S.blocos[bid];
+        if (!cur || cur.deleted) return true;
+        var list = S.listas[listId];
+        await subSave(cur, subCards(cur).filter(function (c) { return c.id !== cid; }), quiet ? null : 'Voltou pra lista' + (list && list.name ? ' ' + list.name : ''));
+        renderSubCards();
+        return true;
+    }
+    async function subReturnOpen(b) {
+        var open = subCards(b).filter(function (c) { return !c.done; }), n = 0;
+        for (var i = 0; i < open.length; i++) if (await subCardToList(b.id, open[i].id, true)) n++;
+        renderSubCards();
+        return n;
+    }
+    // Apagar a sublista: com cartões não feitos, pergunta se eles voltam pra Lista
+    async function deleteSubFlow(b) {
+        var open = subCount(b).open, total = subCards(b).length, v;
+        if (open) v = await dialog({ title: 'Apagar esta sublista?', text: (open === 1 ? 'Tem 1 cartão não feito.' : 'Tem ' + open + ' cartões não feitos.') + ' Ela some daqui e do celular.', okLabel: 'Apagar tudo', danger: true, altLabel: open === 1 ? 'Devolver pra Lista e apagar' : 'Devolver os ' + open + ' pra Lista e apagar' });
+        else v = await dialog({ title: 'Apagar esta sublista?', text: total ? 'Ela e os cartões feitos somem daqui e do celular.' : 'Ela some daqui e do celular.', okLabel: 'Apagar sublista', danger: true });
+        if (!v) return false;
+        if (S.editing && S.editing.kind === 'blocos' && S.editing.id === b.id) closeTask();
+        var n = v === 'alt' ? await subReturnOpen(b) : 0;
+        await patchRow('blocos', b.id, { deleted: true }, v === 'alt' ? 'Sublista apagada; ' + (n === 1 ? '1 cartão voltou' : n + ' cartões voltaram') + ' pra Lista' : 'Sublista apagada');
+        return true;
+    }
+    // Seção "Cartões da sublista" no cartão aberto do bloco
+    function renderSubCards() {
+        var ed = S.editing, wrap = $('f-cards-wrap');
+        var b = ed && ed.kind === 'blocos' && !ed.isNew ? S.blocos[ed.id] : null;
+        if (!b || b.deleted || !isSub(b)) { wrap.classList.add('hidden'); return; }
+        wrap.classList.remove('hidden');
+        var cards = subCards(b), cnt = subCount(b);
+        $('f-cards-count').textContent = cards.length ? cnt.done + ' de ' + cards.length + ' feitos' : 'nenhum ainda';
+        var rb = $('f-cards-return');
+        rb.classList.toggle('hidden', !(cnt.open && cards.length));
+        rb.classList.toggle('inline-flex', !!(cnt.open && cards.length));
+        rb.querySelector('span').textContent = cnt.open === 1 ? 'Devolver o não feito pra Lista' : 'Devolver os ' + cnt.open + ' não feitos pra Lista';
+        var html = cards.map(function (c) {
+            var tag = tagOf(c.tagId), mbs = normMbs(c.microblocks), md = mbs.filter(function (m) { return m.done; }).length;
+            return '<div class="fc-row group flex items-center gap-1.5 px-1 py-0.5 rounded-lg hover:bg-zinc-50' + (c.done ? ' done' : '') + '">' +
+                '<button type="button" class="ag-sub-ck" data-fc-ck="' + esc(c.id) + '" aria-pressed="' + (c.done ? 'true' : 'false') + '" aria-label="' + (c.done ? 'Desmarcar' : 'Marcar como feito') + '"><i class="ph-bold ph-check"></i></button>' +
+                '<span class="w-1 h-5 rounded-full shrink-0" style="background:' + (tag ? esc(safeColor(tag.color)) : (hex6(c.color) || 'transparent')) + '"></span>' +
+                '<button type="button" class="fc-t min-w-0 flex-1 text-left text-sm text-zinc-800 truncate hover:underline" data-fc-open="' + esc(c.id) + '" title="Abrir o cartão">' + (esc(c.title) || 'Sem nome') + '</button>' +
+                (mbs.length ? '<span class="shrink-0 text-[11px] text-zinc-400 inline-flex items-center gap-0.5"><i class="ph ph-check-square"></i>' + md + '/' + mbs.length + '</span>' : '') +
+                '<button type="button" data-fc-list="' + esc(c.id) + '" class="w-7 h-7 shrink-0 rounded-md flex items-center justify-center text-zinc-400 hover:text-emerald-700 hover:bg-emerald-50 opacity-0 group-hover:opacity-100 focus:opacity-100" title="Voltar pra lista" aria-label="Voltar pra lista"><i class="ph ph-arrow-u-up-left"></i></button>' +
+                '<button type="button" data-fc-del="' + esc(c.id) + '" class="w-7 h-7 shrink-0 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus:opacity-100" title="Apagar o cartão" aria-label="Apagar o cartão"><i class="ph ph-x"></i></button>' +
+                '</div>';
+        }).join('');
+        if ($('f-cards')._html !== html) { $('f-cards').innerHTML = html; $('f-cards')._html = html; }
+        if (!$('f-card-pick').classList.contains('hidden')) renderCardPick();
+    }
+    function cardPick(on) {
+        $('f-card-pick').classList.toggle('hidden', !on);
+        $('f-card-pull').setAttribute('aria-expanded', on ? 'true' : 'false');
+        if (on) { $('f-card-q').value = ''; renderCardPick(); $('f-card-q').focus(); }
+    }
+    function subNorm(v) { return String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } // sem acento: "cartorio" acha "Cartório"
+    function cardPickList() {
+        var q = subNorm($('f-card-q').value.trim()), ids = aliveListIds();
+        return alive('tarefas').filter(function (t) { return !q || subNorm(t.title).indexOf(q) >= 0; }).slice(0, 60).map(function (t) { return { t: t, list: (S.listas[colOf(t, ids)] || {}).name || '' }; });
+    }
+    function renderCardPick() {
+        var opts = cardPickList();
+        $('f-card-opts').innerHTML = opts.length ? opts.map(function (o) {
+            var tag = tagOf(o.t.tag_id);
+            return '<button type="button" data-fc-pick="' + esc(o.t.id) + '" class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg text-[13px] text-zinc-800 hover:bg-white">' +
+                '<span class="w-1 h-4 rounded-full shrink-0" style="background:' + (tag ? esc(safeColor(tag.color)) : '#e4e4e7') + '"></span><span class="min-w-0 flex-1 truncate">' + (esc(o.t.title) || 'Sem nome') + '</span>' +
+                '<span class="shrink-0 text-[11px] text-zinc-400">' + esc(o.list) + '</span></button>';
+        }).join('') : '<p class="px-2 py-1.5 text-[12.5px] text-zinc-500">' + (alive('tarefas').length ? 'Nenhuma tarefa com esse nome.' : 'As Listas estão vazias.') + '</p>';
+    }
+    // Cartão da sublista aberto no mesmo cartão das Listas (nome, tag, cor e checklist); fechar volta pra sublista
+    function openSubCard(bid, cid) {
+        var f = subFind(bid, cid);
+        if (!f) return toast('Esse cartão não está mais na sublista.');
+        closeComposer();
+        S.editing = { kind: 'card', block: bid, id: cid, isNew: false, orig: JSON.parse(JSON.stringify(f.c)), tag: tagOf(f.c.tagId) ? f.c.tagId : null, mbs: normMbs(f.c.microblocks), color: hex6(f.c.color) };
+        $('f-title').value = f.c.title || '';
+        $('f-title').placeholder = 'Nome do cartão';
+        $('f-grid').classList.add('hidden');
+        ['f-done', 'f-archive', 'f-schedule', 'f-hand', 'f-sched', 'f-notes-wrap', 'f-cards-wrap', 'f-sub-wrap'].forEach(function (id) { $(id).classList.add('hidden'); $(id).classList.remove('inline-flex', 'flex'); });
+        $('f-mbs-wrap').classList.remove('hidden');
+        $('f-tolist').classList.remove('hidden'); $('f-tolist').classList.add('inline-flex');
+        $('f-delete').classList.remove('hidden');
+        $('f-delete').textContent = 'Apagar cartão';
+        $('f-save').textContent = 'Salvar';
+        var back = $('f-card-back');
+        back.querySelector('span').textContent = f.b.title || 'Sublista';
+        back.classList.remove('hidden'); back.classList.add('inline-flex');
+        $('f-mb-new').value = '';
+        renderTagChips(); renderMbs(); renderColors(); renderDone();
+        var m = $('modal-task');
+        m.classList.remove('hidden'); m.classList.add('flex');
+        autoGrow($('f-title'));
+        $('f-title').focus();
+    }
+    function closeTaskUi() { // fechar o cartão de uma sublista volta pra sublista
+        var ed = S.editing;
+        closeTask();
+        if (ed && ed.kind === 'card') openBlock(ed.block);
+    }
+    async function saveSubCard() {
+        var ed = S.editing, f = ed && subFind(ed.block, ed.id);
+        if (!f) { closeTask(); return toast('Esse cartão não está mais na sublista.'); }
+        var title = $('f-title').value.trim();
+        if (!title) { $('f-title').focus(); return toast('Dê um nome pro cartão.'); }
+        var c = Object.assign({}, f.c, { title: title.slice(0, 200), microblocks: normMbs(ed.mbs) });
+        if (ed.tag && tagOf(ed.tag)) c.tagId = ed.tag; else delete c.tagId;
+        if (ed.color) c.color = ed.color; else delete c.color;
+        var changed = JSON.stringify(c) !== JSON.stringify(f.c), bid = ed.block;
+        closeTask();
+        if (changed) await subSave(f.b, subCards(f.b).map(function (x) { return x.id === c.id ? c : x; }), 'Cartão salvo');
+        openBlock(bid);
+    }
+    async function deleteSubCard() {
+        var ed = S.editing;
+        if (!ed || ed.kind !== 'card') return;
+        var ok = await dialog({ title: 'Apagar este cartão?', text: 'Ele sai da sublista e não volta pra Lista.', okLabel: 'Apagar cartão', danger: true });
+        if (!ok) return;
+        var f = subFind(ed.block, ed.id), bid = ed.block;
+        closeTask();
+        if (f) await subSave(f.b, subCards(f.b).filter(function (x) { return x.id !== f.c.id; }), 'Cartão apagado');
+        openBlock(bid);
+    }
+    async function subCardToListUi() {
+        var ed = S.editing;
+        if (!ed || ed.kind !== 'card') return;
+        var bid = ed.block, cid = ed.id;
+        closeTask();
+        await subCardToList(bid, cid);
+        openBlock(bid);
     }
     function openTask(id) { openCard('tarefas', id); }
     function openBlock(id) { openCard('blocos', id); }
@@ -1784,7 +2120,8 @@
     async function createBlock() {
         var ed = S.editing;
         if (!ed || !ed.isNew) return;
-        var title = $('f-title').value.trim();
+        var asSub = $('f-sub').checked; // V40.24.0
+        var title = $('f-title').value.trim() || (asSub ? 'Sublista' : '');
         if (!title) { $('f-title').focus(); return toast('Dê um nome pro bloco.'); }
         var dur = parseInt($('f-dur').value, 10), day = $('f-date').value, st = parseClock($('f-start').value);
         if (!Number.isFinite(dur) || dur <= 0) dur = 30;
@@ -1796,8 +2133,9 @@
             type: blockType(day, slot, dur), theme: 'focus', tag_id: ed.tag || null, microblocks: mbsForSave(ed),
             completed: false, was_delayed: false, linked_note_ids: [], color: ed.color || null, archived: false, deleted: false
         };
+        if (asSub) { row.cards = []; row.microblocks = []; } // V40.24.0: sublista nasce vazia (os cartões entram depois)
         closeTask();
-        await insertRow('blocos', row, 'Bloco criado para ' + dayLabel(day) + ' às ' + clock(slot) + (slot !== st ? ' (às ' + clock(st) + ' já tinha bloco)' : ''));
+        await insertRow('blocos', row, (asSub ? 'Sublista criada para ' : 'Bloco criado para ') + dayLabel(day) + ' às ' + clock(slot) + (slot !== st ? ' (às ' + clock(st) + ' já tinha bloco)' : ''));
     }
     // ---------- V40.22.0: notas vinculadas ao bloco (igual ao app: o vínculo mora no bloco, em linked_note_ids) ----------
     function noteIdsOf(b) { return (Array.isArray(b && b.linked_note_ids) ? b.linked_note_ids : []).filter(function (x) { return typeof x === 'string'; }); }
@@ -1904,6 +2242,7 @@
     function toggleDone(id) {
         var b = S.blocos[id];
         if (!b || b.deleted) return;
+        if (isSub(b) && subCards(b).length) return subToggleAll(b); // V40.24.0
         var done = !b.completed;
         var p = patchRow('blocos', id, { completed: done }, done ? 'Bloco concluído' : 'Bloco reaberto');
         var sync = function () { if (S.editing && S.editing.kind === 'blocos' && S.editing.id === id) { S.editing.orig.completed = !!S.blocos[id].completed; renderDone(); } };
@@ -1942,6 +2281,7 @@
     async function saveTask() {
         var ed = S.editing;
         if (!ed) return;
+        if (ed.kind === 'card') return saveSubCard(); // V40.24.0
         if (ed.isNew) return createBlock();
         var isB = ed.kind === 'blocos', t = S[ed.kind][ed.id];
         if (!t || t.deleted) { closeTask(); return toast(isB ? 'Esse bloco foi apagado em outro aparelho.' : 'Essa tarefa foi apagada em outro aparelho.'); }
@@ -1979,6 +2319,8 @@
     async function deleteTask() {
         var ed = S.editing;
         if (!ed || ed.isNew) return;
+        if (ed.kind === 'card') return deleteSubCard(); // V40.24.0
+        if (ed.kind === 'blocos' && isSub(S.blocos[ed.id])) return deleteSubFlow(S.blocos[ed.id]);
         var isB = ed.kind === 'blocos';
         var ok = await askDelete(isB);
         if (!ok) return;
@@ -2370,7 +2712,7 @@
         return {
             now: new Date(), hours: S.hours,
             blocks: live('blocos').filter(function (b) { return !b.archived; }).map(function (b) {
-                return { id: b.id, title: b.title, date: String(b.date).slice(0, 10), start: Number(b.start_min) || 0, dur: Number(b.duration) || 0, done: !!b.completed, tag: tagInfo(b.tag_id) };
+                return { id: b.id, title: b.title, date: String(b.date).slice(0, 10), start: Number(b.start_min) || 0, dur: Number(b.duration) || 0, done: !!b.completed, tag: tagInfo(b.tag_id), cards: isSub(b) ? subCount(b) : null };
             }),
             tasks: tasks,
             routines: live('rotinas').map(function (r) { return { id: r.id, title: r.title, emoji: r.emoji, dur: Number(r.duration) || 0 }; }),
@@ -3235,6 +3577,7 @@
     function closeCal() { var pop = $('cal-pop'); if (pop) pop.classList.add('hidden'); CAL.input = null; }
     async function blockToList() {
         var ed = S.editing;
+        if (ed && ed.kind === 'card') return subCardToListUi(); // V40.24.0
         if (!ed || ed.kind !== 'blocos' || ed.isNew) return;
         var b = S.blocos[ed.id];
         if (!b || b.deleted) { closeTask(); return toast('Esse bloco foi apagado em outro aparelho.'); }
@@ -3425,9 +3768,9 @@
         $('f-title').addEventListener('input', function () { autoGrow(this); });
         $('f-title').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveTask(); } });
         $('f-save').addEventListener('click', saveTask);
-        $('f-cancel').addEventListener('click', closeTask);
+        $('f-cancel').addEventListener('click', closeTaskUi);
         $('f-delete').addEventListener('click', deleteTask);
-        $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this) closeTask(); });
+        $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this) closeTaskUi(); });
 
         // V40.17.0: Rotinas
         $('rt-new').addEventListener('click', function () { openRoutine(null); });
@@ -3513,6 +3856,58 @@
         $('f-sched-cancel').addEventListener('click', function () { $('f-sched').classList.add('hidden'); });
         $('f-sched-ok').addEventListener('click', scheduleTask);
         $('f-tolist').addEventListener('click', blockToList);
+        // V40.24.0: sublista
+        $('f-card-back').addEventListener('click', closeTaskUi);
+        $('f-sub').addEventListener('change', function () { $('f-mbs-wrap').classList.toggle('hidden', this.checked); if (this.checked && !$('f-title').value.trim()) $('f-title').placeholder = 'Nome da sublista (ex.: Pendências rápidas)'; });
+        $('f-cards').addEventListener('click', async function (e) {
+            var ed = S.editing, b = ed && ed.kind === 'blocos' ? S.blocos[ed.id] : null, x;
+            if (!b) return;
+            if ((x = e.target.closest('[data-fc-ck]'))) return subToggleCard(b.id, x.dataset.fcCk);
+            if ((x = e.target.closest('[data-fc-list]'))) return subCardToList(b.id, x.dataset.fcList);
+            if ((x = e.target.closest('[data-fc-del]'))) {
+                var cid = x.dataset.fcDel;
+                if (!(await dialog({ title: 'Apagar este cartão?', text: 'Ele sai da sublista e não volta pra Lista.', okLabel: 'Apagar cartão', danger: true }))) return;
+                var cur = S.blocos[b.id];
+                if (cur && !cur.deleted) { await subSave(cur, subCards(cur).filter(function (c) { return c.id !== cid; }), 'Cartão apagado'); renderSubCards(); }
+                return;
+            }
+            if ((x = e.target.closest('[data-fc-open]'))) { // o que mudou no cartão da sublista é salvo antes (como as notas)
+                var fcid = x.dataset.fcOpen;
+                await saveTask();
+                if (S.editing) return; // não deu pra salvar (ex.: sem nome): continua aberto
+                openSubCard(b.id, fcid);
+            }
+        });
+        $('f-card-new').addEventListener('keydown', async function (e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            var ed = S.editing, b = ed && ed.kind === 'blocos' ? S.blocos[ed.id] : null, v = this.value.trim();
+            if (!b || !isSub(b) || !v) return;
+            if (subCards(b).length >= SUB_MAX) return toast('Uma sublista cabe até ' + SUB_MAX + ' cartões.');
+            this.value = '';
+            await subSave(b, subCards(b).concat([{ id: subNewId(), title: v.slice(0, 200), done: false, microblocks: [] }]));
+            renderSubCards();
+        });
+        $('f-card-pull').addEventListener('click', function () { cardPick($('f-card-pick').classList.contains('hidden')); });
+        $('f-card-q').addEventListener('input', renderCardPick);
+        $('f-card-q').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); var first = $('f-card-opts').querySelector('[data-fc-pick]'); if (first) first.click(); }
+        });
+        $('f-card-opts').addEventListener('click', async function (e) {
+            var x = e.target.closest('[data-fc-pick]'), ed = S.editing, b = ed && ed.kind === 'blocos' ? S.blocos[ed.id] : null;
+            if (!x || !b || !isSub(b)) return;
+            var t = S.tarefas[x.dataset.fcPick];
+            if (!t || t.deleted) return toast('Essa tarefa foi apagada em outro aparelho.');
+            await subAddFromTask(b, t);
+            renderSubCards();
+            $('f-card-q').focus();
+        });
+        $('f-cards-return').addEventListener('click', async function () {
+            var ed = S.editing, b = ed && ed.kind === 'blocos' ? S.blocos[ed.id] : null;
+            if (!b || !isSub(b)) return;
+            var n = await subReturnOpen(b);
+            if (n) toast(n === 1 ? '1 cartão voltou pra Lista' : n + ' cartões voltaram pra Lista');
+        });
         $('f-sched-date').addEventListener('change', function () { if (isYmd(this.value)) setTimeVal('f-sched-time', clock(suggestStart(this.value))); renderSchedInfo(); });
         $('f-sched-time').addEventListener('input', renderSchedInfo);
         $('f-dur').addEventListener('change', function () { if (!$('f-sched').classList.contains('hidden')) renderSchedInfo(); });
@@ -3588,7 +3983,8 @@
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
             if (S.rtEdit) return closeRoutine(); // V40.17.0
             if (menuEl) return closeColMenu();
-            if (S.editing) return closeTask();
+            if (!$('f-card-pick').classList.contains('hidden')) { cardPick(false); return $('f-card-pull').focus(); } // V40.24.0: Esc fecha só a busca
+            if (S.editing) return closeTaskUi();
             if (S.placing) return cancelPlacing();
             if (S.composer) closeComposer();
         });
@@ -3666,6 +4062,13 @@
             if (dayBtn) { S.agAnchor = dayBtn.dataset.day; S.agView = 'day'; S.agScrolled = null; return renderAgenda(); }
             var gap = e.target.closest('[data-gap-day]');
             if (gap) return placeHere(gap.dataset.gapDay, gap.dataset.gapStart); // V40.12.0: tarefa na mão → espaço livre
+            // V40.24.0: sublista — soltar a tarefa da mão, marcar um cartão, abrir um cartão
+            var sdr = e.target.closest('[data-sub-drop]');
+            if (sdr) return dropIntoSub(sdr.dataset.subDrop);
+            var sck = e.target.closest('[data-sub-ck]');
+            if (sck && !S.placing) return subToggleCard(sck.dataset.subCk, sck.dataset.card);
+            var sop = e.target.closest('[data-sub-open]');
+            if (sop && !S.placing) return openSubCard(sop.dataset.subOpen, sop.dataset.card);
             var dn = e.target.closest('[data-done]');
             if (dn) return toggleDone(dn.dataset.done); // V40.11.0: concluir sem abrir o cartão
             var add = e.target.closest('[data-add-day]');
@@ -3677,7 +4080,9 @@
             if (S.placing) { // com a tarefa na mão, clicar num bloco não abre o cartão; na visão Dia, clicar no horário coloca
                 var tl = e.target.closest('#ag-timeline');
                 if (tl && !e.target.closest('[data-block]')) return placeHere(S.agAnchor, Math.round(agMin(e.clientY - tl.getBoundingClientRect().top) / 5) * 5);
-                if (e.target.closest('[data-block]')) return toast('Clique num espaço livre pra colocar a tarefa.');
+                var pb = e.target.closest('[data-block]');
+                if (pb && isSub(S.blocos[pb.dataset.block]) && subCanDrop()) return dropIntoSub(pb.dataset.block); // V40.24.0: clicar na sublista põe a tarefa nela
+                if (pb) return toast(isSub(S.blocos[pb.dataset.block]) ? 'Descanso não entra numa sublista: clique num espaço livre.' : 'Clique num espaço livre pra colocar a tarefa.');
             }
             var c = e.target.closest('[data-block]');
             if (c) return openBlock(c.dataset.block);
@@ -3685,7 +4090,7 @@
             if (ruler) openNewBlock(S.agAnchor, Math.floor(agMin(e.clientY - ruler.getBoundingClientRect().top) / 5) * 5);
         });
         $('agenda').addEventListener('keydown', function (e) {
-            if (e.target.closest && e.target.closest('[data-done], [data-more]')) return;
+            if (e.target.closest && e.target.closest('[data-done], [data-more], [data-sub-ck], [data-sub-open], [data-sub-drop]')) return; // V40.24.0
             var c = e.target.closest && e.target.closest('[data-block]');
             if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openBlock(c.dataset.block); }
         });

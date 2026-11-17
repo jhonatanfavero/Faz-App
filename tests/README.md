@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 18 suítes (cerca de 1 minuto)
+npm test        # confere o CSS pronto e roda as 20 suítes (cerca de 1 minuto e meio)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -13,7 +13,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 
 | Arquivo | O que roda | O que confere |
 |---|---|---|
-| `sim_sync.js` | só o motor do `sync.js` | mesclagem celular × nuvem: conflitos, apagados, ordem, lista órfã, primeiro sync, duplicados, metas (listas padrão, órfãs, dias de meta apagada, linhas estranhas) |
+| `sim_sync.js` | só o motor do `sync.js` | mesclagem celular × nuvem: conflitos, apagados, ordem, lista órfã, primeiro sync, duplicados, metas (listas padrão, órfãs, dias de meta apagada, linhas estranhas), sublista (cartões nos dois sentidos, cartões estranhos ou maliciosos) |
 | `test_app.js` | `index.html` + `app.js` + `sync.js` de verdade | app sem login, login, ida e volta com a nuvem, backup e restauração |
 | `test_v408.js` | idem | agenda na nuvem, blocos de 5 e 10 min, dado corrompido, iOS, esqueci a senha |
 | `test_v409.js` | idem | cor livre do cartão, arquivar e desarquivar |
@@ -30,6 +30,8 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_metas.js` | `metas.js` sozinho + `index.html` + `app.js` + `sync.js` de verdade | as regras das metas (período, estrelas, sequência, pontos, níveis, alvo da época), a aba Metas no celular (criar, +/−, editar, apagar, listas), a ida e volta pela nuvem e o Assistente falando das metas |
 | `test_kanban_v4022.js` | `kanban.html` de verdade | notas vinculadas no cartão do bloco (ver, buscar e vincular, criar já vinculada, desvincular, abrir salvando o cartão, apagar a nota solta o vínculo, tempo real) e o Dia com "Compactar vagos" (faixas, escala por trechos, clicar na faixa cria o bloco ou coloca a tarefa na mão) |
 | `test_kanban_v4021.js` | `kanban.html` de verdade | aba Metas no PC (V40.23.0: uma página só, por categoria, cartões em grade): categorias padrão, meta nova com sugestões, +/− (cliques seguidos = um envio), editar, recomeçar a contagem, apagar, listas de metas, tempo real e o Assistente abrindo a meta |
+| `test_sublista.js` | `index.html` + `app.js` + `sync.js` de verdade | V40.24.0: sublista no celular (criar pelo +, cartão novo, tarefa da Lista na mão, marcar, cartão aberto, voltar pra lista, devolver os não feitos, duplicar e repetir, apagar, busca, backup, Assistente, ida e volta com a nuvem) e "ocultar vagos" (faixas, régua encolhida, arrastar e esticar, tocar na faixa) |
+| `test_kanban_v4024.js` | `kanban.html` de verdade | V40.24.0: sublista no PC (Semana e Dia, janela com os cartões, puxar da Lista, cartão aberto, Novo bloco como sublista, tarefa na mão, apagar devolvendo os não feitos, tempo real) |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)
@@ -56,9 +58,9 @@ Para isso existem três testes que abrem um Chrome de verdade:
 
 ```
 npm i -D playwright && npx playwright install chromium    # uma vez
-node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo
+node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo; sublista e vagos ocultos (V40.24.0)
 node tests/navegador/offline.js         # o app abre completo sem internet?
-node tests/navegador/tela_pc.js         # tela do PC com mouse: arrastar e esticar blocos, 3 pontinhos, campo de arquivar, zoom, tags
+node tests/navegador/tela_pc.js         # tela do PC com mouse: arrastar e esticar blocos, 3 pontinhos, campo de arquivar, zoom, tags, sublista
 ```
 
 Com `CHROME=/caminho/do/chrome` eles usam um Chrome já instalado; com `FOTOS=/alguma/pasta` salvam

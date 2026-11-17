@@ -3,6 +3,7 @@
 // pontinhos do cartão (Arquivar / Apagar) e o campo de arquivar que aparece no topo durante o arraste. V40.18.0: janela de Tags.
 // V40.20.0: zoom das Listas e da Semana como colunas por tela (com arrastar e setas). V40.19.0: setas do teclado e aba Finanças.
 // V40.21.0: aba Metas. V40.22.0: Dia com os horários vagos compactados (arrastar e esticar continuam certos) e notas no cartão do bloco.
+// V40.24.0: sublista (Semana, Dia, arrastar, janela com os cartões, cartão aberto e tarefa na mão).
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -471,6 +472,63 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await foto(p, 'pc-bloco-notas.png');
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(100);
   await p.locator('#ag-compact').click(); await p.waitForTimeout(150);
+
+  { // V40.24.0 (bloco próprio: os nomes daqui não se misturam com os de cima)
+  console.log('\nO) Sublista (V40.24.0):');
+  await p.evaluate((uid) => {
+    const n = window.__nuvem, tags = n.alive('tags', uid);
+    n.insert('blocos', uid, { id: 'f_sub', date: '2026-11-19', start_min: 14 * 60, duration: 60, title: 'Pendências rápidas', type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, deleted: false,
+      cards: [{ id: 'cd_1', title: 'Pagar boleto da luz', done: true, microblocks: [] }, { id: 'cd_2', title: 'Responder o Anderson sobre o orçamento da obra', done: false, tagId: tags[0].id, microblocks: [{ title: 'a', done: true }, { title: 'b', done: false }] }, { id: 'cd_3', title: 'Ligar pro cartório', done: false, microblocks: [] }] });
+  }, UID);
+  await p.locator('.ag-view[data-view="week"]').click(); await p.waitForTimeout(300);
+  const sw = () => p.evaluate(() => { const el = document.querySelector('#ag-cols [data-block="f_sub"]'); if (!el) return null; const r = el.getBoundingClientRect(); return { sub: el.classList.contains('ag-sub'), n: el.querySelectorAll('.ag-sub-card').length, cabem: [...el.querySelectorAll('.ag-sub-card')].every((c) => { const x = c.getBoundingClientRect(); return x.left >= r.left && x.right <= r.right + 0.5; }), estilo: getComputedStyle(el).borderTopStyle }; });
+  let w0 = await sw();
+  ok(w0 && w0.sub && w0.n === 3 && w0.cabem && w0.estilo === 'dashed', 'Semana: a sublista aparece tracejada com os 3 cartões cabendo na coluna');
+  await p.evaluate(() => { const el = document.querySelector('#ag-cols [data-block="f_sub"]'); el.scrollIntoView({ block: 'center' }); }); await p.waitForTimeout(150);
+  await foto(p, 'pc-sublista-semana.png');
+  await p.locator('#ag-cols [data-block="f_sub"] [data-sub-ck][data-card="cd_3"]').click(); await p.waitForTimeout(350);
+  ok(await p.evaluate((uid) => window.__nuvem.get('blocos', uid, 'f_sub').cards[2].done === true, UID) && !(await cartaoAberto()), 'clicar no círculo de um cartão marca, sem abrir nada');
+  await p.locator('#ag-cols .ag-day-btn[data-day="2026-11-19"]').click(); await p.waitForTimeout(300);
+  await p.evaluate(() => { document.getElementById('ag-day').scrollTop = (14 * 60 - 7 * 60) * 3.2 - 200; }); await p.waitForTimeout(150);
+  const d0 = await p.evaluate(() => { const el = [...document.querySelectorAll('#ag-timeline [data-block]')].find((e) => e.dataset.block === 'f_sub'), r = el.getBoundingClientRect(); return { n: el.querySelectorAll('.ag-sub-card').length, dentro: [...el.querySelectorAll('.ag-sub-card')].every((c) => c.getBoundingClientRect().bottom <= r.bottom + 0.5), h: Math.round(r.height) }; });
+  ok(d0.n === 3 && d0.dentro, `Dia: os 3 cartões cabem dentro da sublista de 1h (${d0.h}px)`);
+  await foto(p, 'pc-sublista-dia.png');
+  // arrastar a sublista no Dia (30 min pra baixo)
+  let bx = await caixa('f_sub');
+  await p.mouse.move(bx.x + 420, bx.y + 8); await p.mouse.down();
+  await p.mouse.move(bx.x + 420, bx.y + 8 + 96, { steps: 8 }); await p.mouse.move(bx.x + 420, bx.y + 8 + 96.5, { steps: 1 });
+  await solta();
+  ok((await nuvem('f_sub')).st === 14 * 60 + 30, 'arrastar a sublista 30 min pra baixo funciona como bloco (14:30)');
+  // janela
+  bx = await caixa('f_sub');
+  await p.mouse.click(bx.x + 420, bx.y + 10); await p.waitForTimeout(300);
+  const j0 = await p.evaluate(() => { const m = document.querySelector('#modal-task > div').getBoundingClientRect(); return { cards: document.querySelectorAll('#f-cards .fc-row').length, check: !document.getElementById('f-mbs-wrap').classList.contains('hidden'), cabe: m.top >= 0 && m.bottom <= innerHeight }; });
+  ok(j0.cards === 3 && !j0.check && j0.cabe, 'clicar abre a janela com os cartões no lugar da checklist, inteira na tela');
+  await p.locator('#f-card-new').click(); await p.keyboard.type('Comprar toner'); await p.keyboard.press('Enter'); await p.waitForTimeout(350);
+  await p.locator('#f-card-pull').click(); await p.waitForTimeout(150);
+  await p.keyboard.type('tarefa 2'); await p.keyboard.press('Enter'); await p.waitForTimeout(450);
+  const j1 = await p.evaluate((uid) => window.__nuvem.get('blocos', uid, 'f_sub').cards.map((c) => c.title), UID);
+  ok(j1.length === 5 && j1[3] === 'Comprar toner' && j1[4] === 'Tarefa 2', 'digitar + Enter cria; "Puxar da Lista" + busca + Enter traz a tarefa (' + j1.slice(3).join(', ') + ')');
+  await foto(p, 'pc-sublista-janela.png');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(100);
+  await p.locator('#f-cards [data-fc-open="cd_2"]').click(); await p.waitForTimeout(350);
+  const j2 = await p.evaluate(() => ({ voltar: !document.getElementById('f-card-back').classList.contains('hidden'), nome: document.getElementById('f-title').value, grade: !document.getElementById('f-grid').classList.contains('hidden') }));
+  ok(j2.voltar && j2.nome.startsWith('Responder o Anderson') && !j2.grade, 'abrir um cartão: o mesmo cartão das Listas, com "← Pendências rápidas" pra voltar');
+  await foto(p, 'pc-sublista-cartao.png');
+  await p.locator('#f-card-back').click(); await p.waitForTimeout(250);
+  ok(await p.evaluate(() => !document.getElementById('f-cards-wrap').classList.contains('hidden')), '"←" volta pra janela da sublista');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+  // tarefa na mão
+  await p.locator('#tab-listas').click(); await p.waitForTimeout(250);
+  const tid = await p.evaluate(() => document.querySelector('#columns [data-hand]').dataset.hand);
+  await p.locator('#columns [data-hand]').first().click(); await p.waitForTimeout(400);
+  await p.evaluate(() => { document.getElementById('ag-day').scrollTop = (14 * 60 - 7 * 60) * 3.2 - 200; }); await p.waitForTimeout(150);
+  const drop = await p.evaluate(() => { const b = document.querySelector('#ag-timeline [data-sub-drop="f_sub"]'); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  ok(!!drop, 'com a tarefa na mão, a sublista mostra "Colocar na sublista"');
+  await foto(p, 'pc-sublista-mao.png');
+  if (drop) { await p.mouse.click(drop.x, drop.y); await p.waitForTimeout(450); }
+  ok(await p.evaluate(([uid, tid]) => window.__nuvem.get('tarefas', uid, tid).deleted === true && window.__nuvem.get('blocos', uid, 'f_sub').cards.length === 6, [UID, tid]), 'clicar coloca a tarefa na sublista (e ela sai da Lista)');
+  }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));
   await fim();

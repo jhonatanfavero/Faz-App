@@ -63,7 +63,7 @@
         tarefas: ['column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived'],
         listas: ['name', 'is_default', 'position', 'created_ms'],
         tags: ['name', 'color', 'position'],
-        blocos: ['date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived'],
+        blocos: ['date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'cards'],
         rotinas: ['title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms'],
         notas: ['title', 'content', 'created_ms', 'updated_ms'],
         financas: ['title', 'amount', 'start_month', 'duration_months', 'is_recurring', 'due_day', 'tag_id', 'paid_months', 'amount_overrides', 'created_ms'],
@@ -135,6 +135,24 @@
         return out;
     }
     function hex6(c) { return HEX6.test(String(c || '')) ? String(c) : null; }
+    // V40.24.0: SUBLISTA. Bloco com 'cards' (lista, mesmo vazia) é uma sublista; sem 'cards' (null) é bloco normal.
+    // Cada cartão: { id, title, done, tagId?, color?, microblocks, duration?, columnId? } (o mesmo JSON no app,
+    // na nuvem e no PC). id, tag, lista e cor entram em atributos do HTML: só passam no formato certo.
+    var MAX_CARDS = 100;
+    function safeCards(a) {
+        if (!Array.isArray(a)) return null;
+        var seen = {};
+        return a.filter(function (c) { return c && typeof c === 'object' && !Array.isArray(c); }).slice(0, MAX_CARDS).map(function (c, i) {
+            var id = c.id != null && SAFE_ID.test(String(c.id)) && !seen[String(c.id)] ? String(c.id) : 'cd_x' + i;
+            seen[id] = true;
+            var o = { id: id, title: str(c.title, 2000), done: !!c.done, microblocks: safeMbs(c.microblocks) };
+            if (c.tagId != null && SAFE_ID.test(String(c.tagId))) o.tagId = String(c.tagId);
+            if (hex6(c.color)) o.color = String(c.color);
+            if (c.duration != null && c.duration !== '' && Number.isFinite(Number(c.duration))) o.duration = clampInt(c.duration, 30, 5, 1440);
+            if (c.columnId != null && SAFE_ID.test(String(c.columnId))) o.columnId = String(c.columnId);
+            return o;
+        });
+    }
     function goalNum(v, def) { // alvo/passo de meta: > 0, até 1 bilhão, com 2 casas
         var n = Number(v), r = v != null && v !== '' && Number.isFinite(n) ? Math.min(GOAL_MAX, Math.round(n * 100) / 100) : 0;
         return r > 0 ? r : def;
@@ -237,7 +255,8 @@
                     was_delayed: !!b.wasDelayed,
                     linked_note_ids: Array.isArray(b.linkedNoteIds) ? clone(b.linkedNoteIds) : [],
                     color: hex6(b.color),
-                    archived: !!b.__archived
+                    archived: !!b.__archived,
+                    cards: Array.isArray(b.cards) ? safeCards(b.cards) : null // V40.24.0: sublista
                 };
             },
             item: function (r, prev) {
@@ -254,6 +273,7 @@
                 if (r.was_delayed) b.wasDelayed = true; else delete b.wasDelayed;
                 b.linkedNoteIds = clone(r.linked_note_ids || []);
                 if (r.color) b.color = r.color; else delete b.color;
+                if (Array.isArray(r.cards)) b.cards = clone(r.cards); else delete b.cards; // V40.24.0: sublista
                 delete b.__archived;
                 return b;
             }
@@ -442,6 +462,7 @@
                 if (!WORD.test(String(c.type))) c.type = 'focus';
                 if (!WORD.test(String(c.theme))) c.theme = 'focus';
                 c.linked_note_ids = (Array.isArray(c.linked_note_ids) ? c.linked_note_ids : []).filter(function (x) { return typeof x === 'string' && SAFE_ID.test(x); });
+                c.cards = safeCards(c.cards); // V40.24.0
             }
             if (kind === 'rotinas') {
                 c.title = str(c.title, 200);
@@ -796,7 +817,7 @@
 
     return {
         DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS, MONTH: MONTH, DEFAULT_GOAL_LISTS: DEFAULT_GOAL_LISTS,
-        cleanOverrides: cleanOverrides, cleanMonths: cleanMonths,
+        cleanOverrides: cleanOverrides, cleanMonths: cleanMonths, safeCards: safeCards, MAX_CARDS: MAX_CARDS, // V40.24.0
         stable: stable, same: same, validDate: validDate, assignPositions: assignPositions, fixTies: fixTies,
         buildLocal: buildLocal, indexRows: indexRows, cleanRow: cleanRow, merge3: merge3, mergeKind: mergeKind,
         plan: plan, materialize: materialize, materializeArchived: materializeArchived, baseFrom: baseFrom, aliveCount: aliveCount, MAP: MAP
@@ -820,7 +841,7 @@
         tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,deleted',
         listas: 'id,name,is_default,position,created_ms,deleted',
         tags: 'id,name,color,position,deleted',
-        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,deleted,updated_at',
+        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,deleted,updated_at', // V40.24.0: + cards (sublista)
         rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,deleted',
         notas: 'id,title,content,created_ms,updated_ms,deleted',
         financas: 'id,title,amount,start_month,duration_months,is_recurring,due_day,tag_id,paid_months,amount_overrides,created_ms,deleted',

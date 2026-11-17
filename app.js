@@ -568,6 +568,9 @@ function cardMatchesSearch(block, normalizedQuery) {
         }
     }
 
+    // 2b. V40.24.0: cartões da sublista
+    if (isSublist(block) && block.cards.some(c => c && normalizeText(c.title).includes(normalizedQuery))) return true;
+
     // 3. Nome da tag (se tiver tag vinculada)
     if (block.tagId) {
         const tag = tagsDb.find(t => t.id === block.tagId);
@@ -683,7 +686,7 @@ function runRealTimeEngine() {
 
     const nowLine = document.getElementById('now-line');
     if ((isToday && currentRealMins >= START_HOUR * 60 && currentRealMins <= END_HOUR * 60) && !showOnlyDelayed && !showOnlyCompleted) {
-        const topPx = (currentRealMins - (START_HOUR * 60)) * PX_PER_MIN;
+        const topPx = tlY(currentRealMins); // V40.24.0
         nowLine.style.top = `${topPx}px`;
         nowLine.style.display = 'flex';
         document.getElementById('now-badge').innerText = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
@@ -712,7 +715,11 @@ window.toggleBlockCompletion = function(id, e) {
     e.stopPropagation();
     let b = db.find(x => x.id === id);
     if(b) {
-        b.completed = !b.completed;
+        if (isSublist(b) && b.cards.length) { // V40.24.0: sublista com cartões → marca (ou desmarca) todos
+            const all = subCount(b).open === 0;
+            b.cards.forEach(c => { c.done = !all; });
+            subSyncDone(b);
+        } else b.completed = !b.completed;
         saveDb();
         renderTimeline();
     }
@@ -754,6 +761,90 @@ window.deleteMicroblock = function(blockId, mbId, e) {
 // --- 4. O MOTOR MATEMÁTICO ---
 const container = document.getElementById('blocks-container');
 
+// =====================================================
+// V40.24.0 — OCULTAR VAGOS na agenda do celular (o "Compactar vagos" do PC)
+// =====================================================
+// Botão na linha dos filtros liga/desliga; fica guardado neste aparelho (tb__vagos_compactos, fora do backup).
+// Ligado, cada vago de 30 min ou mais vira uma faixa de 36 px ("13:00–15:25 · livre 2h 25m"); o resto da régua
+// continua na escala de sempre (3 px por minuto). tlY/tlMin convertem minuto ↔ pixel por trechos, como o
+// agY/agMin do PC: fora das faixas a conta é exatamente a de antes (arrastar, esticar e a linha do agora seguem
+// certos). Só na agenda normal: nos filtros e na busca (modo lista) não há régua.
+const TL_GAP_MIN = 30, TL_GAP_PX = 36;
+let tlCompact = false;
+try { tlCompact = localStorage.getItem('tb__vagos_compactos') === '1'; } catch (e) {}
+let tlSegs = null; // trechos da régua do dia na tela; null = escala normal
+function tlBuildSegs(list, lo, hi) {
+    const segs = [];
+    const add = (a, b, gap) => {
+        if (b <= a) return;
+        const last = segs[segs.length - 1];
+        if (!gap && last && !last.gap) { last.b = b; last.px += (b - a) * PX_PER_MIN; return; } // trechos normais seguidos viram um só
+        segs.push({ a: a, b: b, px: gap ? TL_GAP_PX : (b - a) * PX_PER_MIN, gap: gap });
+    };
+    let cur = lo;
+    list.forEach(b => {
+        const a = Math.max(lo, b.startMin), z = Math.min(hi, b.startMin + b.duration);
+        if (z <= cur) return;
+        if (a > cur) add(cur, a, a - cur >= TL_GAP_MIN);
+        add(Math.max(a, cur), z, false);
+        cur = z;
+    });
+    if (cur < hi) add(cur, hi, hi - cur >= TL_GAP_MIN);
+    return segs.some(x => x.gap) ? segs : null; // sem vago grande: escala normal
+}
+function tlY(min) {
+    if (!tlSegs) return (min - START_HOUR * 60) * PX_PER_MIN;
+    let y = 0;
+    if (min < tlSegs[0].a) return (min - tlSegs[0].a) * PX_PER_MIN;
+    for (const sg of tlSegs) {
+        if (min <= sg.b) return y + (sg.gap ? (min - sg.a) / (sg.b - sg.a) * sg.px : (min - sg.a) * PX_PER_MIN);
+        y += sg.px;
+    }
+    return y + (min - tlSegs[tlSegs.length - 1].b) * PX_PER_MIN;
+}
+function tlMin(y) {
+    if (!tlSegs) return START_HOUR * 60 + y / PX_PER_MIN;
+    let acc = 0;
+    if (y < 0) return tlSegs[0].a + y / PX_PER_MIN;
+    for (const sg of tlSegs) {
+        if (y <= acc + sg.px) return sg.a + (sg.gap ? (y - acc) / sg.px * (sg.b - sg.a) : (y - acc) / PX_PER_MIN);
+        acc += sg.px;
+    }
+    return tlSegs[tlSegs.length - 1].b + (y - acc) / PX_PER_MIN;
+}
+function tlInGap(min) { return !!tlSegs && tlSegs.some(sg => sg.gap && min > sg.a && min < sg.b); }
+function tlGapAt(min) { return tlSegs ? tlSegs.find(sg => sg.gap && sg.a === min) || null : null; }
+function updateTlCompactBtn() {
+    const b = document.getElementById('tl-compact-btn');
+    if (!b) return;
+    b.classList.toggle('tl-compact-on', tlCompact);
+    b.setAttribute('aria-pressed', tlCompact ? 'true' : 'false');
+    b.title = tlCompact ? 'Mostrar os vagos' : 'Ocultar os vagos';
+}
+window.toggleTlCompact = function() {
+    tlCompact = !tlCompact;
+    try { localStorage.setItem('tb__vagos_compactos', tlCompact ? '1' : '0'); } catch (e) {}
+    updateTlCompactBtn();
+    renderTimeline();
+};
+// Tocar numa faixa (sem tarefa na mão) abre o + já mirando aquele vago: o que for criado entra direto lá.
+let sheetSlot = null; // { date, start, dur }
+function tlSlotLabel() {
+    const btn = document.getElementById('commit-intent-btn');
+    if (btn) btn.innerHTML = `<i class="ph ph-calendar-plus text-base"></i> ${sheetSlot ? 'Inserir às ' + formatClock(sheetSlot.start) : 'Inserir na Agenda'}`;
+}
+window.openSheetAt = function(start, dur) {
+    openSheet();
+    sheetSlot = { date: getActiveDateStr(), start: start, dur: dur };
+    tlSlotLabel();
+};
+function tlTakeSlot() { const sl = sheetSlot; sheetSlot = null; tlSlotLabel(); return sl; }
+function tlPlaceAt(sl) {
+    if (!sl || !pendingIntent || sl.date !== getActiveDateStr()) return;
+    if (pendingIntent.duration > sl.dur) { showToast('Não cabe nesse vago: toque onde quer colocar 👇'); return; }
+    performEncaixeMatematico(sl.start, sl.dur);
+}
+
 function renderGrid() {
     // V3.0 - Bug 2.5: Modo filtro com altura automática
     const tlContainer = document.getElementById('timeline-container');
@@ -761,7 +852,7 @@ function renderGrid() {
     if (showOnlyDelayed || showOnlyCompleted || isSearching) {
         tlContainer.style.height = 'auto';
     } else {
-        tlContainer.style.height = `${TOTAL_MINS * PX_PER_MIN}px`;
+        tlContainer.style.height = `${tlY(END_HOUR * 60)}px`; // V40.24.0: com vagos ocultos a régua encolhe
     }
     const yAxis = document.getElementById('y-axis');
     const gridLines = document.getElementById('grid-lines');
@@ -769,7 +860,8 @@ function renderGrid() {
     gridLines.innerHTML = '';
     
     for (let i = START_HOUR; i <= END_HOUR; i++) {
-        const topPx = (i - START_HOUR) * 60 * PX_PER_MIN;
+        if (tlInGap(i * 60)) continue; // V40.24.0: dentro de um vago oculto (a faixa mostra o horário)
+        const topPx = tlY(i * 60);
         yAxis.innerHTML += `<div class="absolute text-[10px] text-zinc-400 font-medium w-10 text-right left-0 -translate-y-1/2" style="top: ${topPx}px">${i.toString().padStart(2, '0')}:00</div>`;
         gridLines.innerHTML += `<div class="absolute w-[calc(100%+40px)] -left-14 border-t border-black/[0.05]" style="top: ${topPx}px"></div>`;
     }
@@ -797,6 +889,7 @@ function renderTimeline() {
     const timelineContainer = document.getElementById('timeline-container');
     const isSearching = !!(searchQuery && searchQuery.trim());
     
+    tlSegs = null; // V40.24.0: escala normal até saber se a agenda do dia mostra vagos ocultos
     // V40.2.6: busca pesquisa em TODOS os dias e renderiza lista especial
     if (isSearching) {
         timelineContainer.classList.add('filter-list-mode');
@@ -847,7 +940,15 @@ function renderTimeline() {
         }
     }
 
+    // V40.24.0: vagos ocultos (só na agenda normal; nos filtros é lista)
+    if (tlCompact && !showOnlyDelayed && !showOnlyCompleted) {
+        const lo = START_HOUR * 60, hi = END_HOUR * 60;
+        tlSegs = tlBuildSegs(db.filter(b => b.date === getActiveDateStr() && b.startMin < hi && b.startMin + b.duration > lo).sort((a, b) => a.startMin - b.startMin), lo, hi);
+    }
     renderGrid(); 
+    // V40.24.0: a régua pode ter mudado (vagos ocultos ou blocos novos): a linha do agora acompanha já
+    const nowLineEl = document.getElementById('now-line');
+    if (nowLineEl && nowLineEl.style.display !== 'none') nowLineEl.style.top = `${tlY(currentRealMins)}px`;
 
     let dailyDb = db.filter(b => b.date === getActiveDateStr());
     
@@ -892,6 +993,9 @@ function renderTimeline() {
     document.getElementById('progress-text').innerText = `Planejado (${pct}%)`;
 
     renderQueue.forEach(block => drawBlock(block));
+    // V40.24.0: com tarefa na mão e sublista no dia, a dica lembra que dá pra soltar nela também
+    const hint = document.getElementById('floating-hint');
+    if (hint) hint.textContent = pendingIntent && subCanDrop() && dailyDb.some(isSublist) ? 'Toque num espaço livre ou numa sublista' : 'Toque num espaço livre';
 }
 
 // V40.2.6: Renderiza resultados de busca de TODOS os dias como lista
@@ -1001,8 +1105,8 @@ window.goToDateFromSearch = function(dateStr) {
 }
 
 function drawBlock(block) {
-    const topPx = (block.startMin - (START_HOUR * 60)) * PX_PER_MIN;
-    const heightPx = (block.duration * PX_PER_MIN) - 2; 
+    const topPx = tlY(block.startMin); // V40.24.0: escala por trechos (vagos ocultos)
+    const heightPx = tlY(block.startMin + block.duration) - topPx - 2; 
 
     // V40.2.9: detecta modo busca pra neutralizar o atalho de horário (que estava capturando toques na área do card)
     const isSearching = !!(searchQuery && searchQuery.trim());
@@ -1019,7 +1123,33 @@ function drawBlock(block) {
 
     const isSmall = block.duration <= 30;
 
-    if (block.type === 'empty') {
+    // V40.24.0: sublista (bloco com vários cartões dentro) tem desenho próprio
+    if ((block.type === 'focus' || block.type === 'past') && isSublist(block)) {
+        drawSublist(el, block, heightPx, isSearching);
+        container.appendChild(el);
+        return;
+    }
+
+    if (block.type === 'empty' && tlGapAt(block.startMin)) {
+        // V40.24.0: vago oculto = faixa fininha com o horário; tocar cria ali (ou solta a tarefa da mão)
+        el.className += ' bg-hatched border border-dashed items-center justify-center text-center tl-gap';
+        const range = `${formatClock(block.startMin)}–${formatClock(block.startMin + block.duration)}`;
+        if (pendingIntent) {
+            if (block.duration >= pendingIntent.duration) {
+                el.classList.add('border-black/20', 'animate-pulse-drop', 'cursor-pointer', 'z-30');
+                el.onclick = () => performEncaixeMatematico(block.startMin, block.duration);
+                el.innerHTML = `<span class="tl-gap-txt text-app-focus"><i class="ph ph-hand-pointing"></i>Soltar aqui · ${range}</span>`;
+            } else {
+                el.classList.add('border-red-500/20', 'opacity-60');
+                el.innerHTML = `<span class="tl-gap-txt text-red-500">${range} · muito curto</span>`;
+            }
+        } else {
+            el.classList.add('border-black/10', 'cursor-pointer');
+            el.onclick = () => { if (!db.some(x => x.expanded)) openSheetAt(block.startMin, block.duration); }; // com um cartão aberto, o toque só fecha ele
+            el.innerHTML = `<span class="tl-gap-txt"><i class="ph ph-arrows-out-line-vertical"></i>${range} · livre ${formatDur(block.duration)}</span>`;
+        }
+    }
+    else if (block.type === 'empty') {
         el.className += ' bg-hatched border border-dashed items-center justify-center text-center';
         if (pendingIntent) {
             if (block.duration >= pendingIntent.duration) {
@@ -1156,18 +1286,18 @@ function drawBlock(block) {
             ? 'bg-black/20 hover:bg-red-500/70 text-white/85 hover:text-white active:scale-95'
             : 'bg-black/5 hover:bg-red-500/80 text-zinc-700 hover:text-white active:scale-95';
         const actionBarHtml = block.expanded ? `
-            <div class="absolute left-12 right-3 bottom-1 flex gap-1.5 z-30 pointer-events-auto">
+            <div class="blk-bar absolute left-12 right-3 bottom-1 flex gap-1.5 z-30 pointer-events-auto">
                 <button onclick="openEditModal('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarBtnClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Editar">
-                    <i class="ph ph-pencil-simple text-[12px]"></i>Editar
+                    <i class="ph ph-pencil-simple text-[12px] bar-ico"></i>Editar
                 </button>
                 <button onclick="duplicateTask('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarBtnClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Duplicar">
-                    <i class="ph ph-copy text-[12px]"></i>Duplicar
+                    <i class="ph ph-copy text-[12px] bar-ico"></i>Duplicar
                 </button>
                 <button onclick="fazArchiveBlock('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarBtnClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Arquivar">
-                    <i class="ph ph-archive text-[12px]"></i>Arquivar
+                    <i class="ph ph-archive text-[12px] bar-ico"></i>Arquivar
                 </button>
                 <button onclick="openDeleteModal('${block.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${actionBarDeleteClass} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Apagar">
-                    <i class="ph ph-trash text-[12px]"></i>Apagar
+                    <i class="ph ph-trash text-[12px] bar-ico"></i>Apagar
                 </button>
             </div>
         ` : '';
@@ -1252,6 +1382,344 @@ function drawBlock(block) {
     }
 }
 
+// =====================================================
+// V40.24.0 — SUBLISTA (bloco-grupo na agenda)
+// =====================================================
+// Ideia do Jhonatan: "várias coisas pequenas pra fazer no mesmo horário". A sublista é um bloco da agenda
+// (horário fixo; arrasta, estica, duplica e arquiva como qualquer bloco) com vários cartões dentro.
+// Combinado com ele (16/11/2026):
+//   - o horário é da sublista; os cartões dentro não têm horário próprio;
+//   - cartão completo: sai da Lista com tag, cor e checklist e volta inteiro ("Voltar pra lista");
+//   - quando o horário passa, os não feitos ficam lá (atrasados) e um botão devolve todos pra Lista.
+// Dado: o bloco ganha `cards` (lista, mesmo vazia). Sem `cards` = bloco normal. Cada cartão:
+//   { id 'cd_…', title, done, tagId?, color?, microblocks [{ title, done }], duration?, columnId? }
+// (duration e columnId guardam o tempo e a lista de origem pra quando ele voltar.) Na nuvem vai em
+// blocos.cards (o sync.js valida). As mesmas regras e textos estão no kanban.html (PC).
+const SUB_MAX = 100;
+function isSublist(b) { return !!b && Array.isArray(b.cards); }
+function subCount(b) {
+    const a = isSublist(b) ? b.cards : [];
+    const done = a.filter(c => c && c.done).length;
+    return { done: done, total: a.length, open: a.length - done };
+}
+function subNewId() { return 'cd_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8); }
+// Todos os cartões marcados = sublista concluída (desmarcar um reabre). Sublista vazia fica como está.
+function subSyncDone(b) { const c = subCount(b); if (c.total) b.completed = c.done === c.total; }
+// Cópia (duplicar, repetir): ids novos e tudo desmarcado, como a checklist dos blocos.
+function subCloneCards(cards) {
+    return (Array.isArray(cards) ? cards : []).filter(c => c && typeof c === 'object' && !Array.isArray(c)).map(c => {
+        const o = JSON.parse(JSON.stringify(c));
+        o.id = subNewId();
+        o.done = false;
+        o.microblocks = (Array.isArray(c.microblocks) ? c.microblocks : []).map(m => ({ title: String((m && m.title) || ''), done: false }));
+        return o;
+    });
+}
+// Com uma tarefa na mão, a sublista vira lugar de soltar (menos se a mão leva outra sublista ou um Descanso).
+function subCanDrop() { return !!pendingIntent && !Array.isArray(pendingIntent.cards) && pendingIntent.theme !== 'rest'; }
+function subCardFrom(p) {
+    const card = {
+        id: subNewId(), title: String(p.title || '').trim() || 'Sem nome', done: false,
+        microblocks: (Array.isArray(p.microblocks) ? p.microblocks : []).filter(m => m && String(m.title || '').trim()).map(m => ({ title: String(m.title).trim(), done: false }))
+    };
+    if (p.tagId) card.tagId = p.tagId;
+    const col = fazCardColor(p.color);
+    if (col) card.color = col;
+    if (Number(p.duration) > 0) card.duration = Math.round(Number(p.duration));
+    if (p.columnId) card.columnId = p.columnId;
+    return card;
+}
+// O cartão volta pra Lista (pra lista de onde veio, se ela ainda existir). Devolve o nome da lista.
+function subCardToList(b, card) {
+    const col = (card.columnId && backlogColumnsDb.find(c => c.id === card.columnId)) || backlogColumnsDb.find(c => c.id === 'col_geral') || backlogColumnsDb[0];
+    backlogDb.push({
+        id: 'bl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        title: card.title || 'Sem nome',
+        duration: Number(card.duration) > 0 ? Number(card.duration) : 30,
+        tagId: card.tagId || null,
+        microblocks: (card.microblocks || []).map(m => ({ title: m.title, done: false })),
+        ...(fazCardColor(card.color) ? { color: fazCardColor(card.color) } : {}),
+        columnId: col ? col.id : 'col_geral'
+    });
+    b.cards = b.cards.filter(c => c.id !== card.id);
+    subSyncDone(b);
+    return col ? col.name : 'Geral';
+}
+function subCardRowHtml(b, card) {
+    const tagColor = card.tagId ? getTagColor(card.tagId) : null;
+    const col = fazCardColor(card.color);
+    const mbs = Array.isArray(card.microblocks) ? card.microblocks : [];
+    const mbDone = mbs.filter(m => m && m.done).length;
+    const style = (tagColor ? `border-left-color:${tagColor};` : '') + (col ? `background-color:${col};` : '');
+    return `<div class="sub-card${card.done ? ' is-done' : ''}${col && fazIsDark(col) ? ' is-dark' : ''}" data-card-id="${card.id}"${style ? ` style="${style}"` : ''}>
+            <button onclick="toggleSublistCard('${b.id}', '${card.id}', event)" class="sub-ck" aria-label="${card.done ? 'Desmarcar' : 'Marcar como feito'}"><i class="ph-bold ph-check"></i></button>
+            <span onclick="openSublistCard('${b.id}', '${card.id}', event)" class="sub-card-title">${escapeHtml(card.title || 'Sem nome')}</span>
+            ${mbs.length ? `<span class="sub-card-mb"><i class="ph ph-check-square"></i>${mbDone}/${mbs.length}</span>` : ''}
+        </div>`;
+}
+// O bloco da sublista na timeline: amarelinho com borda tracejada (ou a cor escolhida), cabeçalho com o
+// horário, o nome e "feitos/total", e os cartões que couberem na altura ("+N" abre o resto).
+function drawSublist(el, b, heightPx, isSearching) {
+    const listMode = !!document.querySelector('.filter-list-mode');
+    const c = subCount(b);
+    const isPast = b.type === 'past';
+    const custom = b.completed ? null : fazCardColor(b.color);
+    const dark = !!b.completed || (custom ? fazIsDark(custom) : false);
+    const tagColor = getTagColor(b.tagId);
+    const placing = subCanDrop();
+    const compact = !b.expanded && !listMode && b.duration <= 20; // até 20 min (58 px) só cabe o cabeçalho
+    const pb = b.expanded ? 'pb-12' : (compact ? 'pb-1' : 'pb-3');
+    el.className += ` sub-block ${b.completed ? 'sub-done' : (custom ? 'sub-custom' : 'sub-amber')}${dark ? ' sub-dark' : ''} pr-2 ${compact ? 'pt-1' : 'pt-2'} ${pb} group select-none`;
+    if (custom) el.style.backgroundColor = custom;
+    if (tagColor) el.style.cssText += `border-left: 5px solid ${tagColor};`;
+    if (b.expanded) {
+        el.classList.add('shadow-2xl');
+        el.style.height = 'auto'; el.style.minHeight = `${heightPx}px`; el.style.zIndex = '35';
+    }
+    if (placing) {
+        // Tarefa na mão: tocar em qualquer lugar da sublista coloca a tarefa dentro dela
+        el.classList.add('sub-target');
+        el.onclick = (e) => { if (!e.target.closest('.drag-handle, .resize-handle')) dropIntoSublist(b.id, e); };
+    } else if (!b.expanded && !listMode && b.duration < 15) {
+        // 5 e 10 min: não cabem os botões → tocar na sublista abre
+        el.onclick = (e) => { if (!e.target.closest('.drag-handle, .resize-handle, .block-btn')) toggleExpandBlock(b.id, e); };
+    }
+    const btnBg = dark ? 'bg-black/20 hover:bg-black/30' : 'bg-black/5 hover:bg-black/10';
+    const btnIco = dark ? 'text-white/70 hover:text-white' : 'text-amber-800/70 hover:text-amber-950';
+    const pastIcon = (isPast || b.wasDelayed) ? `<div class="pointer-events-auto w-3.5 h-3.5 rounded-full ${dark ? 'bg-black/20 border-black/30 text-white/80' : 'bg-black/10 border-black/10 text-zinc-500'} flex items-center justify-center shrink-0 border mr-1" title="Tempo Esgotado / Realocado"><i class="ph-bold ph-info text-[8px]"></i></div>` : '';
+    const timeClick = isSearching || placing ? '' : `onclick="openTimePicker('${b.id}', ${b.startMin}, event)"`;
+
+    let body = '';
+    if (placing) {
+        body = `<div class="sub-drop ml-10 mr-1 ${compact ? 'mt-0.5' : 'mt-1.5'}"><i class="ph ph-hand-pointing text-sm"></i>Colocar aqui</div>`;
+    } else if (!compact) {
+        let shown = b.cards, more = 0;
+        if (!b.expanded && !listMode) {
+            const fit = Math.max(0, Math.floor((heightPx - 46) / 28)); // 28 px por cartão
+            if (b.cards.length > fit) { shown = b.cards.slice(0, Math.max(0, fit - 1)); more = b.cards.length - shown.length; }
+        }
+        const rows = shown.map(card => subCardRowHtml(b, card)).join('');
+        const moreHtml = more ? `<button onclick="toggleExpandBlock('${b.id}', event)" class="sub-more">+${more} ${more === 1 ? 'cartão' : 'cartões'}</button>` : '';
+        const empty = !b.cards.length && !b.expanded ? `<p class="sub-empty">Vazia · toque em <i class="ph ph-caret-down"></i> pra pôr cartões</p>` : '';
+        const extra = b.expanded ? `
+                <input type="text" id="sub-input-${b.id}" maxlength="200" placeholder="+ Adicionar cartão" class="sub-input microblock-input w-full rounded-md px-2 py-1.5 mt-1.5 text-[11px] font-medium outline-none border border-transparent" onkeypress="if(event.key==='Enter') addSublistCard('${b.id}', this, event)">
+                ${!b.cards.length ? `<p class="sub-empty">Ou agende um cartão da Lista e toque nesta sublista.</p>` : ''}
+                ${c.open && b.cards.length ? `<button onclick="sublistReturnOpen('${b.id}', event)" class="sub-return"><i class="ph ph-arrow-u-up-left"></i>${c.open === 1 ? 'Devolver o não feito pra Lista' : `Devolver os ${c.open} não feitos pra Lista`}</button>` : ''}
+                ${renderLinkedNotesSection(b, dark)}` : '';
+        body = `<div class="sub-cards ml-10 mr-1 relative z-20 pointer-events-auto">${rows}${moreHtml}${empty}${extra}</div>`;
+    }
+
+    const barBtn = dark ? 'bg-black/20 hover:bg-black/30 text-white/85 active:scale-95' : 'bg-black/5 hover:bg-black/10 text-zinc-700 active:scale-95';
+    const barDel = dark ? 'bg-black/20 hover:bg-red-500/70 text-white/85 hover:text-white active:scale-95' : 'bg-black/5 hover:bg-red-500/80 text-zinc-700 hover:text-white active:scale-95';
+    const actionBar = b.expanded && !placing ? `
+            <div class="blk-bar absolute left-12 right-3 bottom-1 flex gap-1.5 z-30 pointer-events-auto">
+                <button onclick="openEditModal('${b.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${barBtn} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Editar"><i class="ph ph-pencil-simple text-[12px] bar-ico"></i>Editar</button>
+                <button onclick="duplicateTask('${b.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${barBtn} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Duplicar"><i class="ph ph-copy text-[12px] bar-ico"></i>Duplicar</button>
+                <button onclick="fazArchiveBlock('${b.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${barBtn} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Arquivar"><i class="ph ph-archive text-[12px] bar-ico"></i>Arquivar</button>
+                <button onclick="openDeleteModal('${b.id}', event)" class="flex-1 flex items-center justify-center gap-1 ${barDel} rounded-md px-2 py-1.5 text-[10px] font-semibold transition" title="Apagar"><i class="ph ph-trash text-[12px] bar-ico"></i>Apagar</button>
+            </div>` : '';
+
+    el.innerHTML = `
+        <div class="drag-handle absolute left-0 top-0 bottom-0 w-10 flex items-start justify-center ${compact ? 'pt-1' : 'pt-2'} pointer-events-auto z-50" title="Arrastar (Mover)">
+            <i class="ph ph-dots-six-vertical sub-ico text-base mt-0.5"></i>
+        </div>
+        <div class="flex justify-between items-start z-30 relative ml-10">
+            <div class="flex flex-col flex-1 min-w-0 pr-2 pointer-events-auto">
+                <span ${timeClick} class="time-label ${compact ? 'hidden' : 'block'} sub-time text-[10px] font-bold tracking-widest uppercase truncate ${timeClick ? 'cursor-pointer' : ''}">${formatClock(b.startMin)} - ${formatClock(b.startMin + b.duration)} &bull; ${formatDur(b.duration)}</span>
+                <div class="title-wrapper flex items-center ${compact ? '' : 'mt-0.5'} min-w-0 pointer-events-none">
+                    ${pastIcon}<i class="ph-bold ph-list-checks sub-ico text-[13px] shrink-0 mr-1"></i>
+                    <h3 class="block-title sub-title text-[14px] font-bold leading-tight truncate${b.completed ? ' line-through' : ''}">${escapeHtml(b.title)}</h3>
+                    <span class="sub-count shrink-0 ml-1.5">${c.total ? `${c.done}/${c.total}` : '0'}</span>
+                </div>
+            </div>
+            ${placing ? '' : `<div class="flex gap-1.5 shrink-0 relative z-[60] pointer-events-auto select-auto">
+                <button onclick="toggleExpandBlock('${b.id}', event)" class="block-btn w-7 h-7 flex items-center justify-center ${btnBg} ${btnIco} rounded transition" title="Expandir/Recolher"><i class="ph ${b.expanded ? 'ph-caret-up' : 'ph-caret-down'}"></i></button>
+                <button onclick="toggleBlockCompletion('${b.id}', event)" class="block-btn w-7 h-7 flex items-center justify-center ${btnBg} ${btnIco} rounded transition" title="${c.total ? 'Marcar todos' : 'Concluir'}"><i class="${b.completed ? 'ph-fill ph-check-circle' : 'ph ph-check'}"></i></button>
+            </div>`}
+        </div>
+        ${body}
+        ${actionBar}
+        <div class="resize-handle absolute bottom-0 left-12 w-12 h-6 flex items-end justify-start pb-1.5 z-40 ${b.expanded ? 'hidden' : ''}">
+            <div class="w-8 h-1 ${dark ? 'bg-white/40' : 'bg-amber-900/25'} rounded-full pointer-events-none"></div>
+        </div>`;
+    enablePhysics(el, b);
+}
+
+window.dropIntoSublist = function(bid, e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const b = db.find(x => x.id === bid);
+    if (!isSublist(b) || !subCanDrop()) return;
+    if (b.cards.length >= SUB_MAX) return showToast(`Uma sublista cabe até ${SUB_MAX} cartões.`);
+    const p = pendingIntent;
+    b.cards.push(subCardFrom(p));
+    subSyncDone(b); // entrou cartão por fazer: a sublista deixa de estar concluída
+    saveDb();
+    if (p.fromBacklogId) { // veio da Lista: sai de lá (igual a agendar)
+        backlogDb = backlogDb.filter(i => i.id !== p.fromBacklogId);
+        saveBacklog();
+        renderBacklog();
+    }
+    cancelPendingTask();
+    showToast(`Entrou na sublista ${b.title || ''}`.trim());
+};
+
+window.addSublistCard = function(bid, inputEl, e) {
+    const t = String((inputEl && inputEl.value) || '').trim();
+    if (!t) return;
+    const b = db.find(x => x.id === bid);
+    if (!isSublist(b)) return;
+    if (b.cards.length >= SUB_MAX) return showToast(`Uma sublista cabe até ${SUB_MAX} cartões.`);
+    b.cards.push({ id: subNewId(), title: t.slice(0, 200), done: false, microblocks: [] });
+    subSyncDone(b);
+    saveDb();
+    renderTimeline();
+    setTimeout(() => { const n = document.getElementById(`sub-input-${bid}`); if (n) n.focus({ preventScroll: true }); }, 50);
+};
+
+window.toggleSublistCard = function(bid, cid, e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (subCanDrop()) return dropIntoSublist(bid, e);
+    const f = subFindCard(bid, cid);
+    if (!f) return;
+    const was = !!f.b.completed;
+    f.card.done = !f.card.done;
+    subSyncDone(f.b);
+    saveDb();
+    renderTimeline();
+    if (!was && f.b.completed) showToast('Sublista concluída! 🎉', 'win');
+};
+
+window.sublistReturnOpen = function(bid, e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const b = db.find(x => x.id === bid);
+    if (!isSublist(b)) return;
+    const open = b.cards.filter(c => !c.done);
+    if (!open.length) return showToast('Todos os cartões já estão feitos.');
+    open.forEach(c => subCardToList(b, c));
+    saveDb(); saveBacklog();
+    renderTimeline(); renderBacklog();
+    showToast(open.length === 1 ? '1 cartão voltou pra Lista' : `${open.length} cartões voltaram pra Lista`);
+};
+
+// ---------- cartão aberto: o mesmo formulário da Lista (nome, etiqueta, cor e checklist) ----------
+let subCardEdit = null; // { bid, cid, tagId, color, mbs, delArmed }
+function subFindCard(bid, cid) {
+    const b = db.find(x => x.id === bid);
+    const card = isSublist(b) ? b.cards.find(c => c && c.id === cid) : null;
+    return card ? { b: b, card: card } : null;
+}
+window.openSublistCard = function(bid, cid, e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (subCanDrop()) return dropIntoSublist(bid, e);
+    const f = subFindCard(bid, cid);
+    if (!f) return;
+    closeAllSheets();
+    subCardEdit = {
+        bid: bid, cid: cid, delArmed: false,
+        tagId: f.card.tagId && tagsDb.some(t => t.id === f.card.tagId) ? f.card.tagId : null,
+        color: fazCardColor(f.card.color),
+        mbs: (f.card.microblocks || []).filter(m => m && typeof m === 'object').map(m => ({ ...m, title: String(m.title || ''), done: !!m.done }))
+    };
+    document.getElementById('sub-card-from').textContent = 'Sublista: ' + (f.b.title || 'Sem nome');
+    document.getElementById('sub-card-title').value = f.card.title || '';
+    document.getElementById('sub-card-mb-new').value = '';
+    renderSubCardForm();
+    document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
+    const m = document.getElementById('sub-card-modal');
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+    pushNavState();
+};
+function renderSubCardForm() {
+    const ed = subCardEdit;
+    if (!ed) return;
+    let html = `<button onclick="selectSubCardTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${ed.tagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
+    tagsDb.forEach(t => {
+        const on = ed.tagId === t.id;
+        html += `<button onclick="selectSubCardTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${on ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100'}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>${escapeHtml(t.name)}</button>`;
+    });
+    document.getElementById('sub-card-tags').innerHTML = html;
+    fazRenderColorPicker('sub-card-colors', ed.color, 'fazPickSubCardColor');
+    renderSubCardMbs();
+    const del = document.getElementById('sub-card-del');
+    del.innerHTML = ed.delArmed ? '<i class="ph ph-warning text-base"></i>Toque de novo pra apagar' : '<i class="ph ph-trash text-base"></i>Apagar cartão';
+    del.classList.toggle('sub-armed', !!ed.delArmed);
+}
+function renderSubCardMbs() {
+    const ed = subCardEdit;
+    if (!ed) return;
+    document.getElementById('sub-card-mbs').innerHTML = ed.mbs.length ? ed.mbs.map((m, i) => `
+        <div class="flex items-center gap-2 px-1 py-0.5">
+            <button type="button" onclick="toggleSubCardMb(${i})" class="shrink-0 w-4 h-4 rounded-[4px] border flex items-center justify-center ${m.done ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-300 bg-white'}" aria-label="${m.done ? 'Desmarcar' : 'Marcar'}">${m.done ? '<i class="ph-bold ph-check text-[10px] text-white"></i>' : ''}</button>
+            <span class="flex-1 min-w-0 text-[12px] break-words ${m.done ? 'line-through text-zinc-400' : 'text-zinc-700'}">${escapeHtml(m.title)}</span>
+            <button type="button" onclick="removeSubCardMb(${i})" class="shrink-0 w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-red-500" aria-label="Remover item"><i class="ph ph-x text-[12px]"></i></button>
+        </div>`).join('') : '<p class="text-[11px] text-zinc-400 px-1">Sem checklist.</p>';
+}
+window.selectSubCardTag = function(id) { if (!subCardEdit) return; subCardEdit.tagId = subCardEdit.tagId === id ? null : id; renderSubCardForm(); };
+window.fazPickSubCardColor = function(c) { if (!subCardEdit) return; subCardEdit.color = fazCardColor(c); fazRenderColorPicker('sub-card-colors', subCardEdit.color, 'fazPickSubCardColor'); };
+window.toggleSubCardMb = function(i) { const m = subCardEdit && subCardEdit.mbs[i]; if (m) { m.done = !m.done; renderSubCardMbs(); } };
+window.removeSubCardMb = function(i) { if (!subCardEdit) return; subCardEdit.mbs.splice(i, 1); renderSubCardMbs(); };
+window.addSubCardMb = function() {
+    const inp = document.getElementById('sub-card-mb-new');
+    const t = String(inp.value || '').trim();
+    if (!subCardEdit || !t) return;
+    subCardEdit.mbs.push({ title: t.slice(0, 200), done: false });
+    inp.value = '';
+    renderSubCardMbs();
+    inp.focus({ preventScroll: true });
+};
+window.saveSubCard = function() {
+    const ed = subCardEdit;
+    if (!ed) return;
+    const f = subFindCard(ed.bid, ed.cid);
+    if (!f) { closeSubCard(); return showToast('Esse cartão não está mais na sublista.'); }
+    const title = document.getElementById('sub-card-title').value.trim();
+    if (!title) { document.getElementById('sub-card-title').focus({ preventScroll: true }); return showToast('Dê um nome pro cartão.'); }
+    const pending = document.getElementById('sub-card-mb-new').value.trim(); // escreveu um item e não deu Enter: vale também
+    if (pending) ed.mbs.push({ title: pending.slice(0, 200), done: false });
+    f.card.title = title.slice(0, 200);
+    if (ed.tagId) f.card.tagId = ed.tagId; else delete f.card.tagId;
+    if (ed.color) f.card.color = ed.color; else delete f.card.color;
+    f.card.microblocks = ed.mbs.filter(m => String(m.title || '').trim()).map(m => ({ ...m, title: String(m.title).trim(), done: !!m.done }));
+    saveDb();
+    closeSubCard();
+    renderTimeline();
+    showToast('Cartão salvo!');
+};
+window.subCardToListFromModal = function() {
+    const ed = subCardEdit;
+    if (!ed) return;
+    const f = subFindCard(ed.bid, ed.cid);
+    if (!f) { closeSubCard(); return showToast('Esse cartão não está mais na sublista.'); }
+    const name = subCardToList(f.b, f.card);
+    saveDb(); saveBacklog();
+    closeSubCard();
+    renderTimeline(); renderBacklog();
+    showToast(`Voltou pra lista ${name}`);
+};
+window.deleteSubCardFromModal = function() {
+    const ed = subCardEdit;
+    if (!ed) return;
+    if (!ed.delArmed) { ed.delArmed = true; renderSubCardForm(); return; } // 2 toques: não apaga sem querer
+    const f = subFindCard(ed.bid, ed.cid);
+    if (f) {
+        f.b.cards = f.b.cards.filter(c => c.id !== ed.cid);
+        subSyncDone(f.b);
+        saveDb();
+    }
+    closeSubCard();
+    renderTimeline();
+    showToast('Cartão apagado.');
+};
+window.closeSubCard = function(keepOverlay) {
+    subCardEdit = null;
+    const m = document.getElementById('sub-card-modal');
+    if (!m || m.classList.contains('hidden')) return;
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+    if (!keepOverlay) document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
+};
+
 // --- 5. ENCAIXE MATEMÁTICO ---
 function performEncaixeMatematico(gapStart, gapDuration) {
     let start = gapStart;
@@ -1278,7 +1746,8 @@ function performEncaixeMatematico(gapStart, gapDuration) {
         completed: false,
         theme: pendingIntent.theme || 'focus',
         tagId: pendingIntent.tagId || null,
-        linkedNoteIds: [] // V40.2: notas vinculadas começam vazias (clone não copia notas)
+        linkedNoteIds: [], // V40.2: notas vinculadas começam vazias (clone não copia notas)
+        ...(Array.isArray(pendingIntent.cards) ? { cards: subCloneCards(pendingIntent.cards) } : {}) // V40.24.0: sublista
     });
     saveDb();
     
@@ -1321,7 +1790,8 @@ window.cloneManual = function() {
         duration: taskToClone.duration, 
         theme: taskToClone.theme || 'focus',
         tagId: taskToClone.tagId || null, // V40.1.4: preserva tag
-        microblocks: taskToClone.microblocks || [] // V40.1.4: copia microblocks
+        microblocks: taskToClone.microblocks || [], // V40.1.4: copia microblocks
+        ...(isSublist(taskToClone) ? { cards: subCloneCards(taskToClone.cards) } : {}) // V40.24.0: sublista leva os cartões (desmarcados)
     };
     selectedDur = taskToClone.duration;
     document.getElementById('floating-title').innerText = taskToClone.title;
@@ -1362,7 +1832,7 @@ window.confirmCloneQtd = function() {
         else if(pendingCloneType === 'weekly') nextDate = addDaysToDateStr(taskToClone.date, i * 7);
         else if(pendingCloneType === 'monthly') nextDate = addMonthToDateStr(taskToClone.date, i);
 
-        db.push({...taskToClone, id: 'f_' + Date.now() + '_' + Math.random(), date: nextDate, microblocks: (taskToClone.microblocks || []).map(mb => ({...mb, id: 'mb_' + Date.now() + Math.random(), done: false})), completed: false, expanded: false, linkedNoteIds: []});
+        db.push({...taskToClone, id: 'f_' + Date.now() + '_' + Math.random(), date: nextDate, microblocks: (taskToClone.microblocks || []).map(mb => ({...mb, id: 'mb_' + Date.now() + Math.random(), done: false})), completed: false, expanded: false, linkedNoteIds: [], ...(isSublist(taskToClone) ? { cards: subCloneCards(taskToClone.cards) } : {})}); // V40.24.0: sublista
     }
     saveDb();
     closeAllSheets();
@@ -1540,13 +2010,12 @@ function enablePhysics(el, block) {
     function onDragMove(e) {
         e.preventDefault();
         const y = e.touches ? e.touches[0].clientY : e.clientY;
-        const deltaMins = Math.round(((y - startY) / PX_PER_MIN) / 5) * 5; 
-        
-        let newStart = initialVal + deltaMins;
+        // V40.24.0: com vagos ocultos a régua é por trechos (tlMin/tlY); sem eles, a conta de sempre
+        let newStart = tlSegs ? tlMin(tlY(initialVal) + (y - startY)) : initialVal + Math.round(((y - startY) / PX_PER_MIN) / 5) * 5;
         newStart = Math.round(newStart / 5) * 5; 
         newStart = Math.max(START_HOUR * 60, Math.min(newStart, (END_HOUR * 60) - block.duration));
         
-        el.style.top = `${(newStart - (START_HOUR * 60)) * PX_PER_MIN}px`;
+        el.style.top = `${tlY(newStart)}px`;
         el.dataset.tempStart = newStart;
     }
 
@@ -1605,15 +2074,14 @@ function enablePhysics(el, block) {
     function onResizeMove(e) {
         e.preventDefault();
         const y = e.touches ? e.touches[0].clientY : e.clientY;
-        const deltaMins = Math.round(((y - startY) / PX_PER_MIN) / 5) * 5; 
-        
-        let newDur = initialVal + deltaMins;
+        // V40.24.0: com vagos ocultos o fim acompanha o dedo pela régua por trechos
+        let newDur = tlSegs ? tlMin(tlY(block.startMin + initialVal) + (y - startY)) - block.startMin : initialVal + Math.round(((y - startY) / PX_PER_MIN) / 5) * 5;
         newDur = Math.round(newDur / 5) * 5; 
         newDur = Math.max(5, Math.min(newDur, maxVal)); // V40.8.0: mínimo 5 min (era 15)
         
         if (newDur !== block.duration) {
             block.duration = newDur;
-            el.style.height = `${(newDur * PX_PER_MIN) - 2}px`;
+            el.style.height = `${tlY(block.startMin + newDur) - tlY(block.startMin) - 2}px`;
             el.querySelector('.time-label').innerHTML = `${formatClock(block.startMin)} - ${formatClock(block.startMin + newDur)} &bull; ${formatDur(newDur)}`;
             
             const microVal = el.querySelector('.micro-time-val');
@@ -1690,6 +2158,7 @@ window.changeFloatDuration = function(mins) {
 }
 
 window.openSheet = () => {
+    if (sheetSlot) { sheetSlot = null; tlSlotLabel(); } // V40.24.0: o + aberto pelo botão não mira vago nenhum (openSheetAt marca depois)
     clearFilters();
     document.getElementById('config-sheet').classList.add('translate-y-full');
     document.getElementById('period-select-sheet').classList.add('translate-y-full');
@@ -1933,6 +2402,9 @@ window.closeAllSheets = () => {
     if (typeof closeColumnMenu === 'function') closeColumnMenu();
     // V40.5.1: fecha modal de mover card
     if (typeof cancelMoveCard === 'function') cancelMoveCard();
+    // V40.24.0: cartão da sublista; o + mirando um vago oculto esquece o vago
+    if (typeof closeSubCard === 'function') closeSubCard(true);
+    if (sheetSlot) { sheetSlot = null; tlSlotLabel(); }
 
     input.blur();
     backlogInput.blur();
@@ -1947,6 +2419,7 @@ window.closeSheet = window.closeAllSheets;
 window.commitIntent = () => {
     const title = input.value.trim();
     if (!title) return;
+    const slot = tlTakeSlot(); // V40.24.0: veio de uma faixa de vago oculto
     
     pendingIntent = { title: title, duration: selectedDur, theme: 'focus', tagId: selectedTagId };
     input.value = '';
@@ -1958,9 +2431,27 @@ window.commitIntent = () => {
     document.getElementById('floating-task').classList.add('flex');
     
     renderTimeline(); 
+    tlPlaceAt(slot);
+};
+
+// V40.24.0: chip "Sublista" do botão +: a sublista vai pra mão (nome digitado ou "Sublista") e entra num Tempo Livre.
+window.commitSublistIntent = () => {
+    const slot = tlTakeSlot();
+    const title = input.value.trim() || 'Sublista';
+    pendingIntent = { title: title, duration: selectedDur, theme: 'focus', tagId: selectedTagId, cards: [] };
+    input.value = '';
+    closeAllSheets();
+    document.getElementById('floating-title').innerText = title;
+    syncDurButtons(selectedDur);
+    document.getElementById('floating-task').classList.remove('hidden');
+    document.getElementById('floating-task').classList.add('flex');
+    renderTimeline();
+    if (slot) tlPlaceAt(slot);
+    else showToast('Toque num Tempo Livre pra colocar a sublista 👇');
 };
 
 window.commitSpecialIntent = (title, theme) => {
+    const slot = tlTakeSlot(); // V40.24.0
     pendingIntent = { title: title, duration: selectedDur, theme: theme, tagId: selectedTagId };
     input.value = '';
     closeAllSheets();
@@ -1971,6 +2462,7 @@ window.commitSpecialIntent = (title, theme) => {
     document.getElementById('floating-task').classList.add('flex');
     
     renderTimeline(); 
+    tlPlaceAt(slot);
 };
 
 // --- LÓGICA DE PERÍODOS E HORÁRIOS GERAIS ---
@@ -2141,7 +2633,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.23.0',
+            version: 'v40.24.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -2471,6 +2963,7 @@ window.scheduleBacklogItem = (id) => {
         tagId: item.tagId || null,
         microblocks: item.microblocks || [],
         color: item.color || null, // V40.9.0
+        columnId: getItemColumn(item), // V40.24.0: se entrar numa sublista e voltar, volta pra esta lista
         fromBacklogId: id  // V40.5.0-fix8: marker pra cleanup só se confirmar
     };
     selectedDur = item.duration;
@@ -3593,7 +4086,7 @@ function assistantSnap() {
     (backlogDb || []).filter(it => !colName[getItemColumn(it)]).forEach(it => tasks.push({ id: it.id, title: it.title, dur: Number(it.duration) || 0, list: 'Geral', tag: tagInfo(it.tagId) }));
     return {
         now: new Date(), hours: [START_HOUR, END_HOUR],
-        blocks: (db || []).filter(b => b && b.date).map(b => ({ id: b.id, title: b.title, date: String(b.date).slice(0, 10), start: Number(b.startMin) || 0, dur: Number(b.duration) || 0, done: !!b.completed, tag: tagInfo(b.tagId) })),
+        blocks: (db || []).filter(b => b && b.date).map(b => ({ id: b.id, title: b.title, date: String(b.date).slice(0, 10), start: Number(b.startMin) || 0, dur: Number(b.duration) || 0, done: !!b.completed, tag: tagInfo(b.tagId), cards: isSublist(b) ? subCount(b) : null })),
         tasks: tasks,
         routines: (routinesDb || []).map(r => ({ id: r.id, title: r.title, emoji: r.emoji, dur: Number(r.duration) || 0 })),
         notes: (notesDb || []).map(n => ({ id: n.id, title: n.title, content: n.content, ms: Number(n.updatedAt || n.createdAt) || 0 })),
@@ -4408,6 +4901,7 @@ window.renderReports = function(period) {
 renderGrid(); 
 runRealTimeEngine();
 renderTimeline();
+updateTlCompactBtn(); // V40.24.0
 renderBacklog();
 renderTagSelector();
 applyThemeColor(); // V2.0 - Aplicar tema salvo
@@ -4420,7 +4914,7 @@ setTimeout(() => {
     if (showOnlyDelayed || showOnlyCompleted) {
         targetY = 0; 
     } else {
-        targetY = (currentRealMins - (START_HOUR * 60)) * PX_PER_MIN - (scrollEl.clientHeight / 2);
+        targetY = tlY(currentRealMins) - (scrollEl.clientHeight / 2); // V40.24.0: escala por trechos
     }
     
     scrollEl.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
@@ -4575,6 +5069,7 @@ window.openEditModal = function(id, e) {
     fazRenderColorPicker('edit-color-picker', editingColor, 'fazPickEditColor');
     
     document.getElementById('edit-task-title').value = b.title;
+    document.getElementById('edit-task-heading').textContent = isSublist(b) ? 'Editar sublista' : 'Editar Tarefa'; // V40.24.0
     renderEditTagSelector();
     
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
@@ -4630,6 +5125,12 @@ window.openDeleteModal = function(id, e) {
     
     closeAllSheets(); 
     deletingTaskId = id;
+    // V40.24.0: sublista — "Mover pra Lista" devolve os cartões não feitos e apaga a sublista
+    const delB = db.find(x => x.id === id), isSub = isSublist(delB), open = isSub ? subCount(delB).open : 0;
+    document.getElementById('delete-task-heading').textContent = isSub ? 'O que fazer com esta sublista?' : 'O que fazer com esta tarefa?';
+    document.getElementById('delete-task-move').classList.toggle('hidden', isSub && !open);
+    document.getElementById('delete-task-move-label').textContent = !isSub ? 'Mover pra Lista' : (open === 1 ? 'Devolver o não feito e apagar' : `Devolver os ${open} não feitos e apagar`);
+    document.getElementById('delete-task-kill-label').textContent = !isSub ? 'Excluir Definitivo' : (delB.cards.length ? 'Apagar a sublista e os cartões' : 'Apagar a sublista');
     
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('delete-task-modal').classList.remove('hidden');
@@ -4640,6 +5141,17 @@ window.openDeleteModal = function(id, e) {
 window.moveToBacklog = function() {
     if(!deletingTaskId) return;
     const b = db.find(x => x.id === deletingTaskId);
+    if (isSublist(b)) { // V40.24.0: os não feitos voltam pra Lista; os feitos saem junto com a sublista
+        const open = b.cards.filter(c => !c.done);
+        open.forEach(c => subCardToList(b, c));
+        db = db.filter(x => x.id !== deletingTaskId);
+        saveBacklog(); saveDb();
+        renderTimeline(); renderBacklog();
+        showToast(!open.length ? 'Sublista apagada.' : open.length === 1 ? 'Sublista apagada; 1 cartão voltou pra Lista' : `Sublista apagada; ${open.length} cartões voltaram pra Lista`);
+        closeAllSheets();
+        cancelDelete();
+        return;
+    }
     if(b) {
         // V40.3.2-fix5: agora preserva os microblocks (checks) ao mover pra Lista.
         // ANTES: só salvava id+title+duration+tagId — perdia toda a checklist.
@@ -4667,12 +5179,13 @@ window.moveToBacklog = function() {
 
 window.confirmKillTask = function() {
     if(!deletingTaskId) return;
+    const wasSub = isSublist(db.find(b => b.id === deletingTaskId)); // V40.24.0
     db = db.filter(b => b.id !== deletingTaskId);
     saveDb();
     renderTimeline();
     closeAllSheets();
     cancelDelete();
-    showToast("Tarefa excluída.");
+    showToast(wasSub ? 'Sublista apagada.' : "Tarefa excluída.");
 }
 
 window.cancelDelete = function() {

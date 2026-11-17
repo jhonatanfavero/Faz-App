@@ -267,5 +267,83 @@ const { abrir } = require('./apoio');
   const mt2 = await m.evaluate(() => [...document.querySelectorAll('#goals-container [data-goal]')].every((c) => { const r = c.getBoundingClientRect(), pb = c.querySelector('.goal-plus').getBoundingClientRect(), t = c.querySelector('.truncate').getBoundingClientRect(); return r.right <= innerWidth && pb.right <= r.right && t.right <= pb.left; }));
   ok(mt2, 'tela de 360 px: nome, progresso e botões cabem no cartão');
   await m.setViewportSize({ width: 390, height: 844 }); await m.waitForTimeout(150);
+
+  { // V40.24.0 (bloco próprio: os nomes daqui não se misturam com os de cima)
+  console.log('\nI) Sublista e vagos ocultos na agenda (V40.24.0):');
+  await m.evaluate(() => { closeAllSheets(); activeDateObj = new Date(2026, 10, 18); renderTimeline(); document.getElementById('timeline-scroll').scrollTop = 0; });
+  await m.waitForTimeout(300);
+  await m.tap('#fab-btn'); await m.waitForTimeout(450);
+  await m.fill('#task-input', 'Pendências rápidas');
+  await m.tap('.sheet-dur-btn[data-time="60"]');
+  await m.tap('#bottom-sheet button:has-text("Sublista")'); await m.waitForTimeout(450);
+  await m.tap('#blocks-container .block-item.bg-hatched'); await m.waitForTimeout(350);
+  const S1 = await m.evaluate(() => (db.find((b) => b.date === '2026-11-18' && Array.isArray(b.cards)) || {}).id);
+  ok(!!S1 && await m.evaluate(() => pendingIntent === null), 'pelo + → "Sublista" → tocar no Tempo Livre: a sublista nasce no dia (com toques de verdade)');
+  const subSel = `#blocks-container .block-item[data-block-id="${S1}"]`;
+  await m.tap(`${subSel} .block-btn[title="Expandir/Recolher"]`); await m.waitForTimeout(250);
+  for (const t of ['Pagar boleto', 'Responder o Anderson', 'Ligar pro cartório']) { await m.tap(`#sub-input-${S1}`); await m.keyboard.type(t); await m.keyboard.press('Enter'); await m.waitForTimeout(160); }
+  ok(await m.evaluate((id) => db.find((b) => b.id === id).cards.length, S1) === 3, 'aberta: 3 cartões digitados com Enter (o campo continua focado)');
+  await foto(m, 'cel-sublista-aberta.png');
+  const barra = async () => m.evaluate((s) => { const e = document.querySelector(s), r = e.getBoundingClientRect(); return [...e.querySelectorAll('.blk-bar > button')].every((b) => { const x = b.getBoundingClientRect(); return x.left >= r.left && x.right <= r.right - 2 && b.scrollWidth <= b.clientWidth + 1; }); }, subSel);
+  ok(await barra(), 'aberta: Editar, Duplicar, Arquivar e Apagar cabem inteiros (390 px)');
+  await m.setViewportSize({ width: 360, height: 740 }); await m.waitForTimeout(200);
+  ok(await barra(), 'e numa tela de 360 px também');
+  await m.setViewportSize({ width: 390, height: 844 }); await m.waitForTimeout(150);
+  await m.evaluate(() => collapseAllBlocks()); await m.waitForTimeout(200);
+  // tarefa da Lista na mão → tocar na sublista
+  const t1 = await m.evaluate(() => backlogDb[0].id);
+  await m.evaluate((id) => scheduleBacklogItem(id), t1); await m.waitForTimeout(350);
+  const tgt = await m.evaluate((s) => { const e = document.querySelector(s); return { alvo: e.classList.contains('sub-target'), txt: e.textContent.includes('Colocar aqui') }; }, subSel);
+  ok(tgt.alvo && tgt.txt && await m.evaluate(() => document.getElementById('floating-hint').textContent) === 'Toque num espaço livre ou numa sublista', 'com a tarefa na mão, a sublista mostra "Colocar aqui" e a dica fala dela');
+  await foto(m, 'cel-sublista-mao.png');
+  await m.tap(`${subSel} .sub-drop`); await m.waitForTimeout(350);
+  ok(await m.evaluate(([id, t]) => db.find((b) => b.id === id).cards.length === 4 && !backlogDb.some((x) => x.id === t) && pendingIntent === null, [S1, t1]), 'tocar em "Colocar aqui": a tarefa entra na sublista e sai da Lista');
+  // marcar com o dedo
+  await m.tap(`${subSel} .sub-card:nth-child(1) .sub-ck`); await m.waitForTimeout(200);
+  ok(await m.evaluate((id) => db.find((b) => b.id === id).cards[0].done, S1), 'tocar no círculo do cartão marca');
+  const lay = await m.evaluate((s) => {
+    const e = document.querySelector(s), r = e.getBoundingClientRect();
+    const rows = [...e.querySelectorAll('.sub-card')].map((c) => { const cr = c.getBoundingClientRect(), ck = c.querySelector('.sub-ck').getBoundingClientRect(); return cr.left >= r.left && cr.right <= r.right + 0.5 && cr.bottom <= r.bottom + 0.5 && ck.width >= 22; });
+    return { n: rows.length, cabem: rows.every(Boolean), more: (e.querySelector('.sub-more') || {}).textContent || '' };
+  }, subSel);
+  ok(lay.n === 4 && lay.cabem && lay.more === '', `1h: os ${lay.n} cartões cabem dentro da sublista (círculo de 22 px), sem "+N"`);
+  await foto(m, 'cel-sublista.png');
+  // abrir o cartão
+  await m.tap(`${subSel} .sub-card:nth-child(2) .sub-card-title`); await m.waitForTimeout(350);
+  const md = await m.evaluate(() => { const e = document.getElementById('sub-card-modal'), r = e.getBoundingClientRect(); return { aberto: !e.classList.contains('hidden'), cabe: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, nome: document.getElementById('sub-card-title').value }; });
+  ok(md.aberto && md.cabe && md.nome === 'Responder o Anderson', 'tocar no nome abre o cartão, inteiro na tela');
+  await foto(m, 'cel-sublista-cartao.png');
+  await m.tap('#sub-card-modal button:has-text("Cancelar")'); await m.waitForTimeout(250);
+  // arrastar a sublista com o dedo (meia hora pra baixo = 90 px)
+  const st0 = await m.evaluate((id) => db.find((b) => b.id === id).startMin, S1);
+  const h = await rect(`${subSel} .drag-handle`);
+  await touch('touchStart', { x: h.x, y: h.top + 12 }); await m.waitForTimeout(60);
+  await glide({ x: h.x, y: h.top + 12 }, { x: h.x, y: h.top + 12 + 90 }); await drop();
+  ok(await m.evaluate((id) => db.find((b) => b.id === id).startMin, S1) === st0 + 30, 'arrastar a sublista pela alça leva os cartões junto (+30 min)');
+  // vagos ocultos
+  await m.evaluate(() => { db.push({ id: 'f_vb1', date: '2026-11-18', startMin: 780, duration: 60, title: 'Almoço', type: 'focus', theme: 'focus', microblocks: [], completed: false, linkedNoteIds: [] }); saveDb(); renderTimeline(); });
+  await m.waitForTimeout(200);
+  const altura0 = await m.evaluate(() => parseFloat(document.getElementById('timeline-container').style.height));
+  await m.tap('#tl-compact-btn'); await m.waitForTimeout(300);
+  const vg = await m.evaluate(() => {
+    const g = [...document.querySelectorAll('#blocks-container .tl-gap')];
+    return { n: g.length, alt: parseFloat(document.getElementById('timeline-container').style.height), textos: g.map((x) => x.textContent.trim()), cabem: g.every((x) => { const t = x.querySelector('.tl-gap-txt'); return t.scrollWidth <= t.clientWidth + 1; }), botao: document.getElementById('tl-compact-btn').classList.contains('tl-compact-on') };
+  });
+  ok(vg.botao && vg.n === 3 && vg.alt < altura0 / 3 && vg.cabem, `ocultar vagos: ${vg.n} faixas (${vg.textos.join(' | ')}), a agenda do dia cai de ${altura0} px pra ${vg.alt} px e o texto cabe`);
+  await m.evaluate(() => { document.getElementById('timeline-scroll').scrollTop = 0; }); await m.waitForTimeout(150);
+  await foto(m, 'cel-vagos.png');
+  const gapPick = await m.evaluate(() => document.querySelectorAll('#blocks-container .tl-gap').length);
+  const gp = await rect('#blocks-container .tl-gap');
+  await m.touchscreen.tap(gp.x, gp.y); await m.waitForTimeout(450);
+  const sheet = await m.evaluate(() => ({ aberto: !document.getElementById('bottom-sheet').classList.contains('translate-y-full'), botao: document.getElementById('commit-intent-btn').textContent.trim() }));
+  ok(gapPick === 3 && sheet.aberto && /^Inserir às \d\d:\d\d$/.test(sheet.botao), 'tocar numa faixa abre o + com "' + sheet.botao + '"');
+  await m.evaluate(() => closeAllSheets()); await m.waitForTimeout(300);
+  await m.setViewportSize({ width: 360, height: 740 }); await m.waitForTimeout(250);
+  const n360 = await m.evaluate((s) => { const e = document.querySelector(s), r = e.getBoundingClientRect(); return [...e.querySelectorAll('.sub-card')].every((c) => { const cr = c.getBoundingClientRect(); return cr.right <= r.right + 0.5; }) && [...document.querySelectorAll('.tl-gap-txt')].every((t) => t.scrollWidth <= t.clientWidth + 1); }, subSel);
+  ok(n360, 'tela de 360 px: os cartões cabem na sublista e o texto das faixas também');
+  await m.setViewportSize({ width: 390, height: 844 }); await m.waitForTimeout(150);
+  await m.tap('#tl-compact-btn'); await m.waitForTimeout(200);
+  ok(await m.evaluate(() => !document.querySelector('.tl-gap') && localStorage.getItem('tb__vagos_compactos') === '0'), 'tocar de novo mostra os vagos');
+  }
   await fim(errs.length ? '\nERROS DE PÁGINA: ' + errs.slice(0, 3).join(' | ') : '');
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

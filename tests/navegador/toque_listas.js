@@ -334,9 +334,9 @@ const { abrir } = require('./apoio');
   await foto(m, 'cel-vagos.png');
   const gapPick = await m.evaluate(() => document.querySelectorAll('#blocks-container .tl-gap').length);
   const gp = await rect('#blocks-container .tl-gap');
-  await m.touchscreen.tap(gp.x, gp.y); await m.waitForTimeout(450);
+  await m.touchscreen.tap(gp.x, gp.y); await m.waitForTimeout(120); await m.touchscreen.tap(gp.x, gp.y); await m.waitForTimeout(450); // V40.25.1: dois toques
   const sheet = await m.evaluate(() => ({ aberto: !document.getElementById('bottom-sheet').classList.contains('translate-y-full'), botao: document.getElementById('commit-intent-btn').textContent.trim() }));
-  ok(gapPick === 3 && sheet.aberto && /^Inserir às \d\d:\d\d$/.test(sheet.botao), 'tocar numa faixa abre o + com "' + sheet.botao + '"');
+  ok(gapPick === 3 && sheet.aberto && /^Inserir às \d\d:\d\d$/.test(sheet.botao), 'dois toques numa faixa abrem o + com "' + sheet.botao + '"');
   await m.evaluate(() => closeAllSheets()); await m.waitForTimeout(300);
   await m.setViewportSize({ width: 360, height: 740 }); await m.waitForTimeout(250);
   const n360 = await m.evaluate((s) => { const e = document.querySelector(s), r = e.getBoundingClientRect(); return [...e.querySelectorAll('.sub-card')].every((c) => { const cr = c.getBoundingClientRect(); return cr.right <= r.right + 0.5; }) && [...document.querySelectorAll('.tl-gap-txt')].every((t) => t.scrollWidth <= t.clientWidth + 1); }, subSel);
@@ -404,6 +404,40 @@ const { abrir } = require('./apoio');
   await m.waitForTimeout(150);
   ok(!(await geo()).vis, 'com o teclado aberto num campo, a barrinha não aparece por cima');
   await m.evaluate(() => { closeSearchBar(); closeAllSheets(); fazUndo(); undoBarHide(); });
+  }
+
+  {
+  console.log('\nK) Dois toques no horário vazio (V40.25.1):');
+  await m.setViewportSize({ width: 390, height: 844 });
+  await m.evaluate(() => { closeAllSheets(); if (pendingIntent) cancelPendingTask(); activeDateObj = new Date(2026, 10, 25); renderTimeline(); localStorage.removeItem('tb__dica_dois_toques'); });
+  await m.waitForTimeout(300);
+  // rola até as 09:30 ficarem no meio da tela e acha o ponto da tela que é 09:30
+  const ponto = (min) => m.evaluate((min) => {
+    const sc = document.getElementById('timeline-scroll'), el = document.querySelector('#blocks-container .block-item.bg-hatched');
+    sc.scrollTop = Math.max(0, tlY(min) - sc.clientHeight / 2);
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + (tlY(min) - tlY(Number(el.dataset.start || 420))) + 1 };
+  }, min);
+  await m.evaluate(() => { const el = document.querySelector('#blocks-container .block-item.bg-hatched'); el.dataset.start = String(START_HOUR * 60); });
+  let pt = await ponto(570);
+  await m.waitForTimeout(150);
+  await m.touchscreen.tap(pt.x, pt.y); await m.waitForTimeout(650);
+  const um = await m.evaluate(() => ({ aberto: !document.getElementById('bottom-sheet').classList.contains('translate-y-full'), dica: document.getElementById('toast-msg').textContent, visivel: !document.getElementById('toast').classList.contains('opacity-0') }));
+  ok(!um.aberto && um.visivel && um.dica === 'Toque 2 vezes no Tempo Livre pra pôr um cartão ali', 'um toque de verdade no Tempo Livre não abre nada e explica: "' + um.dica + '"');
+  await m.waitForTimeout(2600);
+  pt = await ponto(570);
+  await m.touchscreen.tap(pt.x, pt.y); await m.waitForTimeout(120); await m.touchscreen.tap(pt.x, pt.y); await m.waitForTimeout(500);
+  const dois = await m.evaluate(() => ({ aberto: !document.getElementById('bottom-sheet').classList.contains('translate-y-full'), botao: document.getElementById('commit-intent-btn').textContent.trim(), zoom: window.visualViewport ? window.visualViewport.scale : 1 }));
+  ok(dois.aberto && dois.botao === 'Inserir às 09:30' && dois.zoom === 1, 'dois toques de verdade nas 09:30: abre o + com "' + dois.botao + '" (e a tela não dá zoom)');
+  await foto(m, 'cel-dois-toques.png');
+  await m.fill('#task-input', 'Dois toques');
+  await m.tap('#commit-intent-btn'); await m.waitForTimeout(400);
+  ok(await m.evaluate(() => db.some((b) => b.date === '2026-11-25' && b.title === 'Dois toques' && b.startMin === 570)), 'tocou em "Inserir às 09:30": o cartão entra às 09:30');
+  // perto de um bloco (o de cima termina 10:00 agora): dois toques nas 10:50 → 10:45
+  pt = await ponto(650);
+  await m.touchscreen.tap(pt.x, pt.y); await m.waitForTimeout(120); await m.touchscreen.tap(pt.x, pt.y); await m.waitForTimeout(500);
+  ok(/^Inserir às 1[01]:\d\d$/.test(await m.evaluate(() => document.getElementById('commit-intent-btn').textContent.trim())), 'no vago de baixo também: "' + await m.evaluate(() => document.getElementById('commit-intent-btn').textContent.trim()) + '"');
+  await m.evaluate(() => { closeAllSheets(); db = db.filter((b) => b.date !== '2026-11-25'); saveDb(); renderTimeline(); });
   }
   await fim(errs.length ? '\nERROS DE PÁGINA: ' + errs.slice(0, 3).join(' | ') : '');
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

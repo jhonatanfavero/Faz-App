@@ -4,7 +4,7 @@
 // V40.20.0: zoom das Listas e da Semana como colunas por tela (com arrastar e setas). V40.19.0: setas do teclado e aba Finanças.
 // V40.21.0: aba Metas. V40.22.0: Dia com os horários vagos compactados (arrastar e esticar continuam certos) e notas no cartão do bloco.
 // V40.24.0: sublista (Semana, Dia, arrastar, janela com os cartões, cartão aberto e tarefa na mão).
-// V40.25.0: Desfazer (Ctrl+Z e Ctrl+Y de verdade no teclado, botões ↶ ↷, aviso embaixo à esquerda).
+// V40.25.0: Desfazer (Ctrl+Z e Ctrl+Y de verdade no teclado, botões ↶ ↷, aviso embaixo à esquerda). V40.25.1: clique duplo no vazio.
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -579,6 +579,38 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(mid === antes + ' xyz' && dep.length < mid.length && mid.startsWith(dep) && dep.startsWith(antes) && await p.evaluate(() => document.getElementById('btn-undo').title) === tit0 && await p.evaluate(() => document.getElementById('btn-redo').title) === passos0,
     'Ctrl+Z escrevendo uma nota desfaz o que foi digitado (o do navegador), sem mexer nos passos do app');
   await p.locator('#tab-listas').click(); await p.waitForTimeout(300);
+  }
+
+  {
+  console.log('\nQ) Dois cliques num horário vazio (V40.25.1):');
+  await p.locator('#tab-agenda').click(); await p.waitForTimeout(300);
+  await p.evaluate(() => { const b = document.querySelector('.ag-view[data-view="week"]'); if (b) b.click(); document.getElementById('ag-today').click(); }); await p.waitForTimeout(300);
+  const aberto = () => p.evaluate(() => !document.getElementById('modal-task').classList.contains('hidden'));
+  // domingo 22/11 está livre: a coluna é curta (só o "Adicionar bloco"); o clique duplo no espaço embaixo dela vale pra ela
+  const alvo = await p.evaluate(() => {
+    const sec = document.querySelector('#ag-cols .ag-list[data-day="2026-11-22"]').parentNode, r = sec.getBoundingClientRect(), w = document.getElementById('ag-week').getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: Math.min(r.bottom + 120, w.bottom - 20), fora: r.bottom + 120 < w.bottom - 20 };
+  });
+  ok(alvo.fora, 'o domingo (livre) é uma coluna curta, com espaço vazio embaixo dela');
+  await p.mouse.dblclick(alvo.x, alvo.y); await p.waitForTimeout(600);
+  ok(await aberto() && await p.evaluate(() => document.getElementById('f-save').textContent) === 'Criar bloco' && await p.evaluate(() => document.getElementById('f-date').value) === '2026-11-22', 'Semana: clique duplo de verdade no espaço vazio embaixo do domingo abre o "Novo bloco" desse dia (e ele continua aberto)');
+  await foto(p, 'pc-dois-cliques-semana.png');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+  // clique duplo num bloco: abre e não fecha sozinho
+  const bl = await p.evaluate(() => { const c = document.querySelector('#ag-cols [data-block] p'), r = c.getBoundingClientRect(); return { x: r.left + 20, y: r.top + r.height / 2 }; });
+  await p.mouse.dblclick(bl.x, bl.y); await p.waitForTimeout(600);
+  ok(await aberto() && await p.evaluate(() => document.getElementById('f-save').textContent) === 'Salvar', 'clique duplo num bloco: o cartão abre e fica aberto');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+  // Dia: clique duplo num horário vazio (antes a janela abria e fechava na hora)
+  await p.locator('#ag-cols .ag-day-btn[data-day="2026-11-19"]').click(); await p.waitForTimeout(400);
+  const hr = await p.evaluate(() => { const t = document.getElementById('ag-timeline'), r = t.getBoundingClientRect(); document.getElementById('ag-day').scrollTop = (10 * 60 - 7 * 60) * 3.2 - 100; return true; });
+  await p.waitForTimeout(150);
+  const y10 = await p.evaluate(() => { const t = document.getElementById('ag-timeline'), r = t.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + (10 * 60 - 7 * 60) * 3.2 + 2 }; });
+  await p.mouse.dblclick(y10.x, y10.y); await p.waitForTimeout(600);
+  ok(hr && await aberto() && await p.evaluate(() => document.getElementById('f-start').value) === '10:00' && await p.evaluate(() => document.getElementById('f-date').value) === '2026-11-19', 'Dia: clique duplo nas 10:00 abre o "Novo bloco" às 10:00 e ele fica aberto');
+  await foto(p, 'pc-dois-cliques-dia.png');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+  await p.evaluate(() => { const b = document.querySelector('.ag-view[data-view="week"]'); if (b) b.click(); }); await p.waitForTimeout(200);
   }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));

@@ -829,22 +829,56 @@ window.toggleTlCompact = function() {
     updateTlCompactBtn();
     renderTimeline();
 };
-// Tocar numa faixa (sem tarefa na mão) abre o + já mirando aquele vago: o que for criado entra direto lá.
+// Tocar 2 vezes numa faixa ou no Tempo Livre (sem tarefa na mão) abre o + já mirando ali: o que for criado entra direto lá (V40.25.1: eram 1 toque, só na faixa).
 let sheetSlot = null; // { date, start, dur }
 function tlSlotLabel() {
     const btn = document.getElementById('commit-intent-btn');
     if (btn) btn.innerHTML = `<i class="ph ph-calendar-plus text-base"></i> ${sheetSlot ? 'Inserir às ' + formatClock(sheetSlot.start) : 'Inserir na Agenda'}`;
 }
-window.openSheetAt = function(start, dur) {
+// V40.25.1: gap = o vago inteiro { a, b } (pra encostar no fim quando a hora tocada não dá); exact = hora escolhida
+// pelo toque (não muda pra "agora" mesmo se o vago tiver o agora).
+window.openSheetAt = function(start, dur, gap, exact) {
     openSheet();
-    sheetSlot = { date: getActiveDateStr(), start: start, dur: dur };
+    sheetSlot = { date: getActiveDateStr(), start: start, dur: dur, gap: gap || null, exact: !!exact };
     tlSlotLabel();
 };
+// V40.25.1: 2 toques num horário vazio (Tempo Livre ou faixa do "ocultar vagos") abrem o + já mirando ali.
+// Tempo Livre: a hora tocada, de 15 em 15 min (dentro do vago). Faixa: o começo do vago. Um toque só não abre nada
+// (evita abrir sem querer rolando a agenda) e, nas 3 primeiras vezes, explica o gesto.
+var tlTapPrev = null, tlTapHintT = null;
+function tlEmptyTap(e, block) {
+    if (db.some(x => x.expanded)) return; // com um cartão aberto, o toque só fecha ele
+    const now = Date.now(), p = tlTapPrev, x = e.clientX || 0, y = e.clientY || 0;
+    clearTimeout(tlTapHintT);
+    if (p && p.start === block.startMin && p.date === getActiveDateStr() && now - p.t < 450 && Math.abs(x - p.x) < 40 && Math.abs(y - p.y) < 40) {
+        tlTapPrev = null;
+        const end = block.startMin + block.duration, gap = { a: block.startMin, b: end };
+        if (tlGapAt(block.startMin)) return openSheetAt(block.startMin, block.duration, gap, false);
+        const r = e.currentTarget && e.currentTarget.getBoundingClientRect ? e.currentTarget.getBoundingClientRect() : null;
+        const min = r ? tlMin(tlY(block.startMin) + (y - r.top)) : block.startMin;
+        let at = Math.round(min / 15) * 15;
+        if (at >= end) at = Math.floor(min / 15) * 15; // perto do fim: o quarto de hora de antes (não sobra um vago de 5 min)
+        at = Math.max(block.startMin, Math.min(at, end - 5));
+        return openSheetAt(at, end - at, gap, true);
+    }
+    tlTapPrev = { start: block.startMin, date: getActiveDateStr(), t: now, x: x, y: y };
+    tlTapHintT = setTimeout(() => { tlTapPrev = null; tlTapHint(); }, 460);
+}
+function tlTapHint() {
+    let n = 0;
+    try { n = Number(localStorage.getItem('tb__dica_dois_toques')) || 0; } catch (e) {}
+    if (n >= 3) return;
+    try { localStorage.setItem('tb__dica_dois_toques', String(n + 1)); } catch (e) {}
+    showToast('Toque 2 vezes no Tempo Livre pra pôr um cartão ali');
+}
 function tlTakeSlot() { const sl = sheetSlot; sheetSlot = null; tlSlotLabel(); return sl; }
 function tlPlaceAt(sl) {
     if (!sl || !pendingIntent || sl.date !== getActiveDateStr()) return;
-    if (pendingIntent.duration > sl.dur) { showToast('Não cabe nesse vago: toque onde quer colocar 👇'); return; }
-    performEncaixeMatematico(sl.start, sl.dur);
+    let start = sl.start, room = sl.dur;
+    const d = pendingIntent.duration;
+    if (d > room && sl.gap && sl.gap.b - sl.gap.a >= d) { start = sl.gap.b - d; room = d; } // V40.25.1: tocou perto do fim do vago: encosta no próximo bloco
+    if (d > room) { showToast('Não cabe nesse vago: toque onde quer colocar 👇'); return; }
+    performEncaixeMatematico(start, room, sl.exact);
 }
 
 function renderGrid() {
@@ -1147,7 +1181,7 @@ function drawBlock(block) {
             }
         } else {
             el.classList.add('border-black/10', 'cursor-pointer');
-            el.onclick = () => { if (!db.some(x => x.expanded)) openSheetAt(block.startMin, block.duration); }; // com um cartão aberto, o toque só fecha ele
+            el.onclick = (e) => tlEmptyTap(e, block); // V40.25.1: 2 toques abrem o + mirando o vago (1 toque só mostra a dica)
             el.innerHTML = `<span class="tl-gap-txt"><i class="ph ph-arrows-out-line-vertical"></i>${range} · livre ${formatDur(block.duration)}</span>`;
         }
     }
@@ -1163,7 +1197,8 @@ function drawBlock(block) {
                 el.innerHTML = `<span class="text-[9px] text-red-500 font-bold uppercase">Muito Curto</span>`;
             }
         } else {
-            el.classList.add('border-black/10', 'opacity-60');
+            el.classList.add('border-black/10', 'opacity-60', 'cursor-pointer');
+            el.onclick = (e) => tlEmptyTap(e, block); // V40.25.1: 2 toques no Tempo Livre abrem o + mirando a hora tocada
             el.innerHTML = block.duration < 15 ? '' : `${!isSmall ? `<span class="text-sm font-semibold tracking-wide mb-1 text-zinc-500">Tempo Livre</span>` : ''}<span class="text-[10px] bg-black/5 text-zinc-600 px-2 py-1 rounded font-medium">${formatDur(block.duration)} livres</span>`;
         }
     }
@@ -1723,9 +1758,9 @@ window.closeSubCard = function(keepOverlay) {
 };
 
 // --- 5. ENCAIXE MATEMÁTICO ---
-function performEncaixeMatematico(gapStart, gapDuration) {
+function performEncaixeMatematico(gapStart, gapDuration, exact) { // V40.25.1: exact = hora escolhida pelo toque (não puxa pra "agora")
     let start = gapStart;
-    if (getActiveDateStr() === getTodayStr() && currentRealMins >= gapStart && currentRealMins <= gapStart + gapDuration) {
+    if (!exact && getActiveDateStr() === getTodayStr() && currentRealMins >= gapStart && currentRealMins <= gapStart + gapDuration) {
         if (currentRealMins + pendingIntent.duration <= gapStart + gapDuration) {
             start = Math.round(currentRealMins / 5) * 5; 
             start = Math.max(gapStart, Math.min(start, gapStart + gapDuration - pendingIntent.duration));
@@ -2635,7 +2670,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.25.0',
+            version: 'v40.25.1',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

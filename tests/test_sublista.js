@@ -253,17 +253,18 @@ const UID = '11111111-1111-1111-1111-111111111111';
   ok(gaps().every((g) => g.style.height === '34px') && [...d.querySelectorAll('#blocks-container .bg-hatched')].length === 4, 'cada faixa tem 36 px (34 + a folga); o vago de 10 min continua normal');
   ok(top('f_va') === '37px' && top('f_vb') === '247px' && top('f_vc') === '373px' && subEl('f_vc').style.height === '178px', 'blocos no lugar certo da régua encolhida (08:00 em 37 px, 09:10 em 247, 13:00 em 373) e com a altura de sempre');
   ok($('timeline-container').style.height === '588px' && labels().join(',') === '07:00,08:00,09:00,13:00,14:00,24:00', 'régua com 588 px e só as horas fora dos vagos: ' + labels().join(','));
-  // tocar na faixa: o + mira o vago e o bloco novo entra direto lá
-  gaps()[1].click();
-  ok(!$('bottom-sheet').classList.contains('translate-y-full') && /Inserir às 09:40/.test($('commit-intent-btn').textContent), 'tocar na faixa abre o + com "Inserir às 09:40"');
+  // dois toques na faixa (V40.25.1; era um): o + mira o vago e o bloco novo entra direto lá
+  const two = (el) => { el.click(); el.click(); };
+  two(gaps()[1]);
+  ok(!$('bottom-sheet').classList.contains('translate-y-full') && /Inserir às 09:40/.test($('commit-intent-btn').textContent), 'dois toques na faixa abrem o + com "Inserir às 09:40"');
   $('task-input').value = 'Na faixa'; d.querySelector('.sheet-dur-btn[data-time="30"]').click(); w.commitIntent();
   ok(ev("JSON.stringify(db.filter((b) => b.date === '2026-11-23' && b.title === 'Na faixa').map((b) => [b.startMin, b.duration]))") === '[[580,30]]' && ev('pendingIntent') === null && /Inserir na Agenda/.test($('commit-intent-btn').textContent), 'o bloco entrou direto às 09:40 (sem passar pela mão) e o botão volta ao normal');
-  gaps()[0].click(); w.closeAllSheets();
+  two(gaps()[0]); w.closeAllSheets();
   ok(/Inserir na Agenda/.test($('commit-intent-btn').textContent) && ev('sheetSlot') === null, 'fechar o + esquece o vago');
-  gaps()[0].click(); ev("sheet.classList.add('translate-y-full')"); w.openSheet();
+  two(gaps()[0]); ev("sheet.classList.add('translate-y-full')"); w.openSheet();
   ok(/Inserir na Agenda/.test($('commit-intent-btn').textContent) && ev('sheetSlot') === null, 'abrir o + pelo botão depois (sem passar pelo fechar) também esquece o vago');
   w.closeAllSheets();
-  gaps()[0].click(); $('task-input').value = 'Grande demais'; d.querySelector('.sheet-dur-btn[data-time="60"]').click(); w.changeFloatDuration && 0;
+  two(gaps()[0]); $('task-input').value = 'Grande demais'; d.querySelector('.sheet-dur-btn[data-time="60"]').click(); w.changeFloatDuration && 0;
   ev('selectedDur = 120'); w.commitIntent();
   ok(ev('pendingIntent && pendingIntent.title') === 'Grande demais' && lastToast() === 'Não cabe nesse vago: toque onde quer colocar 👇', 'não cabe no vago: fica na mão e avisa');
   ok(/muito curto/.test(gaps()[0].textContent) && /Soltar aqui · 14:00–24:00/.test(gaps()[gaps().length - 1].textContent), 'com tarefa na mão: faixa pequena diz "muito curto"; a grande, "Soltar aqui"');

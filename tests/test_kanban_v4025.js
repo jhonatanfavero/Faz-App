@@ -4,7 +4,8 @@
 // (sem aviso, mas com Ctrl+Z); (F) apagar lista com as tarefas; (G) apagar tag; (H) metas: o "+" e apagar categoria;
 // (I) nota sendo escrita = um passo; (J) o celular mexeu depois: não pisa; (K) Ctrl+Z num campo ou com janela
 // aberta não é nosso; (L) sem internet: volta como estava e dá pra tentar de novo; (M) ação nova apaga o Refazer;
-// (N) arquivados: apagar de vez agora desfaz. Texto nunca vira HTML.
+// (N) arquivados: apagar de vez agora desfaz; (P) V40.25.1: dois cliques num horário vazio criam bloco (Semana e Dia) e o
+// 2º clique de um clique duplo não fecha janela nem age de novo. Texto nunca vira HTML.
 // Uso: TZ='America/Sao_Paulo' node test_kanban_v4025.js <repo> <backup.json>
 const fs = require('fs');
 const path = require('path');
@@ -256,6 +257,89 @@ const C = Object.fromEntries(local.listas.map((c) => [c.name, c.id]));
   click($('ar-close')); await sleep(30);
   ctrlZ(); await waitFor(() => row('tarefas', T4).deleted === false); await settle();
   ok(row('tarefas', T4).deleted === false && row('tarefas', T4).archived === true, 'Ctrl+Z: volta pros arquivados');
+
+  console.log('\nP) Dois cliques num horário vazio (V40.25.1):');
+  {
+    const md = (el, detail, y) => el.dispatchEvent(new w.MouseEvent('mousedown', { bubbles: true, cancelable: true, detail, clientY: y || 0 }));
+    const ck = (el, detail, y) => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true, detail, clientY: y || 0 }));
+    const dc = (el, y) => { const e = new w.MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2, clientY: y || 0 }); el.dispatchEvent(e); return e.defaultPrevented; };
+    const dblAt = (el, y) => { md(el, 1, y); ck(el, 1, y); md(el, 2, y); ck(el, 2, y); return dc(el, y); }; // a ordem do navegador num clique duplo
+    const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    const list = (day) => d.querySelector(`#ag-cols .ag-list[data-day="${day}"]`);
+    const esc = () => press(d.body, 'Escape');
+    click($('tab-agenda')); await sleep(60);
+    click($('undo-pill-x'));
+    // Semana: os cartões do dia 16 ficam um embaixo do outro (60 px cada, no jsdom não tem tela: a gente diz onde estão)
+    const D16 = '2026-11-16', cards16 = () => [...list(D16).querySelectorAll('[data-block]')];
+    const pos = () => cards16().forEach((c, i) => { c.getBoundingClientRect = () => ({ top: i * 60, bottom: i * 60 + 50, left: 0, right: 100, width: 100, height: 50 }); });
+    const b2 = row('blocos', cards16()[2].dataset.block), last = row('blocos', cards16()[cards16().length - 1].dataset.block);
+    pos();
+    ok(dblAt(list(D16), 175) === true && visible('modal-task') && $('f-date').value === D16 && $('f-start').value === hhmm(b2.start_min + b2.duration), 'Semana: dois cliques entre o 3º e o 4º cartão abrem o "Novo bloco" logo depois do 3º (' + $('f-start').value + ')');
+    ok($('f-save').textContent === 'Criar bloco' && $('f-title').value === '' && visible('f-sub-wrap'), 'é o "Novo bloco" de sempre (botão "Criar bloco", nome vazio, com a opção Sublista)');
+    esc(); await sleep(30);
+    pos();
+    dblAt(list(D16), 5000);
+    ok(visible('modal-task') && $('f-start').value === hhmm(last.start_min + last.duration), 'dois cliques embaixo de tudo: depois do último bloco do dia (' + $('f-start').value + ')');
+    esc(); await sleep(30);
+    dblAt(list('2026-11-19'), 10);
+    ok(visible('modal-task') && $('f-date').value === '2026-11-19' && $('f-start').value === '07:00', 'dia vazio: no primeiro horário livre (07:00)');
+    esc(); await sleep(30);
+    // embaixo de uma coluna curta (dia com poucos blocos) o clique cai no fundo da Semana: vale a coluna do clique
+    const sec22 = list('2026-11-22').parentNode;
+    [...$('ag-cols').children].forEach((sec, i) => { sec.getBoundingClientRect = () => ({ left: i * 200, right: i * 200 + 190, top: 0, bottom: 120, width: 190, height: 120 }); });
+    const x22 = [...$('ag-cols').children].indexOf(sec22) * 200 + 90;
+    md($('ag-cols'), 1, 400); $('ag-cols').dispatchEvent(new w.MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2, clientX: x22, clientY: 400 }));
+    ok(!visible('modal-task'), 'um clique embaixo de um dia e o outro embaixo de outro dia: não abre nada');
+    $('ag-cols').dispatchEvent(new w.MouseEvent('mousedown', { bubbles: true, cancelable: true, detail: 1, clientX: x22, clientY: 400 }));
+    $('ag-cols').dispatchEvent(new w.MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2, clientX: x22, clientY: 400 }));
+    ok(visible('modal-task') && $('f-date').value === '2026-11-22', 'dois cliques no espaço vazio embaixo do domingo (coluna curta) abrem o "Novo bloco" do domingo');
+    esc(); await sleep(30);
+    // um clique só na parte vazia não faz nada; dois cliques num cartão abrem ele uma vez só (a janela não pisca)
+    ck(list(D16), 1, 175);
+    ok(!visible('modal-task'), 'um clique na parte vazia do dia não abre nada');
+    const c0 = cards16()[0];
+    md(c0, 1); ck(c0, 1); md($('modal-task'), 2); ck($('modal-task'), 2); dc($('modal-task'));
+    ok(visible('modal-task') && $('f-title').value === row('blocos', c0.dataset.block).title, 'dois cliques num bloco: abre e continua aberto (o 2º clique cai no fundo e não fecha mais)');
+    md($('modal-task'), 1);
+    ok(!visible('modal-task'), 'um clique no fundo continua fechando');
+    // o círculo de concluir não marca e desmarca no clique duplo
+    const done = cards16()[1].querySelector('[data-done]'), bid = cards16()[1].dataset.block, was = row('blocos', bid).completed;
+    md(done, 1); ck(done, 1); md(done, 2); ck(done, 2); dc(done);
+    await waitFor(() => row('blocos', bid).completed === !was); await settle();
+    ok(row('blocos', bid).completed === !was && !visible('modal-task'), 'dois cliques no círculo de concluir: muda uma vez só (e não abre nada)');
+    ctrlZ(); await waitFor(() => row('blocos', bid).completed === was); await settle();
+    // dois cliques no nome do dia abrem o Dia (como um clique), sem criar bloco
+    const dayBtn = d.querySelector(`#ag-cols .ag-day-btn[data-day="${D16}"]`);
+    md(dayBtn, 1); ck(dayBtn, 1);
+    md($('ag-timeline'), 2); ck($('ag-timeline'), 2); dc($('ag-timeline'));
+    ok(!visible('modal-task') && w.document.querySelector('.ag-view.on').dataset.view === 'day', 'dois cliques no nome do dia: abre o Dia e não cria bloco por engano');
+    // Dia: um clique continua abrindo; o 2º clique do clique duplo não fecha mais a janela (antes ela abria e fechava)
+    const tl = $('ag-timeline');
+    ck(tl, 1, 0);
+    ok(visible('modal-task'), 'Dia: um clique no horário vazio continua abrindo o "Novo bloco"');
+    md($('modal-task'), 2); ck($('modal-task'), 2); dc($('modal-task'));
+    ok(visible('modal-task'), 'e o clique duplo também (a janela não abre e fecha mais)');
+    esc(); await sleep(30);
+    tl.getBoundingClientRect = () => ({ top: 0, bottom: 4000, left: 0, right: 800, width: 800, height: 4000 });
+    md(tl, 1, 0); dc(tl, 0);
+    ok(visible('modal-task') && $('f-date').value === D16, 'Dia: o clique duplo sozinho também abre (na hora clicada)');
+    esc(); await sleep(30);
+    // tarefa na mão: clique duplo não cria nada (o clique é pra colocar a tarefa)
+    click(d.querySelector('.ag-view[data-view="week"]')); await sleep(40);
+    click($('tab-listas')); await sleep(40);
+    click(d.querySelector('#columns [data-hand]')); await sleep(60);
+    ok(visible('ag-place') && !!list('2026-11-19'), 'pegou uma tarefa na mão (a Semana mostra onde dá pra colocar)');
+    const l19 = list('2026-11-19');
+    md(l19, 1); dc(l19);
+    ok(!visible('modal-task'), 'com a tarefa na mão, dois cliques na parte vazia não abrem o "Novo bloco"');
+    esc(); await sleep(30);
+    // janela de confirmação: o 2º clique do clique duplo também não fecha
+    click(cards16()[3].querySelector('[data-more]')); click(menu().querySelector('[data-act="delete"]')); await waitFor(() => visible('dialog'));
+    md($('dialog'), 2);
+    ok(visible('dialog'), 'confirmação aberta: o 2º clique de um clique duplo no fundo não cancela');
+    md($('dialog'), 1); await sleep(30);
+    ok(!visible('dialog') && !row('blocos', cards16()[3].dataset.block).deleted, 'um clique no fundo cancela (como antes) e nada é apagado');
+  }
 
   console.log('\nO) Texto vira texto:');
   const X = cardsIn('BETA')[0];

@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 22 suítes (cerca de 2 minutos)
+npm test        # confere o CSS pronto e roda as 23 suítes (cerca de 2 minutos)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -33,7 +33,8 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_sublista.js` | `index.html` + `app.js` + `sync.js` de verdade | V40.24.0: sublista no celular (criar pelo +, cartão novo, tarefa da Lista na mão, marcar, cartão aberto, voltar pra lista, devolver os não feitos, duplicar e repetir, apagar, busca, backup, Assistente, ida e volta com a nuvem) e "ocultar vagos" (faixas, régua encolhida, arrastar e esticar, tocar na faixa) |
 | `test_kanban_v4024.js` | `kanban.html` de verdade | V40.24.0: sublista no PC (Semana e Dia, janela com os cartões, puxar da Lista, cartão aberto, Novo bloco como sublista, tarefa na mão, apagar devolvendo os não feitos, tempo real) |
 | `test_desfazer.js` | `index.html` + `app.js` + `sync.js` de verdade | V40.25.0: Desfazer e Refazer no celular (a barrinha, apagar e voltar no mesmo lugar, agendar = um passo, concluir, checklist, mover, sublista, lista apagada com as tarefas, arquivados, metas, finanças, notas, tags, rotinas, ordem dos cartões, o que não vira passo, vários passos, a nuvem: o que vem do PC não vira passo, desfazer sobe pra nuvem, conflito com o PC, agenda grande) |
-| `test_kanban_v4025.js` | `kanban.html` de verdade | V40.25.0: Desfazer no PC (Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z, Cmd+Z, botões ↶ ↷, aviso com Desfazer, agendar = um passo na ordem segura, lista e tag apagadas, metas, nota sendo escrita = um passo, o celular mexeu depois, Ctrl+Z num campo ou com janela aberta, sem internet) |
+| `test_kanban_v4025.js` | `kanban.html` de verdade | V40.25.0: Desfazer no PC (Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z, Cmd+Z, botões ↶ ↷, aviso com Desfazer, agendar = um passo na ordem segura, lista e tag apagadas, metas, nota sendo escrita = um passo, o celular mexeu depois, Ctrl+Z num campo ou com janela aberta, sem internet). V40.25.1: dois cliques num horário vazio (Semana: depois do cartão de cima; Dia: na hora clicada), o 2º clique de um clique duplo não fecha janela nem marca/desmarca de novo |
+| `test_dois_toques.js` | `index.html` + `app.js` + `sync.js` de verdade | V40.25.1: dois toques no Tempo Livre abrem o + na hora tocada (de 15 em 15 min), um toque só explica (3 vezes), hoje vale a hora tocada, perto do fim encosta no próximo bloco, não cabe fica na mão, a faixa do "ocultar vagos" também é com dois toques, o que não é toque duplo |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)

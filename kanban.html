@@ -827,7 +827,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.25.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.25.1</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -2012,7 +2012,7 @@
                 if (e.key === 'Escape') { e.stopPropagation(); onCancel(); }
                 else if (e.key === 'Enter' && (o.input || document.activeElement === okB)) { e.preventDefault(); onOk(); }
             }
-            function onBackdrop(e) { if (e.target === d) onCancel(); }
+            function onBackdrop(e) { if (e.target === d && e.detail < 2) onCancel(); } // V40.25.1: o 2º clique de um clique duplo não fecha
             okB.addEventListener('click', onOk);
             altB.addEventListener('click', onAlt);
             cancelB.addEventListener('click', onCancel);
@@ -4036,7 +4036,7 @@
         $('f-save').addEventListener('click', saveTask);
         $('f-cancel').addEventListener('click', closeTaskUi);
         $('f-delete').addEventListener('click', deleteTask);
-        $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this) closeTaskUi(); });
+        $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeTaskUi(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
 
         // V40.17.0: Rotinas
         $('rt-new').addEventListener('click', function () { openRoutine(null); });
@@ -4050,7 +4050,7 @@
             var c = e.target.closest && e.target.closest('[data-rt]');
             if (c && e.target === c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openRoutine(c.dataset.rt); }
         });
-        $('modal-rt').addEventListener('mousedown', function (e) { if (e.target === this) closeRoutine(); });
+        $('modal-rt').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeRoutine(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('rt-f-cancel').addEventListener('click', closeRoutine);
         $('rt-f-save').addEventListener('click', function () { saveRoutine(); });
         $('rt-f-delete').addEventListener('click', function () { deleteRoutine(); });
@@ -4341,6 +4341,7 @@
         $('ag-timeline').addEventListener('mousedown', dgDown); // V40.14.0: arrastar e esticar blocos na régua do Dia
         $('agenda').addEventListener('click', function (e) {
             if (S.agNoClick) { S.agNoClick = false; return; } // V40.14.0: o clique que sobra depois de soltar um arraste não faz nada
+            if (e.detail > 1) return; // V40.25.1: o 2º clique de um clique duplo não age de novo (o duplo clique tem o dele, logo abaixo)
             var dayBtn = e.target.closest('.ag-day-btn');
             if (dayBtn) { S.agAnchor = dayBtn.dataset.day; S.agView = 'day'; S.agScrolled = null; return renderAgenda(); }
             var gap = e.target.closest('[data-gap-day]');
@@ -4371,6 +4372,41 @@
             if (c) return openBlock(c.dataset.block);
             var ruler = e.target.closest('#ag-timeline'); // V40.13.0: visão Dia → clicar num horário vazio cria um bloco ali
             if (ruler) openNewBlock(S.agAnchor, Math.floor(agMin(e.clientY - ruler.getBoundingClientRect().top) / 5) * 5);
+        });
+        // V40.25.1: dois cliques num horário vazio abrem o "Novo bloco" ali. Semana: na parte vazia do dia, logo depois
+        // do bloco que está em cima do clique (ou no primeiro horário livre). Dia: na hora clicada (1 clique continua
+        // abrindo também). Só vale se os dois cliques foram no vazio da mesma tela: clicar duas vezes no nome do dia
+        // (que abre a visão Dia) não cria nada.
+        function agEmptyAt(t, cx) {
+            if (!t || !t.closest || t.closest('[data-block], button, a, input, select, textarea, label')) return null;
+            var list = t.closest('.ag-list');
+            if (list) return { kind: 'week', day: list.dataset.day, el: list };
+            if (S.agView === 'week' && (t === $('ag-cols') || t === $('ag-week'))) { // embaixo de um dia curto: vale a coluna do clique
+                var hit = null;
+                $('ag-cols').querySelectorAll('.ag-list').forEach(function (l) { var r = l.parentNode.getBoundingClientRect(); if (cx >= r.left && cx <= r.right) hit = l; });
+                return hit ? { kind: 'week', day: hit.dataset.day, el: hit } : null;
+            }
+            var tl = t.closest('#ag-timeline');
+            return tl ? { kind: 'day', day: S.agAnchor, el: tl } : null;
+        }
+        $('agenda').addEventListener('mousedown', function (e) {
+            if (e.detail > 1) return;
+            var x = agEmptyAt(e.target, e.clientX);
+            S.agDown = x ? { kind: x.kind, day: x.day, view: S.agView, anchor: S.agAnchor } : null;
+        });
+        $('agenda').addEventListener('dblclick', function (e) {
+            var down = S.agDown, x = agEmptyAt(e.target, e.clientX);
+            S.agDown = null;
+            if (!x || !down || down.kind !== x.kind || down.day !== x.day || down.view !== S.agView || down.anchor !== S.agAnchor) return;
+            if (S.placing || S.agDrag || DG || anyLayerOpen()) return;
+            e.preventDefault();
+            if (x.kind === 'day') return openNewBlock(x.day, Math.floor(agMin(e.clientY - x.el.getBoundingClientRect().top) / 5) * 5);
+            var st = null;
+            x.el.querySelectorAll('[data-block]').forEach(function (c) {
+                var b = S.blocos[c.dataset.block];
+                if (b && c.getBoundingClientRect().bottom <= e.clientY) st = b.start_min + b.duration;
+            });
+            openNewBlock(x.day, st);
         });
         $('agenda').addEventListener('keydown', function (e) {
             if (e.target.closest && e.target.closest('[data-done], [data-more], [data-sub-ck], [data-sub-open], [data-sub-drop]')) return; // V40.24.0
@@ -4476,7 +4512,7 @@
         // V40.18.0: Tags
         $('btn-tags').addEventListener('click', function () { openTags(); });
         $('tg-close').addEventListener('click', closeTags);
-        $('modal-tags').addEventListener('mousedown', function (e) { if (e.target === this) closeTags(); });
+        $('modal-tags').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeTags(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('tg-new-add').addEventListener('click', function () { createTag(); });
         $('tg-new-name').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); createTag(); } });
         $('tg-new-colors').addEventListener('click', function (e) {
@@ -4559,7 +4595,7 @@
         $('fn-f-save').addEventListener('click', function () { saveFin(); });
         $('fn-f-cancel').addEventListener('click', closeFin);
         $('fn-f-delete').addEventListener('click', function () { if (S.fnEdit && S.fnEdit.id) deleteFin(S.fnEdit.id); });
-        $('modal-fin').addEventListener('mousedown', function (e) { if (e.target === this) closeFin(); });
+        $('modal-fin').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeFin(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         // V40.21.0: Metas
         $('mt-new').addEventListener('click', function () { openGoal(null); });
         $('mt-new-cat').addEventListener('click', function () { createGoalList(); }); // V40.23.0
@@ -4597,9 +4633,9 @@
         $('mt-f-save').addEventListener('click', function () { saveGoal(); });
         $('mt-f-cancel').addEventListener('click', closeGoal);
         $('mt-f-delete').addEventListener('click', function () { if (S.mtEdit && S.mtEdit.id) deleteGoal(S.mtEdit.id); });
-        $('modal-goal').addEventListener('mousedown', function (e) { if (e.target === this) closeGoal(); });
+        $('modal-goal').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeGoal(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('ar-close').addEventListener('click', closeArchive);
-        $('modal-archive').addEventListener('mousedown', function (e) { if (e.target === this) closeArchive(); });
+        $('modal-archive').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeArchive(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('ar-list').addEventListener('click', function (e) {
             var u = e.target.closest('[data-unarchive]'), x = e.target.closest('[data-delarch]'), v = (u ? u.dataset.unarchive : x ? x.dataset.delarch : '').split('|');
             if (u) unarchive(v[0], v.slice(1).join('|')); else if (x) deleteArchived(v[0], v.slice(1).join('|'));

@@ -786,6 +786,9 @@ let tlSegs = null; // trechos da régua do dia na tela; null = escala normal
 // (tb__agenda_dias, fora do backup). O primeiro dia da tela é o activeDateObj.
 var tlDays = 1;
 try { const n = Number(localStorage.getItem('tb__agenda_dias')); if (n === 2 || n === 3) tlDays = n; } catch (e) {}
+// V40.27.0: dia aberto tocando num bloco ou no nome do dia com 2 ou 3 dias na tela → o voltar do celular volta pra
+// eles. { n, first, top }: quantos dias, o primeiro e a rolagem. Só na memória; sai ao voltar pra 2 ou 3 dias.
+var tlBack = null;
 function tlBuildSegs(list, lo, hi) {
     const segs = [];
     const add = (a, b, gap) => {
@@ -929,7 +932,7 @@ window.setTlDays = function(n, firstDate) {
     if ([1, 2, 3].indexOf(n) < 0) return;
     if (firstDate) activeDateObj = tlDateObj(firstDate);
     if (n === tlDays && !firstDate) return;
-    if (n > 1) collapseAllBlocks();
+    if (n > 1) { collapseAllBlocks(); tlBack = null; }
     tlDays = n;
     try { localStorage.setItem('tb__agenda_dias', String(n)); } catch (e) {}
     tlTapPrev = null;
@@ -942,13 +945,24 @@ window.cycleTlDays = function() { setTlDays(tlDays >= 3 ? 1 : tlDays + 1); };
 
 // Abre um dia em 1 dia (tocou no nome do dia ou num bloco). Com bloco: rola até ele e abre o cartão.
 window.tlOpenDay = function(ds, id) {
+    const sc = document.getElementById('timeline-scroll');
+    const back = tlDays > 1 ? { n: tlDays, first: getActiveDateStr(), top: sc ? sc.scrollTop : 0 } : null; // V40.27.0
     setTlDays(1, ds);
+    tlBack = back;
     const b = id ? db.find(x => x.id === id) : null;
     if (!b) return;
     if (!pendingIntent && !b.expanded) toggleExpandBlock(id, { stopPropagation() {} });
-    const sc = document.getElementById('timeline-scroll');
     if (sc) sc.scrollTop = Math.max(0, tlY(b.startMin) - 140);
 };
+// V40.27.0: o voltar do celular depois de abrir um dia pelos dias lado a lado: volta pra eles, na mesma rolagem.
+function tlBackToDays() {
+    const t = tlBack;
+    tlBack = null;
+    if (!t) return;
+    setTlDays(t.n, t.first);
+    const sc = document.getElementById('timeline-scroll');
+    if (sc) sc.scrollTop = t.top;
+}
 function tlMiniTap(e, id, ds) {
     if (e && e.stopPropagation) e.stopPropagation();
     const b = db.find(x => x.id === id);
@@ -2446,180 +2460,152 @@ window.openListSheet = () => {
 }
 
 // =====================================================
-// V40.5.0-fix7 — NAVIGATION HARDENING
-// Bug 1: clique no overlay fecha SHEETS (vai pra agenda) mesmo com modal aberto.
-// Bug 2: botão "voltar" do Android fecha o app inteiro.
+// V40.27.0 — BOTÃO VOLTAR DO CELULAR
 // =====================================================
+// Pedido do Jhonatan (17/11/2026): "quando aperta em voltar no app ele está fechando; vamos colocar pra voltar a
+// tela e, se tiver na inicial, pedir se quer fechar". Ele escolheu o aviso "Toque em voltar de novo pra sair".
+// O voltar volta UMA tela: fecha a janelinha de cima; sai do formulário ou da sub-tela pra tela de trás; fecha a
+// tela; fecha o menu do zoom das Listas; solta a tarefa na mão; fecha a busca; e, se o dia foi aberto tocando num
+// bloco (ou no nome do dia) com 2 ou 3 dias na tela, volta pros dias lado a lado. Na tela inicial (a agenda sem nada
+// aberto) mostra "Toque em voltar de novo pra sair": o 2º voltar em até 3 s fecha o app; passado esse tempo, ou
+// tocando na tela, o voltar volta a perguntar.
+//
+// Qual é a tela de cima sai do próprio HTML, na hora (não há lista de telas pra manter em dia):
+//   1. janelinhas abertas: [id$="-modal"] sem .hidden (a última no HTML fica por cima);
+//   2. telas abertas: [id$="-sheet"] sem .translate-y-full (idem); dentro dela, o menu do zoom aberto;
+//   3. a faixa da tarefa na mão (#floating-task) e a busca (#search-bar-row);
+//   4. a volta pros dias lado a lado (tlBack, V40.26.0).
+// E o voltar TOCA no botão de voltar/fechar que essa tela mostra, marcado com data-voltar no index.html (a seta de
+// sub-tela ganha do X da tela, que é data-voltar="fechar"). Assim ele faz exatamente o que o toque faz, com a mesma
+// limpeza. A versão da V40.5.0-fix7 fechava as coisas por conta própria e não conhecia as sub-telas da Config (a tela
+// ficava fosca, e a fix11 desligou); também achava "janelinha aberta" pela classe z-[60], que hoje os botões dos
+// blocos e dos cartões também têm.
+// REGRA pra tela ou janelinha nova: o botão de voltar/fechar dela leva data-voltar (o X da tela, data-voltar="fechar").
+// O tests/test_voltar.js reprova janelinha ou tela sem ele.
+//
+// Como o app fica sabendo do voltar: pelo CloseWatcher (Chrome 120+; no Android é o voltar, no computador é o Esc).
+// Fica um só armado; cada voltar consome o que está armado e o app arma outro. Sem CloseWatcher (outro navegador
+// no Android): uma entrada a mais no histórico, que o voltar consome (popstate) e o app põe de novo.
+// (var, não let/const: pushNavState() pode ser chamada antes desta linha rodar, e aí só não faz nada)
+var NAV_SAIR_MS = 3000;
+var navAndroid = /Android/i.test(navigator.userAgent || '');
+var navCW = typeof window.CloseWatcher === 'function';
+var navHist = !navCW && navAndroid && !!(window.history && history.pushState);
+var navW = null;   // o CloseWatcher armado
+var navSairT = 0;  // esperando o 2º voltar na tela inicial: nada armado (o próximo voltar é do celular e fecha o app)
 
-// N1: detecta QUALQUER modal aberto (procura por z-[60] que esteja com flex visível).
-// Como todos os modais usam o padrão Tailwind `hidden flex-col` → `flex`, basta procurar
-// por elementos com z-[60] que NÃO tenham .hidden.
-function getOpenModal() {
-    // Tailwind compila z-[60] como zIndex: 60. Selector funciona com classe.
-    const modals = document.querySelectorAll('.z-\\[60\\]');
-    for (const m of modals) {
-        if (!m.classList.contains('hidden')) return m;
+// O elemento aparece? (sobe até 'stop' procurando .hidden ou display:none; funciona sem layout, como no jsdom)
+function navShown(el, stop) {
+    for (let n = el; n && n !== stop; n = n.parentElement) {
+        if (n.classList.contains('hidden') || n.style.display === 'none') return false;
     }
+    return true;
+}
+function navOpenModals() { return [...document.querySelectorAll('[id$="-modal"]')].filter(m => !m.classList.contains('hidden')); }
+function navOpenSheets() { return [...document.querySelectorAll('[id$="-sheet"]')].filter(s => !s.classList.contains('translate-y-full')); }
+// O botão que o voltar toca: o de sub-tela (seta ←, Cancelar) antes do X da tela.
+function navButton(layer) {
+    const bs = [...layer.querySelectorAll('[data-voltar]')].filter(b => navShown(b, layer));
+    return bs.find(b => b.dataset.voltar !== 'fechar') || bs[0] || null;
+}
+// A tela de cima (o que o voltar fecha). null = tela inicial.
+function navTop() {
+    const m = navOpenModals();
+    if (m.length) return { kind: 'modal', el: m[m.length - 1] };
+    const s = navOpenSheets();
+    if (s.length) {
+        const top = s[s.length - 1], menu = top.querySelector('.zoom-menu:not(.hidden)');
+        return menu ? { kind: 'menu', el: menu } : { kind: 'sheet', el: top };
+    }
+    const ft = document.getElementById('floating-task');
+    if (pendingIntent || (ft && !ft.classList.contains('hidden'))) return { kind: 'hand', el: ft };
+    const sr = document.getElementById('search-bar-row');
+    if (sr && !sr.classList.contains('hidden')) return { kind: 'search', el: sr };
+    if (tlBack && tlDays === 1) return { kind: 'days' };
     return null;
 }
+// Volta uma tela. false = já estava na tela inicial.
+function navBack() {
+    const top = navTop();
+    if (!top) return false;
+    if (top.kind === 'days') { tlBackToDays(); return true; }
+    if (top.kind === 'menu') { closeBacklogZoomMenu(); return true; }
+    const b = navButton(top.el);
+    if (b) b.click();
+    else if (top.kind === 'modal') closeTopmostModal();
+    else if (top.kind === 'sheet') closeAllSheets();
+    else if (top.kind === 'hand') cancelPendingTask();
+    else closeSearchBar();
+    return true;
+}
 
-// N4: fecha apenas o modal topmost, preserva sheets atrás.
+// Janelinha de cima (ou null). V40.27.0: pelo id (-modal); a classe z-[60] também está nos botões dos blocos e dos
+// cartões, e a versão antiga "fechava" esses botões em vez da janelinha.
+function getOpenModal() { const m = navOpenModals(); return m.length ? m[m.length - 1] : null; }
+// Esconde a janelinha de cima sem passar pelo botão dela (só pra janelinha sem botão data-voltar).
 function closeTopmostModal() {
     const modal = getOpenModal();
     if (!modal) return false;
     modal.classList.add('hidden');
     modal.classList.remove('flex');
-    
-    // N4: se ainda tem sheets atrás (qualquer .translate-y-0 — sheets abertas), mantém overlay.
-    // Senão, esconde overlay também.
-    const anySheetOpen = document.querySelector('.app-frame-locked [class*="translate-y-0"]') ||
-                          document.querySelector('#list-sheet:not(.translate-y-full)') ||
-                          document.querySelector('#sheet:not(.translate-y-full)') ||
-                          document.querySelector('#config-sheet:not(.translate-y-full)') ||
-                          document.querySelector('#tags-sheet:not(.translate-y-full)') ||
-                          document.querySelector('#reports-sheet:not(.translate-y-full)') ||
-                          document.querySelector('#period-select-sheet:not(.translate-y-full)') ||
-                          document.querySelector('#clone-sheet:not(.translate-y-full)') ||
-                          document.querySelector('#link-note-sheet:not(.translate-y-full)');
-    
-    if (!anySheetOpen) {
-        const ov = document.getElementById('overlay');
-        if (ov) {
-            ov.classList.add('opacity-0', 'pointer-events-none');
-            ov.style.zIndex = '';
-        }
-    } else {
-        // Restaura zIndex pra ficar acima das sheets (z-50) mas abaixo dos modais (z-60)
-        const ov = document.getElementById('overlay');
-        if (ov) ov.style.zIndex = '55';
+    const ov = document.getElementById('overlay'), sheetOpen = navOpenSheets().length > 0;
+    if (ov) {
+        if (getOpenModal()) ov.style.zIndex = sheetOpen ? '55' : '';
+        else if (sheetOpen) ov.style.zIndex = ''; // V40.27.0: o fundo escuro volta pra trás da tela (com '55' a tela ficava fosca)
+        else { ov.classList.add('opacity-0', 'pointer-events-none'); ov.style.zIndex = ''; }
     }
     return true;
 }
-
-// Handler do overlay.
-// V40.5.1-fix9: VOLTOU AO ESTADO MAIS SIMPLES POSSÍVEL.
-// Fix7 (detecção de modal fantasma) e fix8 (scheduleOverlayForceCheck) introduziram
-// complexidade que não resolveu o bug e potencialmente causou novos problemas.
-// Esta é a versão da fix7 ORIGINAL que SEMPRE funcionou.
+// Toque no fundo escuro. Sem janelinha: fecha as telas. Com janelinha (V40.27.0): o mesmo que o Cancelar dela; mas a
+// janelinha com campo de digitar fica (tocar fora às vezes é só pra baixar o teclado, e o que foi digitado se perderia;
+// ela fecha pelo Cancelar ou pelo voltar). Antes da V40.27.0 o toque não fechava janelinha nenhuma: procurava pela
+// classe z-[60] e escondia os botões de um bloco ou cartão.
 window.onOverlayClick = function() {
-    if (closeTopmostModal()) return;
+    const m = getOpenModal();
+    if (m) {
+        if (m.querySelector('input:not([type="hidden"]), textarea')) return;
+        const b = navButton(m);
+        if (b) b.click(); else closeTopmostModal();
+        return;
+    }
     closeAllSheets();
 };
 
-// =====================================================
-// V40.5.0-fix7 — HISTORY API (botão voltar do Android)
-// =====================================================
-// Estratégia: SEMPRE manter 1 entry "extra" no history quando uma sheet/modal está aberta.
-// Botão voltar dispara popstate → fechamos a camada topmost → repushamos pra manter buffer.
-
-let _navBackToConfirmTimer = null; // N11: flag pra "toque voltar de novo pra fechar"
-let _navIgnoreNextPopstate = false; // N8: ignora popstate disparado por history.back() interno
-
-// Empilha uma entry no history (chamar ao abrir qualquer sheet/modal).
-// V40.5.1-fix11 (Opção A): NO-OP. Função preservada (assinatura intacta) pra que as
-// 19 chamadas existentes no código continuem funcionando sem erro, mas não fazem nada.
-// Como o popstate listener foi desligado, não precisamos mais empilhar state.
-function pushNavState() {
-    // intencionalmente vazio — V40.5.1-fix11 Opção A
-    // (lógica original comentada abaixo pra reativar quando corrigirmos)
-    /*
-    try {
-        if (history.state && history.state.tbNavLayer) return;
-        history.pushState({ tbNavLayer: true }, '', location.href);
-    } catch (e) {}
-    */
-}
-
-// Determina o que está aberto e fecha a camada topmost.
-// Retorna true se fechou algo, false se nada estava aberto (= raiz).
-function closeTopmostLayer() {
-    // Prioridade 1: Modal aberto (z-[60])
-    if (closeTopmostModal()) return true;
-    
-    // Prioridade 2: Sub-form aberto dentro de uma sheet (N13)
-    // Form de Lista (backlog-form-view), Rotinas (routines-form-view), Finanças (financial-form-view).
-    const formViews = [
-        ['backlog-form-view', 'closeBacklogForm'],
-        ['routines-form-view', 'closeRoutineForm'],
-        ['financial-form-view', 'closeFinancialForm'],
-    ];
-    for (const [viewId, closeFn] of formViews) {
-        const v = document.getElementById(viewId);
-        if (v && !v.classList.contains('hidden')) {
-            if (typeof window[closeFn] === 'function') {
-                window[closeFn]();
-                return true;
-            }
-        }
+function navArm() {
+    if (navSairT) return;
+    if (navCW) {
+        if (navW) return;
+        try { navW = new CloseWatcher(); navW.onclose = navOnBack; } catch (e) { navW = null; }
+    } else if (navHist) {
+        try { if (!(history.state && history.state.fazVoltar)) history.pushState({ fazVoltar: 1 }, ''); } catch (e) {}
     }
-    
-    // Prioridade 3: Sheet aberta (qualquer uma com translate-y-0)
-    const sheetIds = ['list-sheet', 'sheet', 'config-sheet', 'tags-sheet', 
-                       'reports-sheet', 'period-select-sheet', 'clone-sheet', 'link-note-sheet'];
-    for (const id of sheetIds) {
-        const s = document.getElementById(id);
-        if (s && !s.classList.contains('translate-y-full')) {
-            closeAllSheets();
-            return true;
-        }
-    }
-    
-    return false; // raiz — nada aberto
 }
-
-// popstate handler — chamado quando user aperta voltar no Android.
-// V40.5.1-fix11 (Opção A): DESLIGADO. A interceptação do botão voltar estava causando
-// bug de "tela fosca presa" em algumas sheets/sub-views (ex: Aparência, Períodos, Lista
-// QUALITÊ). Voltar Android agora tem comportamento padrão do PWA (fecha app). User usa
-// botão X das sheets pra fechar. Re-ativar exige correção da lógica de detecção de
-// sub-views (config-appearance-view, config-hours-view, config-periods-view não
-// estavam contemplados).
-/*
+// Apertou o voltar (ou o Esc no computador).
+function navOnBack() {
+    navW = null;
+    if (navBack()) { setTimeout(navArm, 0); return; }
+    if (!navAndroid) { setTimeout(navArm, 0); return; } // computador: na agenda o Esc não tem o que fechar
+    showToast('Toque em voltar de novo pra sair');
+    navSairT = setTimeout(() => { navSairT = 0; navArm(); }, NAV_SAIR_MS);
+}
+// Desiste de esperar o 2º voltar (o voltar volta a perguntar) e garante o voltar armado.
+function navWake() {
+    if (navSairT) { clearTimeout(navSairT); navSairT = 0; }
+    navArm();
+}
+// Toque de verdade na tela (o .click() do próprio voltar não conta).
+function navTouch(e) { if (!e || e.isTrusted !== false) navWake(); }
+document.addEventListener('pointerup', navTouch, true);
+document.addEventListener('click', navTouch, true);
 window.addEventListener('popstate', (e) => {
-    if (_navIgnoreNextPopstate) {
-        _navIgnoreNextPopstate = false;
-        return;
-    }
-    
-    const closedSomething = closeTopmostLayer();
-    
-    if (closedSomething) {
-        if (closeTopmostModal === null || getOpenModal() || 
-            document.querySelector('#list-sheet:not(.translate-y-full)') ||
-            document.querySelector('#sheet:not(.translate-y-full)') ||
-            document.querySelector('#config-sheet:not(.translate-y-full)') ||
-            document.querySelector('#tags-sheet:not(.translate-y-full)')) {
-            pushNavState();
-        }
-    } else {
-        if (_navBackToConfirmTimer) {
-            clearTimeout(_navBackToConfirmTimer);
-            _navBackToConfirmTimer = null;
-            return;
-        }
-        showToast('Toque voltar de novo pra fechar o app');
-        _navBackToConfirmTimer = setTimeout(() => {
-            _navBackToConfirmTimer = null;
-        }, 2000);
-        pushNavState();
-    }
+    if (!navHist || (e.state && e.state.fazVoltar)) return;
+    navOnBack();
 });
-*/
-
-// N12: ao carregar o app, garante que o estado base é "raiz".
-// replaceState (não pushState) pra não empilhar.
-try {
-    if (!history.state || !history.state.tbNavRoot) {
-        history.replaceState({ tbNavRoot: true }, '', location.href);
-    }
-} catch (e) {
-    // Falha silenciosa em ambientes restritos
-}
-
-
-// Wrapper de openListSheet pra pushar nav state ao abrir.
-// (Outros openXSheet vão chamar pushNavState() também, ver patches abaixo.)
-
+// As chamadas da V40.5.0-fix7 ao abrir uma tela agora só garantem o voltar armado.
+function pushNavState() { navWake(); }
+// Com CloseWatcher, o primeiro fica armado desde a abertura. Pelo histórico, só depois do 1º toque (entrada posta
+// sem toque o Chrome pula no voltar).
+if (navCW) navArm();
 
 window.closeAllSheets = () => {
     overlay.classList.add('opacity-0', 'pointer-events-none');
@@ -2893,7 +2879,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.26.0',
+            version: 'v40.27.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

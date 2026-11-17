@@ -33,14 +33,20 @@ function placar(browser, srv) {
     return { ok, foto, fim };
 }
 
-async function abrir() {
+// Celular: tela de 390 px, toque, dados fictícios. celular(browser, extra) abre outro igual (extra: opções do Playwright,
+// como userAgent), pra quem precisa de dois aparelhos no mesmo teste.
+async function celular(browser, extra) {
+    const ctx = await browser.newContext(Object.assign({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, timezoneId: 'America/Sao_Paulo', locale: 'pt-BR', hasTouch: true, isMobile: true }, extra || {}));
+    const dados = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'dados-ficticios.json'), 'utf8')).data;
+    await ctx.addInitScript((d) => { try { if (!localStorage.getItem('tb_backlog_db')) for (const k in d) localStorage.setItem(k, d[k]); } catch (e) {} }, dados);
+    return ctx;
+}
+async function abrir(extra) {
     const chromium = playwright();
     const srv = await servidor();
     const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, args: ['--no-sandbox'] });
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, timezoneId: 'America/Sao_Paulo', locale: 'pt-BR', hasTouch: true, isMobile: true });
-    const dados = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'dados-ficticios.json'), 'utf8')).data;
-    await ctx.addInitScript((d) => { try { if (!localStorage.getItem('tb_backlog_db')) for (const k in d) localStorage.setItem(k, d[k]); } catch (e) {} }, dados);
-    return Object.assign({ ctx, base: srv.base, ROOT }, placar(browser, srv));
+    const ctx = await celular(browser, extra);
+    return Object.assign({ ctx, browser, base: srv.base, ROOT }, placar(browser, srv));
 }
 
 // Tela do PC. A "nuvem" é o mock_supabase.js dos outros testes, rodando dentro da própria página e já com os dados
@@ -67,4 +73,4 @@ async function abrirPc() {
     await ctx.route('**/libs/supabase-js/supabase.js', (r) => r.fulfill({ contentType: 'text/javascript; charset=utf-8', body: nuvem }));
     return Object.assign({ ctx, base: srv.base, ROOT, UID }, placar(browser, srv));
 }
-module.exports = { abrir, abrirPc };
+module.exports = { abrir, abrirPc, celular };

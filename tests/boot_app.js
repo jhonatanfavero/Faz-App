@@ -16,7 +16,7 @@ module.exports = async function boot(REPO, storage, opts = {}) {
   vc.on('error', (...a) => { const m = a.map(String).join(' '); if (!/^\[Faz\] dado corrompido/.test(m)) errors.push(m); });
   let html = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8').replace(/<script src="[^"]*"><\/script>/g, '').replace('<head>', '<head><script>window.tailwind = {};</script>');
   const dom = new JSDOM(html, { url: 'https://jhonatanfavero.github.io/Faz-App/', runScripts: 'dangerously', pretendToBeVisual: true, virtualConsole: vc,
-    beforeParse(w) { travarRelogio(w); if (opts.userAgent) Object.defineProperty(w.navigator, 'userAgent', { value: opts.userAgent }); } });
+    beforeParse(w) { travarRelogio(w); if (opts.userAgent) Object.defineProperty(w.navigator, 'userAgent', { value: opts.userAgent }); if (opts.beforeParse) opts.beforeParse(w); } });
   const w = dom.window;
   if (w.document.readyState !== 'complete') await new Promise((r) => w.addEventListener('load', r));
   for (const [k, v] of Object.entries(storage || {})) w.localStorage.setItem(k, v);

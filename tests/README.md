@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 24 suítes (cerca de 2 minutos)
+npm test        # confere o CSS pronto e roda as 25 suítes (cerca de 2 minutos)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -36,6 +36,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_kanban_v4025.js` | `kanban.html` de verdade | V40.25.0: Desfazer no PC (Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z, Cmd+Z, botões ↶ ↷, aviso com Desfazer, agendar = um passo na ordem segura, lista e tag apagadas, metas, nota sendo escrita = um passo, o celular mexeu depois, Ctrl+Z num campo ou com janela aberta, sem internet). V40.25.1: dois cliques num horário vazio (Semana: depois do cartão de cima; Dia: na hora clicada), o 2º clique de um clique duplo não fecha janela nem marca/desmarca de novo |
 | `test_dois_toques.js` | `index.html` + `app.js` + `sync.js` de verdade | V40.25.1: dois toques no Tempo Livre abrem o + na hora tocada (de 15 em 15 min), um toque só explica (3 vezes), hoje vale a hora tocada, perto do fim encosta no próximo bloco, não cabe fica na mão, a faixa do "ocultar vagos" também é com dois toques, o que não é toque duplo |
 | `test_agenda_dias.js` | `index.html` + `app.js` + `sync.js` de verdade | V40.26.0: agenda afastada no celular (2 ou 3 dias lado a lado): botão de colunas, nomes dos dias, intervalo no topo, blocos compactos, tocar abre o dia com o cartão aberto, dois toques em outra coluna, tarefa na mão em qualquer dia e na sublista, pinça, arrastar pro lado, filtros/busca em lista, ocultar vagos só em 1 dia, escolha guardada |
+| `test_voltar.js` | `index.html` + `app.js` + `sync.js` de verdade, com um CloseWatcher de mentira | V40.27.0: botão voltar do celular: toda janelinha e tela têm o botão que ele toca (`data-voltar`), aviso antes de sair na agenda (o 2º voltar sai; depois de 3 s ou de um toque volta a perguntar), formulários e sub-telas voltam pra tela de trás, Config volta pro +, janelinhas pelo próprio Cancelar (a de cima primeiro), sem fundo fosco, toque no fundo escuro, tarefa na mão, busca, menu do zoom, volta pros dias lado a lado, Esc no computador, Android sem CloseWatcher pelo histórico |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)
@@ -58,18 +59,19 @@ O "hoje" desses dados é **15/11/2026**. Os testes travam o relógio do app ness
 ## Testes de navegador (opcionais)
 
 Algumas coisas o jsdom não sabe fazer: medir tamanho na tela, rolar, toque de verdade, service worker.
-Para isso existem três testes que abrem um Chrome de verdade:
+Para isso existem quatro testes que abrem um Chrome de verdade:
 
 ```
 npm i -D playwright && npx playwright install chromium    # uma vez
 node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo; sublista e vagos ocultos; desfazer; dois toques; agenda afastada com pinça de verdade
 node tests/navegador/offline.js         # o app abre completo sem internet?
 node tests/navegador/tela_pc.js         # tela do PC com mouse: arrastar e esticar blocos, 3 pontinhos, campo de arquivar, zoom, tags, sublista
+node tests/navegador/voltar.js          # celular: botão voltar (CloseWatcher de verdade; o Esc faz o papel do voltar) e, sem CloseWatcher, pelo histórico
 ```
 
 Com `CHROME=/caminho/do/chrome` eles usam um Chrome já instalado; com `FOTOS=/alguma/pasta` salvam
 imagens das telas. Eles não entram no `npm test` porque o Playwright é pesado. Vale rodar quando
-mexer em arrasto, rolagem, `sw.js` ou na pasta `libs/`. O da tela do PC usa uma "nuvem" de mentira
+mexer em arrasto, rolagem, botão voltar, telas e janelinhas, `sw.js` ou na pasta `libs/`. O da tela do PC usa uma "nuvem" de mentira
 (o mesmo `mock_supabase.js`, rodando dentro da página) e um relógio fixo: veja `abrirPc()` no `apoio.js`.
 
 O que nenhum teste daqui cobre: **Safari do iPhone**. Mudança de toque ou de layout precisa de uma

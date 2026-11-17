@@ -46,6 +46,12 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
    `expanded` do bloco) entra no `skip` da chave em `undoKeys()`. No PC, grave por `insertRow` /
    `patchRow`; gravação em lote direto no Supabase precisa de `undoRec(g, undoBulk(...))` depois do
    sucesso, com o gesto (`var g = S.gesture`) guardado antes do primeiro `await`.
+10. **Tela ou janelinha nova tem o botão do voltar (V40.27.0).** O voltar do Android (e o Esc no
+    computador) toca no botão de voltar/fechar da tela de cima: em cada janelinha (`id` terminado em
+    `-modal`), o Cancelar/fechar leva `data-voltar`; em cada tela (`id` terminado em `-sheet`), o X leva
+    `data-voltar="fechar"`; sub-tela ou formulário dentro dela, a seta ← leva `data-voltar`. Janelinha
+    abre tirando `.hidden`; tela abre tirando `.translate-y-full`. O `tests/test_voltar.js` reprova quem
+    ficar sem.
 
 ## Publicar uma versão
 

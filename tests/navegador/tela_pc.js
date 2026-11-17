@@ -5,6 +5,8 @@
 // V40.21.0: aba Metas. V40.22.0: Dia com os horários vagos compactados (arrastar e esticar continuam certos) e notas no cartão do bloco.
 // V40.24.0: sublista (Semana, Dia, arrastar, janela com os cartões, cartão aberto e tarefa na mão).
 // V40.25.0: Desfazer (Ctrl+Z e Ctrl+Y de verdade no teclado, botões ↶ ↷, aviso embaixo à esquerda). V40.25.1: clique duplo no vazio.
+// V40.28.0: Semana — puxar a borda de baixo muda a duração; arrastar no próprio dia vale também pra antes de agora;
+// Duplicar nos 3 pontinhos; cartão sai da sublista arrastando (vira bloco) e bloco entra nela (vira cartão).
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -611,6 +613,89 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await foto(p, 'pc-dois-cliques-dia.png');
   await p.keyboard.press('Escape'); await p.waitForTimeout(200);
   await p.evaluate(() => { const b = document.querySelector('.ag-view[data-view="week"]'); if (b) b.click(); }); await p.waitForTimeout(200);
+  }
+
+  {
+  console.log('\nR) Semana: duração pela borda de baixo e mover no próprio dia pra antes de agora (V40.28.0):');
+  await p.locator('#tab-agenda').click(); await p.waitForTimeout(300);
+  await p.evaluate(() => { const b = document.querySelector('.ag-view[data-view="week"]'); if (b) b.click(); document.getElementById('ag-today').click(); }); await p.waitForTimeout(300);
+  const aberto = () => p.evaluate(() => !document.getElementById('modal-task').classList.contains('hidden'));
+  const tipo = (id) => p.evaluate(([uid, id]) => window.__nuvem.get('blocos', uid, id).type, [UID, id]);
+  let seg = await blocos('2026-11-16'); // segunda 16/11 é o "hoje" desta tela (10:20)
+  const f0 = seg[0], L = seg.filter((b) => b.st + b.dur <= 600).pop(); // o primeiro do dia e o último que já terminou (antes das 10:00)
+  // um espaço de 10 min logo depois do primeiro bloco (antes de agora)
+  await p.evaluate(([uid, id]) => window.__nuvem.patch('blocos', uid, id, { duration: 5 }), [UID, f0.id]); await p.waitForTimeout(400);
+  const box = async () => { await p.evaluate((id) => document.querySelector(`#ag-cols [data-block="${id}"]`).scrollIntoView({ block: 'center' }), L.id); await p.waitForTimeout(150); return p.locator(`#ag-cols [data-block="${L.id}"]`).first().boundingBox(); };
+  let c = await box();
+  const alca = await p.evaluate((id) => { const el = document.querySelector(`#ag-cols [data-block="${id}"]`), rz = el.querySelector(':scope > .ag-rz'), r = rz.getBoundingClientRect(), e = el.getBoundingClientRect(); return { cur: getComputedStyle(rz).cursor, baixo: Math.round(e.bottom - r.bottom), alt: r.height }; }, L.id);
+  ok(alca.cur === 'ns-resize' && alca.baixo <= 2 && alca.alt >= 5, 'cada bloco da Semana tem a alça na borda de baixo (cursor de puxar)');
+  const x = c.x + c.width / 2, y = c.y + c.height - 3;
+  await p.mouse.move(x, y); await p.waitForTimeout(80);
+  await p.mouse.down(); await p.mouse.move(x, y - 12, { steps: 3 }); await p.mouse.move(x, y - 32, { steps: 4 }); await p.waitForTimeout(120);
+  const puxando = await p.evaluate((id) => { const el = document.querySelector(`#ag-cols [data-block="${id}"]`); return { txt: el.querySelector('.ag-tm').textContent, zonas: document.querySelectorAll('#ag-cols .ag-drop').length, arrastando: !!document.querySelector('#ag-cols .dragging') }; }, L.id);
+  const novo = Math.max(5, L.dur - 10);
+  ok(puxando.txt.startsWith(hhmm(L.st) + '–' + hhmm(L.st + novo)) && puxando.zonas === 0 && !puxando.arrastando, 'puxando a borda pra cima com o mouse: o bloco mostra "' + puxando.txt + '" e não vira arraste pra outro dia');
+  await foto(p, 'pc-semana-duracao.png');
+  await p.mouse.up(); await p.waitForTimeout(400);
+  let g = await nuvem(L.id);
+  ok(g.dur === novo && g.st === L.st && !(await aberto()) && /^Duração ajustada/.test(await aviso()), 'soltou: ' + L.dur + ' → ' + g.dur + ' min na nuvem, sem abrir o cartão | "' + (await aviso()).split('Desfazer')[0].trim() + '"');
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(500);
+  g = await nuvem(L.id);
+  ok(g.dur === L.dur, 'Ctrl+Z de verdade desfaz (' + g.dur + ' min)');
+  await p.keyboard.press('Control+y'); await p.waitForTimeout(500);
+  ok((await nuvem(L.id)).dur === novo, 'Ctrl+Y refaz');
+  // agora arrastar o mesmo bloco pro espaço de antes de agora, entre os cartões da manhã
+  c = await box();
+  await p.mouse.move(c.x + 60, c.y + 15); await p.mouse.down(); await p.mouse.move(c.x + 80, c.y + 40, { steps: 4 }); await p.waitForTimeout(250);
+  const zona = await p.evaluate((st) => { const z = [...document.querySelectorAll('#ag-cols .ag-list[data-day="2026-11-16"] .ag-drop')].find((e) => +e.dataset.dropStart === st && !e.classList.contains('first')); if (!z) return null; z.scrollIntoView({ block: 'center' }); const r = z.getBoundingClientRect(), ant = z.previousElementSibling, prox = z.nextElementSibling; return { x: r.x + r.width / 2, y: r.y + r.height / 2, texto: z.textContent.trim(), entre: !!(ant && ant.dataset.block && prox && prox.dataset.block) }; }, f0.st + 5);
+  ok(!!zona && zona.entre && zona.texto === 'Soltar às ' + hhmm(f0.st + 5), 'arrastando no próprio dia: aparece "' + (zona && zona.texto) + '" entre os cartões da manhã (já passou e mesmo assim vale)');
+  await p.waitForTimeout(150);
+  const zona2 = await p.evaluate((st) => { const z = [...document.querySelectorAll('#ag-cols .ag-list[data-day="2026-11-16"] .ag-drop')].find((e) => +e.dataset.dropStart === st && !e.classList.contains('first')); const r = z.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, f0.st + 5);
+  await p.mouse.move(zona2.x, zona2.y, { steps: 10 }); await p.mouse.move(zona2.x + 2, zona2.y + 1); await p.mouse.move(zona2.x + 3, zona2.y + 2); await p.waitForTimeout(150);
+  await foto(p, 'pc-semana-mesmo-dia.png');
+  await solta();
+  g = await nuvem(L.id);
+  ok(g.st === f0.st + 5 && g.date === '2026-11-16' && await tipo(L.id) === 'past', 'soltou: foi pras ' + hhmm(g.st) + ' do mesmo dia, como "passado" | "' + (await aviso()).split('Desfazer')[0].trim() + '"');
+  }
+
+  {
+  console.log('\nS) Semana: Duplicar e cartões entrando e saindo da sublista (V40.28.0):');
+  const vivo = (id) => p.evaluate(([uid, id]) => { const b = window.__nuvem.get('blocos', uid, id); return b && !b.deleted ? b : null; }, [UID, id]);
+  const centro = (sel) => p.evaluate((sel) => { const e = document.querySelector(sel); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, sel);
+  const arrasta = async (de, para) => { // arrastar de verdade (HTML5): o Playwright só manda o "dragover" no movimento seguinte
+    await p.mouse.move(de.x, de.y); await p.mouse.down(); await p.mouse.move(de.x + 10, de.y + 20, { steps: 4 }); await p.waitForTimeout(250);
+    const alvo = await para();
+    await p.mouse.move(alvo.x, alvo.y, { steps: 10 }); await p.mouse.move(alvo.x + 2, alvo.y + 1); await p.mouse.move(alvo.x + 3, alvo.y + 2); await p.waitForTimeout(150);
+    await solta();
+  };
+  const sub = await p.evaluate((uid) => { const b = window.__nuvem.alive('blocos', uid).find((x) => Array.isArray(x.cards) && x.cards.some((c) => !c.done) && !x.archived && x.date >= '2026-11-16' && x.date <= '2026-11-22'); return b && { id: b.id, date: b.date, title: b.title, cards: b.cards.map((c) => ({ id: c.id, title: c.title, done: !!c.done })) }; }, UID);
+  ok(!!sub, 'a semana tem uma sublista com cartão não feito (' + (sub && sub.title) + ', ' + (sub && sub.date) + ')');
+  // 1) cartão pra fora: vira bloco
+  const sai = sub.cards.find((c) => !c.done);
+  await arrasta(await centro(`#ag-cols [data-sub-drag="${sub.id}"][data-card="${sai.id}"] .ag-sub-t`), async () => {
+    const z = await p.evaluate((day) => [...document.querySelectorAll(`#ag-cols .ag-list[data-day="${day}"] .ag-drop`)].filter((e) => !e.classList.contains('first')).map((e) => +e.dataset.dropStart)[0], sub.date);
+    return centro(`#ag-cols .ag-list[data-day="${sub.date}"] .ag-drop[data-drop-start="${z}"]:not(.first)`);
+  });
+  let virou = await p.evaluate(([uid, day, t]) => window.__nuvem.alive('blocos', uid).find((b) => b.date === day && b.title === t && !Array.isArray(b.cards)), [UID, sub.date, sai.title]);
+  let agora = await vivo(sub.id);
+  ok(!!virou && !agora.cards.some((c) => c.id === sai.id), 'arrastou o cartão "' + sai.title + '" pra um espaço tracejado: virou bloco (' + (virou && hhmm(virou.start_min)) + ') e saiu da sublista | "' + (await aviso()).split('Desfazer')[0].trim() + '"');
+  await foto(p, 'pc-sublista-saiu.png');
+  // 2) bloco pra dentro: vira cartão
+  const entra = await p.evaluate((uid) => window.__nuvem.alive('blocos', uid).find((b) => !Array.isArray(b.cards) && b.theme !== 'rest' && !b.archived && b.date >= '2026-11-17' && b.date <= '2026-11-22' && !(b.linked_note_ids || []).length), UID);
+  await arrasta(await centro(`#ag-cols [data-block="${entra.id}"] p.ag-tm`), () => centro(`#ag-cols [data-block="${sub.id}"] .ag-sub-title`));
+  agora = await vivo(sub.id);
+  ok(!(await vivo(entra.id)) && agora.cards.some((c) => c.title === entra.title), 'arrastou o bloco "' + entra.title + '" pra cima da sublista: virou cartão dela | "' + (await aviso()).split('Desfazer')[0].trim() + '"');
+  await foto(p, 'pc-sublista-entrou.png');
+  // 3) Duplicar pelos 3 pontinhos
+  const n0 = await p.evaluate(([uid, day]) => window.__nuvem.alive('blocos', uid).filter((b) => b.date === day).length, [UID, sub.date]);
+  const mais = await centro(`#ag-cols [data-block="${sub.id}"] [data-more]`);
+  await p.mouse.move(mais.x, mais.y); await p.waitForTimeout(150); await p.mouse.click(mais.x, mais.y); await p.waitForTimeout(250);
+  const itens = await p.evaluate(() => [...document.querySelectorAll('div.fixed.z-40[role="menu"] button')].map((b) => b.textContent.trim()));
+  ok(itens.join('|') === 'Duplicar|Arquivar|Apagar', 'os 3 pontinhos da sublista: ' + itens.join(', '));
+  await foto(p, 'pc-menu-duplicar.png');
+  await p.locator('div.fixed.z-40[role="menu"] [data-act="dup"]').click(); await p.waitForTimeout(500);
+  const n1 = await p.evaluate(([uid, day]) => window.__nuvem.alive('blocos', uid).filter((b) => b.date === day).length, [UID, sub.date]);
+  ok(n1 === n0 + 1 && /^Sublista duplicada/.test(await aviso()), 'Duplicar: "' + (await aviso()).split('Desfazer')[0].trim() + '"');
   }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));

@@ -140,6 +140,9 @@
     .ag-sub-t { flex: 1; min-width: 0; text-align: left; font-size: 12px; font-weight: 600; color: #3f2a0a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .ag-sub-t:hover, .ag-sub-t:focus-visible { text-decoration: underline; }
     .ag-sub-card.done .ag-sub-t { text-decoration: line-through; color: rgba(63,42,10,.45); }
+    .ag-sub-card[draggable="true"] { cursor: grab; } /* V40.28.0: na Semana o cartão sai da sublista arrastando */
+    .ag-sub-card.dragging { opacity: .35; }
+    .ag-sub.ag-sub-over { outline: 2px dashed var(--focus); outline-offset: 2px; } /* V40.28.0: soltar aqui = entrar na sublista */
     .ag-sub-card.dark .ag-sub-t { color: #fff; }
     .ag-sub-mb { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 10.5px; font-weight: 600; color: #a16207; }
     .ag-sub-card.dark .ag-sub-mb { color: rgba(255,255,255,.8); }
@@ -827,7 +830,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.27.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.28.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1417,26 +1420,30 @@
     function agCardHtml(b, day, today, nm) {
         if (isSub(b)) return subWeekHtml(b, day, today, nm); // V40.24.0
         var tag = tagOf(b.tag_id), mb = mbCount(b), paint = paintOf(b.completed ? null : b.color), nn = linkedNotes(b).length; // V40.22.0: notas vinculadas
-        return '<article draggable="true" class="ag-card ' + paint.cls + 'bg-white border border-zinc-200 border-l-4 rounded-lg px-2.5 py-1.5 cursor-pointer hover:border-zinc-300' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
+        return '<article draggable="true" class="ag-card relative ' + paint.cls + 'bg-white border border-zinc-200 border-l-4 rounded-lg px-2.5 py-1.5 cursor-pointer hover:border-zinc-300' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
             '" style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
             '<div class="flex items-start gap-1.5">' + doneBtnHtml(b, 'mt-0.5 -ml-0.5') + '<div class="min-w-0 flex-1">' +
-            '<div class="flex items-center"><p class="min-w-0 flex-1 text-[11px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + '<span class="font-medium text-zinc-400"> · ' + fmtDur(b.duration) + '</span></p>' +
+            '<div class="flex items-center"><p class="ag-tm min-w-0 flex-1 text-[11px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + '<span class="font-medium text-zinc-400"> · ' + fmtDur(b.duration) + '</span></p>' +
             // V40.15.0: 3 pontinhos (Arquivar / Apagar) sem abrir o cartão; com tarefa na mão os blocos não são mexidos
-            (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100" data-more="' + esc(b.id) + '" title="Arquivar ou apagar" aria-label="Mais opções deste bloco" aria-haspopup="menu"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
+            (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100" data-more="' + esc(b.id) + '" title="Duplicar, arquivar ou apagar" aria-label="Mais opções deste bloco" aria-haspopup="menu"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
             '<p class="text-[13px] font-semibold leading-snug break-words ' + (b.completed ? 'line-through text-zinc-400' : 'text-zinc-800') + '">' + (esc(b.title) || 'Sem nome') + '</p>' +
             ((tag || mb.n || b.completed || nn) ? '<div class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-zinc-500">' +
                 (b.completed ? '<span class="inline-flex items-center gap-1 text-emerald-600 font-medium"><i class="ph-fill ph-check-circle"></i>Concluído</span>' : '') +
                 (tag ? '<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
                 (mb.n ? '<span class="inline-flex items-center gap-1"><i class="ph ph-check-square"></i>' + mb.done + '/' + mb.n + '</span>' : '') +
                 (nn ? '<span class="ag-notes inline-flex items-center gap-1" title="' + nn + (nn === 1 ? ' nota vinculada' : ' notas vinculadas') + '"><i class="ph ph-note"></i>' + nn + '</span>' : '') + '</div>' : '') +
-            '</div></div></article>';
+            '</div></div>' + wkRzHtml(b) + '</article>';
     }
+    // V40.28.0: alça de duração na Semana (a mesma do Dia). Com tarefa na mão os blocos não são mexidos.
+    function wkRzHtml(b) { return S.placing ? '' : '<span class="ag-rz' + (b.duration < 10 ? ' s' : '') + '" title="Puxe pra mudar a duração" aria-hidden="true"></span>'; }
 
     // V40.12.0 — tarefa "na mão": espaços livres do dia onde cabe o bloco (os "buracos" da agenda, como no app).
     // Hoje começa de agora; os outros dias, do começo do dia configurado no celular.
-    function gapsOf(list, day, dur) {
+    // V40.28.0: all = hoje também desde o começo do dia (mover um bloco que já está na agenda pode ir pra antes de
+    // agora, como no Dia e no celular). A tarefa na mão continua começando de agora.
+    function gapsOf(list, day, dur, all) {
         var cur = S.hours[0] * 60, out = [];
-        if (day === todayStr()) cur = Math.max(cur, Math.ceil(nowMin() / 5) * 5);
+        if (day === todayStr() && !all) cur = Math.max(cur, Math.ceil(nowMin() / 5) * 5);
         list.forEach(function (b) { if (b.start_min - cur >= dur) out.push(cur); cur = Math.max(cur, b.start_min + b.duration); });
         if (1440 - cur >= dur) out.push(cur);
         return out;
@@ -1755,9 +1762,92 @@
     function dgUp() { dgStop(true, 'up'); }
     function dgAbort() { dgStop(false, 'desistiu'); }
 
+    // ---------- V40.28.0: Semana — duração puxando a borda de baixo do bloco (como no Dia e no celular) ----------
+    // Pedido do Jhonatan: "poder diminuir o horário pelo web na agenda também". A Semana não tem régua: vale a escala
+    // do Dia (5 min a cada 16 px de mouse). O cartão não muda de tamanho; o horário escrito nele muda enquanto puxa.
+    // Mínimo 5 min; cresce só até o próximo bloco do dia (ou meia-noite). Grava por patchRow (Ctrl+Z desfaz).
+    var WZ = null;
+    function wzDown(e) {
+        if (e.button !== 0 || WZ || DG || S.placing || S.agView !== 'week') return;
+        var rz = e.target.closest('.ag-rz'), card = rz && rz.closest('[data-block]'), b = card && S.blocos[card.dataset.block];
+        if (!b || b.deleted) return;
+        e.preventDefault(); // não seleciona texto nem começa o arraste do bloco pra outro dia (o dragstart também confere o WZ)
+        WZ = { id: b.id, day: String(b.date).slice(0, 10), st0: b.start_min, dur0: b.duration, dur: b.duration, y0: e.clientY, on: false };
+        document.addEventListener('mousemove', wzMove);
+        document.addEventListener('mouseup', wzUp);
+    }
+    function wzBegin() { // passou de 4px: agora é puxar (antes disso continua sendo um clique)
+        var g = WZ, b = S.blocos[g.id], el = null;
+        $('ag-cols').querySelectorAll('[data-block]').forEach(function (c) { if (c.dataset.block === g.id) el = c; });
+        if (!b || b.deleted || b.archived || !el || String(b.date).slice(0, 10) !== g.day || b.start_min !== g.st0 || b.duration !== g.dur0) { wzStop(false); return false; }
+        var others = dayOthers(g.day, g.id), next = null;
+        for (var i = 0; i < others.length && !next; i++) if (others[i].start_min >= g.st0 + g.dur0) next = others[i];
+        g.on = true;
+        g.el = el;
+        g.next = next;
+        g.max = Math.max(g.dur0, Math.floor(((next ? next.start_min : 1440) - g.st0) / 5) * 5);
+        S.agDrag = g.id; // segura o redesenho da agenda até soltar
+        el.classList.add('ag-sizing');
+        document.body.classList.add('ag-resizing');
+        window.addEventListener('blur', wzAbort);
+        return true;
+    }
+    function wzMove(e) {
+        var g = WZ;
+        if (!g) return;
+        if (e.buttons === 0) return wzStop(false, 'solto'); // o botão foi solto fora da janela: desiste, nada muda
+        var dy = e.clientY - g.y0;
+        if (!g.on && (Math.abs(dy) < 4 || !wzBegin())) return;
+        e.preventDefault();
+        var want = g.dur0 + Math.round(dy / (5 * PXM)) * 5;
+        g.dur = Math.max(5, Math.min(want, g.max));
+        g.over = want > g.max; // tentou passar do limite
+        var note = g.over ? (g.next ? 'o próximo começa às ' + clock(g.next.start_min) : 'fim do dia') : '';
+        g.el.classList.toggle('ag-limit', !!g.over);
+        var key = g.dur + '|' + note, tm = g.el.querySelector('.ag-tm');
+        if (key === g.key || !tm) return;
+        g.key = key;
+        tm.innerHTML = clock(g.st0) + '–' + clock(g.st0 + g.dur) + '<span class="font-medium"> · ' + fmtDur(g.dur) + '</span>' + (note ? '<span class="ag-note"> · ' + esc(note) + '</span>' : '');
+    }
+    // "why": 'up' soltou o botão (grava), 'solto' o botão já estava solto, outro valor = desistiu com o botão apertado (Esc, troca de janela)
+    function wzStop(commit, why) {
+        var g = WZ;
+        if (!g) return;
+        WZ = null;
+        document.removeEventListener('mousemove', wzMove);
+        document.removeEventListener('mouseup', wzUp);
+        if (!g.on) return; // não chegou a puxar: o clique normal abre o cartão
+        window.removeEventListener('blur', wzAbort);
+        document.body.classList.remove('ag-resizing');
+        S.agDrag = null;
+        if (why !== 'solto') { // o clique que o navegador dispara logo depois de soltar não pode abrir o cartão
+            S.agNoClick = true;
+            var off = function () { S.agNoClick = false; document.removeEventListener('mousedown', off, true); };
+            if (why === 'up') setTimeout(off, 50);
+            else {
+                document.addEventListener('mouseup', function up() { document.removeEventListener('mouseup', up); setTimeout(off, 50); });
+                document.addEventListener('mousedown', off, true);
+            }
+        }
+        var b = S.blocos[g.id], saved = false;
+        if (commit && b && !b.deleted && !b.archived && String(b.date).slice(0, 10) === g.day) {
+            if (b.start_min !== g.st0 || b.duration !== g.dur0) toast('Esse bloco mudou em outro aparelho. Tente de novo.');
+            else if (g.dur !== g.dur0) {
+                if (g.dur > g.dur0 && hits(dayOthers(g.day, g.id), g.st0 + g.dur0, g.dur - g.dur0)) toast('Conflito! A duração voltou ao que era.');
+                else {
+                    patchRow('blocos', g.id, Object.assign({ duration: g.dur }, retimeFields(b, g.day, g.st0, g.dur)), 'Duração ajustada: ' + fmtDur(g.dur) + ' (' + clock(g.st0) + '–' + clock(g.st0 + g.dur) + ')');
+                    saved = true;
+                }
+            } else if (g.over) toast(g.next ? 'O próximo bloco começa às ' + clock(g.next.start_min) + '. Abra espaço antes de aumentar.' : 'O bloco não passa da meia-noite.', 4200);
+        }
+        if (!saved || S.agPending) renderAgenda(); // volta o desenho ao que está gravado
+    }
+    function wzUp() { wzStop(true, 'up'); }
+    function wzAbort() { wzStop(false, 'desistiu'); }
+
     function renderAgenda() {
         if (!S.uid || S.tab !== 'agenda') return;
-        if (S.agDrag) { S.agPending = true; return; } // não redesenha no meio de um arraste
+        if (S.agDrag || S.agCard) { S.agPending = true; return; } // não redesenha no meio de um arraste (V40.28.0: nem de um cartão de sublista)
         S.agPending = false;
         var today = todayStr(), map = blocksByDay();
         if (!S.agAnchor) S.agAnchor = today;
@@ -1772,7 +1862,7 @@
             $('ag-place-hint').textContent = S.agView === 'day' ? 'Clique no horário onde quer colocar.' : 'Clique num espaço tracejado pra colocar. Pra escolher o horário exato, clique no nome do dia.';
         }
         $('ag-tip').textContent = pl ? '' : S.agView === 'day' ? 'Arraste um bloco pra mudar o horário. Puxe a borda de baixo pra mudar a duração.'
-            : 'Arraste um bloco pra outro dia ou pra um espaço livre. Horário exato e duração: clique no nome do dia.';
+            : 'Arraste um bloco pra outro dia ou pra um espaço livre. Puxe a borda de baixo pra mudar a duração.';
         document.querySelectorAll('.ag-view').forEach(function (b) { b.classList.toggle('on', b.dataset.view === S.agView); });
         applyZoom(); // V40.18.0: na visão Dia não tem zoom (a régua das horas depende do tamanho real)
         renderAgFilter();
@@ -1922,18 +2012,20 @@
         menuEl.dataset.card = kind + '|' + id;
         menuEl.setAttribute('role', 'menu');
         menuEl.className = 'fixed z-40 w-44 bg-white border border-zinc-200 rounded-xl shadow-lg p-1';
-        menuEl.innerHTML = '<button type="button" role="menuitem" data-act="archive" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-archive"></i>Arquivar</button>' +
+        menuEl.innerHTML = (kind === 'blocos' ? '<button type="button" role="menuitem" data-act="dup" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-copy"></i>Duplicar</button>' : '') + // V40.28.0
+            '<button type="button" role="menuitem" data-act="archive" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-archive"></i>Arquivar</button>' +
             '<button type="button" role="menuitem" data-act="delete" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-red-600 hover:bg-red-50"><i class="ph ph-trash"></i>Apagar</button>';
         menuEl.addEventListener('click', async function (e) {
             var b = e.target.closest('button');
             if (!b) return;
             closeColMenu();
+            if (b.dataset.act === 'dup') return void duplicateBlock(id); // V40.28.0
             if (b.dataset.act === 'archive') archiveRow(kind, id);
             else if (kind === 'blocos' && isSub(S[kind][id])) deleteSubFlow(S[kind][id]); // V40.24.0
             else if (await askDelete(kind === 'blocos')) patchRow(kind, id, { deleted: true }, kind === 'blocos' ? 'Bloco apagado' : 'Tarefa apagada');
         });
         document.body.appendChild(menuEl);
-        var h = menuEl.offsetHeight || 84, top = r.bottom + 6;
+        var h = menuEl.offsetHeight || (kind === 'blocos' ? 124 : 84), top = r.bottom + 6;
         if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - 6 - h); // cartão no fim da tela: o menu abre pra cima
         menuEl.style.top = Math.round(top) + 'px';
         menuEl.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 184, r.right - 176))) + 'px';
@@ -2126,7 +2218,8 @@
     }
     function subCardRowHtml(b, c, extra) {
         var tag = tagOf(c.tagId), col = hex6(c.color), mbs = normMbs(c.microblocks), md = mbs.filter(function (m) { return m.done; }).length;
-        return '<div class="ag-sub-card' + (c.done ? ' done' : '') + (col && isDark(col) ? ' dark' : '') + '" style="border-left-color:' + (tag ? esc(safeColor(tag.color)) : 'transparent') + (col ? ';background-color:' + col : '') + '">' +
+        var drag = S.agView === 'week' && !S.placing ? ' draggable="true" data-sub-drag="' + esc(b.id) + '" data-card="' + esc(c.id) + '"' : ''; // V40.28.0
+        return '<div class="ag-sub-card' + (c.done ? ' done' : '') + (col && isDark(col) ? ' dark' : '') + '"' + drag + ' style="border-left-color:' + (tag ? esc(safeColor(tag.color)) : 'transparent') + (col ? ';background-color:' + col : '') + '">' +
             '<button type="button" class="ag-sub-ck" data-sub-ck="' + esc(b.id) + '" data-card="' + esc(c.id) + '" aria-pressed="' + (c.done ? 'true' : 'false') + '" aria-label="' + (c.done ? 'Desmarcar' : 'Marcar como feito') + '" title="' + (c.done ? 'Desmarcar' : 'Marcar como feito') + '"><i class="ph-bold ph-check"></i></button>' +
             '<button type="button" class="ag-sub-t" data-sub-open="' + esc(b.id) + '" data-card="' + esc(c.id) + '" title="Abrir o cartão">' + (esc(c.title) || 'Sem nome') + '</button>' +
             (mbs.length ? '<span class="ag-sub-mb"><i class="ph ph-check-square"></i>' + md + '/' + mbs.length + '</span>' : '') + (extra || '') + '</div>';
@@ -2140,17 +2233,17 @@
     function subDropHtml(b) { return '<button type="button" class="ag-sub-drop" data-sub-drop="' + esc(b.id) + '"><i class="ph ph-hand-pointing"></i>Colocar na sublista</button>'; }
     function subWeekHtml(b, day, today, nm) {
         var tag = tagOf(b.tag_id), paint = paintOf(b.completed ? null : b.color), nn = linkedNotes(b).length;
-        return '<article draggable="true" class="ag-card ag-sub ' + paint.cls + (b.completed ? 'done ' : '') + 'rounded-lg px-2.5 py-1.5 cursor-pointer' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
+        return '<article draggable="true" class="ag-card ag-sub relative ' + paint.cls + (b.completed ? 'done ' : '') + 'rounded-lg px-2.5 py-1.5 cursor-pointer' + (isNow(b, day, today, nm) ? ' ag-now' : '') +
             '" style="' + paint.css + (tag ? 'border-left:4px solid ' + esc(safeColor(tag.color)) + ' !important;' : '') + '" tabindex="0" data-block="' + esc(b.id) + '">' +
             '<div class="flex items-start gap-1.5">' + doneBtnHtml(b, 'mt-0.5 -ml-0.5') + '<div class="min-w-0 flex-1">' +
-            '<div class="flex items-center"><p class="min-w-0 flex-1 text-[11px] font-semibold ag-sub-time tabular-nums truncate">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) +
+            '<div class="flex items-center"><p class="ag-tm min-w-0 flex-1 text-[11px] font-semibold ag-sub-time tabular-nums truncate">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) +
             '<span class="font-medium"> · ' + fmtDur(b.duration) + '</span></p>' +
-            (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-amber-800/70 hover:text-amber-950 hover:bg-amber-100" data-more="' + esc(b.id) + '" title="Arquivar ou apagar" aria-label="Arquivar ou apagar"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
+            (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-amber-800/70 hover:text-amber-950 hover:bg-amber-100" data-more="' + esc(b.id) + '" title="Duplicar, arquivar ou apagar" aria-label="Duplicar, arquivar ou apagar"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
             '<p class="text-[13px] font-semibold leading-snug break-words ag-sub-title' + (b.completed ? ' line-through' : '') + '"><i class="ph-bold ph-list-checks"></i> ' + (esc(b.title) || 'Sublista') +
             ' <span class="ag-sub-badge" title="Cartões feitos">' + (subCount(b).total ? subCount(b).done + '/' + subCount(b).total : '0') + '</span>' +
             (nn ? '<span class="ag-notes text-[11px] font-medium text-amber-800/80" title="' + nn + (nn === 1 ? ' nota vinculada' : ' notas vinculadas') + '"> · <i class="ph ph-note"></i>' + nn + '</span>' : '') + '</p>' +
             (subCanDrop() ? subDropHtml(b) : '<div class="ag-sub-cards">' + subRowsHtml(b, 6) + '</div>') +
-            '</div></div></article>';
+            '</div></div>' + wkRzHtml(b) + '</article>';
     }
     function subDayInnerHtml(b, note) {
         var tag = tagOf(b.tag_id), h = b.duration * PXM - 2, compact = h < 50; // (blocos nunca ficam dentro de vago compactado: a altura é a de sempre)
@@ -2214,6 +2307,76 @@
         if (!(await subSave(b, subCards(b).concat([card])))) { if (placingAlive(src)) { S.placing = src; renderAgenda(); } return; } // não deu: volta pra mão
         if (src.kind === 'rotinas') return toast('Rotina na sublista ' + (b.title || '')); // a rotina continua existindo
         await patchRow('tarefas', src.id, { deleted: true }, 'Entrou na sublista ' + (b.title || ''));
+    }
+    // ---------- V40.28.0: cartões entram e saem da sublista arrastando (Semana) ----------
+    // Pedido do Jhonatan: "os cartões dentro da sublista eu quero que sejam os mesmos externos, pra poder remover de
+    // dentro arrastando e incluir arrastando pra dentro". O cartão da sublista já guarda tudo (nome, tag, cor,
+    // checklist, feito e o tempo): sai inteiro como bloco e um bloco entra inteiro como cartão. Sempre primeiro o lado
+    // que recebe, depois o que perde (se a segunda gravação falhar, nada some: no máximo fica nos dois).
+    function subCardDur(c) { return Number(c.duration) > 0 ? Math.round(Number(c.duration)) : 30; }
+    async function subCardOut(bid, cid, day, st) {
+        var f = subFind(bid, cid);
+        if (!f) return toast('Esse cartão não está mais na sublista.');
+        var dur = subCardDur(f.c), n = Date.now();
+        if (!isYmd(day) || hits(dayOthers(day, null), st, dur)) return toast('Conflito! O cartão ficou na sublista.');
+        var block = {
+            user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: st, duration: dur, title: f.c.title || 'Sem nome',
+            type: blockType(day, st, dur), theme: 'focus', tag_id: tagOf(f.c.tagId) ? f.c.tagId : null,
+            microblocks: normMbs(f.c.microblocks).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: m.done }; }),
+            completed: !!f.c.done, was_delayed: false, linked_note_ids: [], color: hex6(f.c.color), archived: false, deleted: false
+        };
+        if (!(await insertRow('blocos', block))) return;
+        var cur = S.blocos[bid];
+        if (cur && !cur.deleted) await subSave(cur, subCards(cur).filter(function (c) { return c.id !== cid; }), 'Saiu da sublista: ' + dayLabel(day) + ' às ' + clock(st));
+        renderSubCards();
+    }
+    async function subCardMove(bid, cid, toId) {
+        var f = subFind(bid, cid), to = S.blocos[toId];
+        if (!f) return toast('Esse cartão não está mais na sublista.');
+        if (!to || to.deleted || !isSub(to) || toId === bid) return;
+        if (subCards(to).length >= SUB_MAX) return toast('Uma sublista cabe até ' + SUB_MAX + ' cartões.');
+        if (!(await subSave(to, subCards(to).concat([JSON.parse(JSON.stringify(f.c))])))) return;
+        var cur = S.blocos[bid];
+        if (cur && !cur.deleted) await subSave(cur, subCards(cur).filter(function (c) { return c.id !== cid; }), 'Cartão foi pra sublista ' + (to.title || ''));
+        renderSubCards();
+    }
+    async function blockIntoSub(id, subId) {
+        var b = S.blocos[id], s = S.blocos[subId];
+        if (!b || b.deleted || !s || s.deleted || !isSub(s) || id === subId) return;
+        if (isSub(b)) return toast('Uma sublista não entra em outra.');
+        if (b.theme === 'rest') return toast('Descanso não entra numa sublista.');
+        if (subCards(s).length >= SUB_MAX) return toast('Uma sublista cabe até ' + SUB_MAX + ' cartões.');
+        var nn = linkedNotes(b).length;
+        if (nn && !(await dialog({ title: 'Colocar na sublista?', text: nn === 1 ? 'Este bloco tem 1 nota vinculada. No cartão da sublista ela não fica vinculada (continua nas Notas).' : 'Este bloco tem ' + nn + ' notas vinculadas. No cartão da sublista elas não ficam vinculadas (continuam nas Notas).', okLabel: 'Colocar na sublista' }))) return;
+        var card = { id: subNewId(), title: String(b.title || '').trim() || 'Sem nome', done: !!b.completed, microblocks: normMbs(b.microblocks), duration: Number(b.duration) || 30 };
+        if (tagOf(b.tag_id)) card.tagId = b.tag_id;
+        if (hex6(b.color)) card.color = hex6(b.color);
+        var cur = S.blocos[subId];
+        if (!cur || cur.deleted || !(await subSave(cur, subCards(cur).concat([card])))) return;
+        await patchRow('blocos', id, { deleted: true }, 'Entrou na sublista ' + (cur.title || ''));
+    }
+    // V40.28.0: "Duplicar" nos 3 pontinhos do bloco: a cópia entra logo depois dele (ou no primeiro espaço livre do
+    // dia), com a checklist e os cartões da sublista desmarcados e sem as notas vinculadas, como o "Copiar" do app.
+    async function duplicateBlock(id) {
+        var b = S.blocos[id];
+        if (!b || b.deleted) return;
+        var day = String(b.date).slice(0, 10), dur = Number(b.duration) > 0 ? Number(b.duration) : 15;
+        var slot = freeSlot(day, b.start_min + dur, dur);
+        if (slot === null) return toast('Esse dia não tem um espaço livre de ' + fmtDur(dur) + ' pra cópia.');
+        var n = Date.now();
+        var row = {
+            user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: slot, duration: dur, title: b.title || '',
+            type: blockType(day, slot, dur), theme: b.theme || 'focus', tag_id: tagOf(b.tag_id) ? b.tag_id : null,
+            microblocks: normMbs(b.microblocks).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: false }; }),
+            completed: false, was_delayed: false, linked_note_ids: [], color: hex6(b.color), archived: false, deleted: false
+        };
+        if (isSub(b)) row.cards = subCards(b).map(function (c) {
+            var o = JSON.parse(JSON.stringify(c));
+            o.id = subNewId(); o.done = false;
+            o.microblocks = normMbs(c.microblocks).map(function (m) { return { title: m.title, done: false }; });
+            return o;
+        });
+        await insertRow('blocos', row, (isSub(b) ? 'Sublista duplicada: ' : 'Bloco duplicado: ') + clock(slot) + '–' + clock(slot + dur));
     }
     // Cartão volta pra Lista: primeiro a tarefa entra na lista (a de origem, se ainda existir), depois sai da sublista
     async function subCardToList(bid, cid, quiet) {
@@ -4240,6 +4403,7 @@
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             if (DG) return dgStop(false, 'esc'); // V40.14.0: Esc no meio do arraste devolve o bloco pro lugar
+            if (WZ) return wzStop(false, 'esc'); // V40.28.0: idem, puxando a duração na Semana
             if (!$('dialog').classList.contains('hidden')) return;
             if (!$('cal-pop').classList.contains('hidden')) return closeCal();
             if (!$('modal-tags').classList.contains('hidden')) return closeTags(); // V40.18.0: fica por cima do cartão
@@ -4419,22 +4583,40 @@
         function agClear() {
             agCols.querySelectorAll('.ag-over').forEach(function (el) { el.classList.remove('ag-over'); });
             agCols.querySelectorAll('.ag-drop.over').forEach(function (el) { el.classList.remove('over'); });
+            agCols.querySelectorAll('.ag-sub-over').forEach(function (el) { el.classList.remove('ag-sub-over'); }); // V40.28.0
         }
         function agEnd() {
             agClear();
-            agCols.querySelectorAll('.ag-card.dragging').forEach(function (el) { el.classList.remove('dragging'); });
+            agCols.querySelectorAll('.ag-card.dragging, .ag-sub-card.dragging').forEach(function (el) { el.classList.remove('dragging'); });
             agCols.querySelectorAll('.ag-drop').forEach(function (el) { el.remove(); });
             archiveZone(false);
             S.agDrag = null;
+            S.agCard = null; // V40.28.0
             if (S.agPending) renderAgenda();
         }
+        // V40.28.0: o que está sendo arrastado: um bloco (S.agDrag) ou um cartão de dentro de uma sublista (S.agCard)
+        function agDragged() {
+            if (S.agDrag) { var b = S.blocos[S.agDrag]; return b ? { dur: b.duration, skip: b.id, own: String(b.date).slice(0, 10), st: b.start_min } : null; }
+            var f = S.agCard && subFind(S.agCard.bid, S.agCard.cid);
+            return f ? { dur: subCardDur(f.c), skip: null, own: null, st: null } : null;
+        }
+        // V40.28.0: a sublista em cima da qual está o arraste (menos o próprio bloco e a sublista de onde o cartão saiu)
+        function subTarget(t) {
+            var el = t && t.closest && t.closest('.ag-sub[data-block]'), id = el && el.dataset.block;
+            if (!el || !isSub(S.blocos[id]) || id === S.agDrag || (S.agCard && id === S.agCard.bid)) return null;
+            return el;
+        }
         function agShowDrops() {
-            var b = S.agDrag && S.blocos[S.agDrag];
-            if (!b || S.placing || agCols.querySelector('.ag-drop')) return; // com tarefa na mão os espaços livres já estão na tela
-            var map = blocksByDay(), own = String(b.date).slice(0, 10);
+            var g = agDragged();
+            if (!g || S.placing || agCols.querySelector('.ag-drop')) return; // com tarefa na mão os espaços livres já estão na tela
+            var map = blocksByDay(), own = g.own, b = { id: g.skip, duration: g.dur, start_min: g.st };
             agCols.querySelectorAll('.ag-list').forEach(function (list) {
                 var day = list.dataset.day, others = (map[day] || []).filter(function (x) { return x.id !== b.id; });
-                var gaps = gapsOf(others, day, b.duration).filter(function (st) { return day !== own || st !== b.start_min; }); // menos o lugar onde ele já está
+                // V40.28.0: hoje também os espaços de antes de agora (o bloco já está na agenda; mover pra trás vale, como no Dia),
+                // sem perder o "a partir de agora" no meio de um espaço que começou antes
+                var gaps = gapsOf(others, day, b.duration, true);
+                if (day === todayStr()) gapsOf(others, day, b.duration).forEach(function (st) { if (gaps.indexOf(st) < 0) gaps.push(st); });
+                gaps = gaps.sort(function (x, y) { return x - y; }).filter(function (st) { return day !== own || st !== b.start_min; }); // menos o lugar onde ele já está
                 var cards = list.querySelectorAll('[data-block]');
                 var zone = function (st, first) {
                     var el = document.createElement('div');
@@ -4450,10 +4632,24 @@
                     list.insertBefore(zone(st, false), before || list.querySelector('.ag-add'));
                 });
                 // dia cheio: o primeiro espaço livre fica lá embaixo; um atalho fixo no topo deixa ele sempre à vista
-                if (gaps.length && others.length && gaps[0] > others[0].start_min) list.insertBefore(zone(gaps[0], true), list.firstChild);
+                // (hoje, o primeiro a partir de agora, como era antes da V40.28.0)
+                var lead = day === todayStr() ? gaps.filter(function (st) { return st >= Math.ceil(nowMin() / 5) * 5; }) : gaps;
+                if (lead.length && others.length && lead[0] > others[0].start_min) list.insertBefore(zone(lead[0], true), list.firstChild);
             });
         }
+        agCols.addEventListener('mousedown', wzDown); // V40.28.0: puxar a borda de baixo muda a duração
         agCols.addEventListener('dragstart', function (e) {
+            if (WZ) { e.preventDefault(); return; } // V40.28.0: a mão está na alça de duração: não é arrastar pra outro dia
+            var row = e.target.closest && e.target.closest('[data-sub-drag]'); // V40.28.0: cartão de dentro de uma sublista
+            if (row) {
+                S.agCard = { bid: row.dataset.subDrag, cid: row.dataset.card };
+                S.agDrag = null;
+                closeColMenu();
+                e.dataTransfer.effectAllowed = 'move';
+                try { e.dataTransfer.setData('text/plain', row.dataset.card); } catch (err) {}
+                requestAnimationFrame(function () { if (!S.agCard || S.agCard.cid !== row.dataset.card) return; row.classList.add('dragging'); agShowDrops(); });
+                return;
+            }
             var c = e.target.closest('[data-block]');
             if (!c) return;
             S.agDrag = c.dataset.block;
@@ -4463,26 +4659,38 @@
             requestAnimationFrame(function () { if (S.agDrag !== c.dataset.block) return; c.classList.add('dragging'); agShowDrops(); archiveZone(true); });
         });
         agCols.addEventListener('dragover', function (e) {
-            var sec = S.agDrag && e.target.closest('section');
+            var sec = (S.agDrag || S.agCard) && e.target.closest('section');
             if (!sec) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            var zone = e.target.closest('.ag-drop'), b = S.blocos[S.agDrag];
+            var zone = e.target.closest('.ag-drop'), sub = !zone && subTarget(e.target), b = S.agDrag && S.blocos[S.agDrag];
             var own = !!b && sec.querySelector('.ag-list').dataset.day === String(b.date).slice(0, 10);
-            var mark = zone || (own ? null : sec), cls = zone ? 'over' : 'ag-over'; // outro dia: o dia inteiro recebe (mesmo horário)
+            var mark, cls;
+            if (zone) { mark = zone; cls = 'over'; }
+            else if (sub) { mark = sub; cls = 'ag-sub-over'; } // V40.28.0: entra na sublista
+            else if (S.agCard) mark = null; // cartão: só espaço tracejado ou outra sublista
+            else { mark = own ? null : sec; cls = 'ag-over'; } // outro dia: o dia inteiro recebe (mesmo horário)
             if (mark && mark.classList.contains(cls)) return;
             agClear();
             if (mark) mark.classList.add(cls);
         });
         agCols.addEventListener('drop', function (e) {
-            var sec = S.agDrag && e.target.closest('section');
+            var sec = (S.agDrag || S.agCard) && e.target.closest('section');
             if (!sec) return;
             e.preventDefault();
-            var id = S.agDrag, day = sec.querySelector('.ag-list').dataset.day, b = S.blocos[id];
+            var id = S.agDrag, card = S.agCard, day = sec.querySelector('.ag-list').dataset.day, b = id && S.blocos[id];
             var zone = e.target.closest('.ag-drop'), to = zone ? { day: zone.dataset.dropDay, st: Number(zone.dataset.dropStart) } : null;
-            var self = e.target.closest('[data-block]'), onSelf = !!self && self.dataset.block === id;
+            var sub = !zone && subTarget(e.target), subId = sub && sub.dataset.block;
+            var self = e.target.closest('[data-block]'), onSelf = !!self && self.dataset.block === (id || (card && card.bid));
             agEnd();
+            if (card) { // V40.28.0: cartão de dentro de uma sublista
+                if (to) return void subCardOut(card.bid, card.cid, to.day, to.st);
+                if (subId) return void subCardMove(card.bid, card.cid, subId);
+                if (!onSelf) toast('Pra tirar da sublista, solte o cartão num espaço tracejado (ele vira um bloco) ou em outra sublista.', 6000);
+                return;
+            }
             if (to) return void moveBlock(id, to.day, to.st);
+            if (subId) return void blockIntoSub(id, subId); // V40.28.0: o bloco entra na sublista como cartão
             if (b && String(b.date).slice(0, 10) === day) { // soltou no próprio dia, fora de um espaço livre: nada muda
                 if (!onSelf) toast('Pra mudar o horário, solte num espaço tracejado. Pro horário exato, abra o dia e arraste o bloco na régua.', 6000);
                 return;

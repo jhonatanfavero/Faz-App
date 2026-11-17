@@ -4,6 +4,7 @@
 // V40.20.0: zoom das Listas e da Semana como colunas por tela (com arrastar e setas). V40.19.0: setas do teclado e aba Finanças.
 // V40.21.0: aba Metas. V40.22.0: Dia com os horários vagos compactados (arrastar e esticar continuam certos) e notas no cartão do bloco.
 // V40.24.0: sublista (Semana, Dia, arrastar, janela com os cartões, cartão aberto e tarefa na mão).
+// V40.25.0: Desfazer (Ctrl+Z e Ctrl+Y de verdade no teclado, botões ↶ ↷, aviso embaixo à esquerda).
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -528,6 +529,56 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await foto(p, 'pc-sublista-mao.png');
   if (drop) { await p.mouse.click(drop.x, drop.y); await p.waitForTimeout(450); }
   ok(await p.evaluate(([uid, tid]) => window.__nuvem.get('tarefas', uid, tid).deleted === true && window.__nuvem.get('blocos', uid, 'f_sub').cards.length === 6, [UID, tid]), 'clicar coloca a tarefa na sublista (e ela sai da Lista)');
+  }
+
+  {
+  console.log('\nP) Desfazer: Ctrl+Z, Ctrl+Y e os botões ↶ ↷ (V40.25.0):');
+  await p.locator('#tab-listas').click(); await p.waitForTimeout(300);
+  const topo = () => p.evaluate(() => {
+    const h = document.querySelector('header'), hr = h.getBoundingClientRect(), u = document.getElementById('btn-undo').getBoundingClientRect(), r = document.getElementById('btn-redo').getBoundingClientRect(), sair = document.getElementById('btn-logout').getBoundingClientRect();
+    return { alt: Math.round(hr.height), cabe: sair.right <= innerWidth && u.width === 36 && r.left >= u.right && u.top >= hr.top && u.bottom <= hr.bottom };
+  });
+  const t0 = await topo();
+  ok(t0.cabe && t0.alt <= 64, `os botões ↶ ↷ cabem no topo (1440 px, topo com ${t0.alt} px)`);
+  await p.setViewportSize({ width: 1100, height: 800 }); await p.waitForTimeout(200);
+  const t1 = await topo();
+  ok(t1.cabe && t1.alt === t0.alt, 'e numa janela de 1100 px também (o topo não quebra em duas linhas)');
+  await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(200);
+  const nuvemT = (id) => p.evaluate(([uid, id]) => window.__nuvem.get('tarefas', uid, id).deleted, [UID, id]);
+  const tid = await p.evaluate(() => document.querySelectorAll('#columns section.col .card')[1].dataset.id);
+  await p.locator(`.card[data-id="${tid}"]`).hover();
+  await p.locator(`.card[data-id="${tid}"] [data-more]`).click(); await p.waitForTimeout(150);
+  await p.locator('div.fixed.z-40[role="menu"] [data-act="delete"]').click(); await p.waitForTimeout(150);
+  await p.locator('#dlg-ok').click(); await p.waitForTimeout(500);
+  const av = await p.evaluate(() => {
+    const e = document.getElementById('undo-pill'), r = e.getBoundingClientRect(), t = document.getElementById('toast').getBoundingClientRect(), v = document.getElementById('pc-version').getBoundingClientRect();
+    const longe = (a, b) => a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+    return { vis: !e.classList.contains('hidden') && r.width > 0, txt: document.getElementById('undo-pill-msg').textContent, esq: r.left, baixo: innerHeight - r.bottom, semToast: longe(r, t), semSelo: longe(r, v), titulo: document.getElementById('btn-undo').title };
+  });
+  ok(av.vis && av.txt === 'Tarefa apagada' && av.esq <= 24 && av.baixo <= 24 && av.semToast && av.semSelo, 'apagou: o aviso com Desfazer aparece embaixo à esquerda, sem cobrir o aviso do meio nem o número da versão');
+  ok(av.titulo === 'Desfazer: Tarefa apagada (Ctrl+Z)', 'passando o mouse no ↶: "' + av.titulo + '"');
+  await foto(p, 'pc-desfazer.png');
+  await p.mouse.click(700, 120); // tira o foco de qualquer campo
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(500);
+  ok(await nuvemT(tid) === false && await p.evaluate((id) => !!document.querySelector(`.card[data-id="${id}"]`), tid), 'Ctrl+Z de verdade no teclado: a tarefa volta (aqui e na nuvem)');
+  ok(await p.evaluate(() => document.getElementById('undo-pill-msg').textContent) === 'Desfeito: tarefa apagada', 'o aviso vira "Desfeito: tarefa apagada" com Refazer');
+  await p.keyboard.press('Control+y'); await p.waitForTimeout(500);
+  ok(await nuvemT(tid) === true, 'Ctrl+Y refaz');
+  await p.keyboard.press('Control+Shift+Z'); await p.waitForTimeout(100);
+  await p.locator('#btn-undo').click(); await p.waitForTimeout(500);
+  ok(await nuvemT(tid) === false, 'o botão ↶ desfaz');
+  // dentro de um campo, o Ctrl+Z é o do texto
+  await p.locator('#tab-notas').click(); await p.waitForTimeout(300);
+  await p.locator('#nt-list [data-nt]').first().click(); await p.waitForTimeout(300);
+  const antes = await p.evaluate(() => document.getElementById('nt-content').value);
+  const tit0 = await p.evaluate(() => document.getElementById('btn-undo').title);
+  await p.locator('#nt-content').click(); await p.keyboard.press('End'); await p.keyboard.type(' xyz'); await p.waitForTimeout(150);
+  const mid = await p.evaluate(() => document.getElementById('nt-content').value), passos0 = await p.evaluate(() => document.getElementById('btn-redo').title);
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(250);
+  const dep = await p.evaluate(() => document.getElementById('nt-content').value);
+  ok(mid === antes + ' xyz' && dep.length < mid.length && mid.startsWith(dep) && dep.startsWith(antes) && await p.evaluate(() => document.getElementById('btn-undo').title) === tit0 && await p.evaluate(() => document.getElementById('btn-redo').title) === passos0,
+    'Ctrl+Z escrevendo uma nota desfaz o que foi digitado (o do navegador), sem mexer nos passos do app');
+  await p.locator('#tab-listas').click(); await p.waitForTimeout(300);
   }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));

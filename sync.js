@@ -1205,6 +1205,8 @@
         if (applying || !session) return;
         schedule(2500);
     };
+    // V40.25.0: o Desfazer do app pergunta isto pra não transformar o que veio da nuvem num passo seu.
+    window.fazSyncApplying = function () { return applying; };
 
     // ---------- tela Config → Sincronizar ----------
     function lastSyncLabel(st) {

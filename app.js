@@ -66,7 +66,7 @@ function getLocalMonthStr() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 let currentFinanceMonth = getLocalMonthStr(); // 'YYYY-MM' do mês atual (local, não UTC)
-function saveFinancial() { localStorage.setItem('tb_financial_db', JSON.stringify(financialDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.17.0: finanças vão pra nuvem
+function saveFinancial() { localStorage.setItem('tb_financial_db', JSON.stringify(financialDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('financas'); } // V40.17.0: finanças vão pra nuvem (V40.25.0: + desfazer)
 
 // ===== V40.4.4: HELPERS RECORRENTE + PARCELADA =====
 // Declarados no TOPO pra evitar TDZ (lição V40.3.2 e V40.3.5-fix2).
@@ -230,6 +230,7 @@ let activeColumnId = 'col_geral'; // coluna que está sendo visualizada (pra cri
 function saveBacklogColumns() {
     localStorage.setItem('tb_backlog_columns', JSON.stringify(backlogColumnsDb));
     if (window.fazSyncNotify) window.fazSyncNotify(); // V40.7.0: avisa o sync (só age se logado)
+    undoTouch('listas'); // V40.25.0
 }
 
 // K3: garante que coluna padrão Geral sempre existe (executa no init e antes de operações).
@@ -242,7 +243,7 @@ function ensureDefaultColumn() {
             isDefault: true,
             createdAt: Date.now()
         });
-        saveBacklogColumns();
+        undoQuiet(saveBacklogColumns); // V40.25.0: a Geral que nasce sozinha não vira passo do Desfazer
     }
 }
 
@@ -283,7 +284,7 @@ if (!routinesDb) {
     ];
     localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb));
 }
-function saveRoutinesDb() { localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.17.0: rotinas vão pra nuvem
+function saveRoutinesDb() { localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('rotinas'); } // V40.17.0: rotinas vão pra nuvem
 
 let periodsDb = fazLoadList('tb_periods_db', null);
 if (!periodsDb || periodsDb.length === 0) {
@@ -335,10 +336,11 @@ if (!db || db.length === 0) {
     if(modified) saveDb();
 }
 
-function saveDb() { localStorage.setItem('tb_master_db', JSON.stringify(db)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.8.0: agenda vai pra nuvem (só ida)
-function saveBacklog() { localStorage.setItem('tb_backlog_db', JSON.stringify(backlogDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.7.0: + aviso ao sync
-function savePeriods() { localStorage.setItem('tb_periods_db', JSON.stringify(periodsDb)); }
-function saveTags() { localStorage.setItem('tb_tags_db', JSON.stringify(tagsDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.7.0: + aviso ao sync
+// V40.25.0: cada save avisa o Desfazer (undoTouch, lá no fim do arquivo), que guarda o que mudou.
+function saveDb() { localStorage.setItem('tb_master_db', JSON.stringify(db)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('blocos'); } // V40.8.0: agenda vai pra nuvem (só ida)
+function saveBacklog() { localStorage.setItem('tb_backlog_db', JSON.stringify(backlogDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('tarefas'); } // V40.7.0: + aviso ao sync
+function savePeriods() { localStorage.setItem('tb_periods_db', JSON.stringify(periodsDb)); undoTouch('periodos'); }
+function saveTags() { localStorage.setItem('tb_tags_db', JSON.stringify(tagsDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('tags'); } // V40.7.0: + aviso ao sync
 
 // --- FUNÇÕES DE TAGS ---
 window.addTag = function(name, color) {
@@ -2633,7 +2635,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.24.0',
+            version: 'v40.25.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -3987,7 +3989,7 @@ window.unlinkNoteFromBlock = function() {
 // Notas com 3 estados: empty / form / list
 // =====================================================
 
-function saveNotes() { localStorage.setItem('tb_notes_db', JSON.stringify(notesDb)); if (window.fazSyncNotify) window.fazSyncNotify(); } // V40.17.0: notas vão pra nuvem
+function saveNotes() { localStorage.setItem('tb_notes_db', JSON.stringify(notesDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('notas'); } // V40.17.0: notas vão pra nuvem
 
 // Helper: escapa HTML para evitar quebra de layout / XSS no innerHTML
 function escapeHtml(str) {
@@ -4170,9 +4172,9 @@ let goalEditId = null;       // meta aberta no formulário (null = nova)
 let goalForm = null;         // { listId, period, unit, stepTouched, targetTouched }
 let goalListNameMode = null; // 'create' | 'rename'
 let _goalConfirmAction = null;
-function saveGoalLists() { localStorage.setItem('tb_goal_lists', JSON.stringify(goalListsDb)); if (window.fazSyncNotify) window.fazSyncNotify(); }
-function saveGoals() { localStorage.setItem('tb_goals_db', JSON.stringify(goalsDb)); if (window.fazSyncNotify) window.fazSyncNotify(); }
-function saveGoalDays() { localStorage.setItem('tb_goal_days', JSON.stringify(goalDaysDb)); if (window.fazSyncNotify) window.fazSyncNotify(); }
+function saveGoalLists() { localStorage.setItem('tb_goal_lists', JSON.stringify(goalListsDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('metas_listas'); }
+function saveGoals() { localStorage.setItem('tb_goals_db', JSON.stringify(goalsDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('metas'); }
+function saveGoalDays() { localStorage.setItem('tb_goal_days', JSON.stringify(goalDaysDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('metas_dias'); }
 const GOAL_SAFE_ID = /^[\w.\-]{1,64}$/;
 function goalJsId(id) { return GOAL_SAFE_ID.test(String(id)) ? String(id) : ''; } // id que entra num onclick
 // Sem nenhuma lista (primeira vez): cria Pessoal, Profissional e Financeiro (os mesmos ids do PC: nunca duplicam).
@@ -4181,7 +4183,7 @@ function ensureGoalLists() {
     if (!M || goalListsDb.length) return false;
     const now = Date.now();
     goalListsDb = M.DEFAULT_LISTS.map(l => ({ id: l.id, name: l.name, isDefault: true, createdAt: now }));
-    saveGoalLists();
+    undoQuiet(saveGoalLists); // V40.25.0: as categorias que nascem sozinhas não viram passo do Desfazer
     return true;
 }
 function newGoalId(prefix, list) { let n = Date.now(); while (list.some(x => x.id === prefix + n)) n++; return prefix + n; }
@@ -5463,7 +5465,7 @@ function fazRenderColorPicker(containerId, current, fn) {
 }
 
 let archiveDb = fazLoadList('tb_archive_db', []);
-function saveArchive() { localStorage.setItem('tb_archive_db', JSON.stringify(archiveDb)); if (window.fazSyncNotify) window.fazSyncNotify(); }
+function saveArchive() { localStorage.setItem('tb_archive_db', JSON.stringify(archiveDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('arquivo'); }
 
 // Primeiro horário livre do dia pra um bloco: o próprio horário, depois o fim de cada bloco.
 function fazFreeSlot(dateStr, startMin, duration) {
@@ -5521,7 +5523,7 @@ window.fazUnarchive = function(id) {
 
 window.fazDeleteArchived = function(id) {
     const a = archiveDb.find(x => x && x.item && x.item.id === id);
-    if (!a || !confirm('Apagar "' + (a.item.title || 'sem nome') + '" de vez?\n\nEssa ação não pode ser desfeita.')) return;
+    if (!a || !confirm('Apagar "' + (a.item.title || 'sem nome') + '" de vez?')) return; // V40.25.0: dá pra desfazer logo depois (barrinha)
     archiveDb = archiveDb.filter(x => x !== a);
     saveArchive();
     renderArchive();
@@ -6120,9 +6122,9 @@ window.openDeleteColumn = function() {
     
     let subtitle;
     if (colItems.length === 0) {
-        subtitle = 'Esta lista está vazia. Esta ação não pode ser desfeita.';
+        subtitle = 'Esta lista está vazia.';
     } else {
-        subtitle = `${colItems.length} ${colItems.length === 1 ? 'tarefa será apagada' : 'tarefas serão apagadas'} junto. Esta ação não pode ser desfeita.`;
+        subtitle = `${colItems.length} ${colItems.length === 1 ? 'tarefa será apagada' : 'tarefas serão apagadas'} junto. Se mudar de ideia, toque em Desfazer logo depois.`; // V40.25.0
     }
     document.getElementById('column-delete-subtitle').innerText = subtitle;
     
@@ -7143,6 +7145,338 @@ document.addEventListener('click', (e) => {
         e.preventDefault();
     }
 }, true);
+
+// =====================================================
+// V40.25.0: DESFAZER (e REFAZER)
+// Toda mudança nos seus dados vira um passo que dá pra desfazer pela barrinha "Desfazer" que aparece embaixo.
+// Como funciona: cada save*() chama undoTouch(<chave>), que compara a lista com a cópia guardada (item por
+// item, pelo id) e junta o que mudou no mesmo toque num passo só (ex.: agendar = sai da Lista + entra na agenda).
+// Desfazer devolve o "antes" só dos itens que continuam como a ação deixou: se outro aparelho mexeu no mesmo
+// item depois, esse fica como está (o resto volta). Refazer faz o caminho contrário.
+// Não viram passo: o que chega da nuvem (sync), a lista Geral e as categorias de metas que nascem sozinhas, o
+// "já passou" que a agenda marca sozinha e abrir/fechar um cartão. Tudo fica só na memória (fechou o app, zerou).
+// Tudo com "var" e função declarada: os saves rodam antes desta parte do arquivo (sem TDZ; undoReady ainda falso).
+// =====================================================
+var UNDO_MAX = 40;
+var undoStack = [], redoStack = [], undoSnap = null, undoGroup = null, undoMute = 0, undoReady = false, undoK = null, undoBarT = null;
+
+function undoKeys() {
+    if (undoK) return undoK;
+    const L = (get, set, save, extra) => Object.assign({ get, set, save }, extra || {});
+    undoK = {
+        // bloco: "expanded" (aberto na tela) não conta; "type" (focus/past) a agenda muda sozinha, mas volta junto
+        blocos: L(() => db, (v) => { db = v; }, saveDb, { skip: ['expanded', 'type'], keep: ['type'] }),
+        tarefas: L(() => backlogDb, (v) => { backlogDb = v; }, saveBacklog, { ordered: true }),
+        listas: L(() => backlogColumnsDb, (v) => { backlogColumnsDb = v; }, saveBacklogColumns, { ordered: true }),
+        tags: L(() => tagsDb, (v) => { tagsDb = v; }, saveTags, { ordered: true }),
+        periodos: L(() => periodsDb, (v) => { periodsDb = v; }, savePeriods),
+        rotinas: L(() => routinesDb, (v) => { routinesDb = v; }, saveRoutinesDb),
+        notas: L(() => notesDb, (v) => { notesDb = v; }, saveNotes),
+        financas: L(() => financialDb, (v) => { financialDb = v; }, saveFinancial),
+        metas_listas: L(() => goalListsDb, (v) => { goalListsDb = v; }, saveGoalLists, { ordered: true }),
+        metas: L(() => goalsDb, (v) => { goalsDb = v; }, saveGoals, { ordered: true }),
+        metas_dias: L(() => goalDaysDb, (v) => { goalDaysDb = v; }, saveGoalDays),
+        arquivo: L(() => archiveDb, (v) => { archiveDb = v; }, saveArchive, { id: (a) => (a && a.item && a.item.id != null ? a.kind + '|' + a.item.id : null) }),
+    };
+    return undoK;
+}
+function undoIdOf(x) { return x && x.id != null ? String(x.id) : null; }
+// Um item vira texto pra comparar (sem os campos que não contam; os que "voltam junto" ficam guardados à parte).
+function undoSer(K, x) {
+    if (!K.skip) return { s: JSON.stringify(x) };
+    const o = Object.assign({}, x), k = {};
+    K.skip.forEach((f) => { if (K.keep && K.keep.indexOf(f) >= 0 && f in o) k[f] = o[f]; delete o[f]; });
+    return { s: JSON.stringify(o), k };
+}
+function undoTake(key) {
+    const K = undoKeys()[key], arr = K.get(), ids = [], m = new Map(), idOf = K.id || undoIdOf;
+    (Array.isArray(arr) ? arr : []).forEach((x) => {
+        const id = idOf(x);
+        if (id == null || m.has(id)) return;
+        ids.push(id);
+        m.set(id, undoSer(K, x));
+    });
+    return { ids, m };
+}
+function undoInit() {
+    undoSnap = {};
+    Object.keys(undoKeys()).forEach((k) => { try { undoSnap[k] = undoTake(k); } catch (e) { console.warn('[Faz] desfazer', k, e); } });
+    undoReady = true;
+}
+// Salva sem virar passo (o próprio desfazer e o que nasce sozinho): só atualiza a cópia.
+function undoQuiet(fn) {
+    if (!undoReady) return fn();
+    undoMute++;
+    try { return fn(); } finally { undoMute--; }
+}
+
+function undoTouch(key) {
+    if (!undoReady || !undoSnap) return;
+    let now;
+    try { now = undoTake(key); } catch (e) { return; }
+    const old = undoSnap[key];
+    undoSnap[key] = now;
+    if (!old || undoMute > 0 || (typeof window.fazSyncApplying === 'function' && window.fazSyncApplying())) return; // veio da nuvem
+    const K = undoKeys()[key], ch = [];
+    old.m.forEach((v, id) => {
+        const n = now.m.get(id);
+        if (!n) ch.push({ id, b: v, a: null, pb: old.ids[old.ids.indexOf(id) - 1] || null }); // pb: quem estava em cima (pra voltar no lugar)
+        else if (n.s !== v.s) ch.push({ id, b: v, a: n });
+    });
+    now.m.forEach((v, id) => { if (!old.m.has(id)) ch.push({ id, b: null, a: v, pa: now.ids[now.ids.indexOf(id) - 1] || null }); });
+    let reord = false;
+    if (K.ordered) { // só onde a ordem é sua (cartões da Lista, listas, tags, metas): arrastar pra cima/baixo também desfaz
+        const o = old.ids.filter((id) => now.m.has(id)), n = now.ids.filter((id) => old.m.has(id));
+        reord = o.some((id, i) => id !== n[i]);
+    }
+    if (ch.length || reord) undoAdd(key, ch, reord ? old.ids : null, reord ? now.ids : null);
+}
+function undoAdd(key, ch, ob, oa) {
+    if (!undoGroup) { undoGroup = { keys: {}, at: Date.now() }; setTimeout(undoClose, 0); } // tudo do mesmo toque = um passo
+    const G = undoGroup.keys[key] || (undoGroup.keys[key] = { ch: new Map(), ob: null, oa: null });
+    ch.forEach((c) => {
+        const p = G.ch.get(c.id);
+        if (!p) { G.ch.set(c.id, c); return; }
+        p.a = c.a; // mexido de novo no mesmo toque: vale o primeiro "antes" e o último "depois"
+        if (c.pa !== undefined) p.pa = c.pa;
+        if (!p.b && !p.a) G.ch.delete(c.id); // nasceu e sumiu no mesmo toque
+    });
+    if (ob) { if (!G.ob) G.ob = ob; G.oa = oa; }
+}
+function undoClose() {
+    const g = undoGroup;
+    undoGroup = null;
+    if (!g) return;
+    const keys = {};
+    Object.keys(g.keys).forEach((k) => {
+        const G = g.keys[k], ch = [];
+        G.ch.forEach((c) => { if ((c.b || c.a) && !(c.b && c.a && c.b.s === c.a.s)) ch.push(c); });
+        let ob = G.ob, oa = G.oa;
+        if (ob && oa) { // voltou pra mesma ordem no fim: não conta
+            const inA = new Set(oa), inB = new Set(ob), o = ob.filter((id) => inA.has(id)), n = oa.filter((id) => inB.has(id));
+            if (!o.some((id, i) => id !== n[i])) ob = oa = null;
+        }
+        if (ch.length || ob) keys[k] = { ch, ob, oa };
+    });
+    const ks = Object.keys(keys);
+    if (!ks.length) return;
+    const step = { keys, at: g.at, label: undoLabel(keys) };
+    step.quiet = ks.every((k) => k === 'metas_dias'); // o "+" das metas já tem o "−" do lado: não precisa da barrinha
+    step.heavy = !!keys.arquivo || ks.some((k) => keys[k].ch.some((c) => !c.a)); // apagou ou arquivou: a barrinha fica mais tempo
+    undoStack.push(step);
+    if (undoStack.length > UNDO_MAX) undoStack.shift();
+    redoStack = [];
+    if (step.quiet) undoBarHide(); else undoBarShow(step.label, 'did', step.heavy ? 7000 : 5000);
+}
+
+// ---- o texto do passo ("Tarefa agendada", "Bloco movido", "3 tarefas apagadas"...) ----
+var UNDO_NOUN = {
+    blocos: ['bloco', 'blocos', 'o'], sublista: ['sublista', 'sublistas', 'a'], tarefas: ['tarefa', 'tarefas', 'a'],
+    listas: ['lista', 'listas', 'a'], tags: ['tag', 'tags', 'a'], periodos: ['período', 'períodos', 'o'],
+    rotinas: ['rotina', 'rotinas', 'a'], notas: ['nota', 'notas', 'a'], financas: ['despesa', 'despesas', 'a'],
+    metas_listas: ['categoria', 'categorias', 'a'], metas: ['meta', 'metas', 'a'], arquivo: ['item', 'itens', 'o'],
+};
+function undoCap(t) { return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
+function undoWord(key, n, verb) { // ("tarefas", 1, "apagad") → "Tarefa apagada"; (…, 3, …) → "3 tarefas apagadas"
+    const w = UNDO_NOUN[key] || UNDO_NOUN.arquivo, g = w[2];
+    return n === 1 ? undoCap(w[0]) + ' ' + verb + g : n + ' ' + w[1] + ' ' + verb + g + 's';
+}
+function undoIsSub(c) { return /"cards":\[/.test((c.a && c.a.s) || (c.b && c.b.s) || ''); }
+function undoMbLabel(b, a) {
+    b = Array.isArray(b) ? b : []; a = Array.isArray(a) ? a : [];
+    if (a.length > b.length) return 'Item da checklist adicionado';
+    if (a.length < b.length) return 'Item da checklist apagado';
+    const done = (l) => l.filter((x) => x && x.done).length, t = (l) => l.map((x) => (x && x.title) || '').sort().join('\n');
+    if (done(a) !== done(b)) return done(a) > done(b) ? 'Item marcado' : 'Item desmarcado';
+    return t(a) === t(b) ? 'Ordem da checklist' : 'Item da checklist editado';
+}
+function undoCardsLabel(b, a) {
+    b = Array.isArray(b) ? b : []; a = Array.isArray(a) ? a : [];
+    const n = Math.abs(a.length - b.length), done = (l) => l.filter((x) => x && x.done).length;
+    if (a.length > b.length) return n === 1 ? 'Cartão na sublista' : n + ' cartões na sublista';
+    if (a.length < b.length) return n === 1 ? 'Cartão saiu da sublista' : n + ' cartões saíram da sublista';
+    if (done(a) !== done(b)) return done(a) > done(b) ? 'Cartão marcado' : 'Cartão desmarcado';
+    return 'Cartão editado';
+}
+function undoModLabel(k, c) {
+    let b, a;
+    try { b = JSON.parse(c.b.s); a = JSON.parse(c.a.s); } catch (e) { return undoWord(k, 1, 'editad'); }
+    const ch = (f) => JSON.stringify(b[f]) !== JSON.stringify(a[f]), only = (...fs) => Object.keys(Object.assign({}, b, a)).every((f) => fs.indexOf(f) >= 0 || !ch(f));
+    if (k === 'blocos') {
+        const nk = undoIsSub(c) ? 'sublista' : 'blocos';
+        if (ch('date') || ch('startMin')) return undoWord(nk, 1, 'movid');
+        if (ch('duration') && only('duration')) return 'Duração mudada';
+        if (ch('cards') && only('cards', 'completed')) return undoCardsLabel(b.cards, a.cards);
+        if (ch('completed') && only('completed', 'cards')) return undoWord(nk, 1, a.completed ? 'concluíd' : 'reabert');
+        if (ch('microblocks') && only('microblocks')) return undoMbLabel(b.microblocks, a.microblocks);
+        if (ch('linkedNoteIds') && only('linkedNoteIds')) return (a.linkedNoteIds || []).length > (b.linkedNoteIds || []).length ? 'Nota ligada ao bloco' : 'Nota tirada do bloco';
+        return undoWord(nk, 1, 'editad');
+    }
+    if ((k === 'tarefas' || k === 'rotinas') && ch('microblocks') && only('microblocks')) return undoMbLabel(b.microblocks, a.microblocks);
+    if (k === 'tarefas' && ch('columnId')) return 'Tarefa movida de lista';
+    if (k === 'financas' && ch('paidMonths') && only('paidMonths')) return (a.paidMonths || []).length > (b.paidMonths || []).length ? 'Despesa paga' : 'Pagamento desmarcado';
+    if ((k === 'listas' || k === 'metas_listas' || k === 'tags') && ch('name') && only('name')) return undoWord(k, 1, 'renomead');
+    return undoWord(k, 1, 'editad');
+}
+function undoLabel(keys) {
+    const st = {};
+    Object.keys(keys).forEach((k) => {
+        const s = st[k] = { n: [], d: [], m: [], o: !!keys[k].ob };
+        keys[k].ch.forEach((c) => { if (!c.b) s.n.push(c); else if (!c.a) s.d.push(c); else s.m.push(c); });
+    });
+    const n = (k) => (st[k] ? st[k].n.length : 0), d = (k) => (st[k] ? st[k].d.length : 0), m = (k) => (st[k] ? st[k].m.length : 0);
+    const arqKind = (list) => { const ks = new Set(list.map((c) => c.id.split('|')[0])); return ks.size === 1 ? (ks.has('bloco') ? 'blocos' : 'tarefas') : null; };
+    // 1) apagar lista, tag ou categoria leva junto (ou solta) o que tinha dentro
+    if (d('listas')) return undoWord('listas', d('listas'), 'apagad');
+    if (d('tags')) return undoWord('tags', d('tags'), 'apagad');
+    if (d('metas_listas')) return undoWord('metas_listas', d('metas_listas'), 'apagad');
+    // 2) arquivados
+    if (n('arquivo')) { const k = arqKind(st.arquivo.n); return k ? undoWord(k, n('arquivo'), 'arquivad') : n('arquivo') + ' itens arquivados'; }
+    if (d('arquivo')) {
+        const k = arqKind(st.arquivo.d);
+        if (n('tarefas') || n('blocos')) return k ? undoWord(k, d('arquivo'), 'desarquivad') : d('arquivo') + ' itens desarquivados';
+        return d('arquivo') === 1 ? 'Apagado dos arquivados' : d('arquivo') + ' itens apagados dos arquivados';
+    }
+    // 3) da Lista pra agenda (e de volta)
+    if (d('tarefas') && n('blocos')) return d('tarefas') === 1 ? 'Tarefa agendada' : d('tarefas') + ' tarefas agendadas';
+    if (d('tarefas') && m('blocos')) return d('tarefas') === 1 ? 'Tarefa entrou na sublista' : d('tarefas') + ' tarefas entraram na sublista';
+    if (d('blocos') && n('tarefas')) {
+        if (st.blocos.d.every(undoIsSub)) return undoWord('sublista', d('blocos'), 'apagad'); // os cartões não feitos voltaram pra Lista
+        return d('blocos') === 1 ? 'Bloco voltou pra lista' : d('blocos') + ' blocos voltaram pra lista';
+    }
+    if (n('tarefas') && m('blocos')) return n('tarefas') === 1 ? 'Cartão voltou pra lista' : n('tarefas') + ' cartões voltaram pra lista';
+    if (d('metas') && st.metas_dias) return undoWord('metas', d('metas'), 'apagad');
+    // 4) uma coisa só
+    const k = ['blocos', 'tarefas', 'notas', 'rotinas', 'financas', 'metas', 'listas', 'tags', 'metas_listas', 'periodos', 'metas_dias'].find((x) => st[x]);
+    if (!k) return 'Alteração';
+    if (k === 'metas_dias') return 'Progresso da meta';
+    const s = st[k], nk = (list) => (k === 'blocos' && list.every(undoIsSub) ? 'sublista' : k);
+    if (s.n.length && !s.d.length && !s.m.length) return undoWord(nk(s.n), s.n.length, 'criad');
+    if (s.d.length && !s.n.length && !s.m.length) return undoWord(nk(s.d), s.d.length, 'apagad');
+    if (s.m.length === 1 && !s.n.length && !s.d.length) return undoModLabel(k, s.m[0]);
+    if (s.m.length > 1 && !s.n.length && !s.d.length) {
+        if (k === 'blocos' && s.m.every((c) => undoModLabel(k, c) === undoModLabel(k, s.m[0]) && /movid/.test(undoModLabel(k, c)))) return s.m.length + ' blocos movidos';
+        return undoWord(k, s.m.length, 'editad');
+    }
+    if (!s.n.length && !s.d.length && !s.m.length && s.o) return k === 'tarefas' ? 'Cartão mudou de lugar' : 'Ordem mudada';
+    return 'Alteração';
+}
+
+// ---- desfazer / refazer ----
+function undoOrder(arr, target, idOf) { // põe os itens conhecidos na ordem "target"; os que surgiram depois ficam onde estão
+    const pos = new Map(target.map((id, i) => [id, i]));
+    const known = arr.filter((x) => pos.has(idOf(x))).sort((a, b) => pos.get(idOf(a)) - pos.get(idOf(b)));
+    let j = 0;
+    return arr.map((x) => (pos.has(idOf(x)) ? known[j++] : x));
+}
+function undoApply(step, dir) { // dir 'b' = desfazer (volta pro antes) · 'a' = refazer
+    const other = dir === 'b' ? 'a' : 'b', res = { done: 0, skipped: 0, keys: {} };
+    undoMute++;
+    try {
+        Object.keys(step.keys).forEach((key) => {
+            const K = undoKeys()[key], R = step.keys[key], idOf = K.id || undoIdOf;
+            let arr = (Array.isArray(K.get()) ? K.get() : []).slice(), touched = false;
+            const byId = new Map();
+            arr.forEach((x) => { const id = idOf(x); if (id != null && !byId.has(id)) byId.set(id, x); });
+            R.ch.forEach((c) => {
+                const x = byId.get(c.id), was = c[other], want = c[dir];
+                if (!(was ? !!x && undoSer(K, x).s === was.s : !x)) { res.skipped++; return; } // mudou depois (outro aparelho): fica como está
+                res.done++; touched = true;
+                if (!want) { arr = arr.filter((y) => idOf(y) !== c.id); byId.delete(c.id); return; }
+                const o = JSON.parse(want.s);
+                if (want.k) Object.assign(o, want.k);
+                if (x) arr[arr.indexOf(x)] = o;
+                else { // volta pro lugar: logo depois de quem estava em cima (ou no começo)
+                    const anchor = dir === 'b' ? c.pb : c.pa, ai = anchor ? arr.findIndex((y) => idOf(y) === anchor) : -1;
+                    arr.splice(ai + 1, 0, o);
+                }
+                byId.set(c.id, o);
+            });
+            if (R.ob && R.oa) { arr = undoOrder(arr, dir === 'b' ? R.ob : R.oa, idOf); touched = true; }
+            if (touched) { K.set(arr); K.save(); res.keys[key] = true; }
+        });
+    } finally { undoMute--; }
+    return res;
+}
+function undoRefresh(keys) {
+    const run = (f) => { try { f(); } catch (e) { console.warn('[Faz] desfazer', e); } };
+    const has = (...ks) => ks.some((k) => keys[k]);
+    if (has('blocos', 'tags', 'notas', 'arquivo')) run(() => { runRealTimeEngine(); renderTimeline(); });
+    if (has('tarefas', 'listas', 'tags', 'arquivo', 'blocos')) {
+        run(() => { if (!backlogColumnsDb.some((c) => c.id === activeColumnId)) activeColumnId = 'col_geral'; renderBacklog(); });
+    }
+    if (has('arquivo')) run(renderArchive);
+    if (has('tags')) run(() => { renderTagsList(); renderTagSelector(); });
+    if (has('rotinas') && typeof window.renderRoutinesList === 'function') run(window.renderRoutinesList);
+    if (has('notas') && typeof window.renderNotes === 'function') run(window.renderNotes);
+    if (has('financas') && typeof window.renderFinancial === 'function') run(window.renderFinancial);
+    if (has('metas_listas', 'metas', 'metas_dias') && typeof window.renderGoals === 'function') run(window.renderGoals);
+    if (has('periodos')) run(() => { renderConfigPeriods(); renderPeriodSelect(); });
+}
+function undoLow(t) { return /^[A-ZÀ-Ú][a-zà-ú]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t; }
+window.fazUndo = function () {
+    undoClose(); // fecha um passo que ainda estivesse sendo montado
+    const step = undoStack.pop();
+    if (!step) { undoBarShow('Nada pra desfazer', 'info', 2500); return false; }
+    const r = undoApply(step, 'b');
+    undoRefresh(r.keys);
+    if (!r.done) { undoBarShow('Não deu pra desfazer: isso já mudou em outro aparelho', 'warn', 5000); return false; }
+    redoStack.push(step);
+    undoBarShow('Desfeito: ' + undoLow(step.label) + (r.skipped ? ' (em parte: o resto mudou em outro aparelho)' : ''), 'undone', 6000);
+    return true;
+};
+window.fazRedo = function () {
+    undoClose();
+    const step = redoStack.pop();
+    if (!step) { undoBarHide(); return false; }
+    const r = undoApply(step, 'a');
+    undoRefresh(r.keys);
+    if (!r.done) { undoBarShow('Não deu pra refazer: isso já mudou em outro aparelho', 'warn', 5000); return false; }
+    undoStack.push(step);
+    undoBarShow('Refeito: ' + undoLow(step.label), 'redone', 6000);
+    return true;
+};
+
+// ---- a barrinha (embaixo, por cima das telas e abaixo das janelinhas de confirmação) ----
+function undoModalOpen() { // alguma janelinha de confirmação (as "-modal") aberta?
+    return [...document.querySelectorAll('[id$="-modal"]')].some((m) => !m.classList.contains('hidden') &&
+        (m.classList.contains('flex') || (getComputedStyle(m).display !== 'none' && m.offsetParent !== null)));
+}
+function undoBarShow(text, mode, ms) {
+    const bar = document.getElementById('undo-bar');
+    if (!bar) return;
+    const a = document.activeElement;
+    if (mode === 'did' && a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) { undoBarHide(); return; } // digitando: não cobre o campo
+    if (mode === 'did' && undoModalOpen()) { undoBarHide(); return; } // com janelinha aberta a barrinha ficaria solta por cima do fundo escuro
+    document.getElementById('undo-bar-msg').textContent = text;
+    document.getElementById('undo-bar-undo').classList.toggle('hidden', !undoStack.length || mode === 'info');
+    document.getElementById('undo-bar-redo').classList.toggle('hidden', !redoStack.length || (mode !== 'undone' && mode !== 'redone'));
+    bar.classList.toggle('undo-warn', mode === 'warn');
+    bar.classList.remove('hidden');
+    // com a tarefa na mão, fica acima da faixa dela (que pode ser mais alta com letra grande)
+    const ft = document.getElementById('floating-task'), host = bar.offsetParent;
+    bar.style.bottom = '';
+    if (ft && host && !ft.classList.contains('hidden') && ft.offsetParent === host) {
+        const need = host.clientHeight - ft.offsetTop + 10;
+        if (need > 160) bar.style.bottom = need + 'px';
+    }
+    clearTimeout(undoBarT);
+    undoBarT = setTimeout(undoBarHide, ms || 5000);
+}
+function undoBarHide() {
+    clearTimeout(undoBarT);
+    const bar = document.getElementById('undo-bar');
+    if (bar) bar.classList.add('hidden');
+}
+document.addEventListener('focusin', (e) => { // começou a digitar: a barrinha sai da frente
+    const t = e.target;
+    if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) undoBarHide();
+});
+if (typeof MutationObserver === 'function') { // abriu uma janelinha (apagar, mover, renomear...): a barrinha sai
+    const mo = new MutationObserver(() => { if (undoModalOpen()) undoBarHide(); });
+    document.querySelectorAll('[id$="-modal"]').forEach((el) => mo.observe(el, { attributes: true, attributeFilter: ['class'] }));
+}
+undoInit();
 
 // V40.8.0 — avisa (uma vez por abertura) se algum dado salvo estava ilegível.
 if (window.fazCorruptKeys && window.fazCorruptKeys.length) {

@@ -345,5 +345,65 @@ const { abrir } = require('./apoio');
   await m.tap('#tl-compact-btn'); await m.waitForTimeout(200);
   ok(await m.evaluate(() => !document.querySelector('.tl-gap') && localStorage.getItem('tb__vagos_compactos') === '0'), 'tocar de novo mostra os vagos');
   }
+
+  {
+  console.log('\nJ) Desfazer (V40.25.0):');
+  await m.setViewportSize({ width: 390, height: 844 });
+  await m.evaluate(() => { closeAllSheets(); undoStack = []; redoStack = []; undoBarHide(); activeColumnId = 'col_geral'; openListSheet(); });
+  await m.waitForTimeout(600);
+  const geo = () => m.evaluate(() => {
+    const b = document.getElementById('undo-bar'), r = b.getBoundingClientRect(), fab = document.getElementById('fab-btn').getBoundingClientRect(), lst = document.getElementById('list-btn').getBoundingClientRect();
+    const msg = document.getElementById('undo-bar-msg'), hit = document.elementFromPoint(r.left + r.width - 30, r.top + r.height / 2);
+    return { vis: !b.classList.contains('hidden') && r.height > 0, meio: Math.abs((r.left + r.right) / 2 - innerWidth / 2), acimaDosBotoes: r.bottom <= Math.min(fab.top, lst.top) - 4, cabe: r.left >= 8 && r.right <= innerWidth - 8,
+      cortaTexto: msg.scrollWidth > msg.clientWidth + 1, temReticencias: getComputedStyle(msg).textOverflow === 'ellipsis', naFrente: !!hit && b.contains(hit), alt: r.height, bottom: innerHeight - r.bottom, texto: msg.textContent };
+  });
+  const g0 = await m.evaluate(() => backlogDb.filter((x) => (x.columnId || 'col_geral') === 'col_geral').map((x) => x.id));
+  await m.evaluate((id) => requestDeleteBacklog(id), g0[1]); await m.waitForTimeout(250);
+  await m.tap('#backlog-delete-modal [onclick="confirmDeleteBacklog()"]'); await m.waitForTimeout(350);
+  let gb = await geo();
+  ok(gb.vis && gb.texto === 'Tarefa apagada' && gb.meio < 2 && gb.acimaDosBotoes && gb.cabe && gb.naFrente, `apagou com o dedo: a barrinha aparece no meio, ${Math.round(gb.bottom)} px acima do fundo, acima do + e da Lista, por cima da tela da Lista`);
+  await foto(m, 'cel-desfazer.png');
+  await m.tap('#undo-bar-undo'); await m.waitForTimeout(300);
+  ok(JSON.stringify(await m.evaluate(() => backlogDb.filter((x) => (x.columnId || 'col_geral') === 'col_geral').map((x) => x.id))) === JSON.stringify(g0) && await m.evaluate((id) => !!document.querySelector(`[data-bl-card="${id}"]`), g0[1]), 'tocar em Desfazer: a tarefa volta no mesmo lugar, na tela');
+  gb = await geo();
+  ok(gb.vis && gb.texto === 'Desfeito: tarefa apagada' && await m.evaluate(() => !document.getElementById('undo-bar-redo').classList.contains('hidden')), 'a barrinha mostra "Desfeito: tarefa apagada" + Refazer');
+  // dois botões numa tela estreita
+  await m.setViewportSize({ width: 360, height: 740 }); await m.waitForTimeout(150);
+  await m.evaluate(() => { const l = backlogDb.filter((x) => (x.columnId || 'col_geral') === 'col_geral'); requestDeleteBacklog(l[2].id); confirmDeleteBacklog(); });
+  await m.waitForTimeout(80);
+  await m.evaluate(() => { const l = backlogDb.filter((x) => (x.columnId || 'col_geral') === 'col_geral'); requestDeleteBacklog(l[3].id); confirmDeleteBacklog(); });
+  await m.waitForTimeout(80);
+  await m.tap('#undo-bar-undo'); await m.waitForTimeout(250);
+  gb = await geo();
+  const dois = await m.evaluate(() => ['undo-bar-redo', 'undo-bar-undo'].every((id) => { const e = document.getElementById(id), r = e.getBoundingClientRect(); return !e.classList.contains('hidden') && r.width >= 60 && r.height >= 32 && e.scrollWidth <= e.clientWidth + 1; }));
+  ok(gb.vis && gb.cabe && dois && (!gb.cortaTexto || gb.temReticencias), `360 px com Refazer e Desfazer: tudo cabe (botões de ${Math.round(gb.alt)} px de altura), o texto encurta com "…"`);
+  await foto(m, 'cel-desfazer-360.png');
+  await m.setViewportSize({ width: 390, height: 844 }); await m.waitForTimeout(150);
+  // janelinha aberta: a barrinha sai
+  await m.evaluate(() => { const l = backlogDb.filter((x) => (x.columnId || 'col_geral') === 'col_geral'); requestDeleteBacklog(l[0].id); confirmDeleteBacklog(); });
+  await m.waitForTimeout(150);
+  ok((await geo()).vis, 'outra ação: a barrinha aparece');
+  await m.evaluate(() => { const l = backlogDb.filter((x) => (x.columnId || 'col_geral') === 'col_geral'); requestDeleteBacklog(l[0].id); }); await m.waitForTimeout(250);
+  ok(!(await geo()).vis, 'abriu a janelinha de confirmar: a barrinha sai da frente');
+  await m.tap('#backlog-delete-modal [onclick="cancelDeleteBacklog()"]'); await m.waitForTimeout(250);
+  // tarefa na mão: a barrinha fica acima da faixa
+  await m.evaluate(() => { closeAllSheets(); activeDateObj = new Date(2026, 10, 18); renderTimeline(); scheduleBacklogItem(backlogDb[0].id); });
+  await m.waitForTimeout(400);
+  await m.evaluate(() => { const b = db.find((x) => x.date === '2026-11-17'); toggleBlockCompletion(b.id, { stopPropagation() {} }); });
+  await m.waitForTimeout(150);
+  const ft = await m.evaluate(() => { const f = document.getElementById('floating-task').getBoundingClientRect(), r = document.getElementById('undo-bar').getBoundingClientRect(); return { vis: !document.getElementById('undo-bar').classList.contains('hidden'), acima: r.bottom <= f.top - 4 }; });
+  ok(ft.vis && ft.acima, 'com a tarefa na mão, a barrinha aparece acima da faixa (não cobre os botões de tempo)');
+  await foto(m, 'cel-desfazer-mao.png');
+  await m.evaluate(() => cancelPendingTask()); await m.waitForTimeout(150);
+  await m.tap('#undo-bar-undo'); await m.waitForTimeout(250);
+  ok(await m.evaluate(() => !db.find((x) => x.date === '2026-11-17').completed), 'tocar em Desfazer desfaz a conclusão');
+  // digitando: a barrinha não cobre o campo
+  await m.evaluate(() => { closeAllSheets(); openSearchBar(); }); await m.waitForTimeout(300);
+  await m.tap('#search-input'); await m.waitForTimeout(150);
+  await m.evaluate(() => { const b = db.find((x) => x.date === '2026-11-17'); toggleBlockCompletion(b.id, { stopPropagation() {} }); });
+  await m.waitForTimeout(150);
+  ok(!(await geo()).vis, 'com o teclado aberto num campo, a barrinha não aparece por cima');
+  await m.evaluate(() => { closeSearchBar(); closeAllSheets(); fazUndo(); undoBarHide(); });
+  }
   await fim(errs.length ? '\nERROS DE PÁGINA: ' + errs.slice(0, 3).join(' | ') : '');
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

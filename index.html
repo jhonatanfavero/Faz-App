@@ -160,6 +160,15 @@
             <span id="toast-msg">Mensagem</span>
         </div>
 
+        <!-- V40.25.0: barrinha Desfazer. Aparece embaixo depois de cada mudança; some sozinha. Fica por cima das
+             telas (Lista, +) e abaixo das janelinhas de confirmação. Com a tarefa na mão, sobe acima da faixa dela. -->
+        <div id="undo-bar" class="hidden" role="status" aria-live="polite">
+            <i class="ph-bold ph-arrow-counter-clockwise undo-bar-ico" aria-hidden="true"></i>
+            <span id="undo-bar-msg" class="undo-bar-msg"></span>
+            <button type="button" id="undo-bar-redo" onclick="fazRedo()" class="undo-bar-btn hidden">Refazer</button>
+            <button type="button" id="undo-bar-undo" onclick="fazUndo()" class="undo-bar-btn">Desfazer</button>
+        </div>
+
         <main class="flex-1 overflow-y-auto no-scrollbar relative pt-36 pb-40" id="timeline-scroll">
             <div class="relative pl-14 pr-4 w-full" id="timeline-container">
                 <div id="y-axis" class="absolute left-0 top-0 bottom-0 w-14 border-r border-black/5 pointer-events-none"></div>
@@ -1318,7 +1327,7 @@
         <div id="column-delete-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
             <div class="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-3"><i class="ph ph-warning text-2xl"></i></div>
             <h3 class="text-lg font-bold text-zinc-900 mb-2 text-center leading-tight" id="column-delete-title">Apagar Lista?</h3>
-            <p class="text-xs text-zinc-500 text-center mb-6" id="column-delete-subtitle">Esta ação não pode ser desfeita.</p>
+            <p class="text-xs text-zinc-500 text-center mb-6" id="column-delete-subtitle">Se mudar de ideia, toque em Desfazer logo depois.</p>
             <div class="flex flex-col gap-2">
                 <button onclick="confirmDeleteColumn()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)] transition">
                     <i class="ph ph-trash text-lg"></i> Apagar Lista
@@ -1481,7 +1490,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.24.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.25.0</div>
 
     </div>
 

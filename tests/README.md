@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 20 suítes (cerca de 1 minuto e meio)
+npm test        # confere o CSS pronto e roda as 22 suítes (cerca de 2 minutos)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -13,7 +13,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 
 | Arquivo | O que roda | O que confere |
 |---|---|---|
-| `sim_sync.js` | só o motor do `sync.js` | mesclagem celular × nuvem: conflitos, apagados, ordem, lista órfã, primeiro sync, duplicados, metas (listas padrão, órfãs, dias de meta apagada, linhas estranhas), sublista (cartões nos dois sentidos, cartões estranhos ou maliciosos) |
+| `sim_sync.js` | só o motor do `sync.js` | mesclagem celular × nuvem: conflitos, apagados, ordem, lista órfã, primeiro sync, duplicados, metas (listas padrão, órfãs, dias de meta apagada, linhas estranhas), sublista (cartões nos dois sentidos, cartões estranhos ou maliciosos), desfazer depois do sync (o apagado volta nos dois sentidos) |
 | `test_app.js` | `index.html` + `app.js` + `sync.js` de verdade | app sem login, login, ida e volta com a nuvem, backup e restauração |
 | `test_v408.js` | idem | agenda na nuvem, blocos de 5 e 10 min, dado corrompido, iOS, esqueci a senha |
 | `test_v409.js` | idem | cor livre do cartão, arquivar e desarquivar |
@@ -32,6 +32,8 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_kanban_v4021.js` | `kanban.html` de verdade | aba Metas no PC (V40.23.0: uma página só, por categoria, cartões em grade): categorias padrão, meta nova com sugestões, +/− (cliques seguidos = um envio), editar, recomeçar a contagem, apagar, listas de metas, tempo real e o Assistente abrindo a meta |
 | `test_sublista.js` | `index.html` + `app.js` + `sync.js` de verdade | V40.24.0: sublista no celular (criar pelo +, cartão novo, tarefa da Lista na mão, marcar, cartão aberto, voltar pra lista, devolver os não feitos, duplicar e repetir, apagar, busca, backup, Assistente, ida e volta com a nuvem) e "ocultar vagos" (faixas, régua encolhida, arrastar e esticar, tocar na faixa) |
 | `test_kanban_v4024.js` | `kanban.html` de verdade | V40.24.0: sublista no PC (Semana e Dia, janela com os cartões, puxar da Lista, cartão aberto, Novo bloco como sublista, tarefa na mão, apagar devolvendo os não feitos, tempo real) |
+| `test_desfazer.js` | `index.html` + `app.js` + `sync.js` de verdade | V40.25.0: Desfazer e Refazer no celular (a barrinha, apagar e voltar no mesmo lugar, agendar = um passo, concluir, checklist, mover, sublista, lista apagada com as tarefas, arquivados, metas, finanças, notas, tags, rotinas, ordem dos cartões, o que não vira passo, vários passos, a nuvem: o que vem do PC não vira passo, desfazer sobe pra nuvem, conflito com o PC, agenda grande) |
+| `test_kanban_v4025.js` | `kanban.html` de verdade | V40.25.0: Desfazer no PC (Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z, Cmd+Z, botões ↶ ↷, aviso com Desfazer, agendar = um passo na ordem segura, lista e tag apagadas, metas, nota sendo escrita = um passo, o celular mexeu depois, Ctrl+Z num campo ou com janela aberta, sem internet) |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)

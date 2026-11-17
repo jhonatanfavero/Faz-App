@@ -247,9 +247,11 @@
             <button id="tab-metas" role="tab" data-tab="metas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Metas</button>
         </nav>
         <p id="board-summary" class="hidden sm:block min-w-0 text-xs text-zinc-500 leading-tight truncate"></p>
-        <div class="ml-auto flex items-center gap-1.5 sm:gap-2">
-            <span id="sync-pill" class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 px-2.5 py-1 rounded-full bg-zinc-100" title="Mudanças do celular aparecem aqui sozinhas">
-                <span id="sync-dot" class="w-2 h-2 rounded-full bg-amber-400"></span><span id="sync-label">Conectando</span>
+        <!-- V40.25.0: com os botões ↶ ↷ o topo apertou: abaixo de 1280 px o "Ao vivo" vira só a bolinha (o texto fica no
+             título) e o e-mail só aparece a partir de 1440 px (no título do "Sair" ele sempre está) -->
+        <div class="ml-auto flex items-center gap-1 xl:gap-2">
+            <span id="sync-pill" class="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 text-xs font-medium text-zinc-600 px-2.5 py-1 rounded-full bg-zinc-100" title="Conectando · mudanças do celular aparecem aqui sozinhas" aria-label="Conectando">
+                <span id="sync-dot" class="w-2 h-2 rounded-full bg-amber-400"></span><span id="sync-label" class="hidden xl:inline">Conectando</span>
             </span>
             <!-- V40.18.0: zoom das Listas e da Semana (cada uma lembra o seu) -->
             <div id="zoom-ctl" class="hidden items-center h-9 rounded-lg border border-zinc-200 bg-white" role="group" aria-label="Zoom">
@@ -257,15 +259,20 @@
                 <button id="zoom-reset" class="h-full px-2 min-w-[64px] text-[12px] font-semibold text-zinc-700 tabular-nums whitespace-nowrap hover:bg-zinc-100" title="Voltar ao normal" aria-label="Quantas colunas por tela (clique pra voltar ao normal)">4 listas</button>
                 <button id="zoom-in" class="w-8 h-full rounded-r-lg flex items-center justify-center text-zinc-600 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent" title="Mostrar menos, mais largas" aria-label="Mostrar menos colunas (mais largas)"><i class="ph-bold ph-plus"></i></button>
             </div>
+            <!-- V40.25.0: desfazer / refazer (Ctrl+Z / Ctrl+Y). O título mostra o que vai ser desfeito. -->
+            <div class="flex shrink-0 items-center" role="group" aria-label="Desfazer e refazer">
+                <button id="btn-undo" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-zinc-500" title="Nada pra desfazer" aria-label="Desfazer" disabled><i class="ph ph-arrow-counter-clockwise text-lg"></i></button>
+                <button id="btn-redo" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-zinc-500" title="Nada pra refazer" aria-label="Refazer" disabled><i class="ph ph-arrow-clockwise text-lg"></i></button>
+            </div>
             <!-- V40.18.0: tags (criar, renomear, trocar cor, apagar) -->
             <button id="btn-tags" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Tags" aria-label="Tags"><i class="ph ph-tag text-lg"></i></button>
             <button id="btn-archive" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Arquivados" aria-label="Arquivados"><i class="ph ph-archive text-lg"></i></button>
             <button id="btn-refresh" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Atualizar agora" aria-label="Atualizar agora">
                 <i class="ph ph-arrows-clockwise text-lg"></i>
             </button>
-            <span class="hidden sm:block h-6 w-px bg-zinc-200"></span>
-            <span id="user-email" class="hidden md:block text-xs text-zinc-500 max-w-[220px] truncate"></span>
-            <button id="btn-logout" class="text-xs font-semibold text-zinc-600 hover:text-zinc-900 px-2.5 py-2 rounded-lg hover:bg-zinc-100">Sair</button>
+            <span class="hidden min-[1440px]:block h-6 w-px bg-zinc-200"></span>
+            <span id="user-email" class="hidden min-[1440px]:block text-xs text-zinc-500 max-w-[220px] truncate"></span>
+            <button id="btn-logout" class="shrink-0 text-xs font-semibold text-zinc-600 hover:text-zinc-900 px-2.5 py-2 rounded-lg hover:bg-zinc-100">Sair</button>
         </div>
     </header>
     <!-- V40.15.0: campo de arquivar. Fica por cima do cabeçalho só enquanto um cartão (ou bloco da Semana) é arrastado. -->
@@ -820,7 +827,16 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.24.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.25.0</div>
+<!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
+     z 45: fica atrás das janelas (z 50+). Some sozinho. -->
+<div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
+    <i class="ph ph-arrow-counter-clockwise text-base text-white/60 shrink-0" aria-hidden="true"></i>
+    <span id="undo-pill-msg" class="min-w-0 truncate pr-1"></span>
+    <button type="button" id="undo-pill-redo" class="hidden shrink-0 h-8 px-3 rounded-lg bg-white/15 hover:bg-white/25 font-semibold whitespace-nowrap">Refazer <span class="text-white/60 font-normal text-[11.5px]">Ctrl+Y</span></button>
+    <button type="button" id="undo-pill-undo" class="shrink-0 h-8 px-3 rounded-lg bg-white/15 hover:bg-white/25 font-semibold whitespace-nowrap">Desfazer <span class="text-white/60 font-normal text-[11.5px]">Ctrl+Z</span></button>
+    <button type="button" id="undo-pill-x" class="shrink-0 w-7 h-8 rounded-lg flex items-center justify-center text-white/60 hover:text-white" title="Fechar" aria-label="Fechar o aviso"><i class="ph ph-x"></i></button>
+</div>
 <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 translate-y-2 opacity-0 pointer-events-none z-[70] bg-zinc-900 text-white text-[13px] font-medium px-4 py-2.5 rounded-xl shadow-lg" role="status" aria-live="polite"></div>
 
 <script src="faz-config.js"></script>
@@ -923,6 +939,8 @@
         var dot = $('sync-dot'), label = $('sync-label');
         dot.className = 'w-2 h-2 rounded-full ' + (state === 'live' ? 'bg-emerald-500' : state === 'connecting' ? 'bg-amber-400' : 'bg-zinc-400');
         label.textContent = state === 'live' ? 'Ao vivo' : state === 'connecting' ? 'Conectando' : (navigator.onLine === false ? 'Sem internet' : 'Reconectando');
+        $('sync-pill').title = label.textContent + ' · mudanças do celular aparecem aqui sozinhas'; // V40.25.0: em tela menor só a bolinha aparece
+        $('sync-pill').setAttribute('aria-label', label.textContent);
     }
 
     // ---------- dados ----------
@@ -988,10 +1006,12 @@
     }
 
     async function insertRow(kind, row, okMsg) {
+        var g = S.gesture, was = S[kind][row.id] ? undoClone(S[kind][row.id]) : null; // V40.25.0: pro Desfazer
         S[kind][row.id] = row;
         render(); renderAgenda(); renderSide(); renderTags();
         var res = await S.sb.from(kind).upsert(row, { onConflict: 'user_id,id' });
         if (res.error) { delete S[kind][row.id]; render(); renderAgenda(); renderSide(); renderTags(); fail(res.error); return false; }
+        undoRec(g, [undoIns(kind, row, was)], okMsg);
         if (okMsg) toast(okMsg);
         return true;
     }
@@ -1000,12 +1020,240 @@
     async function patchRow(kind, id, fields, okMsg) {
         var row = S[kind][id];
         if (!row) return false;
+        var g = S.gesture, was = undoClone(row); // V40.25.0: pro Desfazer (cópia funda: listas e cartões dentro)
         var prev = Object.assign({}, row);
         Object.assign(row, fields);
         render(); renderAgenda(); renderArchive(); renderSide(); renderTags();
         var res = await S.sb.from(kind).update(fields).eq('user_id', S.uid).eq('id', id);
         if (res.error) { S[kind][id] = prev; render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); fail(res.error); return false; }
+        undoRec(g, [undoUpd(kind, id, was, fields)], okMsg);
         if (okMsg) toast(okMsg);
+        return true;
+    }
+
+    // ---------- V40.25.0: DESFAZER (Ctrl+Z) e REFAZER (Ctrl+Y ou Ctrl+Shift+Z) ----------
+    // Cada gravação (insertRow, patchRow e as em lote) guarda o "antes" e o "depois" só dos campos que mudou. O que
+    // nasce do mesmo clique (ou tecla) vira um passo só (ex.: agendar = bloco novo + a tarefa saindo da Lista).
+    // Desfazer grava de volta o "antes", mas só nas linhas que continuam como a ação deixou: se o celular mexeu
+    // depois, aquela fica como está (e o aviso diz "em parte"). Linha criada → desfazer apaga (deleted), refazer
+    // traz de volta. O "+" das metas também desfaz, sem aviso (ele já tem o "−"). Fica só na memória desta aba.
+    var UNDO_MAX = 50, UNDO_SKIP = { user_id: 1, id: 1, updated_at: 1, created_at: 1 };
+    var UNDO_PARENT = { listas: 0, tags: 0, metas_listas: 0, metas: 1 }; // quem "contém" outros: volta primeiro, sai por último
+    S.undo = []; S.redo = []; S.gesture = 0; S.undoBusy = false; S.undoPillFor = null;
+    function undoClone(v) { return v == null ? null : JSON.parse(JSON.stringify(v)); }
+    // Igual de verdade? (a nuvem devolve o jsonb com as chaves em outra ordem e às vezes número como texto)
+    function undoSame(a, b) {
+        if (a === b) return true;
+        if (a == null || b == null) return a == null && b == null;
+        if (typeof a === 'number' || typeof b === 'number') return String(a) !== '' && String(b) !== '' && typeof a !== 'boolean' && typeof b !== 'boolean' && Number(a) === Number(b);
+        if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every(function (x, i) { return undoSame(x, b[i]); });
+        if (typeof a === 'object' && typeof b === 'object') {
+            var ka = Object.keys(a).filter(function (k) { return a[k] != null; }), kb = Object.keys(b).filter(function (k) { return b[k] != null; });
+            return ka.length === kb.length && ka.every(function (k) { return undoSame(a[k], b[k]); });
+        }
+        return false;
+    }
+    function undoPick(row, fs) { var o = {}; fs.forEach(function (f) { o[f] = row && row[f] !== undefined ? undoClone(row[f]) : null; }); return o; }
+    // Uma linha que mudou: { kind, id, b, a, row }. b/a = os campos antes/depois; b null = a linha não existia (ou
+    // estava apagada) e foi criada. row = a linha inteira, pra redesenhar se ela não estiver mais carregada.
+    function undoIns(kind, row, was) {
+        if (!was || was.deleted) return { kind: kind, id: row.id, b: null, a: undoPick(row, Object.keys(row).filter(function (f) { return !UNDO_SKIP[f]; })), row: undoClone(row) };
+        var fs = Object.keys(row).filter(function (f) { return !UNDO_SKIP[f] && !undoSame(was[f], row[f]); });
+        return fs.length ? { kind: kind, id: row.id, b: undoPick(was, fs), a: undoPick(row, fs), row: was } : null;
+    }
+    function undoUpd(kind, id, was, fields) {
+        var fs = Object.keys(fields).filter(function (f) { return !UNDO_SKIP[f] && !undoSame(was[f], fields[f]); });
+        return fs.length ? { kind: kind, id: id, b: undoPick(was, fs), a: undoPick(fields, fs), row: was } : null;
+    }
+    // As gravações em lote (apagar lista, tag, categoria...) contam assim: o mesmo campo, de um valor pro outro, em várias linhas.
+    function undoBulk(kind, ids, field, from, to) {
+        return ids.map(function (id) { var o = {}, n = {}; o[field] = from; n[field] = to; return S[kind][id] ? { kind: kind, id: id, b: o, a: n, row: undoClone(S[kind][id]) } : null; });
+    }
+    function undoRec(g, list, msg) {
+        list = (list || []).filter(Boolean);
+        if (!list.length) return null;
+        var e = null, top = S.undo[S.undo.length - 1];
+        for (var i = S.undo.length - 1; i >= 0 && i >= S.undo.length - 4; i--) if (S.undo[i].g === g) { e = S.undo[i]; break; }
+        if (!e && undoTyping(top, list)) e = top; // nota sendo escrita: os salvamentos automáticos viram um passo só
+        if (!e) { e = { g: g, at: Date.now(), ch: [], msg: '' }; S.undo.push(e); if (S.undo.length > UNDO_MAX) S.undo.shift(); }
+        list.forEach(function (c) { undoMergeIn(e, c); });
+        e.ch = e.ch.filter(undoReal);
+        if (!e.ch.length) { S.undo.splice(S.undo.indexOf(e), 1); undoUi(); return null; }
+        if (msg && !e.msg) e.msg = String(msg);
+        e.quiet = e.ch.every(function (c) { return c.q; });
+        e.label = undoLabelPc(e);
+        e.last = Date.now();
+        S.redo = [];
+        undoUi();
+        if (!e.quiet && undoHeavy(e)) undoPill(e.label, 'did', e);
+        else if (S.undoPillFor !== e) undoPillHide(); // o "Desfazer" do aviso agora seria de outra coisa
+        return e;
+    }
+    function undoMergeIn(e, c) {
+        var p = null;
+        for (var i = 0; i < e.ch.length; i++) if (e.ch[i].kind === c.kind && e.ch[i].id === c.id) { p = e.ch[i]; break; }
+        if (!p) { e.ch.push(c); return; }
+        if (c.q) p.q = true;
+        if (p.b === null || c.b === null) { Object.assign(p.a, c.a); return; } // nasceu neste passo: o "depois" vai somando
+        Object.keys(c.a).forEach(function (f) { if (!(f in p.b)) p.b[f] = c.b[f]; p.a[f] = c.a[f]; });
+    }
+    function undoReal(c) { // sobrou mudança de verdade? (nasceu e já foi apagada no mesmo passo = nada)
+        if (c.b === null) return !(c.a && c.a.deleted === true);
+        return Object.keys(c.a).some(function (f) { return !undoSame(c.b[f], c.a[f]); });
+    }
+    function undoTyping(top, list) {
+        if (!top || Date.now() - (top.last || 0) > 60000 || top.ch.length !== 1 || list.length !== 1) return false;
+        var a = top.ch[0], c = list[0];
+        return a.kind === 'notas' && c.kind === 'notas' && a.id === c.id && c.b !== null && Object.keys(c.a).every(function (f) { return f === 'title' || f === 'content' || f === 'updated_ms'; });
+    }
+    // Apagou, arquivou, mudou de lista ou mexeu em várias coisas: aparece o aviso com o botão. O resto desfaz pelo Ctrl+Z / botão ↶.
+    function undoHeavy(e) {
+        return e.ch.length > 1 || e.ch.some(function (c) { return c.b !== null && ('deleted' in c.a || 'archived' in c.a || 'column_id' in c.a); });
+    }
+    var PC_NOUN = { blocos: ['bloco', 'blocos', 'o'], tarefas: ['tarefa', 'tarefas', 'a'], listas: ['lista', 'listas', 'a'], tags: ['tag', 'tags', 'a'],
+        rotinas: ['rotina', 'rotinas', 'a'], notas: ['nota', 'notas', 'a'], financas: ['despesa', 'despesas', 'a'],
+        metas_listas: ['categoria', 'categorias', 'a'], metas: ['meta', 'metas', 'a'] };
+    function pcWord(kind, n, verb) {
+        var w = PC_NOUN[kind] || ['item', 'itens', 'o'];
+        return n === 1 ? w[0].charAt(0).toUpperCase() + w[0].slice(1) + ' ' + verb + w[2] : n + ' ' + w[1] + ' ' + verb + w[2] + 's';
+    }
+    function undoLabelPc(e) {
+        var msg = e.msg && e.msg.length > 70 ? e.msg.slice(0, 69) + '…' : e.msg;
+        var st = {};
+        e.ch.forEach(function (c) {
+            var s = st[c.kind] || (st[c.kind] = { n: 0, d: 0, r: 0, ar: 0, un: 0, m: [] });
+            if (c.b === null) s.n++;
+            else if (c.a.deleted === true) s.d++;
+            else if (c.a.deleted === false && c.b.deleted === true) s.r++;
+            else if (c.a.archived === true) s.ar++;
+            else if (c.a.archived === false && c.b.archived === true) s.un++;
+            else s.m.push(c);
+        });
+        function has(k, f) { return !!st[k] && (f === 'm' ? st[k].m.length > 0 : st[k][f] > 0); }
+        if (has('listas', 'd')) return pcWord('listas', st.listas.d, 'apagad');
+        if (has('tags', 'd')) return pcWord('tags', st.tags.d, 'apagad');
+        if (has('metas_listas', 'd')) return pcWord('metas_listas', st.metas_listas.d, 'apagad');
+        if (has('tarefas', 'd') && has('blocos', 'n')) return st.tarefas.d === 1 ? 'Tarefa agendada' : st.tarefas.d + ' tarefas agendadas';
+        if (has('tarefas', 'd') && has('blocos', 'm')) return msg || 'Tarefa entrou na sublista';
+        if (has('blocos', 'd') && has('tarefas', 'n')) return msg || 'Bloco voltou pra lista';
+        if (has('tarefas', 'n') && has('blocos', 'm')) return msg || 'Cartão voltou pra lista';
+        if (has('metas', 'd')) return pcWord('metas', st.metas.d, 'apagad');
+        if (msg) return msg;
+        var k = ['blocos', 'tarefas', 'notas', 'rotinas', 'financas', 'metas', 'listas', 'tags', 'metas_listas', 'metas_dias'].filter(function (x) { return st[x]; })[0];
+        if (!k) return 'Alteração';
+        if (k === 'metas_dias') return 'Progresso da meta';
+        var s = st[k];
+        if (s.n) return pcWord(k, s.n, 'criad');
+        if (s.d) return pcWord(k, s.d, 'apagad');
+        if (s.r) return pcWord(k, s.r, 'restaurad');
+        if (s.ar) return pcWord(k, s.ar, 'arquivad');
+        if (s.un) return pcWord(k, s.un, 'desarquivad');
+        var f = Object.keys(s.m[0].a), only = function () { var l = [].slice.call(arguments); return f.every(function (x) { return l.indexOf(x) >= 0; }); };
+        if (s.m.length > 1) return only('position', 'column_id') ? (k === 'tarefas' ? 'Cartões mudaram de lugar' : 'Ordem mudada') : pcWord(k, s.m.length, 'editad');
+        if (k === 'blocos') {
+            if (f.indexOf('date') >= 0 || f.indexOf('start_min') >= 0) return 'Bloco movido';
+            if (only('duration')) return 'Duração mudada';
+            if (only('cards', 'completed')) return 'Sublista mudada';
+            if (only('completed')) return s.m[0].a.completed ? 'Bloco concluído' : 'Bloco reaberto';
+            if (only('linked_note_ids')) return 'Notas do bloco';
+        }
+        if (k === 'tarefas' && f.indexOf('column_id') >= 0) return 'Tarefa movida de lista';
+        if (only('position')) return k === 'tarefas' ? 'Cartão mudou de lugar' : 'Ordem mudada';
+        if (only('microblocks')) return 'Checklist mudada';
+        if (only('name')) return pcWord(k, 1, 'renomead');
+        return pcWord(k, 1, 'editad');
+    }
+    function undoLow(t) { return /^[A-ZÀ-Ú][a-zà-ú]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t; }
+    // Botões ↶ ↷ do topo e o aviso de baixo (à esquerda)
+    function undoUi() {
+        var u = $('btn-undo'), r = $('btn-redo'), e = S.undo[S.undo.length - 1], x = S.redo[S.redo.length - 1];
+        if (u) { u.disabled = !e || S.undoBusy; u.title = e ? 'Desfazer: ' + e.label + ' (Ctrl+Z)' : 'Nada pra desfazer'; u.setAttribute('aria-label', e ? 'Desfazer: ' + e.label : 'Desfazer'); }
+        if (r) { r.disabled = !x || S.undoBusy; r.title = x ? 'Refazer: ' + x.label + ' (Ctrl+Y)' : 'Nada pra refazer'; r.setAttribute('aria-label', x ? 'Refazer: ' + x.label : 'Refazer'); }
+    }
+    var undoPillT = null;
+    function undoPill(text, mode, e) {
+        var p = $('undo-pill');
+        if (!p) return;
+        $('undo-pill-msg').textContent = text;
+        $('undo-pill-undo').classList.toggle('hidden', !S.undo.length);
+        $('undo-pill-redo').classList.toggle('hidden', !S.redo.length || mode === 'did');
+        p.classList.remove('hidden'); p.classList.add('flex');
+        S.undoPillFor = e || null;
+        clearTimeout(undoPillT);
+        undoPillT = setTimeout(undoPillHide, mode === 'did' ? 8000 : 6000);
+    }
+    function undoPillHide() { clearTimeout(undoPillT); S.undoPillFor = null; var p = $('undo-pill'); if (p) { p.classList.add('hidden'); p.classList.remove('flex'); } }
+    function undoWant(c, dir) { return dir === 'b' ? (c.b === null ? { deleted: true } : c.b) : (c.b === null ? { deleted: false } : c.a); }
+    function undoFits(c, side) { // a linha está como esse lado deixou?
+        var cur = S[c.kind][c.id], f = c[side];
+        if (f === null) return !cur || !!cur.deleted;
+        if (!cur) return f.deleted === true; // não carregada = apagada (a agenda e os dias das metas não trazem as apagadas)
+        return Object.keys(f).every(function (k) { return undoSame(cur[k], f[k]) || (k === 'deleted' && !f[k] && !cur[k]); });
+    }
+    function undoOrderKey(c, w) {
+        var p = UNDO_PARENT[c.kind] != null ? UNDO_PARENT[c.kind] : 2;
+        if (w.deleted === false && (c.b === null || c.b.deleted === true || c.a.deleted === true)) return p; // volta a existir: quem contém primeiro
+        if (w.deleted === true) return 6 - p;                                                                     // some: o de dentro primeiro
+        return 3;
+    }
+    function undoRenderAll() { render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); }
+    async function undoRun(dir) {
+        var word = dir === 'b' ? 'desfazer' : 'refazer';
+        if (S.undoBusy || !S.uid) return false;
+        if (anyLayerOpen() || S.placing || S.dragId || S.agDrag || DG) { toast('Feche a janela aberta (ou termine o que está fazendo) pra ' + word + '.'); return false; }
+        if (S.nt && (S.nt.dirty || S.nt.saving)) await ntFlush(); // o que estava sendo escrito na nota vira o último passo
+        var from = dir === 'b' ? S.undo : S.redo, to = dir === 'b' ? S.redo : S.undo, e = from[from.length - 1];
+        if (!e) { toast(dir === 'b' ? 'Nada pra desfazer.' : 'Nada pra refazer.'); return false; }
+        var other = dir === 'b' ? 'a' : 'b', todo = [], skipped = 0;
+        e.ch.forEach(function (c, i) { if (undoFits(c, other)) todo.push({ c: c, w: undoWant(c, dir), i: i }); else skipped++; });
+        from.pop();
+        if (!todo.length) { undoUi(); undoPillHide(); toast('Não deu pra ' + word + ': isso já mudou no celular.', 4000); return false; }
+        todo.sort(function (x, y) { return (undoOrderKey(x.c, x.w) - undoOrderKey(y.c, y.w)) || (x.i - y.i); });
+        S.undoBusy = true;
+        undoUi();
+        if (S.nt && S.nt.id && todo.some(function (t) { return t.c.kind === 'notas' && t.c.id === S.nt.id && t.w.deleted === true; })) ntClose(); // a nota aberta vai sumir
+        var back = [];
+        todo.forEach(function (t) { // na tela já (como as outras gravações)
+            var k = t.c.kind, cur = S[k][t.c.id];
+            back.push([k, t.c.id, cur ? Object.assign({}, cur) : null]);
+            var row = cur || (t.c.row ? undoClone(t.c.row) : null);
+            if (!row) return;
+            Object.assign(row, undoClone(t.w));
+            S[k][t.c.id] = row;
+        });
+        undoRenderAll();
+        var groups = []; // mesmo tipo + mesmos campos = uma gravação só
+        todo.forEach(function (t) {
+            var key = t.c.kind + '|' + JSON.stringify(t.w) + (t.c.q ? '|fila' : ''), last = groups[groups.length - 1];
+            if (last && last.key === key) last.ids.push(t.c.id); else groups.push({ key: key, kind: t.c.kind, w: t.w, q: !!t.c.q, ids: [t.c.id] });
+        });
+        var err = null;
+        try {
+            for (var i = 0; i < groups.length && !err; i++) {
+                var gr = groups[i];
+                if (gr.q) { // dias das metas: pela mesma fila do "+", pra chegar na ordem certa
+                    gr.ids.forEach(function (id) {
+                        var r = S.metas_dias[id];
+                        if (r) mtWrite({ user_id: S.uid, id: id, goal_id: r.goal_id, date: r.date, amount: Number(r.amount) || 0, target: r.target, deleted: !!r.deleted });
+                    });
+                    continue;
+                }
+                var q = S.sb.from(gr.kind).update(gr.w).eq('user_id', S.uid);
+                var res = await (gr.ids.length === 1 ? q.eq('id', gr.ids[0]) : q.in('id', gr.ids));
+                if (res.error) err = res.error;
+            }
+        } catch (x) { err = x; }
+        S.undoBusy = false;
+        if (err) {
+            back.forEach(function (b) { if (b[2]) S[b[0]][b[1]] = b[2]; else delete S[b[0]][b[1]]; });
+            from.push(e);
+            undoRenderAll(); undoUi();
+            fail(err); loadAll();
+            return false;
+        }
+        to.push(e);
+        undoUi();
+        undoPill((dir === 'b' ? 'Desfeito: ' : 'Refeito: ') + undoLow(e.label) + (skipped ? ' (em parte: o resto mudou no celular)' : ''), dir === 'b' ? 'undone' : 'redone');
         return true;
     }
 
@@ -1629,10 +1877,11 @@
         var tasks = tasksInCol(colId);
         var ok = await dialog({
             title: 'Apagar a lista ' + c.name + '?',
-            text: tasks.length ? (tasks.length === 1 ? 'A tarefa dela também será apagada' : 'As ' + tasks.length + ' tarefas dela também serão apagadas') + ', aqui e no celular. Não dá pra desfazer.' : 'A lista está vazia. Não dá pra desfazer.',
+            text: tasks.length ? (tasks.length === 1 ? 'A tarefa dela também será apagada' : 'As ' + tasks.length + ' tarefas dela também serão apagadas') + ', aqui e no celular. Dá pra desfazer com Ctrl+Z.' : 'A lista está vazia. Dá pra desfazer com Ctrl+Z.',
             okLabel: 'Apagar lista', danger: true
         });
         if (!ok) return;
+        var g = S.gesture, undoList = undoBulk('tarefas', tasks.map(function (t) { return t.id; }), 'deleted', false, true).concat(undoBulk('listas', [colId], 'deleted', false, true)); // V40.25.0
         var prevTasks = tasks.map(function (t) { return Object.assign({}, t); }), prevCol = Object.assign({}, c);
         tasks.forEach(function (t) { t.deleted = true; });
         c.deleted = true;
@@ -1648,6 +1897,7 @@
             loadAll();
             return;
         }
+        undoRec(g, undoList, 'Lista apagada');
         toast('Lista apagada');
     }
     async function startFromScratch() { // V40.18.0: quem começa pelo computador ganha também as 3 tags que o app cria
@@ -3116,7 +3366,10 @@
         var res = M.bump(mtDays(id), g, today, (dir < 0 ? -1 : 1) * M.normalize(g).step);
         if (!res.changed) return;
         var row = { user_id: S.uid, id: res.row.id, goal_id: id, date: today, amount: res.row.amount, target: res.row.target, deleted: false };
+        var was = S.metas_dias[row.id], F = ['amount', 'target', 'deleted']; // V40.25.0: o "+" também desfaz (sem aviso: ele já tem o "−")
+        var ch = { kind: 'metas_dias', id: row.id, b: was && !was.deleted ? undoPick(was, F) : null, a: undoPick(row, F), row: undoClone(row), q: true };
         S.metas_dias[row.id] = row;
+        undoRec(S.gesture, [ch]);
         var msg = dir > 0 ? M.gainText(M.gain(before, M.summary(mtGoals(), mtDays(), now))) : '';
         renderMetas();
         if (msg) toast(msg, 3200);
@@ -3135,13 +3388,16 @@
         S.mtQueue[row.id] = job;
         job.then(function () { if (S.mtQueue[row.id] === job) delete S.mtQueue[row.id]; });
     }
-    async function mtClearDays(goalId) { // apaga o que foi marcado numa meta (recomeçar a contagem ou meta apagada)
+    async function mtClearDays(goalId, g) { // apaga o que foi marcado numa meta (recomeçar a contagem ou meta apagada)
+        if (g == null) g = S.gesture; // V40.25.0: quem chamou passa o gesto, pra desfazer junto com a meta
         var ids = Object.keys(S.metas_dias).filter(function (k) { return !S.metas_dias[k].deleted && S.metas_dias[k].goal_id === goalId; });
         if (!ids.length) return true;
+        var undoList = undoBulk('metas_dias', ids, 'deleted', false, true);
         ids.forEach(function (k) { S.metas_dias[k].deleted = true; });
         renderMetas();
         var res = await S.sb.from('metas_dias').update({ deleted: true }).eq('user_id', S.uid).eq('goal_id', goalId);
         if (res.error) { fail(res.error); loadAll(); return false; }
+        undoRec(g, undoList);
         return true;
     }
     function mtFormUi() {
@@ -3231,7 +3487,7 @@
         if (target !== Number(r.target)) fields.target = target;
         if (step !== Number(r.step)) fields.step = step;
         closeGoal();
-        if (restart) await mtClearDays(r.id);
+        if (restart) await mtClearDays(r.id, S.gesture);
         if (Object.keys(fields).length) patchRow('metas', r.id, fields, restart ? 'Meta salva. A contagem recomeçou.' : 'Meta salva');
     }
     async function deleteGoal(id) {
@@ -3241,7 +3497,8 @@
         var yes = await dialog({ title: 'Apagar a meta "' + (r.title || 'Sem nome') + '"?', text: (x.stars ? 'Ela tem ⭐ ' + x.stars + (x.stars === 1 ? ' estrela' : ' estrelas') + ' (' + x.points + ' pontos), que saem da sua pontuação. ' : '') + 'Ela sai daqui e do celular.', okLabel: 'Apagar meta', danger: true });
         if (!yes || !S.metas[id] || S.metas[id].deleted) return;
         if (S.mtEdit && S.mtEdit.id === id) closeGoal();
-        if (await patchRow('metas', id, { deleted: true }, 'Meta apagada')) mtClearDays(id); // a meta primeiro: nunca sobra meta sem os dias
+        var g = S.gesture; // V40.25.0: a meta e os dias dela desfazem juntos
+        if (await patchRow('metas', id, { deleted: true }, 'Meta apagada')) mtClearDays(id, g); // a meta primeiro: nunca sobra meta sem os dias
     }
     async function createGoalList() {
         var name = await dialog({ title: 'Nova categoria', input: { placeholder: 'Ex.: Saúde, Estudos, Casa', max: 30 }, okLabel: 'Criar categoria' });
@@ -3270,6 +3527,7 @@
         });
         if (!yes || !S.metas_listas[id] || S.metas_listas[id].deleted) return;
         var ids = goals.map(function (g) { return g.id; }), prev = ids.map(function (k) { return Object.assign({}, S.metas[k]); }), prevL = Object.assign({}, l);
+        var gst = S.gesture, undoList = undoBulk('metas', ids, 'deleted', false, true).concat(undoBulk('metas_listas', [id], 'deleted', false, true)); // V40.25.0
         ids.forEach(function (k) { S.metas[k].deleted = true; });
         l.deleted = true;
         renderMetas();
@@ -3284,8 +3542,9 @@
             loadAll();
             return;
         }
+        undoRec(gst, undoList, 'Categoria apagada');
         toast('Categoria apagada');
-        for (var i = 0; i < ids.length; i++) await mtClearDays(ids[i]);
+        for (var i = 0; i < ids.length; i++) await mtClearDays(ids[i], gst);
     }
 
     // ---------- V40.18.0: TAGS (as mesmas do celular). O app só cria e apaga; aqui também renomeia e troca a cor. ----------
@@ -3435,13 +3694,16 @@
         });
         if (!yes || !S.tags[id] || S.tags[id].deleted) return;
         if (TG.picking === id) TG.picking = null;
+        var g = S.gesture; // V40.25.0: a tag e quem perdeu a tag desfazem juntos
         if (!(await patchRow('tags', id, { deleted: true }, 'Tag apagada'))) return;
         for (var i = 0; i < TAG_KINDS.length; i++) {
             var k = TAG_KINDS[i][0], ids = Object.keys(S[k]).filter(function (x) { return S[k][x].tag_id === id; });
             if (!ids.length) continue;
+            var undoList = undoBulk(k, ids.filter(function (x) { return !S[k][x].deleted; }), 'tag_id', id, null);
             ids.forEach(function (x) { S[k][x].tag_id = null; });
             var res = await S.sb.from(k).update({ tag_id: null }).eq('user_id', S.uid).eq('tag_id', id);
             if (res.error) fail(res.error);
+            else undoRec(g, undoList);
         }
         render(); renderAgenda(); renderSide(); renderTags();
     }
@@ -3643,7 +3905,7 @@
     async function deleteArchived(kind, id) {
         var r = S[kind][id];
         if (!r) return;
-        var ok = await dialog({ title: 'Apagar de vez?', text: '"' + (r.title || 'Sem nome') + '" some daqui e do celular. Não dá pra desfazer.', okLabel: 'Apagar', danger: true });
+        var ok = await dialog({ title: 'Apagar de vez?', text: '"' + (r.title || 'Sem nome') + '" some daqui e do celular. Dá pra desfazer com Ctrl+Z.', okLabel: 'Apagar', danger: true });
         if (ok) patchRow(kind, id, { deleted: true }, 'Apagado');
     }
 
@@ -3708,6 +3970,10 @@
     }
 
     // ---------- eventos ----------
+    // Alguma janela, menu ou calendário aberto? (setas do teclado e Desfazer não agem por baixo dela)
+    function anyLayerOpen() {
+        return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'modal-goal', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
+    }
     function bindEvents() {
         var wrap = $('columns');
         wrap.addEventListener('click', function (e) {
@@ -4019,9 +4285,7 @@
         function agMove(sign) { S.agAnchor = addDays(S.agAnchor || todayStr(), sign * (S.agView === 'week' ? 7 : 1)); S.agScrolled = null; renderAgenda(); }
         // V40.19.0: setas ← → do teclado. Agenda: semana (ou dia) anterior/seguinte; Listas: uma lista pro lado; Finanças: mês.
         // Não fazem nada com o cursor num campo, com janela, menu ou calendário aberto, no meio de um arraste ou com Alt/Ctrl/Shift.
-        function anyLayerOpen() {
-            return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'modal-goal', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
-        }
+        // (anyLayerOpen saiu daqui na V40.25.0: o Desfazer também usa)
         function colStep(sc, cols, dir) { // rola uma coluna (lista ou dia) pro lado; false = já está na beirada
             if (cols.length < 2) return false;
             var pitch = cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left; // largura de uma coluna + o espaço
@@ -4052,6 +4316,25 @@
             else if (S.tab === 'listas') { if (S.dragId) return; e.preventDefault(); colStep($('board'), $('columns').querySelectorAll('section.col'), dir); }
             else if (S.tab === 'financas') { e.preventDefault(); fnMove(dir); }
         });
+        // V40.25.0: cada clique, tecla ou arraste é um "gesto"; o que ele gravar vira um passo só do Desfazer
+        ['pointerdown', 'mousedown', 'keydown', 'click', 'dragstart', 'drop'].forEach(function (t) { document.addEventListener(t, function () { S.gesture++; }, true); });
+        // Ctrl+Z desfaz, Ctrl+Y (ou Ctrl+Shift+Z) refaz. No Mac, Cmd. Dentro de um campo de texto vale o desfazer do próprio texto.
+        document.addEventListener('keydown', function (e) {
+            if (!(e.ctrlKey || e.metaKey) || e.altKey || e.defaultPrevented) return;
+            var k = String(e.key || '').toLowerCase();
+            if (k !== 'z' && k !== 'y') return;
+            if (!S.uid || $('view-board').classList.contains('hidden')) return;
+            var t = e.target, tag = t && t.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+            if (anyLayerOpen()) return; // com janela aberta, Ctrl+Z não mexe por baixo dela
+            e.preventDefault();
+            undoRun(k === 'y' || e.shiftKey ? 'a' : 'b');
+        });
+        $('btn-undo').addEventListener('click', function () { undoRun('b'); });
+        $('btn-redo').addEventListener('click', function () { undoRun('a'); });
+        $('undo-pill-undo').addEventListener('click', function () { undoRun('b'); });
+        $('undo-pill-redo').addEventListener('click', function () { undoRun('a'); });
+        $('undo-pill-x').addEventListener('click', undoPillHide);
         $('ag-prev').addEventListener('click', function () { agMove(-1); });
         $('ag-next').addEventListener('click', function () { agMove(1); });
         $('ag-today').addEventListener('click', function () { S.agAnchor = todayStr(); S.agScrolled = null; renderAgenda(); });
@@ -4467,6 +4750,7 @@
         S.uid = uid;
         S.email = session.user.email || '';
         $('user-email').textContent = S.email;
+        $('btn-logout').title = S.email ? 'Sair (' + S.email + ')' : 'Sair'; // V40.25.0: em tela menor o e-mail não aparece no topo
         $('board-summary').textContent = 'Carregando…';
         $('columns').innerHTML = '';
         show('view-board');

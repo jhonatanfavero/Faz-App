@@ -39,6 +39,13 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
    sem reenviar tudo para a nuvem. `tests/test_atualizacao.js` é o modelo.
 8. **`npm test` verde antes de publicar.** Mexeu em arrasto, rolagem, `sw.js` ou `libs/`? Rode também
    os testes de navegador.
+9. **Toda gravação passa pelo caminho que o Desfazer enxerga (V40.25.0).** No celular, grave dado só
+   pelos `save*()` da chave (`saveDb`, `saveBacklog`...), nunca com `localStorage.setItem('tb_...')`
+   direto: cada save chama `undoTouch()`, que guarda o que mudou. O que o app cria sozinho, sem o
+   usuário pedir, vai dentro de `undoQuiet(...)`; campo que é só de tela num item salvo (como o
+   `expanded` do bloco) entra no `skip` da chave em `undoKeys()`. No PC, grave por `insertRow` /
+   `patchRow`; gravação em lote direto no Supabase precisa de `undoRec(g, undoBulk(...))` depois do
+   sucesso, com o gesto (`var g = S.gesture`) guardado antes do primeiro `await`.
 
 ## Publicar uma versão
 

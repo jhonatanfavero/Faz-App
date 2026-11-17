@@ -581,5 +581,31 @@ ok(pushes(sp.sync(sc)) === 0, 'e a limpeza não vira envio (sincronizar de novo 
 ok(CORE.safeCards(null) === null && CORE.safeCards('x') === null && JSON.stringify(CORE.safeCards([])) === '[]' && CORE.MAX_CARDS === 100, 'unitário: sem lista = bloco normal; lista vazia = sublista vazia');
 ok(CORE.MAP.blocos.row({ id: 'f_1', date: '2026-11-18', startMin: 60, duration: 30, cards: [{ id: 'cd_1', title: 'a', tagId: "x'y" }] }).cards[0].tagId === undefined && CORE.MAP.blocos.row({ id: 'f_2', date: '2026-11-18', startMin: 60, duration: 30 }).cards === null, 'o que o celular manda também passa pela limpeza');
 
+console.log('\n43) V40.25.0 — Desfazer depois do sync: o que foi apagado volta (nos dois sentidos):');
+{
+  const uc = new Cloud(), up = new Phone({ ...REAL, used: USED, blocos: blocks.slice(0, 40), rotinas: clone(routines) });
+  up.sync(uc);
+  // celular apaga, sincroniza (nuvem fica com deleted = true), depois DESFAZ (o item volta igual) e sincroniza
+  const t0 = clone(up.tarefas[5]), b0 = clone(up.blocos[3]), r0 = clone(up.rotinas[0]);
+  up.tarefas.splice(5, 1); up.blocos.splice(3, 1); up.rotinas.splice(0, 1);
+  up.sync(uc);
+  ok(uc.t.tarefas[t0.id].deleted === true && uc.t.blocos[b0.id].deleted === true && uc.t.rotinas[r0.id].deleted === true, 'apagou no celular: a nuvem guarda como apagado');
+  up.tarefas.splice(5, 0, t0); up.blocos.splice(3, 0, b0); up.rotinas.unshift(r0);
+  p = up.sync(uc);
+  ok(uc.t.tarefas[t0.id].deleted === false && uc.t.blocos[b0.id].deleted === false && uc.t.rotinas[r0.id].deleted === false, 'desfez no celular: a nuvem traz de volta (deleted = false)');
+  ok(up.tarefas[5].id === t0.id && uc.t.tarefas[t0.id].title === t0.title && pushes(p) === 3, 'só os 3 itens que voltaram sobem, iguais');
+  ok(pushes(up.sync(uc)) === 0, 'sincronizar de novo não manda nada');
+  // o PC apaga e desfaz (deleted: true → false) com o celular sincronizando no meio
+  const t1 = up.tarefas[7];
+  uc.patch('tarefas', t1.id, { deleted: true }); up.sync(uc);
+  ok(!up.tarefas.some((t) => t.id === t1.id), 'o PC apagou: sumiu do celular');
+  uc.patch('tarefas', t1.id, { deleted: false }); up.sync(uc);
+  ok(up.tarefas.some((t) => t.id === t1.id && t.title === t1.title), 'o PC desfez: voltou pro celular');
+  // o PC cria e desfaz (a linha nova vira deleted = true): o celular nem fica com ela
+  uc.insert('tarefas', { id: 'bl_pc_undo', column_id: 'col_geral', title: 'Criada e desfeita no PC', duration: 30, position: 99999, microblocks: [] });
+  uc.patch('tarefas', 'bl_pc_undo', { deleted: true }); p = up.sync(uc);
+  ok(!up.tarefas.some((t) => t.id === 'bl_pc_undo') && pushes(p) === 0, 'criada e desfeita no PC antes do celular ver: não aparece e não volta pra nuvem');
+}
+
 console.log(`\n==== RESULTADO: ${pass} passaram, ${fail} falharam ====`);
 process.exit(fail ? 1 : 0);

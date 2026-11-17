@@ -312,6 +312,8 @@
             <button id="ag-hide-done" type="button" aria-pressed="false" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50" title="Esconder os blocos já concluídos"><i class="ph ph-eye-slash"></i>Ocultar concluídos</button>
             <!-- V40.22.0: só na visão Dia: encolhe os horários vagos (lembrado neste computador) -->
             <button id="ag-compact" type="button" aria-pressed="false" class="hidden items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50" title="Encolher os horários vagos do dia (30 min ou mais)"><i class="ph ph-arrows-in-line-vertical"></i>Compactar vagos</button>
+            <!-- V40.29.0: Relatórios (o "Produtividade" do celular) -->
+            <button id="ag-rep" type="button" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50" title="Produtividade: quanto foi feito hoje, em 7 e em 30 dias, por tag"><i class="ph ph-chart-bar"></i>Relatórios</button>
             <div class="ml-auto inline-flex p-1 bg-white border border-zinc-200 rounded-xl" role="tablist" aria-label="Visualização">
                 <button data-view="week" class="ag-view px-3 py-1.5 rounded-lg text-[13px] font-semibold">Semana</button>
                 <button data-view="day" class="ag-view px-3 py-1.5 rounded-lg text-[13px] font-semibold">Dia</button>
@@ -827,10 +829,29 @@
     </div>
 </div>
 
+<!-- V40.29.0: Relatórios — o "Produtividade" do celular (Hoje, 7 dias, 30 dias; o total e cada tag) -->
+<div id="modal-rep" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="rep-title">
+    <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[85vh]">
+        <div class="px-5 pt-5 pb-3 flex items-center gap-3">
+            <h3 id="rep-title" class="text-base font-bold text-zinc-900">Produtividade</h3>
+            <span id="rep-range" class="text-xs text-zinc-500"></span>
+            <button id="rep-close" class="ml-auto text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Fechar</button>
+        </div>
+        <div class="px-5 pb-3">
+            <div id="rep-tabs" class="flex gap-1 bg-zinc-100 p-1 rounded-xl" role="tablist" aria-label="Período">
+                <button type="button" data-rep="today" role="tab" class="flex-1 py-1.5 rounded-lg text-xs font-bold">Hoje</button>
+                <button type="button" data-rep="week" role="tab" class="flex-1 py-1.5 rounded-lg text-xs font-bold">7 dias</button>
+                <button type="button" data-rep="month" role="tab" class="flex-1 py-1.5 rounded-lg text-xs font-bold">30 dias</button>
+            </div>
+        </div>
+        <div id="rep-body" class="px-5 pb-5 overflow-y-auto thin-scroll flex flex-col gap-2"></div>
+    </div>
+</div>
+
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.28.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.29.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1262,7 +1283,7 @@
 
     // ---------- render ----------
     var renderT = null;
-    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); if (S.editing && S.editing.kind === 'blocos') { renderDone(); renderNoteLinks(); renderSubCards(); } }, 60); }
+    function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderReports(); renderSide(); renderTags(); if (S.editing && S.editing.kind === 'blocos') { renderDone(); renderNoteLinks(); renderSubCards(); } }, 60); }
     function renderSide() { renderRotinas(); renderNotas(); renderFinancas(); renderMetas(); renderAssistente(); } // V40.17.0 (+ Finanças na V40.19.0, Metas na V40.21.0): cada uma só desenha se a aba dela estiver aberta
 
     function cardHtml(t) {
@@ -1486,6 +1507,18 @@
         while (gi < gaps.length) html += gapHtml(day, gaps[gi++]);
         return html;
     }
+    // V40.29.0: a Semana é sempre de segunda a domingo (pedido do Jhonatan: "na semana mostra sempre de segunda a
+    // domingo"; antes eram 7 dias a partir do dia de referência, e o "Hoje" começava em hoje). S.agAnchor continua sendo
+    // o dia de referência (hoje, o dia aberto no Dia...); a Semana na tela é a dele. Com menos dias por tela (zoom), ao
+    // trocar de semana ou clicar em "Hoje", a tela rola até o dia de referência ficar à vista.
+    function weekStart(day) { var d = parseYmd(day); return addDays(day, -((d.getDay() + 6) % 7)); }
+    function agRevealDay(day) {
+        var sc = $('ag-week'), list = $('ag-cols').querySelector('.ag-list[data-day="' + day + '"]');
+        if (!list || !$('ag-cols').classList.contains('zoomed')) return;
+        var r = list.parentNode.getBoundingClientRect(), v = sc.getBoundingClientRect();
+        if (r.left >= v.left && r.right <= v.right) return; // já está à vista
+        sc.scrollLeft += r.left - v.left - zoomPad();
+    }
     function renderWeek(anchor, map, today, nm) {
         var wrap = $('ag-cols'), scroll = {}, html = '', total = 0, mins = 0;
         wrap.querySelectorAll('.ag-list').forEach(function (el) { scroll[el.dataset.day] = el.scrollTop; });
@@ -1511,6 +1544,7 @@
         }
         wrap.innerHTML = html;
         wrap.querySelectorAll('.ag-list').forEach(function (el) { if (scroll[el.dataset.day] != null) el.scrollTop = scroll[el.dataset.day]; });
+        if (S.agWeekShown !== anchor) { S.agWeekShown = anchor; agRevealDay(S.agAnchor); } // V40.29.0
         var a = parseYmd(anchor), z = parseYmd(addDays(anchor, 6));
         $('ag-label').textContent = a.getDate() + (a.getMonth() === z.getMonth() ? '' : ' de ' + MES[a.getMonth()].slice(0, 3)) + ' a ' + z.getDate() + ' de ' + MES[z.getMonth()].slice(0, 3) +
             (z.getFullYear() !== new Date().getFullYear() ? ' de ' + z.getFullYear() : '');
@@ -1875,7 +1909,7 @@
         cb.setAttribute('aria-pressed', S.agCompact ? 'true' : 'false');
         cb.title = S.agCompact ? 'Mostrar o dia inteiro, com os horários vagos' : 'Encolher os horários vagos do dia (30 min ou mais)';
         cb.innerHTML = S.agCompact ? '<i class="ph ph-arrows-out-line-vertical"></i>Mostrar vagos' : '<i class="ph ph-arrows-in-line-vertical"></i>Compactar vagos';
-        $('board-summary').textContent = S.agView === 'day' ? renderDay(S.agAnchor, map, today, nowMin()) : renderWeek(S.agAnchor, map, today, nowMin());
+        $('board-summary').textContent = S.agView === 'day' ? renderDay(S.agAnchor, map, today, nowMin()) : renderWeek(weekStart(S.agAnchor), map, today, nowMin()); // V40.29.0: segunda a domingo
     }
 
     var TABS = ['assistente', 'listas', 'agenda', 'rotinas', 'notas', 'financas', 'metas']; // V40.17.0: + Rotinas e Notas; V40.19.0: + Finanças; V40.20.0: Assistente na frente; V40.21.0: + Metas
@@ -4053,6 +4087,63 @@
     }
     function openArchive() { var m = $('modal-archive'); m.classList.remove('hidden'); m.classList.add('flex'); renderArchive(); $('ar-close').focus(); }
     function closeArchive() { var m = $('modal-archive'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    // ---------- V40.29.0: Relatórios (Produtividade), as mesmas contas do celular (renderReports do app.js) ----------
+    // Pedido do Jhonatan: "aqui não está aparecendo o relatório" (tudo que tem no app tem que ter no PC). O período termina
+    // hoje (na visão Dia, no dia aberto, como o dia na tela do celular): Hoje, 7 dias (com ele) ou 30 dias. Contam os
+    // blocos do período (arquivados e apagados não), por tag: planejado (soma das durações), feito (os concluídos) e
+    // atrasado (não concluído que já passou ou ficou marcado como atrasado; o "focus" que já terminou conta como passado,
+    // como o celular faz sozinho no minuto seguinte). Global = feito ÷ planejado. Os filtros da Agenda não mudam nada.
+    var REP = { period: 'today' };
+    function repData(period) {
+        var end = S.agView === 'day' && isYmd(S.agAnchor) ? S.agAnchor : todayStr();
+        var start = period === 'week' ? addDays(end, -6) : period === 'month' ? addDays(end, -29) : end;
+        var tags = {}, total = 0, done = 0, n = 0;
+        alive('tags').forEach(function (t) { tags[t.id] = { name: t.name || 'Sem nome', color: safeColor(t.color), planned: 0, completed: 0, delayed: 0 }; });
+        tags['null'] = { name: 'Sem Etiqueta', color: '#9ca3af', planned: 0, completed: 0, delayed: 0 };
+        alive('blocos').forEach(function (b) {
+            var day = String(b.date).slice(0, 10), dur = Number(b.duration) || 0;
+            if (b.type === 'empty' || day < start || day > end) return;
+            var k = b.tag_id || 'null';
+            if (!tags[k]) tags[k] = { name: 'Excluída', color: '#9ca3af', planned: 0, completed: 0, delayed: 0 };
+            n++; total += dur; tags[k].planned += dur;
+            if (b.completed) { tags[k].completed += dur; done += dur; }
+            else if (b.type === 'past' || b.was_delayed || (b.type === 'focus' && blockType(day, b.start_min, dur) === 'past')) tags[k].delayed += dur;
+        });
+        var list = Object.keys(tags).map(function (k) { return tags[k]; }).filter(function (t) { return t.planned > 0; }).sort(function (a, b) { return b.planned - a.planned; });
+        return { start: start, end: end, n: n, total: total, done: done, tags: list };
+    }
+    function repDay(s) { var d = parseYmd(s); return WD3[d.getDay()] + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1); }
+    function renderReports() {
+        if ($('modal-rep').classList.contains('hidden')) return;
+        var r = repData(REP.period);
+        $('rep-range').textContent = r.start === r.end ? (r.end === todayStr() ? 'hoje, ' : '') + repDay(r.end) : repDay(r.start) + ' a ' + repDay(r.end);
+        $('rep-tabs').querySelectorAll('[data-rep]').forEach(function (b) {
+            var on = b.dataset.rep === REP.period;
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+            b.classList.toggle('bg-white', on); b.classList.toggle('shadow-sm', on); b.classList.toggle('text-zinc-800', on); b.classList.toggle('text-zinc-500', !on);
+        });
+        if (!r.n) { $('rep-body').innerHTML = '<div class="py-10 text-center text-zinc-400"><i class="ph ph-chart-line-down text-4xl"></i><p class="mt-2 text-sm font-medium">Sem registros no período.</p></div>'; return; }
+        var pct = r.total > 0 ? Math.round(r.done / r.total * 100) : 0;
+        var html = '<div class="rep-global bg-focus text-white p-4 rounded-xl flex items-center justify-between shadow-md mb-1">' +
+            '<div><p class="text-[10px] uppercase tracking-widest text-white/60 font-bold mb-1">Global</p><p class="rep-pct text-3xl font-black">' + pct + '%</p></div>' +
+            '<div class="text-right flex flex-col gap-1"><p class="rep-done text-xs text-white/90 font-bold bg-white/10 px-2 py-0.5 rounded"><span class="text-emerald-300 mr-1">●</span>' + fmtDur(r.done) + ' concluídos</p>' +
+            '<p class="rep-total text-xs text-white/70 font-bold bg-white/5 px-2 py-0.5 rounded"><span class="text-white/50 mr-1">●</span>' + fmtDur(r.total) + ' totais</p></div></div>';
+        r.tags.forEach(function (t) {
+            var c = Math.round(t.completed / t.planned * 100) || 0, dl = Math.round(t.delayed / t.planned * 100) || 0, pend = Math.max(0, 100 - c - dl);
+            html += '<div class="rep-tag bg-white border border-zinc-200 p-4 rounded-xl shadow-sm">' +
+                '<div class="flex items-center justify-between mb-3"><div class="flex items-center gap-2 min-w-0"><span class="w-3 h-3 rounded-full shrink-0" style="background:' + esc(t.color) + '"></span>' +
+                '<span class="rep-name font-bold text-sm text-zinc-800 truncate">' + esc(t.name) + '</span></div>' +
+                '<span class="rep-planned shrink-0 text-[11px] bg-zinc-100 px-2 py-1 rounded font-bold text-zinc-500">' + fmtDur(t.planned) + '</span></div>' +
+                '<div class="w-full h-3 bg-zinc-100 rounded-full flex overflow-hidden mb-2"><div class="h-full" style="width:' + c + '%;background:' + esc(t.color) + '"></div>' +
+                '<div class="h-full bg-red-400" style="width:' + dl + '%"></div><div class="h-full bg-zinc-200" style="width:' + pend + '%"></div></div>' +
+                '<div class="flex justify-between text-[10px] font-bold uppercase tracking-wider"><span class="rep-feito" style="color:' + esc(t.color) + '">' + c + '% feito</span>' +
+                (t.delayed > 0 ? '<span class="rep-atr text-red-500">' + dl + '% atr.</span>' : '') + '</div></div>';
+        });
+        $('rep-body').innerHTML = html;
+    }
+    function openReports() { var m = $('modal-rep'); m.classList.remove('hidden'); m.classList.add('flex'); renderReports(); $('rep-close').focus(); }
+    function closeReports() { var m = $('modal-rep'); m.classList.add('hidden'); m.classList.remove('flex'); }
     function unarchive(kind, id) {
         var r = S[kind][id];
         if (!r) return;
@@ -4135,7 +4226,7 @@
     // ---------- eventos ----------
     // Alguma janela, menu ou calendário aberto? (setas do teclado e Desfazer não agem por baixo dela)
     function anyLayerOpen() {
-        return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'modal-goal', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
+        return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'modal-goal', 'modal-rep', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
     }
     function bindEvents() {
         var wrap = $('columns');
@@ -4277,7 +4368,7 @@
         // V40.13.0: bloco novo → trocar o dia sugere de novo o horário, até a pessoa escolher um
         $('f-date').addEventListener('change', function () { var ed = S.editing; if (ed && ed.isNew && !ed.timeTouched && isYmd(this.value)) setTimeVal('f-start', clock(suggestStart(this.value, parseInt($('f-dur').value, 10) || 30))); });
         $('f-start').addEventListener('change', function () { if (S.editing && S.editing.isNew) S.editing.timeTouched = true; });
-        $('ag-new').addEventListener('click', function () { openNewBlock(S.agView === 'day' ? S.agAnchor : (todayStr() >= S.agAnchor && todayStr() <= addDays(S.agAnchor, 6) ? todayStr() : S.agAnchor)); });
+        $('ag-new').addEventListener('click', function () { var ws = weekStart(S.agAnchor || todayStr()), t = todayStr(); openNewBlock(S.agView === 'day' ? S.agAnchor : (t >= ws && t <= addDays(ws, 6) ? t : ws)); }); // V40.29.0: semana de segunda a domingo
         $('f-schedule').addEventListener('click', function () { if ($('f-sched').classList.contains('hidden')) openSched(); else document.querySelector('[data-date-for="f-sched-date"]').focus(); });
         $('f-hand').addEventListener('click', function () { startPlacing(formAsSource()); });
         $('f-sched-hand').addEventListener('click', function () { startPlacing(formAsSource()); });
@@ -4411,6 +4502,7 @@
             if (S.fnEdit) return closeFin();
             if (S.mtEdit) return closeGoal(); // V40.21.0
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
+            if (!$('modal-rep').classList.contains('hidden')) return closeReports(); // V40.29.0
             if (S.rtEdit) return closeRoutine(); // V40.17.0
             if (menuEl) return closeColMenu();
             if (!$('f-card-pick').classList.contains('hidden')) { cardPick(false); return $('f-card-pull').focus(); } // V40.24.0: Esc fecha só a busca
@@ -4426,6 +4518,7 @@
                 S.agView = b.dataset.view === 'day' ? 'day' : 'week';
                 try { localStorage.setItem('faz_pc_agview', S.agView); } catch (e) {}
                 S.agScrolled = null;
+                S.agWeekShown = null; // V40.29.0: voltando pra Semana, o dia que estava aberto fica à vista
                 renderAgenda();
             });
         });
@@ -4501,7 +4594,7 @@
         $('undo-pill-x').addEventListener('click', undoPillHide);
         $('ag-prev').addEventListener('click', function () { agMove(-1); });
         $('ag-next').addEventListener('click', function () { agMove(1); });
-        $('ag-today').addEventListener('click', function () { S.agAnchor = todayStr(); S.agScrolled = null; renderAgenda(); });
+        $('ag-today').addEventListener('click', function () { S.agAnchor = todayStr(); S.agScrolled = null; S.agWeekShown = null; renderAgenda(); }); // V40.29.0: S.agWeekShown = null rola até hoje
         $('ag-timeline').addEventListener('mousedown', dgDown); // V40.14.0: arrastar e esticar blocos na régua do Dia
         $('agenda').addEventListener('click', function (e) {
             if (S.agNoClick) { S.agNoClick = false; return; } // V40.14.0: o clique que sobra depois de soltar um arraste não faz nada
@@ -4843,6 +4936,11 @@
         $('mt-f-delete').addEventListener('click', function () { if (S.mtEdit && S.mtEdit.id) deleteGoal(S.mtEdit.id); });
         $('modal-goal').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeGoal(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('ar-close').addEventListener('click', closeArchive);
+        // V40.29.0: Relatórios
+        $('ag-rep').addEventListener('click', openReports);
+        $('rep-close').addEventListener('click', closeReports);
+        $('modal-rep').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeReports(); });
+        $('rep-tabs').addEventListener('click', function (e) { var b = e.target.closest('[data-rep]'); if (b) { REP.period = b.dataset.rep; renderReports(); } });
         $('modal-archive').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeArchive(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('ar-list').addEventListener('click', function (e) {
             var u = e.target.closest('[data-unarchive]'), x = e.target.closest('[data-delarch]'), v = (u ? u.dataset.unarchive : x ? x.dataset.delarch : '').split('|');

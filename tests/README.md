@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 26 suítes (cerca de 2 minutos)
+npm test        # confere o CSS pronto e roda as 27 suítes (cerca de 2 minutos)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -38,6 +38,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_agenda_dias.js` | `index.html` + `app.js` + `sync.js` de verdade | V40.26.0: agenda afastada no celular (2 ou 3 dias lado a lado): botão de colunas, nomes dos dias, intervalo no topo, blocos compactos, tocar abre o dia com o cartão aberto, dois toques em outra coluna, tarefa na mão em qualquer dia e na sublista, pinça, arrastar pro lado, filtros/busca em lista, ocultar vagos só em 1 dia, escolha guardada |
 | `test_voltar.js` | `index.html` + `app.js` + `sync.js` de verdade, com um CloseWatcher de mentira | V40.27.0: botão voltar do celular: toda janelinha e tela têm o botão que ele toca (`data-voltar`), aviso antes de sair na agenda (o 2º voltar sai; depois de 3 s ou de um toque volta a perguntar), formulários e sub-telas voltam pra tela de trás, Config volta pro +, janelinhas pelo próprio Cancelar (a de cima primeiro), sem fundo fosco, toque no fundo escuro, tarefa na mão, busca, menu do zoom, volta pros dias lado a lado, Esc no computador, Android sem CloseWatcher pelo histórico |
 | `test_kanban_v4028.js` | `kanban.html` de verdade, relógio na terça 17/11 às 14:56 | V40.28.0: na Semana, puxar a borda de baixo muda a duração (diminuir, aumentar até o próximo, mínimo 5 min, Esc, o clique depois de soltar, Ctrl+Z, não vira arraste pra outro dia, sublista, sem alça com tarefa na mão) e arrastar no próprio dia mostra também os espaços de antes de agora, entre os cartões; Duplicar nos 3 pontinhos; cartão sai da sublista arrastando (vira bloco), muda de sublista, e bloco entra nela (vira cartão) |
+| `test_kanban_v4029.js` | `kanban.html` e o app do celular de verdade, mesmo relógio (domingo 15/11, 21:00) | V40.29.0: Relatórios no PC (Hoje, 7 e 30 dias) com os mesmos números do "Produtividade" do celular, visão Dia usa o dia aberto, arquivado não conta, tag apagada vira "Excluída", filtros não mudam, atualiza com a nuvem, Esc/Fechar/fundo, texto escapado; Semana sempre de segunda a domingo |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)

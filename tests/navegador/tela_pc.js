@@ -7,6 +7,7 @@
 // V40.25.0: Desfazer (Ctrl+Z e Ctrl+Y de verdade no teclado, botões ↶ ↷, aviso embaixo à esquerda). V40.25.1: clique duplo no vazio.
 // V40.28.0: Semana — puxar a borda de baixo muda a duração; arrastar no próprio dia vale também pra antes de agora;
 // Duplicar nos 3 pontinhos; cartão sai da sublista arrastando (vira bloco) e bloco entra nela (vira cartão).
+// V40.29.0: Relatórios na barra da Agenda; Semana sempre de segunda a domingo (com zoom, o dia aberto fica à vista).
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -696,6 +697,37 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await p.locator('div.fixed.z-40[role="menu"] [data-act="dup"]').click(); await p.waitForTimeout(500);
   const n1 = await p.evaluate(([uid, day]) => window.__nuvem.alive('blocos', uid).filter((b) => b.date === day).length, [UID, sub.date]);
   ok(n1 === n0 + 1 && /^Sublista duplicada/.test(await aviso()), 'Duplicar: "' + (await aviso()).split('Desfazer')[0].trim() + '"');
+  }
+
+  {
+  console.log('\nT) Relatórios e Semana de segunda a domingo (V40.29.0):');
+  await p.locator('#tab-agenda').click(); await p.waitForTimeout(250);
+  await p.evaluate(() => { const b = document.querySelector('.ag-view[data-view="week"]'); if (b) b.click(); document.getElementById('ag-today').click(); }); await p.waitForTimeout(300);
+  const barra = await p.evaluate(() => { const r = document.getElementById('ag-rep').getBoundingClientRect(), v = document.querySelector('.ag-view[data-view="week"]').getBoundingClientRect(); return { vis: r.width > 0, linha: Math.abs(r.top - v.top) < 6 }; });
+  ok(barra.vis && barra.linha, 'botão "Relatórios" na barra da Agenda, na mesma linha de Semana/Dia (1440 px)');
+  await p.locator('#ag-rep').click(); await p.waitForTimeout(300);
+  const rel = await p.evaluate(() => ({ aberta: !document.getElementById('modal-rep').classList.contains('hidden'), faixa: document.getElementById('rep-range').textContent, tags: document.querySelectorAll('#rep-body .rep-tag').length, pct: (document.querySelector('#rep-body .rep-pct') || {}).textContent }));
+  ok(rel.aberta && rel.faixa === 'hoje, Seg 16/11' && rel.tags > 0, 'clicou: abre a "Produtividade" de hoje (' + rel.pct + ', ' + rel.tags + ' tags)');
+  await p.locator('#rep-tabs [data-rep="week"]').click(); await p.waitForTimeout(200);
+  ok(await p.evaluate(() => document.getElementById('rep-range').textContent) === 'Ter 10/11 a Seg 16/11', '7 dias: Ter 10/11 a Seg 16/11');
+  await foto(p, 'pc-relatorios.png');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+  ok(await p.evaluate(() => document.getElementById('modal-rep').classList.contains('hidden')), 'Esc fecha');
+  await p.setViewportSize({ width: 1100, height: 800 }); await p.waitForTimeout(300);
+  const b1100 = await p.evaluate(() => { const r = document.getElementById('ag-rep').getBoundingClientRect(), bar = document.getElementById('ag-rep').parentNode.getBoundingClientRect(); return { dentro: r.right <= bar.right + 1 && r.width > 0, altura: Math.round(bar.height) }; });
+  ok(b1100.dentro, 'em 1100 px o botão cabe (a barra tem ' + b1100.altura + ' px de altura)');
+  await foto(p, 'pc-barra-1100.png');
+  await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(300);
+  // com menos dias por tela: voltar pra Semana deixa o dia aberto à vista
+  await p.evaluate(() => { for (let i = 0; i < 4; i++) document.getElementById('zoom-in').click(); }); await p.waitForTimeout(300);
+  const nDias = await p.evaluate(() => document.getElementById('zoom-reset').textContent);
+  await p.locator('#ag-cols .ag-day-btn[data-day="2026-11-16"]').click(); await p.waitForTimeout(250);
+  for (let i = 0; i < 5; i++) { await p.locator('#ag-next').click(); await p.waitForTimeout(80); }
+  await p.locator('.ag-view[data-view="week"]').click(); await p.waitForTimeout(350);
+  const vis = await p.evaluate(() => { const l = document.querySelector('#ag-cols .ag-list[data-day="2026-11-21"]').parentNode.getBoundingClientRect(), v = document.getElementById('ag-week').getBoundingClientRect(); return { dentro: l.left >= v.left - 1 && l.right <= v.right + 1, primeiro: document.querySelector('#ag-cols .ag-list').dataset.day }; });
+  ok(vis.primeiro === '2026-11-16' && vis.dentro, 'com ' + nDias + ' por tela: abriu o sábado 21 no Dia e voltou pra Semana (segunda 16 a domingo 22) com o sábado à vista');
+  await foto(p, 'pc-semana-zoom-sabado.png');
+  await p.evaluate(() => document.getElementById('zoom-reset').click()); await p.waitForTimeout(200);
   }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));

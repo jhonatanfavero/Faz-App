@@ -31,6 +31,7 @@ const SUITES = [
     ['Agenda afastada no celular: 2 ou 3 dias lado a lado', 'test_agenda_dias.js', [ROOT, DADOS]],
     ['Botão voltar do celular', 'test_voltar.js', [ROOT, DADOS]],
     ['Tela do PC: duração, mesmo dia, Duplicar e sublista na Semana', 'test_kanban_v4028.js', [ROOT, DADOS]],
+    ['Tela do PC: Relatórios (as mesmas contas do celular) e Semana de segunda a domingo', 'test_kanban_v4029.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

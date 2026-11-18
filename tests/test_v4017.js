@@ -77,7 +77,7 @@ const qtd = (k) => JSON.parse(backup.data[k] || '[]').length;
 
   console.log('\nE) Nada fica sendo reenviado:');
   await syncDone(); const antes = server.log.length; await syncDone();
-  ok(server.log.slice(antes).filter((l) => l.op !== 'select').length === 0, 'sincronizar de novo não envia nada');
+  ok(server.log.slice(antes).filter((l) => l.op !== 'select' && l.op !== 'getUser').length === 0, 'sincronizar de novo não envia nada'); // V40.32.0: getUser só lê (a cor e o horário da conta)
   ok(A.errors.length === 0, 'nenhum erro de página' + (A.errors.length ? ': ' + A.errors[0].slice(0, 200) : ''));
   try { w.close(); } catch (e) {}
 

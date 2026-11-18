@@ -48,7 +48,7 @@ const ok = (c, m) => { if (c) { pass++; console.log('  ✅', m); } else { fail++
   ok(L('tb_archive_db') === null || L('tb_archive_db') === '[]', 'nada foi arquivado sozinho');
   ok(A.confirms.length === 0 && A.alerts.length === 0, 'nenhuma pergunta nem alerta aparece' + (A.confirms.length + A.alerts.length ? ': ' + JSON.stringify([...A.confirms, ...A.alerts]).slice(0, 200) : ''));
   const antes = server.log.length; { const st = L('tb__sync'); w.fazSyncNow(); await waitFor(() => L('tb__sync') !== st, 8000); await sleep(300); }
-  ok(server.log.slice(antes).filter((l) => l.op !== 'select').length === 0, 'sincronizar de novo não envia mais nada');
+  ok(server.log.slice(antes).filter((l) => l.op !== 'select' && l.op !== 'getUser').length === 0, 'sincronizar de novo não envia mais nada (só lê; V40.32.0: lê também a cor e o horário da conta)');
   ok(!!JSON.parse(L('tb__sync')).cursorBlocos, 'da segunda rodada em diante a agenda é lida de forma incremental');
   ok(A.errors.length === 0, 'nenhum erro de página' + (A.errors.length ? ': ' + A.errors[0].slice(0, 200) : ''));
   console.log(`\n==== RESULTADO: ${pass} passaram, ${fail} falharam ====`);

@@ -63,6 +63,13 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     por mês pro futuro de uma recorrente (seriam 1200): "neste e nos próximos" troca o valor normal e
     guarda o valor antigo nos meses de antes (`setAmountFromMonthOn` no app, o mesmo no PC). Salvar o
     formulário de uma recorrente mantém o fim que ela tiver.
+13. **Cor do app e horário do dia: ganha a mudança mais nova (V40.32.0).** Não têm tabela: vão na conta
+    (`user_metadata`) como `faz_theme`, `faz_hours` e `faz_prefs_at` (hora da mudança, em ms). No celular a
+    hora da última mudança que ele conhece fica em `tb__prefs_at` (fora do backup); o `CORE.prefsPlan`
+    decide quem ganha e o sync lê a conta de novo com `getUser()` (a sessão guardada pode estar velha).
+    Mudou a cor ou o horário no celular? Chame `fazPrefsTouch()` (só quando o valor mudou de fato). No PC,
+    grave pelo `savePrefs()`. A hora é sempre maior que a última vista (`Math.max(agora, última + 1)`):
+    relógio adiantado em outro aparelho não faz uma mudança nova perder.
 
 ## Publicar uma versão
 

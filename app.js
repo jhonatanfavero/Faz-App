@@ -3326,7 +3326,8 @@ window.saveConfigHours = () => {
         showToast("Erro: Início deve ser antes do fim!");
         return;
     }
-    
+
+    if (start !== START_HOUR || end !== END_HOUR) fazPrefsTouch(); // V40.32.0: vai pro PC
     START_HOUR = start;
     END_HOUR = end;
     TOTAL_MINS = (END_HOUR - START_HOUR) * 60;
@@ -3443,7 +3444,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.31.0',
+            version: 'v40.32.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -3589,6 +3590,7 @@ function applyFazImport(parsed) {
 
     // 2) Limpa chaves de dados atuais (tb_ mas não tb__) e grava as do backup.
     try {
+        const prefsBefore = fazPrefsKeys();
         const toRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
             const k = localStorage.key(i);
@@ -3596,6 +3598,7 @@ function applyFazImport(parsed) {
         }
         toRemove.forEach(k => localStorage.removeItem(k));
         for (const k in incoming) { localStorage.setItem(k, incoming[k]); }
+        fazPrefsStampIfChanged(prefsBefore); // V40.32.0: a cor e o horário do backup valem também no PC
     } catch (e) {
         showToast('Erro ao gravar 😕 Revertendo...');
         try {
@@ -3622,6 +3625,7 @@ window.undoFazImport = function() {
     if (!confirm('Desfazer a última restauração e voltar ao estado de ' + quando + '?')) return;
 
     try {
+        const prefsBefore = fazPrefsKeys();
         const toRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
             const k = localStorage.key(i);
@@ -3629,6 +3633,7 @@ window.undoFazImport = function() {
         }
         toRemove.forEach(k => localStorage.removeItem(k));
         for (const k in rb.data) { localStorage.setItem(k, rb.data[k]); }
+        fazPrefsStampIfChanged(prefsBefore); // V40.32.0
         localStorage.removeItem(FAZ_ROLLBACK_KEY);
         showToast('Estado anterior restaurado! Recarregando... ✅');
         setTimeout(() => location.reload(), 900);
@@ -6083,15 +6088,8 @@ window.openConfigAppearance = function() {
     document.getElementById('config-appearance-view').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Aparência';
     document.getElementById('config-back-btn').setAttribute('onclick', 'closeConfigAppearance()');
-    
-    document.querySelectorAll('.theme-color-btn').forEach(btn => {
-        btn.classList.remove('scale-110', 'shadow-sm', 'border-zinc-900');
-        btn.classList.add('border-transparent');
-        if(btn.dataset.color === themeColor) {
-            btn.classList.remove('border-transparent');
-            btn.classList.add('scale-110', 'shadow-sm', 'border-zinc-900');
-        }
-    });
+
+    paintThemePicker();
 }
 
 window.closeConfigAppearance = function() {
@@ -6102,19 +6100,77 @@ window.closeConfigAppearance = function() {
 }
 
 window.selectThemeColor = function(btn) {
+    const changed = btn.dataset.color !== themeColor;
     themeColor = btn.dataset.color;
     localStorage.setItem('tb_theme_color', themeColor);
-    
-    document.querySelectorAll('.theme-color-btn').forEach(b => {
-        b.classList.remove('scale-110', 'shadow-sm', 'border-zinc-900');
-        b.classList.add('border-transparent');
-    });
-    btn.classList.remove('border-transparent');
-    btn.classList.add('scale-110', 'shadow-sm', 'border-zinc-900');
-    
+
+    paintThemePicker();
+
     applyThemeColor();
+    if (changed) fazPrefsTouch(); // V40.32.0: vai pro PC (e ganha de uma mudança mais antiga feita lá)
     showToast("Cor atualizada!");
 }
+
+// Marca a bolinha da cor atual em Config → Aparência.
+function paintThemePicker() {
+    document.querySelectorAll('.theme-color-btn').forEach(b => {
+        const on = b.dataset.color === themeColor;
+        b.classList.toggle('border-transparent', !on);
+        b.classList.toggle('scale-110', on);
+        b.classList.toggle('shadow-sm', on);
+        b.classList.toggle('border-zinc-900', on);
+    });
+}
+
+// ===== V40.32.0: cor do app e horário do dia também mudam pelo PC =====
+// Vão na conta (o sync.js cuida). Ganha a mudança mais nova: tb__prefs_at (deste aparelho, fora do backup)
+// guarda quando a cor ou o horário mudaram por último aqui (ou quando chegou a mudança mais nova da conta).
+// A hora é sempre maior que a última que este aparelho conhece (a da conta inclusive): relógio do PC adiantado
+// não faz uma mudança feita aqui depois perder pra uma de lá feita antes.
+function fazPrefsStamp() {
+    try {
+        const cur = Number(localStorage.getItem('tb__prefs_at')) || 0;
+        localStorage.setItem('tb__prefs_at', String(Math.max(Date.now(), cur + 1)));
+    } catch (e) {}
+}
+function fazPrefsTouch() {
+    fazPrefsStamp();
+    if (window.fazSyncNotify) window.fazSyncNotify();
+}
+// Restaurar backup (ou desfazer a restauração) que troca a cor ou o horário: isso vira a mudança mais nova.
+function fazPrefsKeys() {
+    try { return ['tb_theme_color', 'tb_start_hour', 'tb_end_hour'].map(k => localStorage.getItem(k)).join('|'); } catch (e) { return ''; }
+}
+function fazPrefsStampIfChanged(before) {
+    if (fazPrefsKeys() !== before) fazPrefsStamp();
+}
+function fazHoursLabel(a, b) { return String(a).padStart(2, '0') + ':00 às ' + String(b).padStart(2, '0') + ':00'; }
+window.fazPrefs = function () {
+    let at = 0;
+    try { at = Number(localStorage.getItem('tb__prefs_at')) || 0; } catch (e) {}
+    return { theme: themeColor, hours: [START_HOUR, END_HOUR], at: at };
+};
+window.fazSetPrefsAt = function (t) { try { localStorage.setItem('tb__prefs_at', String(t)); } catch (e) {} };
+// O que veio da conta (sync.js). Volta o que mudou: { theme: true/false, hours: '07:00 às 24:00' ou '' }.
+window.fazApplyPrefs = function (p) {
+    const did = { theme: false, hours: '' };
+    if (p && p.theme && p.theme !== themeColor) {
+        themeColor = p.theme;
+        try { localStorage.setItem('tb_theme_color', themeColor); } catch (e) {}
+        applyThemeColor();
+        paintThemePicker();
+        did.theme = true;
+    }
+    if (p && Array.isArray(p.hours) && (p.hours[0] !== START_HOUR || p.hours[1] !== END_HOUR)) {
+        START_HOUR = p.hours[0];
+        END_HOUR = p.hours[1];
+        TOTAL_MINS = (END_HOUR - START_HOUR) * 60;
+        try { localStorage.setItem('tb_start_hour', START_HOUR); localStorage.setItem('tb_end_hour', END_HOUR); } catch (e) {}
+        try { renderGrid(); renderTimeline(); } catch (e) { console.warn('[Faz] horário do dia', e); }
+        did.hours = fazHoursLabel(START_HOUR, END_HOUR);
+    }
+    return did;
+};
 
 // =====================================================
 // V40.3 — MOTOR DE ROTINAS (Fase 1 — CRUD)

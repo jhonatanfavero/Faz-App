@@ -325,7 +325,7 @@ const UID = '11111111-1111-1111-1111-111111111111';
   w.closeSubCard();
   ok(await waitFor(() => get(S1).title === 'Pendências (PC)', 15000), 'fechou o cartão: a mudança do PC entra');
   await syncDone(); const antes = server.log.length; await syncDone();
-  ok(server.log.slice(antes).filter((l) => l.op !== 'select').length === 0, 'sincronizar de novo não envia nada');
+  ok(server.log.slice(antes).filter((l) => l.op !== 'select' && l.op !== 'getUser').length === 0, 'sincronizar de novo não envia nada'); // V40.32.0: getUser só lê (a cor e o horário da conta)
   ok(B.errors.length === 0, 'nenhum erro de página' + (B.errors.length ? ': ' + B.errors[0].slice(0, 300) : ''));
   try { w.close(); } catch (e) {}
   end();

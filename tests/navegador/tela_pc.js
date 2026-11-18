@@ -730,6 +730,53 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await p.evaluate(() => document.getElementById('zoom-reset').click()); await p.waitForTimeout(200);
   }
 
+  {
+  console.log('\nU) Configurações: cor do app e horário do dia (V40.32.0):');
+  await p.locator('#tab-listas').click(); await p.waitForTimeout(250);
+  const topoCfg = () => p.evaluate(() => {
+    const h = document.querySelector('#view-board header').getBoundingClientRect(), g = document.getElementById('btn-cfg').getBoundingClientRect(), sair = document.getElementById('btn-logout').getBoundingClientRect();
+    return { alt: Math.round(h.height), cabe: sair.right <= innerWidth && g.width === 36 && g.top >= h.top && g.bottom <= h.bottom && g.right <= sair.left };
+  });
+  const larguras = [1440, 1280, 1100, 1024], alturas = [];
+  for (const lw of larguras) {
+    await p.setViewportSize({ width: lw, height: 820 }); await p.waitForTimeout(200);
+    const t = await topoCfg(); alturas.push(t.alt);
+    ok(t.cabe && t.alt <= 64, `topo em ${lw} px: a engrenagem cabe antes do "Sair" (uma linha só, ${t.alt} px)`);
+    if (lw === 1024) await foto(p, 'pc-topo-1024.png');
+  }
+  ok(alturas.every((a) => a === alturas[0]), 'o topo tem a mesma altura em todas as larguras (' + alturas.join(', ') + ' px)');
+  await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(200);
+  await p.locator('#btn-cfg').click(); await p.waitForTimeout(250);
+  const jan = await p.evaluate(() => {
+    const m = document.querySelector('#modal-cfg > div').getBoundingClientRect(), on = document.querySelector('#cfg-colors .on');
+    return { vis: m.width > 0, w: Math.round(m.width), h: Math.round(m.height), dentro: m.top >= 0 && m.bottom <= innerHeight, on: on && on.dataset.cfgColor, n: document.querySelectorAll('#cfg-colors [data-cfg-color]').length, h0: document.getElementById('cfg-h0').value, h1: document.getElementById('cfg-h1').value };
+  });
+  ok(jan.vis && jan.dentro && jan.n === 8 && jan.on === '#10b981' && jan.h0 === '7' && jan.h1 === '24', `janela Configurações (${jan.w}×${jan.h}): 8 cores com o verde marcado, horário 07:00 às 24:00`);
+  await foto(p, 'pc-configuracoes.png');
+  const corTela = () => p.evaluate(() => ({ focus: getComputedStyle(document.documentElement).getPropertyValue('--focus').trim(), aba: getComputedStyle(document.querySelector('.bg-focus')).backgroundColor }));
+  const c0 = await corTela();
+  await p.locator('#cfg-colors [data-cfg-color="#8b5cf6"]').click(); await p.waitForTimeout(400);
+  const c1 = await corTela(), m1 = await p.evaluate(() => window.__nuvem.users.get('pessoa@teste.com').meta);
+  ok(c1.focus === '#8b5cf6' && c0.aba === 'rgb(16, 185, 129)' && c1.aba === 'rgb(139, 92, 246)' && m1.faz_theme === '#8b5cf6' && m1.faz_prefs_at > 0, `clicou no roxo: a tela muda na hora (botões ${c0.aba} → ${c1.aba}) e grava na conta`);
+  ok(/Cor do app atualizada/.test(await p.evaluate(() => document.getElementById('toast').textContent)), 'aviso: "' + await p.evaluate(() => document.getElementById('toast').textContent) + '"');
+  await foto(p, 'pc-configuracoes-roxo.png');
+  await p.selectOption('#cfg-h0', '9'); await p.waitForTimeout(400);
+  const m2 = await p.evaluate(() => window.__nuvem.users.get('pessoa@teste.com').meta);
+  ok(JSON.stringify(m2.faz_hours) === '[9,24]', 'Começa 09:00: grava 09:00 às 24:00');
+  await p.selectOption('#cfg-h1', '8'); await p.waitForTimeout(300);
+  const msg = await p.evaluate(() => { const e = document.getElementById('cfg-h-msg'); return { t: e.textContent, cor: getComputedStyle(e).color }; });
+  ok(msg.t === 'O começo precisa ser antes do fim.' && msg.cor === 'rgb(220, 38, 38)', 'Termina antes de começar: aviso em vermelho (' + msg.cor + ')');
+  await foto(p, 'pc-configuracoes-aviso.png');
+  // volta como estava (verde, 07:00 às 24:00)
+  await p.selectOption('#cfg-h1', '24'); await p.waitForTimeout(250);
+  await p.selectOption('#cfg-h0', '7'); await p.waitForTimeout(250);
+  await p.locator('#cfg-colors [data-cfg-color="#10b981"]').click(); await p.waitForTimeout(300);
+  const m3 = await p.evaluate(() => window.__nuvem.users.get('pessoa@teste.com').meta);
+  ok(m3.faz_theme === '#10b981' && JSON.stringify(m3.faz_hours) === '[7,24]', 'voltou pro verde, 07:00 às 24:00');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+  ok(await p.evaluate(() => document.getElementById('modal-cfg').classList.contains('hidden')), 'Esc fecha');
+  }
+
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));
   await fim();
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

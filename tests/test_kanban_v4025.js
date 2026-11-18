@@ -58,7 +58,7 @@ const C = Object.fromEntries(local.listas.map((c) => [c.name, c.id]));
   const pill = () => visible('undo-pill');
   const pillTxt = () => $('undo-pill-msg').textContent;
   const row = (t, id) => server.get(t, UID, id);
-  const writes = () => server.log.filter((l) => l.op !== 'select');
+  const writes = () => server.log.filter((l) => l.op !== 'select' && l.op !== 'getUser'); // V40.32.0: getUser só lê (cor e horário da conta)
   const cols = () => [...d.querySelectorAll('section.col')];
   const colByName = (n) => cols().find((s) => s.querySelector('h2').textContent === n);
   const cardsIn = (n) => [...colByName(n).querySelectorAll('.card')].map((c) => c.dataset.id);

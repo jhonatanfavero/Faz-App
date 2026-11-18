@@ -35,6 +35,7 @@ const SUITES = [
     ['Sublista arrastando no celular: cartão sai, muda de sublista e bloco entra', 'test_sublista_arrastar.js', [ROOT, DADOS]],
     ['Recorrente sem fim, até encerrar (celular, nuvem e PC)', 'test_recorrente.js', [ROOT, DADOS]],
     ['Dias lado a lado: arrastar bloco de um dia pro outro (celular)', 'test_arrastar_dias.js', [ROOT, DADOS]],
+    ['Configurações no PC: cor do app e horário do dia, nos 2 sentidos', 'test_preferencias.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

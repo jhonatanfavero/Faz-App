@@ -815,12 +815,48 @@
         return b;
     }
 
+    // V40.32.0 — COR DO APP E HORÁRIO DO DIA, nos 2 sentidos (celular e PC). Não têm tabela: vão na conta
+    // (user_metadata) como faz_theme, faz_hours ([início, fim]) e faz_prefs_at (quando mudou, em ms).
+    // Ganha a mudança MAIS NOVA. O aparelho guarda em local.at a hora da última mudança que ele conhece.
+    //   local = { theme, hours, at }   meta = user_metadata da conta   now = Date.now()
+    // Volta { apply: {theme?, hours?} | null (o que vem da conta pro aparelho), push: dados pra conta | null,
+    //         at: hora pra guardar no aparelho | 0 (não mexe) }.
+    function prefTheme(c) { c = String(c || '').toLowerCase(); return /^#[0-9a-f]{6}$/.test(c) ? c : null; }
+    function prefHours(h) {
+        if (!Array.isArray(h) || h.length < 2) return null;
+        var a = Number(h[0]), b = Number(h[1]);
+        if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+        a = Math.floor(a); b = Math.ceil(b);
+        return a >= 0 && b <= 24 && a < b ? [a, b] : null;
+    }
+    function prefsPlan(local, meta, now) {
+        meta = meta || {};
+        var lt = num(local && local.at, 0) || 0, rt = num(meta.faz_prefs_at, 0) || 0;
+        var lTheme = prefTheme(local && local.theme), lHours = prefHours(local && local.hours);
+        var rTheme = prefTheme(meta.faz_theme), rHours = prefHours(meta.faz_hours);
+        if (!lTheme || !lHours) return { apply: null, push: null, at: 0 }; // o aparelho ainda não tem o que mandar
+        if (rTheme === lTheme && same(rHours, lHours)) { // iguais: só acerta as horas
+            if (!rt) { var t0 = lt || now; return { apply: null, push: { faz_theme: lTheme, faz_hours: lHours, faz_prefs_at: t0 }, at: t0 }; } // conta antiga, sem a hora: carimba
+            return { apply: null, push: null, at: rt !== lt ? rt : 0 };
+        }
+        if (rt > lt) { // mudou depois na conta (no PC ou em outro aparelho): vem pra cá
+            var ap = {};
+            if (rTheme && rTheme !== lTheme) ap.theme = rTheme;
+            if (rHours && !same(rHours, lHours)) ap.hours = rHours;
+            var whole = !!(rTheme && rHours); // conta sem cor ou sem horário: depois de aplicar, completa com o daqui
+            return { apply: (ap.theme || ap.hours) ? ap : null, push: whole ? null : { faz_theme: rTheme || lTheme, faz_hours: rHours || lHours, faz_prefs_at: rt }, at: rt };
+        }
+        var t = lt > rt ? lt : Math.max(now, rt + 1); // mudou aqui por último (ou a conta é de antes desta versão): vai pra conta, sempre mais nova
+        return { apply: null, push: { faz_theme: lTheme, faz_hours: lHours, faz_prefs_at: t }, at: t };
+    }
+
     return {
         DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS, MONTH: MONTH, DEFAULT_GOAL_LISTS: DEFAULT_GOAL_LISTS,
         cleanOverrides: cleanOverrides, cleanMonths: cleanMonths, safeCards: safeCards, MAX_CARDS: MAX_CARDS, // V40.24.0
         stable: stable, same: same, validDate: validDate, assignPositions: assignPositions, fixTies: fixTies,
         buildLocal: buildLocal, indexRows: indexRows, cleanRow: cleanRow, merge3: merge3, mergeKind: mergeKind,
-        plan: plan, materialize: materialize, materializeArchived: materializeArchived, baseFrom: baseFrom, aliveCount: aliveCount, MAP: MAP
+        plan: plan, materialize: materialize, materializeArchived: materializeArchived, baseFrom: baseFrom, aliveCount: aliveCount, MAP: MAP,
+        prefsPlan: prefsPlan, prefTheme: prefTheme, prefHours: prefHours // V40.32.0
     };
 });
 
@@ -1177,7 +1213,7 @@
             lastError = null;
             if (manual || firstSync) toast('Sincronizado ✅');
             else if (novosTipos) toast('☁️ Rotinas, notas e finanças agora também vão pro computador');
-            pushTheme();
+            await syncPrefs(manual); // V40.32.0: cor e horário do dia (nos 2 sentidos)
         } catch (e) {
             lastError = e;
             console.warn('[FazSync]', e);
@@ -1189,17 +1225,42 @@
         }
     }
 
-    // A cor do tema vai junto na conta (sem tabela): a tela do PC abre com a mesma cor do app.
-    function pushTheme() {
+    // A cor do tema e a janela do dia (ex.: 7 → 24) vão na conta (sem tabela): o PC abre com a mesma cor e o
+    // mesmo horário. V40.32.0: nos 2 sentidos — o PC também muda. Ganha a mudança mais nova (CORE.prefsPlan).
+    // A sessão guardada no aparelho pode ter os dados da conta velhos: de vez em quando (e ao voltar pro app,
+    // ou no Sincronizar agora) lê de novo da nuvem com getUser().
+    var PREFS_CHECK_MS = 120000, prefsChecked = { uid: null, at: 0 }, prefsFresh = true;
+    async function syncPrefs(manual) {
         try {
-            var c = (typeof themeColor !== 'undefined') ? themeColor : null;
-            var meta = (session && session.user && session.user.user_metadata) || {};
-            if (!/^#[0-9a-fA-F]{6}$/.test(String(c || ''))) return;
-            // janela do dia (ex.: 7 → 24) também vai, pro PC desenhar a agenda no mesmo intervalo
-            var hours = (typeof START_HOUR !== 'undefined' && typeof END_HOUR !== 'undefined') ? [Number(START_HOUR), Number(END_HOUR)] : null;
-            if (meta.faz_theme === c && CORE.same(meta.faz_hours || null, hours)) return;
-            sb.auth.updateUser({ data: { faz_theme: c, faz_hours: hours } }).catch(function () {});
-        } catch (e) {}
+            if (typeof window.fazPrefs !== 'function' || !session || !sb) return;
+            var uid = session.user.id;
+            var meta = (session.user && session.user.user_metadata) || {};
+            if (manual || prefsFresh || prefsChecked.uid !== uid || Date.now() - prefsChecked.at >= PREFS_CHECK_MS) {
+                var r = await sb.auth.getUser();
+                var u = r && r.data && r.data.user;
+                if (!session || session.user.id !== uid) return; // saiu da conta no meio
+                if (u && u.id === uid) {
+                    meta = u.user_metadata || {};
+                    session.user.user_metadata = meta;
+                    prefsChecked = { uid: uid, at: Date.now() };
+                    prefsFresh = false;
+                }
+            }
+            if (appBusy()) return; // arrastando ou com formulário aberto: fica pra próxima rodada
+            var p = CORE.prefsPlan(window.fazPrefs(), meta, Date.now());
+            if (p.apply && typeof window.fazApplyPrefs === 'function') {
+                var did = window.fazApplyPrefs(p.apply);
+                if (did.theme && did.hours) toast('Cor e horário do dia mudaram no outro aparelho');
+                else if (did.theme) toast('Cor do app mudou no outro aparelho 🎨');
+                else if (did.hours) toast('Horário do dia mudou no outro aparelho: ' + did.hours);
+            }
+            if (p.at && typeof window.fazSetPrefsAt === 'function') window.fazSetPrefsAt(p.at);
+            if (p.push) {
+                var res = await sb.auth.updateUser({ data: p.push });
+                if (res && res.error) throw res.error;
+                if (session && session.user && session.user.id === uid) session.user.user_metadata = Object.assign({}, meta, p.push);
+            }
+        } catch (e) { console.warn('[FazSync] cor/horário', e); }
     }
 
     // Chamado pelo app.js depois de salvar Listas/colunas/tags.
@@ -1356,6 +1417,7 @@
         document.addEventListener('visibilitychange', function () {
             if (!session) return;
             if (document.visibilityState === 'visible') {
+                prefsFresh = true; // V40.32.0: voltou pro app: confere se a cor ou o horário mudaram no PC
                 if (Date.now() - lastRunAt > 10000) schedule(400);
             } else if (debounceT) { // saindo do app com mudança pendente → sobe já
                 clearTimeout(debounceT);

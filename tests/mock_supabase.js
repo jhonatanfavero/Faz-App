@@ -119,7 +119,7 @@ function check(table, r) { // mesmas CHECKs da migration
 function makeServer() {
   const s = {
     tables: { tarefas: new Map(), listas: new Map(), tags: new Map(), blocos: new Map(), rotinas: new Map(), notas: new Map(), financas: new Map(), metas_listas: new Map(), metas: new Map(), metas_dias: new Map() },
-    users: new Map(), clock: 0, log: [], channels: [], storedSession: null, createClientCalls: 0, failNext: 0,
+    users: new Map(), clock: 0, log: [], channels: [], storedSession: null, createClientCalls: 0, failNext: 0, failAuth: 0,
   };
   s.emitters = [];
   s.stamp = () => new Date(Date.now() + (++s.clock)).toISOString(); // updated_at do servidor, sempre crescente
@@ -203,7 +203,7 @@ function makeCreateClient(s) {
     s.createClientCalls++;
     let session = s.storedSession;
     const listeners = [];
-    const emit = (ev) => listeners.forEach((cb) => { try { cb(ev, session); } catch (e) {} });
+    const emit = (ev, sess) => listeners.forEach((cb) => { try { cb(ev, sess === undefined ? session : sess); } catch (e) {} }); // sess: teste manda outra sessão (ex.: a velha guardada no aparelho)
     s.emitters.push(emit);
     const auth = {
       async getSession() { return { data: { session }, error: null }; },
@@ -219,7 +219,15 @@ function makeCreateClient(s) {
       async resetPasswordForEmail(email, opts) { s.log.push({ op: 'reset', email, redirectTo: opts && opts.redirectTo }); return { data: {}, error: null }; },
       async signUp({ email }) { s.log.push({ op: 'signUp', email }); return { data: { session: null, user: null }, error: null }; },
       async signOut() { session = null; s.storedSession = null; setTimeout(() => emit('SIGNED_OUT'), 0); return { error: null }; },
+      // V40.32.0: lê os dados da conta de novo no "servidor" (a sessão guardada no aparelho pode estar velha)
+      async getUser() {
+        s.log.push({ op: 'getUser' });
+        if (!session) return { data: { user: null }, error: { message: 'Auth session missing!' } };
+        const u = [...s.users.values()].find((x) => x.id === session.user.id);
+        return { data: { user: { ...clone(session.user), user_metadata: clone(u ? u.meta : session.user.user_metadata || {}) } }, error: null };
+      },
       async updateUser({ data, password }) {
+        if (s.failAuth > 0) { s.failAuth--; s.log.push({ op: 'updateUser', data, failed: true }); return { data: { user: null }, error: { message: 'Failed to fetch' } }; } // V40.32.0: sem internet
         const u = [...s.users.values()].find((x) => x.id === session.user.id);
         if (password) u.password = password;
         Object.assign(u.meta, clone(data || {}));

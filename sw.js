@@ -27,7 +27,8 @@
 // V10.32 - v40.29.0 (Tela do PC: botão Relatórios na barra da Agenda, com o "Produtividade" do celular: Hoje, 7 dias e 30 dias (terminando hoje; na visão Dia, no dia aberto), global feito/planejado e cada tag com feito, atrasado e pendente, pelas mesmas contas do renderReports do app. A Semana do PC passa a ser sempre de segunda a domingo (antes eram 7 dias a partir do dia de referência; o "Hoje" começava em hoje); com menos dias por tela, rola até o dia de hoje. Celular sem mudança.)
 // V10.33 - v40.30.0 (Celular: cartão da sublista sai arrastando (segurar 400 ms; vira bloco num horário livre, com contorno do lugar, ou muda de sublista) e bloco arrastado pela alça entra na sublista (como o PC desde a V40.28.0). Despesa Recorrente sem fim, até encerrar (celular e PC): "Encerrar depois de <mês>" e "Repetir sem fim de novo"; as antigas de 12 meses viram sem fim na nuvem. Dica de instalar no iPhone fala dos ⋯ do iOS 26.)
 // V10.34 - v40.31.0 (Celular, dias lado a lado: segurar um bloco e arrastar pra outro dia e/ou horário. O bloco vai com o dedo encaixado de 5 em 5 min, encosta no vago mais perto, fica vermelho quando não cabe, um balão diz o dia e a hora; em cima de uma sublista entra nela; parado na borda os dias andam. Um passo no Desfazer.)
-const CACHE_NAME = 'timeblock-v40-31-0';
+// V10.35 - v40.32.0 (Tela do PC: botão Configurações (engrenagem) no topo, com a cor do app (as 8 do celular) e o horário do dia (Começa / Termina). Vale aqui e no celular, nos 2 sentidos: ganha a mudança mais nova (faz_prefs_at na conta; tb__prefs_at no celular). O celular confere a conta ao sincronizar (getUser) e avisa "Cor do app mudou no outro aparelho"; aparelho novo pega a cor e o horário da conta em vez do padrão. Abaixo de 1280 px as abas do PC ficam mais justas pra engrenagem caber até 1024 px.)
+const CACHE_NAME = 'timeblock-v40-32-0';
 const ASSETS = [
   './',
   './index.html',

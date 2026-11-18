@@ -235,19 +235,19 @@
 <div id="view-board" class="hidden h-full flex flex-col">
     <header class="h-14 shrink-0 bg-white border-b border-zinc-200 flex items-center gap-3 px-4 sm:px-5">
         <img src="icon-192.png" alt="" class="w-8 h-8 rounded-lg">
-        <!-- V40.8.0: abas Listas | Agenda -->
+        <!-- V40.8.0: abas Listas | Agenda. V40.32.0: abaixo de 1280 px as abas ficam mais justas (a engrenagem cabe no topo até 1024 px) -->
         <nav class="inline-flex p-1 bg-zinc-100 rounded-xl shrink-0" role="tablist" aria-label="Seções">
             <!-- V40.20.0: Assistente, a primeira aba (versão padrão, sem IA paga) -->
-            <button id="tab-assistente" role="tab" data-tab="assistente" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold inline-flex items-center gap-1.5"><i class="ph-fill ph-sparkle"></i>Assistente</button>
-            <button id="tab-listas" role="tab" data-tab="listas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Listas</button>
-            <button id="tab-agenda" role="tab" data-tab="agenda" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Agenda</button>
+            <button id="tab-assistente" role="tab" data-tab="assistente" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold inline-flex items-center gap-1.5"><i class="ph-fill ph-sparkle"></i>Assistente</button>
+            <button id="tab-listas" role="tab" data-tab="listas" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold">Listas</button>
+            <button id="tab-agenda" role="tab" data-tab="agenda" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold">Agenda</button>
             <!-- V40.17.0: Rotinas e Notas, as mesmas do celular -->
-            <button id="tab-rotinas" role="tab" data-tab="rotinas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Rotinas</button>
-            <button id="tab-notas" role="tab" data-tab="notas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Notas</button>
+            <button id="tab-rotinas" role="tab" data-tab="rotinas" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold">Rotinas</button>
+            <button id="tab-notas" role="tab" data-tab="notas" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold">Notas</button>
             <!-- V40.19.0: Finanças, as mesmas do celular -->
-            <button id="tab-financas" role="tab" data-tab="financas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Finanças</button>
+            <button id="tab-financas" role="tab" data-tab="financas" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold">Finanças</button>
             <!-- V40.21.0: Metas, as mesmas do celular -->
-            <button id="tab-metas" role="tab" data-tab="metas" class="tab px-3 py-1.5 rounded-lg text-[13px] font-semibold">Metas</button>
+            <button id="tab-metas" role="tab" data-tab="metas" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold">Metas</button>
         </nav>
         <p id="board-summary" class="hidden sm:block min-w-0 text-xs text-zinc-500 leading-tight truncate"></p>
         <!-- V40.25.0: com os botões ↶ ↷ o topo apertou: abaixo de 1280 px o "Ao vivo" vira só a bolinha (o texto fica no
@@ -273,6 +273,8 @@
             <button id="btn-refresh" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Atualizar agora" aria-label="Atualizar agora">
                 <i class="ph ph-arrows-clockwise text-lg"></i>
             </button>
+            <!-- V40.32.0: Configurações (cor do app e horário do dia), as mesmas do celular -->
+            <button id="btn-cfg" class="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800" title="Configurações (cor do app e horário do dia)" aria-label="Configurações"><i class="ph ph-gear-six text-lg"></i></button>
             <span class="hidden min-[1440px]:block h-6 w-px bg-zinc-200"></span>
             <span id="user-email" class="hidden min-[1440px]:block text-xs text-zinc-500 max-w-[220px] truncate"></span>
             <button id="btn-logout" class="shrink-0 text-xs font-semibold text-zinc-600 hover:text-zinc-900 px-2.5 py-2 rounded-lg hover:bg-zinc-100">Sair</button>
@@ -853,10 +855,37 @@
     </div>
 </div>
 
+<!-- V40.32.0: Configurações — cor do app e horário do dia. Vão na conta: valem aqui e no celular. -->
+<div id="modal-cfg" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="cfg-title">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[85vh]">
+        <div class="px-5 pt-5 pb-3 flex items-center gap-3">
+            <h3 id="cfg-title" class="text-base font-bold text-zinc-900">Configurações</h3>
+            <span class="text-xs text-zinc-500">valem aqui e no celular</span>
+            <button id="cfg-close" class="ml-auto text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Fechar</button>
+        </div>
+        <div class="px-5 pb-5 overflow-y-auto thin-scroll">
+            <p class="mt-1 text-xs font-semibold text-zinc-500">Cor do app</p>
+            <div id="cfg-colors" class="mt-2 flex flex-wrap gap-2.5" role="radiogroup" aria-label="Cor do app"></div>
+            <p class="mt-5 text-xs font-semibold text-zinc-500">Horário do dia</p>
+            <div class="mt-2 flex items-end gap-3">
+                <label class="flex-1 min-w-0">
+                    <span class="text-[11.5px] text-zinc-500">Começa</span>
+                    <select id="cfg-h0" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none tabular-nums"></select>
+                </label>
+                <label class="flex-1 min-w-0">
+                    <span class="text-[11.5px] text-zinc-500">Termina</span>
+                    <select id="cfg-h1" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none tabular-nums"></select>
+                </label>
+            </div>
+            <p id="cfg-h-msg" class="mt-2 text-[12px] text-zinc-500" aria-live="polite"></p>
+        </div>
+    </div>
+</div>
+
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.31.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.32.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -902,7 +931,8 @@
         fnMonth: null, fnEdit: null, fnScope: null, step: null, as: { msgs: [], auto: true },
         tab: 'listas', agView: 'week', agAnchor: null, agScrolled: null, hours: [7, 24], recovery: false,
         channel: null, live: 'connecting', lastLoad: 0, loading: false,
-        dragId: null, pendingRender: false, composer: null, editing: null, placing: null, agH0: 7
+        dragId: null, pendingRender: false, composer: null, editing: null, placing: null, agH0: 7,
+        theme: '#4f46e5', prefsAt: 0, prefsSeen: false, prefsCheckedAt: 0 // V40.32.0: cor do app e quando a cor/horário mudaram por último
     };
 
     // ---------- utilitários ----------
@@ -952,15 +982,32 @@
         toast(navigator.onLine === false ? 'Sem internet. A mudança não foi salva.' : 'Não foi possível salvar. Confira a internet e tente de novo.');
     }
 
-    function applyTheme(user) {
-        var c = user && user.user_metadata && user.user_metadata.faz_theme;
-        if (/^#[0-9a-fA-F]{6}$/.test(String(c || ''))) {
-            document.documentElement.style.setProperty('--focus', c);
-            var meta = document.querySelector('meta[name="theme-color"]');
-            if (meta) meta.setAttribute('content', c);
-        }
-        var h = user && user.user_metadata && user.user_metadata.faz_hours; // janela do dia configurada no celular
+    function setTheme(c) {
+        c = String(c || '').toLowerCase();
+        if (!/^#[0-9a-f]{6}$/.test(c)) return;
+        S.theme = c;
+        document.documentElement.style.setProperty('--focus', c);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', c);
+    }
+    // Cor do app e janela do dia, da conta (o celular manda; V40.32.0: daqui também, em Configurações).
+    // Ganha a mudança mais nova (faz_prefs_at): dado mais velho que a última mudança feita aqui (que pode estar
+    // indo pra nuvem ainda) não volta a tela pra trás. fresh = veio agora da nuvem (getUser, USER_UPDATED,
+    // TOKEN_REFRESHED); a sessão guardada no PC (INITIAL_SESSION, SIGNED_IN ao abrir) pode ser de dias atrás e,
+    // depois que a nuvem respondeu, só passa se for mais nova. Devolve true se o horário do dia mudou (a Agenda redesenha).
+    function applyTheme(user, fresh) {
+        var m = (user && user.user_metadata) || {};
+        var at = Number(m.faz_prefs_at) || 0;
+        if (at < S.prefsAt || (!fresh && S.prefsSeen && at <= S.prefsAt)) return false;
+        S.prefsAt = at;
+        if (fresh) S.prefsSeen = true;
+        var before = S.theme + '|' + S.hours.join('-');
+        setTheme(m.faz_theme);
+        var h = m.faz_hours; // janela do dia (ex.: 7 → 24)
         if (Array.isArray(h) && h[0] >= 0 && h[1] <= 24 && h[0] < h[1]) S.hours = [Math.floor(h[0]), Math.ceil(h[1])];
+        var hoursChanged = before.split('|')[1] !== S.hours.join('-');
+        if (before !== S.theme + '|' + S.hours.join('-')) renderCfg(true);
+        return hoursChanged;
     }
 
     function setLive(state) {
@@ -988,6 +1035,7 @@
 
     async function loadAll() {
         if (!S.uid || S.loading) return;
+        refreshPrefs(false); // V40.32.0: a cor ou o horário podem ter mudado no celular
         S.loading = true;
         try {
             var results = await Promise.all(KINDS.map(fetchKind));
@@ -4191,6 +4239,89 @@
     }
     function openReports() { var m = $('modal-rep'); m.classList.remove('hidden'); m.classList.add('flex'); renderReports(); $('rep-close').focus(); }
     function closeReports() { var m = $('modal-rep'); m.classList.add('hidden'); m.classList.remove('flex'); }
+
+    // ---------- V40.32.0: Configurações (cor do app e horário do dia) ----------
+    // As mesmas do celular (Config → Aparência e Janela de Horário). Vão na conta (user_metadata): faz_theme, faz_hours e
+    // faz_prefs_at (quando mudou). Ganha a mudança mais nova, aqui ou no celular; o celular confere ao sincronizar.
+    var THEME_COLORS = [['#4f46e5', 'Índigo'], ['#ef4444', 'Vermelho'], ['#3b82f6', 'Azul'], ['#10b981', 'Verde'], ['#f59e0b', 'Âmbar'], ['#8b5cf6', 'Roxo'], ['#ec4899', 'Rosa'], ['#14b8a6', 'Turquesa']];
+    var CFG_HINT = 'A Agenda mostra esse intervalo (bloco fora dele continua aparecendo).';
+    function hoursText(h) { return pad(h[0]) + ':00 às ' + pad(h[1]) + ':00'; }
+    function cfgMsg(text, bad) {
+        var p = $('cfg-h-msg');
+        p.textContent = text;
+        p.classList.toggle('text-red-600', !!bad);
+        p.classList.toggle('font-semibold', !!bad);
+        p.classList.toggle('text-zinc-500', !bad);
+    }
+    // full: os horários voltam pro que está valendo (ao abrir, ou quando chega uma mudança do celular)
+    function renderCfg(full) {
+        if ($('modal-cfg').classList.contains('hidden')) return;
+        $('cfg-colors').innerHTML = THEME_COLORS.map(function (c) {
+            var on = S.theme === c[0];
+            return '<button type="button" class="tg-dot' + (on ? ' on' : '') + '" style="background:' + c[0] + '" data-cfg-color="' + c[0] + '" role="radio" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + c[1] + '" title="' + c[1] + '"></button>';
+        }).join('');
+        var a = $('cfg-h0'), b = $('cfg-h1');
+        if (!a.options.length) {
+            for (var i = 0; i < 24; i++) a.add(new Option(pad(i) + ':00', String(i)));
+            for (var j = 1; j <= 24; j++) b.add(new Option(pad(j) + ':00', String(j)));
+        }
+        if (full) { a.value = String(S.hours[0]); b.value = String(S.hours[1]); cfgMsg(CFG_HINT, false); }
+    }
+    function openCfg() {
+        closeColMenu();
+        var m = $('modal-cfg');
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+        renderCfg(true);
+        $('cfg-close').focus();
+        refreshPrefs(true); // traz o que mudou no celular desde a última olhada
+    }
+    function closeCfg() { var m = $('modal-cfg'); m.classList.add('hidden'); m.classList.remove('flex'); }
+    // Aplica na hora e grava na conta. Sem internet: volta como estava e avisa.
+    async function savePrefs(theme, hours, what) {
+        if (!S.uid) return;
+        var prev = { theme: S.theme, hours: S.hours.slice(), at: S.prefsAt };
+        var at = Math.max(Date.now(), S.prefsAt + 1); // sempre mais nova que a última que este PC viu (relógios diferentes)
+        S.prefsAt = at;
+        S.prefsSeen = true;
+        setTheme(theme);
+        var moved = hours[0] !== S.hours[0] || hours[1] !== S.hours[1];
+        S.hours = hours.slice();
+        if (moved) scheduleRender();
+        renderCfg(false);
+        try {
+            var res = await S.sb.auth.updateUser({ data: { faz_theme: S.theme, faz_hours: S.hours.slice(), faz_prefs_at: at } });
+            if (res && res.error) throw res.error;
+            if (S.prefsAt === at) toast((what === 'theme' ? 'Cor do app atualizada' : 'Horário do dia: ' + hoursText(S.hours)) + '. No celular muda na próxima sincronização.', 3600);
+        } catch (e) {
+            if (S.prefsAt === at) { // nada mais novo por cima: volta como estava
+                S.prefsAt = prev.at;
+                setTheme(prev.theme);
+                if (prev.hours[0] !== S.hours[0] || prev.hours[1] !== S.hours[1]) { S.hours = prev.hours; scheduleRender(); }
+                renderCfg(true);
+            }
+            fail(e);
+        }
+    }
+    function cfgHoursChanged() {
+        var a = Number($('cfg-h0').value), b = Number($('cfg-h1').value);
+        if (!(a < b)) return cfgMsg('O começo precisa ser antes do fim.', true); // fica escolhido, mas não grava
+        cfgMsg(CFG_HINT, false);
+        if (a === S.hours[0] && b === S.hours[1]) return;
+        savePrefs(S.theme, [a, b], 'hours');
+    }
+    // A sessão guardada pode ter os dados da conta velhos: lê de novo da nuvem (ao abrir, voltar pra janela e de tempos em tempos).
+    function refreshPrefs(force) {
+        if (!S.uid || !S.sb) return;
+        if (!force && Date.now() - S.prefsCheckedAt < 60000) return;
+        S.prefsCheckedAt = Date.now();
+        var uid = S.uid;
+        S.sb.auth.getUser().then(function (r) {
+            var u = r && r.data && r.data.user;
+            if (!u || u.id !== uid || S.uid !== uid) return;
+            if (applyTheme(u, true)) scheduleRender();
+        }).catch(function () {});
+    }
     function unarchive(kind, id) {
         var r = S[kind][id];
         if (!r) return;
@@ -4273,7 +4404,7 @@
     // ---------- eventos ----------
     // Alguma janela, menu ou calendário aberto? (setas do teclado e Desfazer não agem por baixo dela)
     function anyLayerOpen() {
-        return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'modal-goal', 'modal-rep', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
+        return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'modal-goal', 'modal-rep', 'modal-cfg', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
     }
     function bindEvents() {
         var wrap = $('columns');
@@ -4550,6 +4681,7 @@
             if (S.mtEdit) return closeGoal(); // V40.21.0
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
             if (!$('modal-rep').classList.contains('hidden')) return closeReports(); // V40.29.0
+            if (!$('modal-cfg').classList.contains('hidden')) return closeCfg(); // V40.32.0
             if (S.rtEdit) return closeRoutine(); // V40.17.0
             if (menuEl) return closeColMenu();
             if (!$('f-card-pick').classList.contains('hidden')) { cardPick(false); return $('f-card-pull').focus(); } // V40.24.0: Esc fecha só a busca
@@ -4989,6 +5121,16 @@
         $('ag-rep').addEventListener('click', openReports);
         $('rep-close').addEventListener('click', closeReports);
         $('modal-rep').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeReports(); });
+        // V40.32.0: Configurações
+        $('btn-cfg').addEventListener('click', openCfg);
+        $('cfg-close').addEventListener('click', closeCfg);
+        $('modal-cfg').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeCfg(); });
+        $('cfg-colors').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-cfg-color]');
+            if (b && b.dataset.cfgColor !== S.theme) savePrefs(b.dataset.cfgColor, S.hours, 'theme');
+        });
+        $('cfg-h0').addEventListener('change', cfgHoursChanged);
+        $('cfg-h1').addEventListener('change', cfgHoursChanged);
         $('rep-tabs').addEventListener('click', function (e) { var b = e.target.closest('[data-rep]'); if (b) { REP.period = b.dataset.rep; renderReports(); } });
         $('modal-archive').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeArchive(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('ar-list').addEventListener('click', function (e) {
@@ -5118,9 +5260,10 @@
 
     // ---------- sessão ----------
     var currentUid;
-    function onSession(session) {
+    function onSession(session, event) {
         var uid = session ? session.user.id : null;
-        if (session) applyTheme(session.user);
+        if (uid !== currentUid) { S.prefsAt = 0; S.prefsSeen = false; S.prefsCheckedAt = 0; } // V40.32.0: outra conta
+        if (session && applyTheme(session.user, event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') && uid === currentUid) scheduleRender(); // V40.32.0: o horário do dia mudou
         if (S.recovery && session) { show('view-recovery'); $('recovery-pass').focus(); return; }
         if (uid === currentUid) return;
         currentUid = uid;
@@ -5131,6 +5274,7 @@
             S.metas_listas = {}; S.metas = {}; S.metas_dias = {}; S.mtWant = {}; S.mtQueue = {}; closeGoal(); // V40.21.0
             closeTags(); // V40.18.0
             closeFin(); // V40.19.0
+            closeCfg(); // V40.32.0
             closeTask();
             S.placing = null;
             closeArchive();
@@ -5165,7 +5309,7 @@
         bindEvents();
         S.sb.auth.onAuthStateChange(function (event, session) {
             if (event === 'PASSWORD_RECOVERY') S.recovery = true;
-            setTimeout(function () { onSession(session); }, 0);
+            setTimeout(function () { onSession(session, event); }, 0);
         });
         try {
             var r = await S.sb.auth.getSession();

@@ -270,14 +270,15 @@ const { abrir } = require('./apoio');
 
   { // V40.24.0 (bloco próprio: os nomes daqui não se misturam com os de cima)
   console.log('\nI) Sublista e vagos ocultos na agenda (V40.24.0):');
-  await m.evaluate(() => { closeAllSheets(); activeDateObj = new Date(2026, 10, 18); renderTimeline(); document.getElementById('timeline-scroll').scrollTop = 0; });
+  // um dia que nunca é hoje nem passado (com 18/11/2026 o teste quebrava conforme a hora do dia): o 1º livre é às 07:00
+  await m.evaluate(() => { closeAllSheets(); activeDateObj = new Date(2030, 6, 12); renderTimeline(); document.getElementById('timeline-scroll').scrollTop = 0; });
   await m.waitForTimeout(300);
   await m.tap('#fab-btn'); await m.waitForTimeout(450);
   await m.fill('#task-input', 'Pendências rápidas');
   await m.tap('.sheet-dur-btn[data-time="60"]');
   await m.tap('#bottom-sheet button:has-text("Sublista")'); await m.waitForTimeout(450);
   await m.tap('#blocks-container .block-item.bg-hatched'); await m.waitForTimeout(350);
-  const S1 = await m.evaluate(() => (db.find((b) => b.date === '2026-11-18' && Array.isArray(b.cards)) || {}).id);
+  const S1 = await m.evaluate(() => (db.find((b) => b.date === '2030-07-12' && Array.isArray(b.cards)) || {}).id);
   ok(!!S1 && await m.evaluate(() => pendingIntent === null), 'pelo + → "Sublista" → tocar no Tempo Livre: a sublista nasce no dia (com toques de verdade)');
   const subSel = `#blocks-container .block-item[data-block-id="${S1}"]`;
   await m.tap(`${subSel} .block-btn[title="Expandir/Recolher"]`); await m.waitForTimeout(250);
@@ -321,7 +322,7 @@ const { abrir } = require('./apoio');
   await glide({ x: h.x, y: h.top + 12 }, { x: h.x, y: h.top + 12 + 90 }); await drop();
   ok(await m.evaluate((id) => db.find((b) => b.id === id).startMin, S1) === st0 + 30, 'arrastar a sublista pela alça leva os cartões junto (+30 min)');
   // vagos ocultos
-  await m.evaluate(() => { db.push({ id: 'f_vb1', date: '2026-11-18', startMin: 780, duration: 60, title: 'Almoço', type: 'focus', theme: 'focus', microblocks: [], completed: false, linkedNoteIds: [] }); saveDb(); renderTimeline(); });
+  await m.evaluate(() => { db.push({ id: 'f_vb1', date: '2030-07-12', startMin: 780, duration: 60, title: 'Almoço', type: 'focus', theme: 'focus', microblocks: [], completed: false, linkedNoteIds: [] }); saveDb(); renderTimeline(); });
   await m.waitForTimeout(200);
   const altura0 = await m.evaluate(() => parseFloat(document.getElementById('timeline-container').style.height));
   await m.tap('#tl-compact-btn'); await m.waitForTimeout(300);

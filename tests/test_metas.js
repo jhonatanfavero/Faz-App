@@ -235,7 +235,7 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   ok(!ev("goalListsDb.some((l) => l.id === 'gl_profissional')") && !ev("goalsDb.some((g) => g.id === 'meta_pc')") && !ev("goalDaysDb.some((x) => x.goalId === 'meta_pc')") && !secs().some((x) => x.startsWith('Profissional')), 'categoria apagada no PC: some do celular com a meta e os dias dela');
   ok(await waitFor(() => server.get('metas_dias', UID, 'meta_pc_20261115').deleted === true), 'e o dia daquela meta também fica apagado na nuvem');
   await syncDone(); const antes = server.log.length; await syncDone();
-  ok(server.log.slice(antes).filter((l) => l.op !== 'select').length === 0, 'sincronizar de novo não envia nada');
+  ok(server.log.slice(antes).filter((l) => l.op !== 'select' && l.op !== 'getUser').length === 0, 'sincronizar de novo não envia nada'); // V40.32.0: getUser só lê (a cor e o horário da conta)
   const selDias = server.log.slice(antes).filter((l) => l.op === 'select' && l.t === 'metas_dias');
   ok(selDias.length >= 1 && selDias.every((l) => l.since !== null) && selDias.every((l) => l.n <= 2), 'e os dias das metas são lidos de forma incremental (só o que mudou nos últimos segundos, não tudo)');
 

@@ -28,7 +28,8 @@
 // V10.33 - v40.30.0 (Celular: cartão da sublista sai arrastando (segurar 400 ms; vira bloco num horário livre, com contorno do lugar, ou muda de sublista) e bloco arrastado pela alça entra na sublista (como o PC desde a V40.28.0). Despesa Recorrente sem fim, até encerrar (celular e PC): "Encerrar depois de <mês>" e "Repetir sem fim de novo"; as antigas de 12 meses viram sem fim na nuvem. Dica de instalar no iPhone fala dos ⋯ do iOS 26.)
 // V10.34 - v40.31.0 (Celular, dias lado a lado: segurar um bloco e arrastar pra outro dia e/ou horário. O bloco vai com o dedo encaixado de 5 em 5 min, encosta no vago mais perto, fica vermelho quando não cabe, um balão diz o dia e a hora; em cima de uma sublista entra nela; parado na borda os dias andam. Um passo no Desfazer.)
 // V10.35 - v40.32.0 (Tela do PC: botão Configurações (engrenagem) no topo, com a cor do app (as 8 do celular) e o horário do dia (Começa / Termina). Vale aqui e no celular, nos 2 sentidos: ganha a mudança mais nova (faz_prefs_at na conta; tb__prefs_at no celular). O celular confere a conta ao sincronizar (getUser) e avisa "Cor do app mudou no outro aparelho"; aparelho novo pega a cor e o horário da conta em vez do padrão. Abaixo de 1280 px as abas do PC ficam mais justas pra engrenagem caber até 1024 px.)
-const CACHE_NAME = 'timeblock-v40-32-0';
+// V10.36 - v40.32.1 (iPhone instalado: as telas cheias (Listas, Config, +, Relatórios, Tags, Períodos...) respeitam a área segura de cima — o X de fechar ficava atrás da bateria, sem dar pra tocar; Config → Períodos: os campos Início e Fim não vazam mais do cartão no iPhone.)
+const CACHE_NAME = 'timeblock-v40-32-1';
 const ASSETS = [
   './',
   './index.html',

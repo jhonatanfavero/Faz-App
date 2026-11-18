@@ -673,5 +673,47 @@ const { abrir } = require('./apoio');
   ok(await m.evaluate((d) => tlDays === 1 && getActiveDateStr() === d, DS[1]), 'tocar (sem segurar) num bloco continua abrindo o dia dele');
   await m.evaluate((DS) => { db = db.filter((b) => !DS.includes(b.date)); saveDb(); setTlDays(1); activeDateObj = new Date(); renderTimeline(); }, DS);
   }
+
+  {
+  console.log('\nO) iPhone instalado: o topo das telas fica abaixo da barra de status (V40.32.1):');
+  // o Chrome não tem área segura: simula a do iPhone 13 (47 px) pela variável que o style.css usa
+  const topo = (sel) => m.evaluate((sel) => {
+    const out = [];
+    document.querySelectorAll(sel).forEach((b) => {
+      const r = b.getBoundingClientRect();
+      if (!r.width) return;
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      out.push({ top: Math.round(r.top), livre: !!hit && (hit === b || b.contains(hit)) });
+    });
+    return out;
+  }, sel);
+  const telas = [
+    ['list-sheet', 'openListSheet()'], ['config-sheet', 'openConfigSheet()'], ['bottom-sheet', 'openSheet()'],
+    ['reports-sheet', 'openReportsSheet()'], ['tags-sheet', 'openTagsSheet()'], ['period-select-sheet', 'openPeriodSelectSheet()']
+  ];
+  const semIphone = {};
+  for (const [id, abre] of telas) {
+    await m.evaluate((abre) => { closeAllSheets(); eval(abre); }, abre); await m.waitForTimeout(400);
+    semIphone[id] = await m.evaluate((id) => getComputedStyle(document.getElementById(id)).paddingTop, id);
+  }
+  ok(Object.values(semIphone).every((p) => p === '24px'), 'sem área segura (Android, PC): o topo das telas continua 24 px (' + [...new Set(Object.values(semIphone))].join(', ') + ')');
+  await m.evaluate(() => { closeAllSheets(); document.documentElement.style.setProperty('--faz-safe-top', '47px'); });
+  for (const [id, abre] of telas) {
+    await m.evaluate((abre) => { closeAllSheets(); eval(abre); }, abre); await m.waitForTimeout(400);
+    const bs = await topo(`#${id} [data-voltar]`);
+    ok(bs.length > 0 && bs.every((b) => b.top >= 47 && b.livre), `${id}: botões de fechar/voltar começam abaixo da barra de status (${bs.map((b) => b.top + ' px').join(', ')}) e dá pra tocar`);
+    if (id === 'list-sheet') await foto(m, 'cel-iphone-topo-listas.png');
+  }
+  // Config → Períodos: o formulário com Início e Fim
+  await m.evaluate(() => { closeAllSheets(); openConfigSheet(); openConfigPeriods(); }); await m.waitForTimeout(400);
+  const per = await m.evaluate(() => {
+    const box = document.getElementById('config-period-name').parentElement.getBoundingClientRect();
+    const a = document.getElementById('config-period-start').getBoundingClientRect(), b = document.getElementById('config-period-end').getBoundingClientRect();
+    return { dentro: a.left >= box.left && b.right <= box.right + 0.5 && a.right <= b.left, a: Math.round(a.width), b: Math.round(b.width), box: Math.round(box.width) };
+  });
+  ok(per.dentro, `Períodos: Início (${per.a} px) e Fim (${per.b} px) lado a lado, dentro do cartão (${per.box} px)`);
+  await foto(m, 'cel-iphone-periodos.png');
+  await m.evaluate(() => { closeAllSheets(); document.documentElement.style.removeProperty('--faz-safe-top'); });
+  }
   await fim(errs.length ? '\nERROS DE PÁGINA: ' + errs.slice(0, 3).join(' | ') : '');
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

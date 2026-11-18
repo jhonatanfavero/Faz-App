@@ -1025,12 +1025,13 @@
                 
                 <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-3 mb-4">
                     <input type="text" id="config-period-name" placeholder="Ex: Madrugada" autocomplete="off" class="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:border-app-focus outline-none mb-2">
+                    <!-- V40.32.1: min-w-0 — no iPhone o campo de hora tem largura mínima própria e o "Fim" vazava do cartão -->
                     <div class="flex gap-2 mb-2">
-                        <div class="flex-1">
+                        <div class="flex-1 min-w-0">
                             <label class="text-[10px] font-bold text-zinc-500 uppercase ml-1">Início</label>
                             <input type="time" id="config-period-start" class="w-full bg-white border border-zinc-200 rounded-lg px-2 py-2 text-sm outline-none">
                         </div>
-                        <div class="flex-1">
+                        <div class="flex-1 min-w-0">
                             <label class="text-[10px] font-bold text-zinc-500 uppercase ml-1">Fim</label>
                             <input type="time" id="config-period-end" class="w-full bg-white border border-zinc-200 rounded-lg px-2 py-2 text-sm outline-none">
                         </div>
@@ -1501,7 +1502,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.32.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.32.1</div>
 
     </div>
 

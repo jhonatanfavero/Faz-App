@@ -194,6 +194,28 @@ function cleanupOverridesOutsideRange(item) {
     validKeys.forEach(k => { newOverrides[k] = item.paidMonthsOverrides[k]; });
     item.paidMonthsOverrides = newOverrides;
 }
+
+// ===== V40.30.0: RECORRENTE SEM FIM (escolha do Jhonatan em 17/11: "sem fim, até encerrar") =====
+// Antes a recorrente valia 12 meses e sumia (o "renovar" prometido no formulário nunca existiu). Agora ela repete todo
+// mês até a pessoa tocar em "Encerrar". "Sem fim" = durationMonths 1200 (100 anos: o máximo que a nuvem aceita; uma
+// versão antiga do app entende como "por muito tempo"). Encerrar = durationMonths até o último mês. As recorrentes que
+// já existiam (12 meses) viraram sem fim pela migration faz_v40_30_0_recorrente_sem_fim. O PC usa as mesmas regras.
+const REC_OPEN = 1200;
+function isOpenRecurring(item) { return !!item && item.isRecurring === true && (item.durationMonths || 1) >= REC_OPEN; }
+function getItemEndMonth(item) { return addMonths(getItemStartMonth(item), (item.durationMonths || 1) - 1); }
+function monthsBetween(a, b) { const [ay, am] = a.split('-').map(Number), [by, bm] = b.split('-').map(Number); return (by - ay) * 12 + (bm - am); }
+const FIN_MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+function finMonthLong(m) { const [y, mm] = m.split('-'); return FIN_MONTHS[Number(mm) - 1] + ' de ' + y; }        // "novembro de 2026"
+function finMonthShort(m) { return m.slice(0, 4) === getLocalMonthStr().slice(0, 4) ? FIN_MONTHS[Number(m.slice(5)) - 1] : finMonthLong(m); } // do ano de hoje: só o nome
+// "Neste e nos próximos" numa recorrente: o valor normal passa a ser o novo e os meses de antes guardam o valor que
+// tinham (sem escrever um valor pra cada mês do futuro, que na sem fim seriam 1200).
+function setAmountFromMonthOn(item, fromMonthStr, amount) {
+    const start = getItemStartMonth(item), old = Number(item.amount) || 0, ov = Object.assign({}, item.paidMonthsOverrides || {});
+    for (let c = start, g = 0; c < fromMonthStr && g < REC_OPEN; c = addMonths(c, 1), g++) if (!ov[c]) ov[c] = { amount: old };
+    Object.keys(ov).forEach(k => { if (k >= fromMonthStr) delete ov[k]; });
+    item.amount = amount;
+    if (Object.keys(ov).length) item.paidMonthsOverrides = ov; else delete item.paidMonthsOverrides;
+}
 // V2.0 - Estado do header
 // V40.2.28: persistido em localStorage. Default false (1ª vez = expandido pra Descoberta).
 //   Depois que o usuário escolhe (toggleHeader), a escolha vira a nova default.
@@ -1151,7 +1173,8 @@ function renderTimeline() {
     // V40.3.2: bloqueia re-render durante drag de microbloc pra não invalidar mbDragRects/mbDragSourceEl.
     // O drag chamará renderTimeline() no final (onMbDragEnd) — não precisa renderizar enquanto rola.
     // Variável declarada no topo do arquivo pra evitar TDZ.
-    if (mbDragActive) return;
+    // V40.30.0: arrastando um cartão da sublista também não (subDrag é "var": existe antes da linha dele rodar).
+    if (mbDragActive || subDrag) return;
     container.innerHTML = ''; 
     container.classList.remove('tl-multi'); // V40.26.0: volta a ser um dia só até saber se a agenda está afastada
     
@@ -1399,6 +1422,7 @@ function drawBlock(block) {
     if ((block.type === 'focus' || block.type === 'past') && isSublist(block)) {
         drawSublist(el, block, heightPx, isSearching);
         container.appendChild(el);
+        try { subDragSetup(el, block); subDragTip(el, block); } catch (err) { console.warn('[drawBlock] arrasto da sublista:', err); } // V40.30.0
         return;
     }
 
@@ -1773,10 +1797,10 @@ function drawSublist(el, b, heightPx, isSearching) {
         }
         const rows = shown.map(card => subCardRowHtml(b, card)).join('');
         const moreHtml = more ? `<button onclick="toggleExpandBlock('${b.id}', event)" class="sub-more">+${more} ${more === 1 ? 'cartão' : 'cartões'}</button>` : '';
-        const empty = !b.cards.length && !b.expanded ? `<p class="sub-empty">Vazia · toque em <i class="ph ph-caret-down"></i> pra pôr cartões</p>` : '';
+        const empty = !b.cards.length && !b.expanded ? `<p class="sub-empty">Vazia · arraste um bloco pra cá ou toque em <i class="ph ph-caret-down"></i></p>` : '';
         const extra = b.expanded ? `
                 <input type="text" id="sub-input-${b.id}" maxlength="200" placeholder="+ Adicionar cartão" class="sub-input microblock-input w-full rounded-md px-2 py-1.5 mt-1.5 text-[11px] font-medium outline-none border border-transparent" onkeypress="if(event.key==='Enter') addSublistCard('${b.id}', this, event)">
-                ${!b.cards.length ? `<p class="sub-empty">Ou agende um cartão da Lista e toque nesta sublista.</p>` : ''}
+                ${!b.cards.length ? `<p class="sub-empty">Ou arraste um bloco pra cá, ou agende um cartão da Lista e toque nesta sublista.</p>` : ''}
                 ${c.open && b.cards.length ? `<button onclick="sublistReturnOpen('${b.id}', event)" class="sub-return"><i class="ph ph-arrow-u-up-left"></i>${c.open === 1 ? 'Devolver o não feito pra Lista' : `Devolver os ${c.open} não feitos pra Lista`}</button>` : ''}
                 ${renderLinkedNotesSection(b, dark)}` : '';
         body = `<div class="sub-cards ml-10 mr-1 relative z-20 pointer-events-auto">${rows}${moreHtml}${empty}${extra}</div>`;
@@ -1992,6 +2016,317 @@ window.closeSubCard = function(keepOverlay) {
     m.classList.remove('flex');
     if (!keepOverlay) document.getElementById('overlay').classList.add('opacity-0', 'pointer-events-none');
 };
+
+// =====================================================
+// V40.30.0 — SUBLISTA ARRASTANDO NO CELULAR (o PC faz igual desde a V40.28.0)
+// =====================================================
+// Pedido do Jhonatan: os cartões da sublista funcionam como os de fora. Segurar um cartão e arrastar:
+//   - pra um horário livre do dia: vira bloco ali, inteiro (nome, tag, cor, checklist, feito e o tempo dele);
+//   - pra outra sublista: muda de sublista.
+// E o contrário: arrastar um bloco pela alça e soltar em cima de uma sublista: ele vira cartão dela.
+// Regras e avisos iguais aos do PC (kanban.html: subCardOut, subCardMove, blockIntoSub); quando dá certo, quem avisa é
+// a barrinha do Desfazer ("Cartão saiu da sublista", "Cartão mudou de sublista", "Bloco entrou na sublista"). Só na agenda de 1 dia
+// (com 2 ou 3 dias os blocos aparecem resumidos; nos filtros e na busca a agenda vira lista).
+// Gesto: segurar 400 ms num cartão (fora do círculo) e ele sai acompanhando o dedo. Um contorno tracejado mostra
+// onde ele vira bloco: começa onde está o dedo e encosta no próximo bloco se precisar; vermelho = não cabe ali.
+// Perto do topo ou do fim da tela a agenda rola sozinha. Cada arrasto vira um passo só no Desfazer.
+var subDrag = null;        // arrasto de cartão em andamento: a agenda não redesenha e o sync espera
+var subDragClickUntil = 0; // o "clique" que sobra ao soltar não abre nem marca o cartão
+var subTipShown = {};      // dica "segure um cartão" já mostrada nesta sublista (só na memória)
+const SUB_DRAG_MS = 400, SUB_DRAG_SLOP = 8;
+
+function subCardDur(c) { return Number(c && c.duration) > 0 ? Math.round(Number(c.duration)) : 30; }
+function subHits(ds, st, dur) { return db.some(x => x && x.date === ds && st < x.startMin + x.duration && x.startMin < st + dur); }
+// O vago do dia em volta de `min` ({ a, b }, dentro do horário do dia); null se `min` cai em cima de um bloco.
+function subFreeAround(ds, min) {
+    const lo = START_HOUR * 60, hi = END_HOUR * 60;
+    if (!(min >= lo && min < hi)) return null;
+    let a = lo, b = hi;
+    for (const x of db) {
+        if (!x || x.date !== ds) continue;
+        const s = x.startMin, e = x.startMin + x.duration;
+        if (min >= s && min < e) return null;
+        if (e <= min && e > a) a = e;
+        if (s > min && s < b) b = s;
+    }
+    return { a: a, b: b };
+}
+
+// Cartão → bloco no dia `ds` às `st` (o mesmo bloco que o PC cria). Devolve true se saiu da sublista.
+function subCardOut(bid, cid, ds, st) {
+    const f = subFindCard(bid, cid);
+    if (!f) { showToast('Esse cartão não está mais na sublista.'); return false; }
+    const dur = subCardDur(f.card);
+    st = Math.round(Number(st) / 5) * 5;
+    if (!(st >= 0 && st + dur <= 1440) || subHits(ds, st, dur)) { showToast('Conflito! O cartão ficou na sublista.'); return false; }
+    const today = getTodayStr(), n = Date.now(), col = fazCardColor(f.card.color);
+    db.push({
+        id: 'f_' + n + '_' + Math.random().toString(36).slice(2, 7),
+        type: ds < today || (ds === today && st + dur <= currentRealMins) ? 'past' : 'focus',
+        title: String(f.card.title || '').trim() || 'Sem nome',
+        ...(col ? { color: col } : {}),
+        startMin: st,
+        duration: dur,
+        date: ds,
+        microblocks: (Array.isArray(f.card.microblocks) ? f.card.microblocks : []).filter(m => m && String(m.title || '').trim())
+            .map((m, i) => ({ id: 'mb_' + n + '_' + i + Math.random().toString(36).slice(2, 5), title: String(m.title).trim(), done: !!m.done })),
+        completed: !!f.card.done,
+        theme: 'focus',
+        tagId: f.card.tagId && tagsDb.some(t => t.id === f.card.tagId) ? f.card.tagId : null,
+        linkedNoteIds: []
+    });
+    f.b.cards = f.b.cards.filter(c => c.id !== cid);
+    subSyncDone(f.b);
+    saveDb(); // a barrinha do Desfazer avisa: "Cartão saiu da sublista" (aviso só quando não dá)
+    renderTimeline();
+    return true;
+}
+// Cartão inteiro (o mesmo id) de uma sublista pra outra.
+function subCardMoveTo(bid, cid, toId) {
+    const f = subFindCard(bid, cid), to = db.find(x => x.id === toId);
+    if (!f) { showToast('Esse cartão não está mais na sublista.'); return false; }
+    if (!isSublist(to) || toId === bid) return false;
+    if (to.cards.length >= SUB_MAX) { showToast(`Uma sublista cabe até ${SUB_MAX} cartões.`); return false; }
+    to.cards.push(JSON.parse(JSON.stringify(f.card)));
+    f.b.cards = f.b.cards.filter(c => c.id !== cid);
+    subSyncDone(to);
+    subSyncDone(f.b);
+    saveDb(); // barrinha do Desfazer: "Cartão mudou de sublista"
+    renderTimeline();
+    return true;
+}
+// Bloco → cartão da sublista (o mesmo cartão que o PC cria). Com nota vinculada, pergunta antes (como no PC).
+function blockIntoSublist(id, subId, sure) {
+    const b = db.find(x => x.id === id), s = db.find(x => x.id === subId);
+    if (!b || !isSublist(s) || id === subId) return false;
+    if (isSublist(b)) { showToast('Uma sublista não entra em outra.'); return false; }
+    if (b.theme === 'rest') { showToast('Descanso não entra numa sublista.'); return false; }
+    if (s.cards.length >= SUB_MAX) { showToast(`Uma sublista cabe até ${SUB_MAX} cartões.`); return false; }
+    const nn = (Array.isArray(b.linkedNoteIds) ? b.linkedNoteIds : []).filter(nid => notesDb.some(x => x.id === nid)).length;
+    if (nn && !sure) {
+        askGoalConfirm('Colocar na sublista?', nn === 1
+            ? 'Este bloco tem 1 nota vinculada. No cartão da sublista ela não fica vinculada (continua nas Notas).'
+            : `Este bloco tem ${nn} notas vinculadas. No cartão da sublista elas não ficam vinculadas (continuam nas Notas).`,
+            'Colocar na sublista', () => blockIntoSublist(id, subId, true), 'neutral');
+        return false;
+    }
+    const card = {
+        id: subNewId(), title: String(b.title || '').trim() || 'Sem nome', done: !!b.completed,
+        microblocks: (Array.isArray(b.microblocks) ? b.microblocks : []).filter(m => m && String(m.title || '').trim()).map(m => ({ title: String(m.title).trim(), done: !!m.done })),
+        duration: Number(b.duration) > 0 ? Math.round(Number(b.duration)) : 30
+    };
+    if (b.tagId && tagsDb.some(t => t.id === b.tagId)) card.tagId = b.tagId;
+    const col = fazCardColor(b.color);
+    if (col) card.color = col;
+    s.cards.push(card);
+    subSyncDone(s);
+    db = db.filter(x => x.id !== id);
+    saveDb(); // barrinha do Desfazer: "Bloco entrou na sublista"
+    renderTimeline();
+    return true;
+}
+
+// ---------- o gesto: segurar o cartão e arrastar ----------
+function subDragOff() { // com 2 ou 3 dias, nos filtros, na busca e com uma tarefa na mão não tem arrasto de cartão
+    return tlMulti() || showOnlyDelayed || showOnlyCompleted || !!(searchQuery && searchQuery.trim()) || !!pendingIntent;
+}
+function subDragSetup(el, b) {
+    if (!isSublist(b) || subDragOff()) return;
+    el.querySelectorAll('.sub-card[data-card-id]').forEach(row => {
+        const press = (e) => subDragPress(e, b.id, row);
+        row.addEventListener('touchstart', press, { passive: false }); // não-passivo: depois de segurar, o arrasto consegue parar a rolagem
+        row.addEventListener('mousedown', press);
+    });
+}
+function subDragTip(el, b) { // 3 vezes no aparelho, uma por sublista aberta
+    if (!isSublist(b) || !b.expanded || !b.cards.length || subDragOff() || subTipShown[b.id]) return;
+    let n = 0;
+    try { n = Number(localStorage.getItem('tb__dica_sub_arrastar')) || 0; } catch (e) {}
+    if (n >= 3) return;
+    subTipShown[b.id] = true;
+    try { localStorage.setItem('tb__dica_sub_arrastar', String(n + 1)); } catch (e) {}
+    const tip = document.createElement('div');
+    tip.className = 'sub-tip absolute top-12 left-12 right-3 z-[55] px-3 py-1.5 bg-zinc-900/90 text-white text-[10px] font-medium rounded-lg shadow-lg pointer-events-none flex items-center gap-1.5 transition-opacity duration-500';
+    tip.innerHTML = '<i class="ph ph-hand-tap text-xs"></i> Segure um cartão pra arrastar ele pra fora';
+    el.appendChild(tip);
+    setTimeout(() => { tip.style.opacity = '0'; setTimeout(() => tip.remove(), 500); }, 3500);
+}
+function subDragPress(e, bid, row) {
+    if (subDrag || isPhysicsBusy) return;
+    if (e.touches ? e.touches.length !== 1 : e.button !== 0) return;
+    if (e.target.closest('.sub-ck')) return; // o círculo continua só marcando
+    const p = e.touches ? e.touches[0] : e;
+    const pre = { x0: p.clientX, y0: p.clientY, x: p.clientX, y: p.clientY, timer: null };
+    const stop = () => {
+        clearTimeout(pre.timer);
+        document.removeEventListener('touchmove', move);
+        document.removeEventListener('touchend', stop);
+        document.removeEventListener('touchcancel', stop);
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', stop);
+    };
+    const move = (ev) => {
+        const q = ev.touches ? ev.touches[0] : ev;
+        if (!q) return;
+        pre.x = q.clientX; pre.y = q.clientY;
+        if (Math.abs(pre.x - pre.x0) > SUB_DRAG_SLOP || Math.abs(pre.y - pre.y0) > SUB_DRAG_SLOP) stop(); // está rolando a agenda
+    };
+    pre.timer = setTimeout(() => { stop(); subDragBegin(bid, row, pre.x, pre.y); }, SUB_DRAG_MS);
+    document.addEventListener('touchmove', move, { passive: true });
+    document.addEventListener('touchend', stop);
+    document.addEventListener('touchcancel', stop);
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', stop);
+}
+function subDragBegin(bid, row, x, y) {
+    const cid = row.dataset.cardId;
+    if (subDrag || !row.isConnected || !subFindCard(bid, cid) || subDragOff()) return;
+    const r = row.getBoundingClientRect();
+    const ghost = row.cloneNode(true);
+    ghost.removeAttribute('data-card-id');
+    ghost.querySelectorAll('[onclick]').forEach(n => n.removeAttribute('onclick'));
+    ghost.classList.add('sub-ghost');
+    ghost.style.width = r.width + 'px';
+    ghost.style.left = r.left + 'px';
+    ghost.style.top = r.top + 'px';
+    document.body.appendChild(ghost);
+    const land = document.createElement('div');
+    land.className = 'sub-land';
+    land.style.display = 'none';
+    container.appendChild(land);
+    row.classList.add('sub-src');
+    isPhysicsBusy = true; // o cartão aberto não fecha rolando e a pinça não troca os dias no meio
+    if (navigator.vibrate) navigator.vibrate(20);
+    subDrag = { bid: bid, cid: cid, row: row, ghost: ghost, land: land, offX: x - r.left, offY: y - r.top, x: x, y: y, edge: 0, target: null };
+    subDrag.timer = setInterval(subDragTick, 16);
+    document.addEventListener('touchmove', subDragMove, { passive: false });
+    document.addEventListener('touchend', subDragEnd);
+    document.addEventListener('touchcancel', subDragEnd);
+    document.addEventListener('mousemove', subDragMove);
+    document.addEventListener('mouseup', subDragEnd);
+    subDragTarget();
+}
+function subDragArea() { // o pedaço da agenda que aparece (abaixo do cabeçalho)
+    const sc = document.getElementById('timeline-scroll').getBoundingClientRect();
+    const hd = document.querySelector('header');
+    return { top: Math.max(sc.top, hd ? hd.getBoundingClientRect().bottom : sc.top), bottom: sc.bottom };
+}
+function subDragMove(e) {
+    const st = subDrag;
+    if (!st) return;
+    const p = e.touches ? e.touches[0] : e;
+    if (!p) return;
+    if (e.cancelable) e.preventDefault(); // a agenda não rola junto com o cartão
+    st.x = p.clientX; st.y = p.clientY;
+    st.ghost.style.left = (st.x - st.offX) + 'px';
+    st.ghost.style.top = (st.y - st.offY) + 'px';
+    const a = subDragArea(), up = a.top + 56 - st.y, down = st.y - (a.bottom - 72);
+    st.edge = up > 0 ? -Math.min(10, 2 + up / 6) : down > 0 ? Math.min(10, 2 + down / 6) : 0; // perto da borda: rola, mais rápido quanto mais perto
+    subDragTarget();
+}
+function subDragTick() {
+    const st = subDrag;
+    if (!st) return;
+    if (!st.row.isConnected) { subDragStop(); renderTimeline(); return; } // a agenda foi redesenhada no meio
+    if (!st.edge) return;
+    const sc = document.getElementById('timeline-scroll'), before = sc.scrollTop;
+    sc.scrollTop += st.edge;
+    if (sc.scrollTop !== before) subDragTarget(); // o dedo está parado, mas o que está embaixo dele mudou
+}
+// Decide o que acontece se o dedo soltar agora e mostra na tela.
+function subDragTarget() {
+    const st = subDrag;
+    if (!st) return;
+    const x = st.x, y = st.y;
+    let t = null, over = null;
+    container.querySelectorAll('.block-item.sub-block').forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) over = el;
+    });
+    container.querySelectorAll('.sub-over').forEach(el => { if (el !== over || el.dataset.blockId === st.bid) el.classList.remove('sub-over'); });
+    if (over) {
+        if (over.dataset.blockId === st.bid) t = { kind: 'self' };
+        else { t = { kind: 'sub', id: over.dataset.blockId }; over.classList.add('sub-over'); }
+    } else {
+        const a = subDragArea(), cr = container.getBoundingClientRect();
+        if (y >= a.top && y <= a.bottom) {
+            const f = subFindCard(st.bid, st.cid), dur = f ? subCardDur(f.card) : 30, lo = START_HOUR * 60, hi = END_HOUR * 60;
+            const min = Math.max(lo, Math.min(hi - 5, Math.round(tlMin(y - cr.top) / 5) * 5));
+            const gap = subFreeAround(getActiveDateStr(), min);
+            t = gap && gap.b - gap.a >= dur
+                ? { kind: 'free', ok: true, st: Math.max(gap.a, Math.min(min, gap.b - dur)), dur: dur }
+                : { kind: 'free', ok: false, st: min, dur: dur };
+        }
+    }
+    st.target = t;
+    const L = st.land;
+    if (t && t.kind === 'free') {
+        const y0 = tlY(t.st), y1 = tlY(Math.min(t.st + t.dur, END_HOUR * 60));
+        L.style.display = '';
+        L.style.top = (y0 + 1) + 'px';
+        L.style.height = Math.max(20, y1 - y0 - 2) + 'px';
+        L.classList.toggle('bad', !t.ok);
+        L.textContent = t.ok ? `${formatClock(t.st)} - ${formatClock(t.st + t.dur)}` : 'Não cabe aqui';
+    } else {
+        L.style.display = 'none';
+    }
+}
+function subDragStop() {
+    const st = subDrag;
+    if (!st) return null;
+    subDrag = null;
+    clearInterval(st.timer);
+    document.removeEventListener('touchmove', subDragMove);
+    document.removeEventListener('touchend', subDragEnd);
+    document.removeEventListener('touchcancel', subDragEnd);
+    document.removeEventListener('mousemove', subDragMove);
+    document.removeEventListener('mouseup', subDragEnd);
+    st.ghost.remove();
+    st.land.remove();
+    st.row.classList.remove('sub-src');
+    container.querySelectorAll('.sub-over').forEach(el => el.classList.remove('sub-over'));
+    subDragClickUntil = Date.now() + 400;
+    setTimeout(() => { isPhysicsBusy = false; }, 200);
+    return st;
+}
+function subDragEnd(e) {
+    if (!subDrag) return;
+    if (e && e.touches && e.touches.length) return; // ainda tem dedo na tela
+    const st = subDragStop(), t = st.target;
+    if (e && e.type === 'touchcancel') { renderTimeline(); return; } // o sistema cancelou o toque: nada muda
+    let moved = false;
+    if (t && t.kind === 'sub') moved = subCardMoveTo(st.bid, st.cid, t.id);
+    else if (t && t.kind === 'free' && t.ok) moved = subCardOut(st.bid, st.cid, getActiveDateStr(), t.st);
+    else if (t && t.kind === 'free') showToast('Conflito! O cartão ficou na sublista.');
+    if (!moved) renderTimeline();
+}
+document.addEventListener('click', (e) => {
+    if (Date.now() >= subDragClickUntil) return;
+    subDragClickUntil = 0;
+    e.stopPropagation();
+    e.preventDefault();
+}, true);
+
+// Bloco arrastado pela alça em cima de uma sublista (onde está o dedo): marca a sublista e deixa o bloco meio
+// transparente pra ela aparecer por baixo. Guarda o id dela no bloco (data-over-sub) pra hora de soltar.
+function subDropMark(el, block, x, y) {
+    let over = null;
+    container.querySelectorAll('.block-item.sub-block').forEach(s => {
+        if (s === el || s.dataset.blockId === block.id) return;
+        const r = s.getBoundingClientRect();
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) over = s;
+    });
+    const fits = !!over && !isSublist(block) && block.theme !== 'rest';
+    container.querySelectorAll('.sub-over').forEach(s => { if (s !== over || !fits) s.classList.remove('sub-over'); });
+    if (fits) over.classList.add('sub-over');
+    el.classList.toggle('into-sub', fits);
+    el.dataset.overSub = over ? over.dataset.blockId : '';
+}
+function subDropClear(el) {
+    el.classList.remove('into-sub');
+    delete el.dataset.overSub;
+    container.querySelectorAll('.sub-over').forEach(s => s.classList.remove('sub-over'));
+}
 
 // --- 5. ENCAIXE MATEMÁTICO ---
 function performEncaixeMatematico(gapStart, gapDuration, exact, date) { // V40.25.1: exact = hora escolhida pelo toque (não puxa pra "agora")
@@ -2278,29 +2613,45 @@ function enablePhysics(el, block) {
         document.addEventListener('touchmove', onDragMove, {passive: false});
         document.addEventListener('mousemove', onDragMove);
         document.addEventListener('touchend', onDragEnd);
+        document.addEventListener('touchcancel', onDragEnd); // V40.30.0: toque cancelado pelo sistema = nada muda
         document.addEventListener('mouseup', onDragEnd);
     }
-    
+
     function onDragMove(e) {
         e.preventDefault();
         const y = e.touches ? e.touches[0].clientY : e.clientY;
         // V40.24.0: com vagos ocultos a régua é por trechos (tlMin/tlY); sem eles, a conta de sempre
         let newStart = tlSegs ? tlMin(tlY(initialVal) + (y - startY)) : initialVal + Math.round(((y - startY) / PX_PER_MIN) / 5) * 5;
-        newStart = Math.round(newStart / 5) * 5; 
+        newStart = Math.round(newStart / 5) * 5;
         newStart = Math.max(START_HOUR * 60, Math.min(newStart, (END_HOUR * 60) - block.duration));
-        
+
         el.style.top = `${tlY(newStart)}px`;
         el.dataset.tempStart = newStart;
+        subDropMark(el, block, e.touches ? e.touches[0].clientX : e.clientX, y); // V40.30.0: em cima de uma sublista?
     }
 
-    function onDragEnd() {
+    function onDragEnd(e) {
         document.removeEventListener('touchmove', onDragMove);
         document.removeEventListener('mousemove', onDragMove);
         document.removeEventListener('touchend', onDragEnd);
+        document.removeEventListener('touchcancel', onDragEnd);
         document.removeEventListener('mouseup', onDragEnd);
-        
+
         if (el.classList.contains('dragging')) {
             el.classList.remove('dragging');
+            // V40.30.0: soltou em cima de uma sublista → o bloco vira cartão dela (sublista e Descanso não entram)
+            const overSub = el.dataset.overSub || null;
+            subDropClear(el);
+            if (e && e.type === 'touchcancel') {
+                renderTimeline();
+                setTimeout(() => { isPhysicsBusy = false; }, 200);
+                return;
+            }
+            if (overSub) {
+                if (!blockIntoSublist(block.id, overSub)) renderTimeline();
+                setTimeout(() => { isPhysicsBusy = false; }, 200);
+                return;
+            }
             const newStart = parseInt(el.dataset.tempStart || block.startMin);
             
             const dailyDb = db.filter(b => b.date === getActiveDateStr());
@@ -2879,7 +3230,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.29.0',
+            version: 'v40.30.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -4720,8 +5071,13 @@ window.openDeleteGoalList = function() {
 };
 
 // ---------- confirmação ----------
-function askGoalConfirm(title, text, okLabel, action) {
+// V40.30.0: tone 'neutral' = pergunta que não apaga nada (ícone e botão na cor do app em vez de vermelho); icon = ícone dela.
+function askGoalConfirm(title, text, okLabel, action, tone, icon) {
     _goalConfirmAction = action;
+    const neutral = tone === 'neutral';
+    document.getElementById('goal-confirm-modal').classList.toggle('ask-neutral', neutral);
+    const ico = document.getElementById('goal-confirm-ico');
+    if (ico) ico.className = 'ph ' + (neutral ? (icon || 'ph-list-checks') : 'ph-warning') + ' text-2xl';
     document.getElementById('goal-confirm-title').textContent = title;
     document.getElementById('goal-confirm-text').textContent = text;
     document.getElementById('goal-confirm-btn').textContent = okLabel;
@@ -6565,7 +6921,8 @@ function renderFinancialCard(item, monthStr) {
     const duration = item.durationMonths || 1;
     if (duration > 1) {
         if (item.isRecurring) {
-            typePillHtml = `<span class="inline-flex items-center justify-center w-5 h-[18px] rounded bg-app-focus-soft text-app-focus text-[10px] font-extrabold leading-none" title="Recorrente">R</span>`;
+            const recTitle = isOpenRecurring(item) ? 'Recorrente, sem fim' : 'Recorrente até ' + finMonthLong(getItemEndMonth(item)); // V40.30.0
+            typePillHtml = `<span class="inline-flex items-center justify-center w-5 h-[18px] rounded bg-app-focus-soft text-app-focus text-[10px] font-extrabold leading-none" title="${recTitle}">R</span>`;
         } else {
             const label = getInstallmentLabel(item, monthStr); // ex "3/10"
             if (label) {
@@ -6814,10 +7171,53 @@ function updateFinancialTypeButtonsUI() {
     const wrapInst = document.getElementById('fin-installments-wrapper');
     if (wrapInst) wrapInst.classList.toggle('hidden', currentFinType !== 'installment');
     
-    // Aviso pra Recorrente
+    // Aviso pra Recorrente. V40.30.0: sem fim, com "Encerrar depois de <mês>" e "Repetir sem fim de novo"
     const infoRec = document.getElementById('fin-recurring-info');
     if (infoRec) infoRec.classList.toggle('hidden', currentFinType !== 'recurring');
+    if (currentFinType === 'recurring') updateFinancialRecurringUI();
 }
+function updateFinancialRecurringUI() {
+    const txt = document.getElementById('fin-recurring-text');
+    if (!txt) return;
+    const item = currentFinId ? financialDb.find(x => x.id === currentFinId) : null;
+    const rec = item && item.isRecurring === true && (item.durationMonths || 1) > 1 ? item : null; // já é recorrente (senão vira agora, sem fim)
+    const open = !rec || isOpenRecurring(rec), end = rec && !open ? getItemEndMonth(rec) : null;
+    txt.textContent = !rec ? 'Repete todo mês, sem fim. Quando não precisar mais, abra a despesa e toque em Encerrar.'
+        : open ? `Repete todo mês, sem fim (desde ${finMonthLong(getItemStartMonth(rec))}).`
+        : `Repete todo mês até ${finMonthLong(end)}.`;
+    const canEnd = !!rec && (open || end > currentFinanceMonth);
+    const show = (id, on) => { const b = document.getElementById(id); if (b) { b.classList.toggle('hidden', !on); b.classList.toggle('inline-flex', on); } };
+    show('fin-end-btn', canEnd);
+    show('fin-reopen-btn', !!rec && !open);
+    const lbl = document.getElementById('fin-end-label');
+    if (lbl) lbl.textContent = 'Encerrar depois de ' + finMonthShort(currentFinanceMonth);
+}
+// Encerrar: a despesa fica até o mês da tela e sai dos seguintes (os meses que passaram ficam como estão).
+window.endRecurringFromForm = function() {
+    const item = currentFinId ? financialDb.find(x => x.id === currentFinId) : null;
+    if (!item || item.isRecurring !== true) return;
+    const last = currentFinanceMonth, start = getItemStartMonth(item);
+    if (!start || last < start) return;
+    askGoalConfirm(`Encerrar "${item.title}"?`,
+        `Ela fica até ${finMonthLong(last)} e sai dos meses seguintes. Os meses que já passaram continuam como estão.`,
+        'Encerrar', () => {
+            const it = financialDb.find(x => x.id === item.id);
+            if (!it) return;
+            it.durationMonths = monthsBetween(start, last) + 1;
+            it.paidMonths = (Array.isArray(it.paidMonths) ? it.paidMonths : []).filter(m => m <= last);
+            cleanupOverridesOutsideRange(it);
+            saveFinancial(); // barrinha do Desfazer: "Despesa encerrada"
+            if (it.durationMonths === 1 && currentFinId === it.id) currentFinType = 'oneshot'; // encerrou no 1º mês: ficou só nele
+            updateFinancialTypeButtonsUI();
+        }, 'neutral', 'ph-calendar-x');
+};
+window.reopenRecurringFromForm = function() {
+    const item = currentFinId ? financialDb.find(x => x.id === currentFinId) : null;
+    if (!item || item.isRecurring !== true || isOpenRecurring(item)) return;
+    item.durationMonths = REC_OPEN;
+    saveFinancial(); // "Despesa voltou a repetir"
+    updateFinancialTypeButtonsUI();
+};
 
 window.selectFinancialType = function(type) {
     currentFinType = type;
@@ -6851,7 +7251,9 @@ window.saveFinancialForm = function() {
     let durationMonths = 1;
     let isRecurring = false;
     if (currentFinType === 'recurring') {
-        durationMonths = 12;
+        // V40.30.0: sem fim (até encerrar). A que já era recorrente guarda o fim que tiver (salvar não reabre nem encerra).
+        const prev = currentFinId ? financialDb.find(x => x.id === currentFinId) : null;
+        durationMonths = prev && prev.isRecurring === true && (prev.durationMonths || 1) > 1 ? prev.durationMonths : REC_OPEN;
         isRecurring = true;
     } else if (currentFinType === 'installment') {
         const instRaw = document.getElementById('financial-installments-input').value.trim();
@@ -6947,7 +7349,8 @@ function applyFinancialItemUpdate(item, payload) {
         if (scopeForAmount === 'this') {
             setOverrideForMonth(item, currentFinanceMonth, amount);
         } else if (scopeForAmount === 'future') {
-            setOverrideThisAndFuture(item, currentFinanceMonth, amount);
+            if (item.isRecurring) setAmountFromMonthOn(item, currentFinanceMonth, amount); // V40.30.0: recorrente pode ser sem fim
+            else setOverrideThisAndFuture(item, currentFinanceMonth, amount);
         } else if (scopeForAmount === 'all') {
             setAmountAllMonths(item, amount);
         } // 'keep' (V40.19.0): o valor não mudou, os valores ficam como estão
@@ -7560,6 +7963,7 @@ function undoModLabel(k, c) {
     if ((k === 'tarefas' || k === 'rotinas') && ch('microblocks') && only('microblocks')) return undoMbLabel(b.microblocks, a.microblocks);
     if (k === 'tarefas' && ch('columnId')) return 'Tarefa movida de lista';
     if (k === 'financas' && ch('paidMonths') && only('paidMonths')) return (a.paidMonths || []).length > (b.paidMonths || []).length ? 'Despesa paga' : 'Pagamento desmarcado';
+    if (k === 'financas' && ch('durationMonths') && only('durationMonths', 'paidMonths', 'paidMonthsOverrides') && b.isRecurring === true) return (a.durationMonths || 1) < (b.durationMonths || 1) ? 'Despesa encerrada' : 'Despesa voltou a repetir'; // V40.30.0
     if ((k === 'listas' || k === 'metas_listas' || k === 'tags') && ch('name') && only('name')) return undoWord(k, 1, 'renomead');
     return undoWord(k, 1, 'editad');
 }
@@ -7591,6 +7995,15 @@ function undoLabel(keys) {
     }
     if (n('tarefas') && m('blocos')) return n('tarefas') === 1 ? 'Cartão voltou pra lista' : n('tarefas') + ' cartões voltaram pra lista';
     if (d('metas') && st.metas_dias) return undoWord('metas', d('metas'), 'apagad');
+    // V40.30.0: cartão arrastado pra fora, pra dentro ou entre sublistas
+    if (st.blocos && !st.tarefas) {
+        const B = st.blocos, subs = B.m.filter(undoIsSub);
+        const nCards = (c, side) => { try { return (JSON.parse(c[side].s).cards || []).length; } catch (e) { return 0; } };
+        const diff = (c) => nCards(c, 'a') - nCards(c, 'b');
+        if (B.n.length === 1 && !B.d.length && B.m.length === 1 && subs.length === 1 && !undoIsSub(B.n[0]) && diff(B.m[0]) < 0) return 'Cartão saiu da sublista';
+        if (B.d.length === 1 && !B.n.length && B.m.length === 1 && subs.length === 1 && !undoIsSub(B.d[0]) && diff(B.m[0]) > 0) return 'Bloco entrou na sublista';
+        if (!B.n.length && !B.d.length && B.m.length === 2 && subs.length === 2 && diff(B.m[0]) + diff(B.m[1]) === 0 && diff(B.m[0]) !== 0) return 'Cartão mudou de sublista';
+    }
     // 4) uma coisa só
     const k = ['blocos', 'tarefas', 'notas', 'rotinas', 'financas', 'metas', 'listas', 'tags', 'metas_listas', 'periodos', 'metas_dias'].find((x) => st[x]);
     if (!k) return 'Alteração';
@@ -7755,7 +8168,7 @@ if (window.fazCorruptKeys && window.fazCorruptKeys.length) {
         hint.className = 'fixed left-3 right-3 bg-zinc-900 text-white px-4 py-3 rounded-2xl shadow-2xl z-[80] flex items-start gap-3';
         hint.style.bottom = 'calc(env(safe-area-inset-bottom) + 12px)';
         hint.innerHTML = '<i class="ph ph-export text-xl shrink-0 mt-0.5"></i>' +
-            '<p class="text-[13px] leading-snug flex-1"><b>Instale o app no iPhone:</b> toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>. Instalado, ele abre em tela cheia e guarda seus dados com segurança.</p>' +
+            '<p class="text-[13px] leading-snug flex-1"><b>Instale o app no iPhone:</b> toque em <b>Compartilhar</b> (no iOS 26 ele fica nos <b>⋯</b> da barra de endereço) e depois em <b>Adicionar à Tela de Início</b>. Instalado, ele abre em tela cheia e guarda seus dados com segurança.</p>' +
             '<button aria-label="Fechar" class="shrink-0 w-8 h-8 -mr-1 flex items-center justify-center rounded-full bg-white/10"><i class="ph-bold ph-x"></i></button>';
         hint.querySelector('button').addEventListener('click', function () {
             try { localStorage.setItem('tb__ios_dica_instalar', '1'); } catch (e) {}

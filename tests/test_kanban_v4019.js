@@ -167,7 +167,7 @@ const sortApp = (a, b) => (a.due_day && b.due_day ? a.due_day - b.due_day || a.c
   click(row(d6));
   ok(visible('modal-fin') && $('fn-f-head').textContent === 'Editar despesa' && $('fn-f-title').value === F(d6).title && $('fn-f-amount').value === '295,50' && $('fn-f-due').value === '16' && d.querySelector('#fn-f-type .on').dataset.type === 'recurring' && visible('fn-f-delete'), 'abre com nome, valor DESTE mês (295,50), dia e tipo');
   ok(visible('fn-f-note') && $('fn-f-note').textContent === 'Neste mês o valor é diferente do normal (' + BRL(725.9) + ').' && $('fn-f-sub').textContent === 'O valor e o "paga" daqui são de novembro de 2026.', 'avisa que o mês tem valor próprio e de que mês são o valor e o "paga"');
-  ok($('fn-f-range').textContent === 'Todo mês por 12 meses: de nov/2026 a out/2027.', 'mostra o período da recorrente');
+  ok($('fn-f-range').textContent === 'Todo mês, de nov/2026 até out/2027.', 'mostra o período da recorrente (V40.30.0: esta, dos dados antigos, tem fim)');
   typeIn($('fn-f-title'), 'Aluguel'); key($('fn-f-title'), 'Enter');
   await waitFor(() => F(d6).title === 'Aluguel');
   ok(F(d6).title === 'Aluguel' && F(d6).amount === 725.9 && JSON.stringify(F(d6).amount_overrides) === ov6 && lastLog('update', 'financas').fields.join() === 'title', 'trocar só o nome grava só o nome: o valor normal e os valores por mês continuam iguais');
@@ -184,9 +184,9 @@ const sortApp = (a, b) => (a.due_day && b.due_day ? a.due_day - b.due_day || a.c
   ok(JSON.stringify(F(d2).amount_overrides) === '{"2026-11":{"amount":200}}' && F(d2).amount === 177.9 && lastLog('update', 'financas').fields.join() === 'amount_overrides', '"Só neste mês": valor próprio só em novembro');
   click(row(d2)); typeIn($('fn-f-amount'), '210'); click($('fn-f-save')); await waitFor(() => visible('fn-scope'));
   click(d.querySelector('[data-scope="future"]'));
-  await waitFor(() => F(d2).amount_overrides['2027-06']);
+  await waitFor(() => F(d2).amount === 210);
   const ov2 = F(d2).amount_overrides, ks = Object.keys(ov2);
-  ok(ks[0] === '2026-11' && ks[ks.length - 1] === '2027-06' && ks.length === 8 && ks.every((k) => ov2[k].amount === 210) && F(d2).amount === 177.9, '"Neste mês e nos próximos": 210 de nov/2026 até o fim (jun/2027); os meses de antes não mudam');
+  ok(F(d2).amount === 210 && ks.join() === '2026-07,2026-08,2026-09,2026-10' && ks.every((k) => ov2[k].amount === 177.9), '"Neste mês e nos próximos" (V40.30.0, recorrente): o valor normal vira 210 e os meses de antes (jul a out) guardam 177,90; o "só neste mês" de novembro sai');
   click(row(d2)); typeIn($('fn-f-amount'), '250,00'); click($('fn-f-save')); await waitFor(() => visible('fn-scope'));
   click(d.querySelector('[data-scope="all"]'));
   await waitFor(() => F(d2).amount === 250);
@@ -273,7 +273,7 @@ const sortApp = (a, b) => (a.due_day && b.due_day ? a.due_day - b.due_day || a.c
   click($('fn-empty-new')); typeIn($('fn-f-title'), 'Contador'); typeIn($('fn-f-amount'), '350'); click(d.querySelector('#fn-f-type [data-type="recurring"]')); typeIn($('fn-f-due'), '5'); click($('fn-f-save'));
   await waitFor(() => server.alive('financas', UID2).length === 1);
   const c = server.alive('financas', UID2)[0];
-  ok(c.title === 'Contador' && c.amount === 350 && c.duration_months === 12 && c.is_recurring === true && c.due_day === 5 && c.start_month === NOW, 'cria uma recorrente de 12 meses pelo computador');
+  ok(c.title === 'Contador' && c.amount === 350 && c.duration_months === 1200 && c.is_recurring === true && c.due_day === 5 && c.start_month === NOW, 'cria uma recorrente sem fim pelo computador (V40.30.0: 1200 meses)');
   ok(!visible('fn-empty') && !!row(c.id) && row(c.id).classList.contains('late') && cells(c.id)[2] === 'Recorrente', 'aparece na hora (dia 5 já passou: atrasada)');
   ok(errors.length === 0, 'nenhum erro de página' + (errors.length ? ': ' + errors[0].slice(0, 300) : ''));
 

@@ -525,6 +525,11 @@
                     <span class="text-[12px] text-zinc-500">(2 a 60)</span>
                 </div>
                 <p id="fn-f-range" class="mt-2 text-[12px] text-zinc-500"></p>
+                <!-- V40.30.0: recorrente sem fim: encerrar depois do mês da tela, ou voltar a repetir sem fim -->
+                <div id="fn-f-rec" class="hidden mt-2 flex-wrap gap-2">
+                    <button type="button" id="fn-f-end" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-[12.5px] font-semibold text-zinc-700 hover:bg-zinc-50"><i class="ph ph-calendar-x text-sm"></i><span id="fn-f-end-label">Encerrar</span></button>
+                    <button type="button" id="fn-f-reopen" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-[12.5px] font-semibold text-zinc-700 hover:bg-zinc-50"><i class="ph ph-repeat text-sm"></i>Repetir sem fim de novo</button>
+                </div>
             </div>
             <button type="button" id="fn-f-paid" aria-pressed="false" class="mt-4 w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-left">
                 <span class="fn-check shrink-0"><i class="ph-bold ph-check"></i></span>
@@ -851,7 +856,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.29.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.30.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -3234,6 +3239,10 @@
     function monthLong(m) { var p = String(m).split('-'); return MONTHS[Number(p[1]) - 1] + ' de ' + p[0]; }                                       // "novembro de 2026"
     function monthShort(m) { var p = String(m).split('-'); return MONTHS[Number(p[1]) - 1].slice(0, 3) + '/' + p[0]; }                            // "nov/2026"
     function fnDur(r) { var n = Math.round(Number(r.duration_months) || 1); return n >= 1 ? n : 1; }
+    // V40.30.0: Recorrente sem fim (até encerrar), igual ao app: "sem fim" = 1200 meses (o máximo que a nuvem aceita).
+    var REC_OPEN = 1200;
+    function fnOpen(r) { return !!r && !!r.is_recurring && fnDur(r) >= REC_OPEN; }
+    function fnRec(r) { return !!r && !!r.is_recurring && fnDur(r) > 1; } // já é recorrente
     function fnEnd(r) { return monthAdd(r.start_month, fnDur(r) - 1); }
     function fnIn(r, m) { if (!isMonth(r.start_month)) return false; return fnDur(r) === 1 ? r.start_month === m : m >= r.start_month && m <= fnEnd(r); }
     function fnPaid(r, m) { return Array.isArray(r.paid_months) && r.paid_months.indexOf(m) >= 0; }
@@ -3286,7 +3295,7 @@
             '<button type="button" class="fn-check' + (paid ? ' on' : '') + '" data-fn-pay="' + esc(r.id) + '" aria-pressed="' + (paid ? 'true' : 'false') + '" title="' + (paid ? 'Paga. Clique pra voltar pra "a pagar"' : 'Marcar como paga') + '" aria-label="Paga em ' + monthLong(m) + '"><i class="ph-bold ph-check"></i></button>' +
             '<div class="min-w-0"><p class="text-[14px] font-semibold truncate ' + (paid ? 'text-zinc-500' : 'text-zinc-800') + '" title="' + esc(r.title) + '">' + (esc(r.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
             (tag ? '<p class="mt-0.5 flex items-center gap-1.5 text-[11.5px] text-zinc-500"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</p>' : '') + '</div>' +
-            '<span class="text-[12.5px] text-zinc-600"' + (t !== 'oneshot' ? ' title="De ' + monthShort(r.start_month) + ' a ' + monthShort(fnEnd(r)) + '"' : '') + '>' + fnTypeLabel(r, m) + '</span>' +
+            '<span class="text-[12.5px] text-zinc-600"' + (t !== 'oneshot' ? ' title="' + (fnOpen(r) ? 'Desde ' + monthShort(r.start_month) + ', sem fim' : 'De ' + monthShort(r.start_month) + ' a ' + monthShort(fnEnd(r))) + '"' : '') + '>' + fnTypeLabel(r, m) + '</span>' +
             '<span class="text-[12.5px] ' + (late ? 'font-semibold text-red-600' : 'text-zinc-600') + '">' + (r.due_day ? (late ? 'Venceu dia ' : 'Dia ') + r.due_day : '<span class="text-zinc-300">—</span>') + '</span>' +
             '<div class="text-right"><span class="text-[14px] font-semibold tabular-nums ' + (paid ? 'line-through text-zinc-400' : late ? 'text-red-600' : 'text-zinc-900') + '">' + brl(fnAmount(r, m)) + '</span>' +
             (special ? '<span class="block text-[11px] text-zinc-400" title="O valor normal é ' + brl(r.amount) + '">valor deste mês</span>' : '') + '</div>' +
@@ -3328,7 +3337,7 @@
     function fnMove(n) { S.fnMonth = n === 0 ? monthNow() : monthAdd(S.fnMonth || monthNow(), n); renderFinancas(); }
     function fnFormDur() {
         var t = S.fnEdit.type;
-        if (t === 'recurring') return 12; // igual ao app: recorrente vale 12 meses
+        if (t === 'recurring') { var cur = S.fnEdit.id ? S.financas[S.fnEdit.id] : null; return fnRec(cur) ? fnDur(cur) : REC_OPEN; } // V40.30.0: sem fim; a que já é guarda o fim dela
         if (t !== 'installment') return 1;
         var v = $('fn-f-inst').value.trim(), n = parseInt(v, 10);
         return /^\d{1,2}$/.test(v) && n >= 2 && n <= 60 ? n : null;
@@ -3344,7 +3353,40 @@
         var ed = S.fnEdit, d = fnFormDur(), st = ed.start;
         $('fn-f-range').textContent = ed.type === 'oneshot' ? 'Só em ' + monthLong(st) + '.'
             : !d ? 'As parcelas vão de 2 a 60.'
-            : (ed.type === 'recurring' ? 'Todo mês por 12 meses' : d + ' parcelas') + ': de ' + monthShort(st) + ' a ' + monthShort(monthAdd(st, d - 1)) + '.';
+            : ed.type === 'recurring' ? (d >= REC_OPEN ? 'Todo mês, sem fim, a partir de ' + monthShort(st) + '.' + (ed.id && fnRec(S.financas[ed.id]) ? '' : ' Pra parar depois, abra a despesa e use Encerrar.') : 'Todo mês, de ' + monthShort(st) + ' até ' + monthShort(monthAdd(st, d - 1)) + '.')
+            : d + ' parcelas: de ' + monthShort(st) + ' a ' + monthShort(monthAdd(st, d - 1)) + '.';
+        fnRecUi();
+    }
+    function fnRecUi() { // V40.30.0: botões Encerrar / Repetir sem fim de novo (só numa recorrente que já existe)
+        var ed = S.fnEdit, r = ed && ed.id ? S.financas[ed.id] : null, box = $('fn-f-rec'), m = S.fnMonth || monthNow();
+        var on = !!ed && ed.type === 'recurring' && fnRec(r) && !r.deleted, canEnd = on && (fnOpen(r) || fnEnd(r) > m), canReopen = on && !fnOpen(r);
+        box.classList.toggle('hidden', !(canEnd || canReopen));
+        box.classList.toggle('flex', canEnd || canReopen);
+        $('fn-f-end').classList.toggle('hidden', !canEnd);
+        $('fn-f-reopen').classList.toggle('hidden', !canReopen);
+        $('fn-f-end-label').textContent = 'Encerrar depois de ' + (m.slice(0, 4) === monthNow().slice(0, 4) ? MONTHS[Number(m.slice(5)) - 1] : monthLong(m));
+    }
+    // Encerrar: fica até o mês da tela e sai dos seguintes (os que já passaram ficam como estão). Igual ao app.
+    async function endFin() {
+        var ed = S.fnEdit, r = ed && ed.id ? S.financas[ed.id] : null, m = S.fnMonth || monthNow();
+        if (!fnRec(r) || r.deleted || m < r.start_month) return;
+        var yes = await dialog({ title: 'Encerrar "' + (r.title || 'Sem nome') + '"?', text: 'Ela fica até ' + monthLong(m) + ' e sai dos meses seguintes. Os meses que já passaram continuam como estão.', okLabel: 'Encerrar' });
+        r = S.financas[r.id];
+        if (!yes || !r || r.deleted || S.fnEdit !== ed) return;
+        var p0 = r.start_month.split('-').map(Number), p1 = m.split('-').map(Number), dur = (p1[0] - p0[0]) * 12 + (p1[1] - p0[1]) + 1;
+        var fields = { duration_months: dur }, paidM = (Array.isArray(r.paid_months) ? r.paid_months : []).filter(function (x) { return x <= m; }), ovr = fnOverrides(r), cut = false;
+        if (paidM.length !== (r.paid_months || []).length) fields.paid_months = paidM;
+        Object.keys(ovr).forEach(function (k) { if (k > m) { delete ovr[k]; cut = true; } });
+        if (cut) fields.amount_overrides = ovr;
+        if (dur === 1) ed.type = 'oneshot'; // encerrou no 1º mês: ficou só nele
+        var ok = await patchRow('financas', r.id, fields, 'Despesa encerrada: fica até ' + monthLong(m));
+        if (ok && S.fnEdit === ed) fnTypeUi();
+    }
+    async function reopenFin() {
+        var ed = S.fnEdit, r = ed && ed.id ? S.financas[ed.id] : null;
+        if (!fnRec(r) || r.deleted || fnOpen(r)) return;
+        var ok = await patchRow('financas', r.id, { duration_months: REC_OPEN }, 'Despesa voltou a repetir, sem fim');
+        if (ok && S.fnEdit === ed) fnTypeUi();
     }
     function fnPaidUi() {
         var on = !!S.fnEdit.paid;
@@ -3441,6 +3483,11 @@
                 if (!scope) return $('fn-f-amount').focus(); // desistiu: a janela continua aberta
             }
             if (scope === 'this') ovr[m] = { amount: amount };
+            else if (scope === 'future' && rec) { // V40.30.0: recorrente (pode ser sem fim): o valor normal vira o novo e os meses de antes guardam o deles
+                for (var c0 = start, g0 = 0; c0 < m && g0 < REC_OPEN; c0 = monthAdd(c0, 1), g0++) if (!ovr[c0]) ovr[c0] = { amount: base };
+                Object.keys(ovr).forEach(function (k) { if (k >= m) delete ovr[k]; });
+                base = amount;
+            }
             else if (scope === 'future') { for (var c = m, g = 0; c <= end && g < 1200; c = monthAdd(c, 1), g++) ovr[c] = { amount: amount }; }
             else { base = amount; ovr = {}; }
         } // valor igual: nada muda nos valores (o app regravava o valor de todos os meses; corrigido nos dois na V40.19.0)
@@ -3472,7 +3519,7 @@
         var r = S.financas[id];
         if (!r || r.deleted) return;
         var multi = fnType(r) !== 'oneshot';
-        var yes = await dialog({ title: 'Apagar a despesa "' + (r.title || 'Sem nome') + '"?', text: (multi ? 'Ela sai de todos os meses (de ' + monthShort(r.start_month) + ' a ' + monthShort(fnEnd(r)) + '), ' : 'Ela sai ') + 'aqui e no celular.', okLabel: 'Apagar despesa', danger: true });
+        var yes = await dialog({ title: 'Apagar a despesa "' + (r.title || 'Sem nome') + '"?', text: (multi ? 'Ela sai de todos os meses (' + (fnOpen(r) ? 'desde ' + monthShort(r.start_month) : 'de ' + monthShort(r.start_month) + ' a ' + monthShort(fnEnd(r))) + '), ' : 'Ela sai ') + 'aqui e no celular.', okLabel: 'Apagar despesa', danger: true });
         if (!yes || !S.financas[id] || S.financas[id].deleted) return;
         if (S.fnEdit && S.fnEdit.id === id) closeFin();
         patchRow('financas', id, { deleted: true }, 'Despesa apagada');
@@ -4896,6 +4943,8 @@
         $('fn-f-save').addEventListener('click', function () { saveFin(); });
         $('fn-f-cancel').addEventListener('click', closeFin);
         $('fn-f-delete').addEventListener('click', function () { if (S.fnEdit && S.fnEdit.id) deleteFin(S.fnEdit.id); });
+        $('fn-f-end').addEventListener('click', endFin); // V40.30.0
+        $('fn-f-reopen').addEventListener('click', reopenFin);
         $('modal-fin').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeFin(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         // V40.21.0: Metas
         $('mt-new').addEventListener('click', function () { openGoal(null); });

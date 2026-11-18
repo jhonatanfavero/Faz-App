@@ -402,6 +402,21 @@ body { overflow-x: hidden; max-width: 100vw; }
 .sub-drop { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 8px; border-radius: 10px; border: 1.5px dashed #b45309; background: #fde68a; color: #78350f; font-size: 12px; font-weight: 800; }
 #sub-card-del.sub-armed { background: #ef4444; color: #fff; }
 
+/* V40.30.0 — cartão da sublista arrastando no celular */
+.sub-card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.sub-card.sub-src { opacity: 0.3; }
+.sub-ghost { position: fixed !important; z-index: 90; margin: 0 !important; pointer-events: none; background: #fffdf5; box-shadow: 0 0 0 1px rgba(217, 119, 6, 0.5), 0 14px 28px -8px rgba(0, 0, 0, 0.35); transform: scale(1.04); }
+/* o horário fica embaixo, à direita: em cima e à esquerda está o cartão que acompanha o dedo */
+.sub-land { position: absolute; left: 4px; right: 4px; z-index: 45; pointer-events: none; display: flex; align-items: flex-end; justify-content: flex-end; padding: 0 12px 4px 44px; border: 2px dashed var(--theme-color, #4f46e5); border-radius: 16px; background: rgba(255, 255, 255, 0.94); color: var(--theme-color, #4f46e5); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; overflow: hidden; white-space: nowrap; }
+.sub-land.bad { border-color: #ef4444; background: rgba(254, 226, 226, 0.94); color: #b91c1c; }
+/* soltar aqui: sublista debaixo do dedo (com um cartão ou um bloco na mão) */
+.sub-block.sub-over { outline: 3px dashed #d97706; outline-offset: -2px; }
+.sub-block.sub-over::after { content: 'Soltar aqui'; position: absolute; right: 10px; bottom: 6px; z-index: 60; padding: 3px 10px; border-radius: 9999px; background: #d97706; color: #fff; font-size: 11px; font-weight: 800; white-space: nowrap; pointer-events: none; box-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.4); }
+.block-item.dragging.into-sub { opacity: 0.35 !important; transform: scale(0.92) !important; }
+/* pergunta que não apaga nada (ex.: "Colocar na sublista?"): ícone e botão na cor do app */
+#goal-confirm-modal.ask-neutral .ask-badge { background: #fffbeb !important; color: #d97706 !important; }
+#goal-confirm-modal.ask-neutral #goal-confirm-btn { background: var(--theme-color, #4f46e5) !important; }
+
 /* V40.24.0 — OCULTAR VAGOS no celular: o vago de 30 min ou mais vira uma faixa (36 px) com o horário */
 .tl-gap { padding: 0 8px !important; }
 .tl-gap-txt { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; font-weight: 700; color: #71717a; }

@@ -497,5 +497,96 @@ const { abrir } = require('./apoio');
   ok((await ver()).dias === 1, 'abrir os dedos em 2 dias: volta pra 1 dia');
   await m.evaluate(() => setTlDays(1)); await m.waitForTimeout(200);
   }
+
+  {
+  console.log('\nM) Sublista arrastando no celular, com o dedo de verdade (V40.30.0):');
+  await m.setViewportSize({ width: 390, height: 844 });
+  const DIA = '2030-07-10';
+  await m.evaluate((DIA) => {
+    closeAllSheets(); if (pendingIntent) cancelPendingTask(); setTlDays(1); if (tlCompact) toggleTlCompact();
+    const b = (id, st, dur, title, extra) => Object.assign({ id, date: DIA, startMin: st, duration: dur, title, type: 'focus', theme: 'focus', tagId: null, microblocks: [], completed: false, linkedNoteIds: [] }, extra || {});
+    db = db.filter((x) => x.date !== DIA).concat([
+      b('f_m_s1', 480, 45, 'Rápidas', { cards: [
+        { id: 'cd_m1', title: 'Pagar boleto', done: false, microblocks: [], duration: 25 },
+        { id: 'cd_m2', title: 'Ligar pro cartório', done: false, microblocks: [] },
+        { id: 'cd_m3', title: 'Responder o Anderson', done: false, microblocks: [] }] }),
+      b('f_m_n', 570, 30, 'Reunião'),
+      b('f_m_s2', 600, 30, 'Casa', { cards: [] }),
+      b('f_m_x', 630, 30, 'Comprar pão', { microblocks: [{ id: 'mb_m1', title: 'Padaria', done: false }] }),
+    ]);
+    saveDb(); activeDateObj = new Date(2030, 6, 10); renderTimeline();
+    const sc = document.getElementById('timeline-scroll'), cr = document.getElementById('blocks-container').getBoundingClientRect();
+    sc.scrollTop += cr.top + tlY(450) - 184; // 07:30 logo abaixo do topo
+  }, DIA);
+  await m.waitForTimeout(350);
+  const yDe = (min) => m.evaluate((min) => document.getElementById('blocks-container').getBoundingClientRect().top + tlY(min) + 2, min);
+  const rowPt = (bid, i) => m.evaluate(([bid, i]) => { const r = document.querySelectorAll(`#blocks-container .block-item[data-block-id="${bid}"] .sub-card`)[i].querySelector('.sub-card-title').getBoundingClientRect(); return { x: r.left + Math.min(60, r.width / 2), y: r.top + r.height / 2 }; }, [bid, i]);
+  const sel = (id) => `#blocks-container .block-item[data-block-id="${id}"]`;
+  const getB = (id) => m.evaluate((id) => db.find((b) => b.id === id) || null, id);
+  const scrollTop = () => m.evaluate(() => document.getElementById('timeline-scroll').scrollTop);
+  // 1) cartão → horário livre
+  let p0 = await rowPt('f_m_s1', 0);
+  const sc0 = await scrollTop();
+  await press(p0);
+  await glide(p0, { x: p0.x, y: await yDe(545) }, 10); await m.waitForTimeout(120);
+  const durante = await m.evaluate(() => { const l = document.querySelector('#blocks-container .sub-land'), g = document.querySelector('.sub-ghost'); return { land: l ? l.textContent : null, vis: !!l && l.style.display !== 'none', ghost: !!g, src: !!document.querySelector('.sub-card.sub-src') }; });
+  ok(durante.ghost && durante.src && durante.vis && durante.land === '09:05 - 09:30', `segurar o cartão e arrastar: ele sai acompanhando o dedo e o contorno mostra "${durante.land}"`);
+  ok(Math.abs((await scrollTop()) - sc0) < 2, 'a agenda não rola junto com o dedo');
+  await foto(m, 'cel-sublista-arrastando.png');
+  await drop();
+  const nb = await m.evaluate((DIA) => db.find((b) => b.date === DIA && b.title === 'Pagar boleto') || null, DIA);
+  ok(nb && nb.startMin === 545 && nb.duration === 25 && (await getB('f_m_s1')).cards.length === 2, 'soltou: virou bloco às 09:05 (25 min) e saiu da sublista');
+  ok(await m.evaluate(() => !document.querySelector('.sub-ghost') && !document.querySelector('.sub-land') && subDrag === null && document.getElementById('sub-card-modal').classList.contains('hidden')), 'a cópia e o contorno somem, e soltar não abre o cartão');
+  await m.waitForTimeout(450);
+  // 2) cartão → outra sublista
+  p0 = await rowPt('f_m_s1', 0);
+  await press(p0);
+  const casa = await rect(sel('f_m_s2'));
+  await glide(p0, { x: p0.x, y: casa.y }, 10); await m.waitForTimeout(100);
+  ok(await m.evaluate(() => document.querySelector('#blocks-container .block-item[data-block-id="f_m_s2"]').classList.contains('sub-over')), 'em cima da sublista Casa ela fica marcada ("Soltar aqui")');
+  await foto(m, 'cel-sublista-soltar-aqui.png');
+  await drop();
+  ok(JSON.stringify((await getB('f_m_s2')).cards.map((c) => c.id)) === '["cd_m2"]' && (await getB('f_m_s1')).cards.length === 1, 'soltou: o cartão mudou pra sublista Casa');
+  await m.waitForTimeout(450);
+  // 3) bloco pela alça → sublista
+  await m.evaluate(() => undoBarHide()); await m.waitForTimeout(250); // a barrinha do Desfazer fica por cima do bloco de baixo
+  const hx = await rect(`${sel('f_m_x')} .drag-handle`);
+  const de = { x: hx.x, y: hx.top + 12 };
+  await touch('touchStart', de); await m.waitForTimeout(60);
+  await glide(de, { x: de.x, y: casa.y }, 8); await m.waitForTimeout(100);
+  const marca = await m.evaluate(() => ({ sub: document.querySelector('#blocks-container .block-item[data-block-id="f_m_s2"]').classList.contains('sub-over'), bloco: document.querySelector('#blocks-container .block-item[data-block-id="f_m_x"]').classList.contains('into-sub') }));
+  ok(marca.sub && marca.bloco, 'bloco arrastado pela alça em cima da sublista: ela fica marcada e o bloco meio transparente');
+  await foto(m, 'cel-bloco-pra-sublista.png');
+  await drop();
+  const casa2 = await getB('f_m_s2');
+  ok(!(await getB('f_m_x')) && casa2.cards.length === 2 && casa2.cards[1].title === 'Comprar pão' && casa2.cards[1].duration === 30 && casa2.cards[1].microblocks[0].title === 'Padaria', 'soltou: o bloco virou cartão da Casa (com o tempo e a checklist)');
+  await m.waitForTimeout(450);
+  // 4) segurar e soltar sem mexer: nada muda; 5) toque simples abre
+  p0 = await rowPt('f_m_s1', 0);
+  await press(p0); await drop();
+  ok((await getB('f_m_s1')).cards.length === 1 && await m.evaluate(() => document.getElementById('sub-card-modal').classList.contains('hidden') && !document.querySelector('.sub-ghost')), 'segurar e soltar sem mexer: nada muda e o cartão não abre');
+  await m.waitForTimeout(450);
+  await m.touchscreen.tap(p0.x, p0.y); await m.waitForTimeout(350);
+  ok(await m.evaluate(() => !document.getElementById('sub-card-modal').classList.contains('hidden')), 'toque simples no nome continua abrindo o cartão');
+  await m.evaluate(() => closeSubCard()); await m.waitForTimeout(250);
+  // 6) arrastar rápido em cima do cartão = rolar a agenda
+  const s1 = await scrollTop();
+  await touch('touchStart', p0);
+  for (let i = 1; i <= 6; i++) { await touch('touchMove', { x: p0.x, y: p0.y - i * 30 }); await m.waitForTimeout(16); }
+  await touch('touchEnd'); await m.waitForTimeout(500);
+  ok((await scrollTop()) > s1 + 40 && await m.evaluate(() => subDrag === null && !document.querySelector('.sub-ghost')), `deslizar o dedo rápido em cima de um cartão rola a agenda (${Math.round(s1)} → ${Math.round(await scrollTop())} px), sem arrastar`);
+  await m.evaluate(() => { const sc = document.getElementById('timeline-scroll'), cr = document.getElementById('blocks-container').getBoundingClientRect(); sc.scrollTop += cr.top + tlY(450) - 184; });
+  await m.waitForTimeout(300);
+  // 7) perto do fim da tela a agenda rola sozinha; toque cancelado não muda nada
+  p0 = await rowPt('f_m_s1', 0);
+  const s2 = await scrollTop();
+  await press(p0);
+  await glide(p0, { x: p0.x, y: 830 }, 10); await m.waitForTimeout(700);
+  const rolou = (await scrollTop()) - s2;
+  ok(rolou > 60, `cartão perto do fim da tela: a agenda rola sozinha (${Math.round(rolou)} px)`);
+  await drop('touchCancel');
+  ok((await getB('f_m_s1')).cards.length === 1 && await m.evaluate(() => subDrag === null && !document.querySelector('.sub-ghost')), 'toque cancelado pelo sistema: nada muda');
+  await m.evaluate((DIA) => { db = db.filter((b) => b.date !== DIA); saveDb(); activeDateObj = new Date(); renderTimeline(); }, DIA);
+  }
   await fim(errs.length ? '\nERROS DE PÁGINA: ' + errs.slice(0, 3).join(' | ') : '');
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

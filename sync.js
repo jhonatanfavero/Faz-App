@@ -899,6 +899,7 @@
         try {
             if (typeof _dragState !== 'undefined' && _dragState) return true;
             if (typeof mbDragActive !== 'undefined' && mbDragActive) return true;
+            if (typeof subDrag !== 'undefined' && subDrag) return true; // V40.30.0: arrastando um cartão da sublista
             if (typeof pendingIntent !== 'undefined' && pendingIntent) return true;
             if (typeof _moveCardPendingId !== 'undefined' && _moveCardPendingId) return true;
             var form = $('backlog-form-view');

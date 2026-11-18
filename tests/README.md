@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 27 suítes (cerca de 2 minutos)
+npm test        # confere o CSS pronto e roda as 29 suítes (cerca de 2 minutos)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -39,6 +39,8 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_voltar.js` | `index.html` + `app.js` + `sync.js` de verdade, com um CloseWatcher de mentira | V40.27.0: botão voltar do celular: toda janelinha e tela têm o botão que ele toca (`data-voltar`), aviso antes de sair na agenda (o 2º voltar sai; depois de 3 s ou de um toque volta a perguntar), formulários e sub-telas voltam pra tela de trás, Config volta pro +, janelinhas pelo próprio Cancelar (a de cima primeiro), sem fundo fosco, toque no fundo escuro, tarefa na mão, busca, menu do zoom, volta pros dias lado a lado, Esc no computador, Android sem CloseWatcher pelo histórico |
 | `test_kanban_v4028.js` | `kanban.html` de verdade, relógio na terça 17/11 às 14:56 | V40.28.0: na Semana, puxar a borda de baixo muda a duração (diminuir, aumentar até o próximo, mínimo 5 min, Esc, o clique depois de soltar, Ctrl+Z, não vira arraste pra outro dia, sublista, sem alça com tarefa na mão) e arrastar no próprio dia mostra também os espaços de antes de agora, entre os cartões; Duplicar nos 3 pontinhos; cartão sai da sublista arrastando (vira bloco), muda de sublista, e bloco entra nela (vira cartão) |
 | `test_kanban_v4029.js` | `kanban.html` e o app do celular de verdade, mesmo relógio (domingo 15/11, 21:00) | V40.29.0: Relatórios no PC (Hoje, 7 e 30 dias) com os mesmos números do "Produtividade" do celular, visão Dia usa o dia aberto, arquivado não conta, tag apagada vira "Excluída", filtros não mudam, atualiza com a nuvem, Esc/Fechar/fundo, texto escapado; Semana sempre de segunda a domingo |
+| `test_sublista_arrastar.js` | `index.html` + `app.js` + `sync.js` de verdade, com uma "tela" de mentira pras posições | V40.30.0: no celular o cartão da sublista vira bloco num horário livre (tempo, tag, cor, checklist, feito; conflito; passado), muda de sublista, e o bloco entra na sublista (com a pergunta das notas vinculadas; Descanso e sublista não entram); um passo do Desfazer cada; o gesto (segurar 400 ms, rolar não arrasta, contorno do lugar, "Não cabe aqui", toque cancelado, o clique que sobra); a nuvem nos dois sentidos |
+| `test_recorrente.js` | o app do celular e `kanban.html` de verdade, a mesma nuvem | V40.30.0: Recorrente sem fim (1200 meses): criar, editar sem mexer no fim, "neste e nos próximos" sem escrever 1200 meses, Encerrar depois do mês da tela, Repetir sem fim de novo, encerrar no 1º mês (vira avulsa), as antigas de 12 meses, Desfazer, a nuvem e o PC com as mesmas regras |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)
@@ -65,7 +67,7 @@ Para isso existem quatro testes que abrem um Chrome de verdade:
 
 ```
 npm i -D playwright && npx playwright install chromium    # uma vez
-node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo; sublista e vagos ocultos; desfazer; dois toques; agenda afastada com pinça de verdade
+node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo; sublista e vagos ocultos; desfazer; dois toques; agenda afastada com pinça de verdade; cartão da sublista e bloco arrastando com o dedo
 node tests/navegador/offline.js         # o app abre completo sem internet?
 node tests/navegador/tela_pc.js         # tela do PC com mouse: arrastar e esticar blocos (Dia e Semana), 3 pontinhos, campo de arquivar, zoom, tags, sublista
 node tests/navegador/voltar.js          # celular: botão voltar (CloseWatcher de verdade; o Esc faz o papel do voltar) e, sem CloseWatcher, pelo histórico

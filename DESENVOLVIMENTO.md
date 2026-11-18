@@ -38,7 +38,8 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
    aparelho (`tb_*` ou `tb__sync`)? A versão nova tem que abrir o formato antigo sem perguntar nada e
    sem reenviar tudo para a nuvem. `tests/test_atualizacao.js` é o modelo.
 8. **`npm test` verde antes de publicar.** Mexeu em arrasto, rolagem, `sw.js` ou `libs/`? Rode também
-   os testes de navegador.
+   os testes de navegador. Tela, janelinha ou botão novo no celular: rode o `tests/navegador/iphone.js`
+   (V40.32.2: iPhone simulado, com a barra de status e o risco de início por cima do app).
 9. **Toda gravação passa pelo caminho que o Desfazer enxerga (V40.25.0).** No celular, grave dado só
    pelos `save*()` da chave (`saveDb`, `saveBacklog`...), nunca com `localStorage.setItem('tb_...')`
    direto: cada save chama `undoTouch()`, que guarda o que mudou. O que o app cria sozinho, sem o

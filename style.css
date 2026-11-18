@@ -31,8 +31,11 @@ body { touch-action: pan-y; background-color: #e2e8f0; overscroll-behavior-x: no
    No iPhone instalado a barra de status (relógio, bateria) fica POR CIMA do app (black-translucent +
    viewport-fit=cover) e o X de fechar ficava atrás da bateria, sem dar pra tocar. Sem área segura (Android,
    PC) continua 1.5rem, o p-6 de sempre. --faz-safe-top existe pro teste de navegador simular o iPhone. */
-:root { --faz-safe-top: env(safe-area-inset-top, 0px); }
+:root { --faz-safe-top: env(safe-area-inset-top, 0px); --faz-safe-bottom: env(safe-area-inset-bottom, 0px); }
 [id$="-sheet"] { padding-top: max(1.5rem, calc(var(--faz-safe-top) + 0.75rem)) !important; }
+/* V40.32.2: o campo do Assistente fica no pé da tela: no iPhone ele encostava no risco de início (a barrinha de baixo).
+   Sobe o que faltar; sem área segura embaixo (Android, PC) fica igual. */
+#assistant-form { margin-bottom: max(0px, calc(var(--faz-safe-bottom) - 0.75rem)); }
 
 /* Retraído INTACTO: padding-bottom 4px conforme fix5. */
 header.header-collapsed {

@@ -707,9 +707,23 @@ function runRealTimeEngine() {
     if (mDays.length) dateStr = tlRangeLabel(mDays);
     const hasToday = isToday || mDays.includes(getTodayStr());
     
-    document.getElementById('header-date').innerHTML = 
-        (hasToday ? `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span> ` : `<i class="ph ph-calendar text-zinc-400 text-lg"></i> `) +
-        `<span class="font-bold text-zinc-800">${dateStr}</span>`;
+    const hd = document.getElementById('header-date');
+    const putDate = (t) => {
+        hd.innerHTML = (hasToday ? `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span> ` : `<i class="ph ph-calendar text-zinc-400 text-lg"></i> `) +
+            `<span class="font-bold text-zinc-800">${t}</span>`;
+    };
+    putDate(dateStr);
+    // V40.32.2: em tela estreita (iPhone 13/mini, 375–390 px, com os 6 botões do lado) o nome do dia ficava cortado
+    // ("Quarta, 18 r"). Não coube? Vai encurtando: "Qua, 18 nov" → "Qua, 18" → "18".
+    if (!mDays.length && hd.scrollWidth > hd.clientWidth + 1) {
+        const wk = activeDateObj.toLocaleDateString('pt-BR', { weekday: 'short' }).replace(/\./g, '');
+        const Wk = wk.charAt(0).toUpperCase() + wk.slice(1), d = activeDateObj.getDate();
+        const mo = activeDateObj.toLocaleDateString('pt-BR', { month: 'short' }).replace(/\./g, '');
+        for (const t of [`${Wk}, ${d} ${mo}`, `${Wk}, ${d}`, String(d)]) {
+            putDate(t);
+            if (hd.scrollWidth <= hd.clientWidth + 1) break;
+        }
+    }
 
     const nowLine = document.getElementById('now-line');
     const nowMini = document.querySelector('#blocks-container .tl-now-mini');
@@ -3444,7 +3458,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.32.1',
+            version: 'v40.32.2',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

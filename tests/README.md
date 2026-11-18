@@ -71,6 +71,7 @@ Para isso existem quatro testes que abrem um Chrome de verdade:
 npm i -D playwright && npx playwright install chromium    # uma vez
 node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo; sublista e vagos ocultos; desfazer; dois toques; agenda afastada com pinça de verdade; cartão da sublista e bloco arrastando com o dedo; bloco de um dia pro outro com os dias lado a lado; o topo das telas e os Períodos no iPhone (área segura simulada)
 node tests/navegador/offline.js         # o app abre completo sem internet?
+node tests/navegador/iphone.js          # iPhone 13 e 13 mini simulados (barra de status e risco de início): percorre as telas e acha botão escondido, coberto ou vazando
 node tests/navegador/tela_pc.js         # tela do PC com mouse: arrastar e esticar blocos (Dia e Semana), 3 pontinhos, campo de arquivar, zoom, tags, sublista; Configurações (cor e horário) e o topo de 1024 a 1440 px
 node tests/navegador/voltar.js          # celular: botão voltar (CloseWatcher de verdade; o Esc faz o papel do voltar) e, sem CloseWatcher, pelo histórico
 ```

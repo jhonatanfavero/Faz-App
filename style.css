@@ -485,6 +485,16 @@ body { overflow-x: hidden; max-width: 100vw; }
 .tl-dh { min-width: 0; margin: 0 2px; padding: 4px 0; border-radius: 8px; font-size: 12px; font-weight: 800; color: #3f3f46; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tl-dh:active { background: rgba(0, 0, 0, 0.06); }
 .tl-dh.today { background: var(--theme-color, #4f46e5); color: #fff; }
+/* V40.31.0 — bloco arrastado entre os dias lado a lado: ele vai com o dedo (encaixado), o lugar de onde saiu fica
+   tracejado e um balão em cima do dedo diz o dia e a hora. Vermelho = não cabe; em cima de uma sublista, ela acende. */
+.tl-mini.tl-dragging { z-index: 40; transform: scale(1.04); box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.45); filter: none; }
+.tl-mini.tl-dragging.bad { box-shadow: 0 0 0 2px #ef4444, 0 12px 24px -8px rgba(0, 0, 0, 0.45); opacity: 0.85; }
+.tl-mini.tl-dragging.into-sub { opacity: 0.35; transform: scale(0.92); }
+.tl-mini.sub-over { outline: 3px dashed #d97706; outline-offset: -1px; }
+.tl-src { position: absolute; left: 2px; right: 2px; z-index: 6; border: 2px dashed rgba(0, 0, 0, 0.2); border-radius: 8px; pointer-events: none; }
+.tl-drag-tip { position: fixed; z-index: 95; transform: translate(-50%, -100%); padding: 4px 10px; border-radius: 9999px; background: #18181b; color: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; pointer-events: none; box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.5); }
+.tl-drag-tip.bad { background: #dc2626; }
+.tl-drag-tip:empty { display: none; }
 #tl-days-btn.tl-days-on { background-color: var(--theme-color, #4f46e5) !important; }
 #tl-days-btn.tl-days-on i { color: #fff !important; }
 .tl-days-badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; border: 2px solid #fff; background: #18181b; color: #fff; font-size: 10px; font-weight: 800; line-height: 14px; text-align: center; }

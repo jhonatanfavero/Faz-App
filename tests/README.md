@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 29 suítes (cerca de 2 minutos)
+npm test        # confere o CSS pronto e roda as 30 suítes (cerca de 2 minutos)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -41,6 +41,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_kanban_v4029.js` | `kanban.html` e o app do celular de verdade, mesmo relógio (domingo 15/11, 21:00) | V40.29.0: Relatórios no PC (Hoje, 7 e 30 dias) com os mesmos números do "Produtividade" do celular, visão Dia usa o dia aberto, arquivado não conta, tag apagada vira "Excluída", filtros não mudam, atualiza com a nuvem, Esc/Fechar/fundo, texto escapado; Semana sempre de segunda a domingo |
 | `test_sublista_arrastar.js` | `index.html` + `app.js` + `sync.js` de verdade, com uma "tela" de mentira pras posições | V40.30.0: no celular o cartão da sublista vira bloco num horário livre (tempo, tag, cor, checklist, feito; conflito; passado), muda de sublista, e o bloco entra na sublista (com a pergunta das notas vinculadas; Descanso e sublista não entram); um passo do Desfazer cada; o gesto (segurar 400 ms, rolar não arrasta, contorno do lugar, "Não cabe aqui", toque cancelado, o clique que sobra); a nuvem nos dois sentidos |
 | `test_recorrente.js` | o app do celular e `kanban.html` de verdade, a mesma nuvem | V40.30.0: Recorrente sem fim (1200 meses): criar, editar sem mexer no fim, "neste e nos próximos" sem escrever 1200 meses, Encerrar depois do mês da tela, Repetir sem fim de novo, encerrar no 1º mês (vira avulsa), as antigas de 12 meses, Desfazer, a nuvem e o PC com as mesmas regras |
+| `test_arrastar_dias.js` | `index.html` + `app.js` + `sync.js` de verdade, com uma "tela" de mentira pras posições | V40.31.0: com 2 ou 3 dias, segurar um bloco e levar pra outro dia e/ou horário (encaixe no vago mais perto, vermelho quando não cabe, balão com dia e hora, sublista, passado/adiado, Desfazer), os dias andando na borda, toque cancelado, o clique que sobra, o "pro lado anda um dia" e o tocar pra abrir que continuam, tarefa na mão, a dica e a nuvem |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)
@@ -67,7 +68,7 @@ Para isso existem quatro testes que abrem um Chrome de verdade:
 
 ```
 npm i -D playwright && npx playwright install chromium    # uma vez
-node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo; sublista e vagos ocultos; desfazer; dois toques; agenda afastada com pinça de verdade; cartão da sublista e bloco arrastando com o dedo
+node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo; sublista e vagos ocultos; desfazer; dois toques; agenda afastada com pinça de verdade; cartão da sublista e bloco arrastando com o dedo; bloco de um dia pro outro com os dias lado a lado
 node tests/navegador/offline.js         # o app abre completo sem internet?
 node tests/navegador/tela_pc.js         # tela do PC com mouse: arrastar e esticar blocos (Dia e Semana), 3 pontinhos, campo de arquivar, zoom, tags, sublista
 node tests/navegador/voltar.js          # celular: botão voltar (CloseWatcher de verdade; o Esc faz o papel do voltar) e, sem CloseWatcher, pelo histórico

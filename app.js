@@ -916,7 +916,7 @@ function tlTapHint() {
 // Arrastar pro lado com um dedo anda um dia. Tocar num bloco (ou no nome do dia) abre aquele dia em 1 dia, já com o
 // cartão aberto. Dois toques num vazio abrem o + naquele dia e hora. Tarefa na mão: tocar num vazio onde ela cabe
 // solta ali (em qualquer um dos dias). Filtros e busca continuam em lista; "ocultar vagos" vale só em 1 dia.
-// Arrastar bloco de um dia pro outro fica pra uma próxima versão.
+// Arrastar bloco de um dia pro outro: V40.31.0 (segurar o bloco e arrastar; seção "DIAS LADO A LADO: ARRASTAR BLOCO").
 // =====================================================
 const TL_WD = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const TL_MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -955,6 +955,7 @@ window.setTlDays = function(n, firstDate) {
     if (firstDate) activeDateObj = tlDateObj(firstDate);
     if (n === tlDays && !firstDate) return;
     if (n > 1) { collapseAllBlocks(); tlBack = null; }
+    const from = tlDays;
     tlDays = n;
     try { localStorage.setItem('tb__agenda_dias', String(n)); } catch (e) {}
     tlTapPrev = null;
@@ -962,6 +963,7 @@ window.setTlDays = function(n, firstDate) {
     applyHeaderState();
     runRealTimeEngine();
     renderTimeline();
+    if (n > 1 && from === 1 && !firstDate) blkDragTipOnce(); // V40.31.0: ensina o arrasto entre os dias (3 vezes)
 };
 window.cycleTlDays = function() { setTlDays(tlDays >= 3 ? 1 : tlDays + 1); };
 
@@ -1083,6 +1085,7 @@ function tlRenderMulti() {
     tlDayhead(days);
     const hint = document.getElementById('floating-hint');
     if (hint) hint.textContent = 'Toque num espaço livre de um dos dias';
+    blkDragSetup(); // V40.31.0: segurar um bloco e arrastar pra outro dia
 }
 
 // Pinça e arrastar pro lado na agenda. Dois dedos: um nível por gesto (só vale se os DOIS dedos se mexeram). Um dedo
@@ -1119,7 +1122,7 @@ function tlRenderMulti() {
     sc.addEventListener('touchend', (e) => {
         const s = swipe;
         if ((e.touches || []).length === 0) { pinch = null; swipe = null; }
-        if (!s || !tlMulti()) return;
+        if (!s || !tlMulti() || blkDrag || isPhysicsBusy) return; // V40.31.0: soltar um bloco arrastado não anda o dia
         const dx = s.lx - s.x, dy = s.ly - s.y;
         if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.6 || Date.now() - s.t > 700) return;
         if (dx < 0) debugAdvanceDay(); else debugPreviousDay();
@@ -1174,7 +1177,8 @@ function renderTimeline() {
     // O drag chamará renderTimeline() no final (onMbDragEnd) — não precisa renderizar enquanto rola.
     // Variável declarada no topo do arquivo pra evitar TDZ.
     // V40.30.0: arrastando um cartão da sublista também não (subDrag é "var": existe antes da linha dele rodar).
-    if (mbDragActive || subDrag) return;
+    // V40.31.0: nem arrastando um bloco entre os dias, a não ser quando os dias andam (blkDrag.paging).
+    if (mbDragActive || subDrag || (blkDrag && !blkDrag.paging)) return;
     container.innerHTML = ''; 
     container.classList.remove('tl-multi'); // V40.26.0: volta a ser um dia só até saber se a agenda está afastada
     
@@ -2151,10 +2155,9 @@ function subDragTip(el, b) { // 3 vezes no aparelho, uma por sublista aberta
     el.appendChild(tip);
     setTimeout(() => { tip.style.opacity = '0'; setTimeout(() => tip.remove(), 500); }, 3500);
 }
-function subDragPress(e, bid, row) {
-    if (subDrag || isPhysicsBusy) return;
-    if (e.touches ? e.touches.length !== 1 : e.button !== 0) return;
-    if (e.target.closest('.sub-ck')) return; // o círculo continua só marcando
+// Segurar parado 400 ms (mexer até 8 px) e chama begin(x, y) com onde o dedo está. Mexeu antes = está rolando: não chama.
+// V40.31.0: separado do arrasto do cartão pra servir também ao bloco dos dias lado a lado.
+function fazLongPress(e, begin) {
     const p = e.touches ? e.touches[0] : e;
     const pre = { x0: p.clientX, y0: p.clientY, x: p.clientX, y: p.clientY, timer: null };
     const stop = () => {
@@ -2171,12 +2174,18 @@ function subDragPress(e, bid, row) {
         pre.x = q.clientX; pre.y = q.clientY;
         if (Math.abs(pre.x - pre.x0) > SUB_DRAG_SLOP || Math.abs(pre.y - pre.y0) > SUB_DRAG_SLOP) stop(); // está rolando a agenda
     };
-    pre.timer = setTimeout(() => { stop(); subDragBegin(bid, row, pre.x, pre.y); }, SUB_DRAG_MS);
+    pre.timer = setTimeout(() => { stop(); begin(pre.x, pre.y); }, SUB_DRAG_MS);
     document.addEventListener('touchmove', move, { passive: true });
     document.addEventListener('touchend', stop);
     document.addEventListener('touchcancel', stop);
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', stop);
+}
+function subDragPress(e, bid, row) {
+    if (subDrag || blkDrag || isPhysicsBusy) return;
+    if (e.touches ? e.touches.length !== 1 : e.button !== 0) return;
+    if (e.target.closest('.sub-ck')) return; // o círculo continua só marcando
+    fazLongPress(e, (x, y) => subDragBegin(bid, row, x, y));
 }
 function subDragBegin(bid, row, x, y) {
     const cid = row.dataset.cardId;
@@ -2326,6 +2335,210 @@ function subDropClear(el) {
     el.classList.remove('into-sub');
     delete el.dataset.overSub;
     container.querySelectorAll('.sub-over').forEach(s => s.classList.remove('sub-over'));
+}
+
+// =====================================================
+// V40.31.0 — DIAS LADO A LADO: ARRASTAR BLOCO DE UM DIA PRO OUTRO (celular)
+// =====================================================
+// Fila do Jhonatan (escolha dele na V40.26.0: "arrastar entre os dias numa próxima versão"; "pode fazer" em 18/11).
+// Com 2 ou 3 dias na tela: segurar um bloco 400 ms e arrastar. O próprio bloco vai com o dedo, encaixado de 5 em 5 min
+// na coluna do dia que está embaixo do dedo; se bater em outro bloco, procura o vago mais perto (até 30 min, ou o tempo
+// do bloco se ele for maior) e encosta nele; sem vago perto fica vermelho ("Não cabe aqui"). Um balão em cima do dedo
+// diz o dia e a hora ("Qui 19 · 14:30").
+// O lugar de onde ele saiu fica tracejado. Soltar muda o dia e/ou o horário, com as regras do arrasto de 1 dia (horário
+// que já passou vira "passado"; o passado que foi pro futuro fica marcado como adiado). Em cima de uma sublista: entra
+// nela (como no dia sozinho). Perto da borda de cima/baixo a agenda rola; parado na borda da esquerda/direita, os dias
+// andam (um a cada 0,7 s). Um passo só no Desfazer ("Bloco movido"). Tocar sem segurar continua abrindo o dia; com
+// tarefa na mão não arrasta. O PC já arrasta entre os dias na Semana desde a V40.9.0.
+var blkDrag = null; // arrasto em andamento: a agenda só redesenha quando os dias andam (blkDrag.paging) e o sync espera
+const BLK_PAGE_MS = 700, BLK_SNAP_MAX = 30;
+
+function blkDragSetup() { // chamado no fim do tlRenderMulti
+    if (!tlMulti() || pendingIntent) return;
+    container.querySelectorAll('.tl-mini[data-mini-id]').forEach(el => {
+        const press = (e) => blkDragPress(e, el);
+        el.addEventListener('touchstart', press, { passive: false }); // não-passivo: depois de segurar, o arrasto consegue parar a rolagem
+        el.addEventListener('mousedown', press);
+    });
+}
+function blkDragTipOnce() { // 3 vezes no aparelho, ao pôr 2 ou 3 dias na tela
+    let n = 0;
+    try { n = Number(localStorage.getItem('tb__dica_arrastar_dias')) || 0; } catch (e) {}
+    if (n >= 3) return;
+    try { localStorage.setItem('tb__dica_arrastar_dias', String(n + 1)); } catch (e) {}
+    showToast('Segure um bloco pra arrastar ele pra outro dia');
+}
+// O horário mais perto de st0 (até BLK_SNAP_MAX min, ou o tempo do bloco) onde ele cabe nesse dia, sem contar ele mesmo; null se não tem.
+function blkBestStart(ds, st0, dur, id) {
+    const lo = START_HOUR * 60, hi = END_HOUR * 60;
+    const others = db.filter(v => v && v.date === ds && v.id !== id && v.startMin < hi && v.startMin + v.duration > lo).sort((p, q) => p.startMin - q.startMin);
+    let cur = lo, best = null;
+    const tryGap = (a, b) => {
+        if (b - a < dur) return;
+        const s = Math.max(a, Math.min(st0, b - dur));
+        if (best === null || Math.abs(s - st0) < Math.abs(best - st0)) best = s;
+    };
+    others.forEach(v => { tryGap(cur, v.startMin); cur = Math.max(cur, v.startMin + v.duration); });
+    tryGap(cur, hi);
+    return best !== null && Math.abs(best - st0) <= Math.max(BLK_SNAP_MAX, dur) ? best : null; // bloco comprido pode encostar mais longe
+}
+// Muda o dia e/ou o horário do bloco. Devolve true se mudou.
+function blkMoveTo(id, ds, st) {
+    const b = db.find(v => v.id === id);
+    if (!b) return false;
+    st = Math.round(Number(st) / 5) * 5;
+    if (b.date === ds && b.startMin === st) return false; // soltou onde estava
+    if (!(st >= 0 && st + b.duration <= 1440) || db.some(v => v && v.id !== id && v.date === ds && st < v.startMin + v.duration && v.startMin < st + b.duration)) {
+        showToast('Conflito! A tarefa voltou.');
+        return false;
+    }
+    const today = getTodayStr(), past = ds < today || (ds === today && st + b.duration <= currentRealMins);
+    if (!past) { if (b.type === 'past') b.wasDelayed = true; b.type = 'focus'; } // igual ao arrasto de 1 dia (e ao retimeFields do PC)
+    else if (b.type === 'focus') b.type = 'past';
+    b.date = ds;
+    b.startMin = st;
+    b.expanded = false;
+    saveDb(); // barrinha do Desfazer: "Bloco movido"
+    renderTimeline();
+    return true;
+}
+
+function blkDragPress(e, el) {
+    if (blkDrag || subDrag || isPhysicsBusy || pendingIntent) return;
+    if (e.touches ? e.touches.length !== 1 : e.button !== 0) return;
+    fazLongPress(e, (x, y) => blkDragBegin(el, x, y));
+}
+function blkDragBegin(el, x, y) {
+    const id = el.dataset.miniId, b = db.find(v => v.id === id);
+    if (blkDrag || subDrag || !b || !el.isConnected || !tlMulti() || pendingIntent) return;
+    const r = el.getBoundingClientRect(), tip = document.createElement('div');
+    tip.className = 'tl-drag-tip';
+    document.body.appendChild(tip);
+    el.classList.add('tl-dragging');
+    isPhysicsBusy = true; // a pinça e o "pro lado anda um dia" ficam quietos
+    if (navigator.vibrate) navigator.vibrate(20);
+    blkDrag = { id: id, el: el, ph: null, tip: tip, offY: Math.max(0, Math.min(y - r.top, r.height)), x: x, y: y, edge: 0, side: 0, sideAt: 0, target: null, paging: false };
+    blkDragMarkFrom(el);
+    blkDrag.timer = setInterval(blkDragTick, 16);
+    document.addEventListener('touchmove', blkDragMove, { passive: false });
+    document.addEventListener('touchend', blkDragEnd);
+    document.addEventListener('touchcancel', blkDragEnd);
+    document.addEventListener('mousemove', blkDragMove);
+    document.addEventListener('mouseup', blkDragEnd);
+    blkDragTarget();
+}
+function blkDragMarkFrom(el) { // tracejado no lugar de onde o bloco saiu
+    const st = blkDrag;
+    if (!st || !el || !el.parentNode) return;
+    if (st.ph) st.ph.remove();
+    const ph = document.createElement('div');
+    ph.className = 'tl-src';
+    ph.style.top = el.style.top;
+    ph.style.height = el.style.height;
+    el.parentNode.appendChild(ph);
+    st.ph = ph;
+}
+function blkDragMove(e) {
+    const st = blkDrag;
+    if (!st) return;
+    const p = e.touches ? e.touches[0] : e;
+    if (!p) return;
+    if (e.cancelable) e.preventDefault(); // a agenda não rola junto com o bloco
+    st.x = p.clientX; st.y = p.clientY;
+    const a = subDragArea(), up = a.top + 56 - st.y, down = st.y - (a.bottom - 72);
+    st.edge = up > 0 ? -Math.min(10, 2 + up / 6) : down > 0 ? Math.min(10, 2 + down / 6) : 0;
+    const cr = container.getBoundingClientRect(), side = st.x < cr.left + 14 ? -1 : st.x > cr.right - 14 ? 1 : 0;
+    if (side !== st.side) { st.side = side; st.sideAt = Date.now(); }
+    blkDragTarget();
+}
+function blkDragTick() {
+    const st = blkDrag;
+    if (!st) return;
+    if (st.edge) {
+        const sc = document.getElementById('timeline-scroll'), before = sc.scrollTop;
+        sc.scrollTop += st.edge;
+        if (sc.scrollTop !== before) blkDragTarget();
+    }
+    if (st.side && Date.now() - st.sideAt >= BLK_PAGE_MS) { st.sideAt = Date.now(); blkDragPage(st.side); }
+}
+// Parado na borda: os dias andam um (a agenda redesenha só agora; o bloco arrastado continua na mão).
+function blkDragPage(dir) {
+    const st = blkDrag;
+    if (!st) return;
+    activeDateObj = tlDateObj(addDaysToDateStr(getActiveDateStr(), dir));
+    st.paging = true;
+    try { runRealTimeEngine(); renderTimeline(); } finally { st.paging = false; }
+    const fresh = container.querySelector(`.tl-mini[data-mini-id="${st.id}"]:not(.tl-dragging)`);
+    st.ph = null;
+    if (fresh) { blkDragMarkFrom(fresh); fresh.remove(); } // o dia de onde ele saiu ainda aparece: tracejado lá
+    if (navigator.vibrate) navigator.vibrate(10);
+    blkDragTarget();
+}
+// Decide onde o bloco cai se o dedo soltar agora e mostra (o bloco na coluna, o balão).
+function blkDragTarget() {
+    const st = blkDrag;
+    if (!st) return;
+    const b = db.find(v => v.id === st.id);
+    if (!b) return;
+    const cols = [...container.querySelectorAll('.tl-col')];
+    if (!cols.length) return;
+    let col = cols.find(c => { const r = c.getBoundingClientRect(); return st.x >= r.left && st.x < r.right; });
+    if (!col) col = st.x < cols[0].getBoundingClientRect().left ? cols[0] : cols[cols.length - 1]; // na régua das horas ou na beirada
+    const ds = col.dataset.date, cr = col.getBoundingClientRect(), lo = START_HOUR * 60, hi = END_HOUR * 60, dur = b.duration;
+    const st0 = Math.max(lo, Math.min(hi - dur, Math.round(tlMin(st.y - st.offY - cr.top) / 5) * 5));
+    const best = blkBestStart(ds, st0, dur, b.id), ok = best !== null, start = ok ? best : st0;
+    if (st.el.parentNode !== col) col.appendChild(st.el);
+    st.el.style.top = (tlY(start) + 1) + 'px';
+    const tm = st.el.querySelector('.tl-mini-time');
+    if (tm) tm.textContent = formatClock(start);
+    // em cima de uma sublista (bloco normal entra nela, como no dia sozinho)?
+    let sub = null;
+    if (!isSublist(b) && b.theme !== 'rest') {
+        container.querySelectorAll('.tl-mini[data-mini-id]').forEach(m => {
+            if (m === st.el || !isSublist(db.find(v => v.id === m.dataset.miniId))) return;
+            const r = m.getBoundingClientRect();
+            if (st.x >= r.left && st.x <= r.right && st.y >= r.top && st.y <= r.bottom) sub = m;
+        });
+    }
+    container.querySelectorAll('.tl-mini.sub-over').forEach(m => { if (m !== sub) m.classList.remove('sub-over'); });
+    if (sub) sub.classList.add('sub-over');
+    st.el.classList.toggle('into-sub', !!sub);
+    st.el.classList.toggle('bad', !sub && !ok);
+    const d = tlDateObj(ds);
+    st.target = sub ? { kind: 'sub', id: sub.dataset.miniId } : ok ? { kind: 'move', ds: ds, st: start } : { kind: 'bad' };
+    st.tip.textContent = sub ? 'Soltar na sublista' : ok ? `${TL_WD[d.getDay()]} ${d.getDate()} · ${formatClock(start)}` : 'Não cabe aqui';
+    st.tip.classList.toggle('bad', !sub && !ok);
+    st.tip.style.left = Math.max(60, Math.min(window.innerWidth - 60, st.x)) + 'px';
+    st.tip.style.top = Math.max(8, st.y - 44) + 'px';
+}
+function blkDragStop() {
+    const st = blkDrag;
+    if (!st) return null;
+    blkDrag = null;
+    clearInterval(st.timer);
+    document.removeEventListener('touchmove', blkDragMove);
+    document.removeEventListener('touchend', blkDragEnd);
+    document.removeEventListener('touchcancel', blkDragEnd);
+    document.removeEventListener('mousemove', blkDragMove);
+    document.removeEventListener('mouseup', blkDragEnd);
+    st.tip.remove();
+    if (st.ph) st.ph.remove();
+    st.el.classList.remove('tl-dragging', 'bad', 'into-sub');
+    container.querySelectorAll('.sub-over').forEach(m => m.classList.remove('sub-over'));
+    subDragClickUntil = Date.now() + 400; // o "clique" que sobra ao soltar não abre o dia
+    setTimeout(() => { isPhysicsBusy = false; }, 200);
+    return st;
+}
+function blkDragEnd(e) {
+    if (!blkDrag) return;
+    if (e && e.touches && e.touches.length) return; // ainda tem dedo na tela
+    const st = blkDragStop(), t = st.target;
+    if (e && e.type === 'touchcancel') { renderTimeline(); return; } // o sistema cancelou o toque: nada muda
+    let done = false;
+    if (t && t.kind === 'sub') done = blockIntoSublist(st.id, t.id);
+    else if (t && t.kind === 'move') done = blkMoveTo(st.id, t.ds, t.st);
+    else if (t && t.kind === 'bad') showToast('Conflito! A tarefa voltou.');
+    if (!done) renderTimeline();
 }
 
 // --- 5. ENCAIXE MATEMÁTICO ---
@@ -3230,7 +3443,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.30.0',
+            version: 'v40.31.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

@@ -588,5 +588,89 @@ const { abrir } = require('./apoio');
   ok((await getB('f_m_s1')).cards.length === 1 && await m.evaluate(() => subDrag === null && !document.querySelector('.sub-ghost')), 'toque cancelado pelo sistema: nada muda');
   await m.evaluate((DIA) => { db = db.filter((b) => b.date !== DIA); saveDb(); activeDateObj = new Date(); renderTimeline(); }, DIA);
   }
+
+  {
+  console.log('\nN) Dias lado a lado: arrastar bloco de um dia pro outro com o dedo (V40.31.0):');
+  await m.setViewportSize({ width: 390, height: 844 });
+  const DS = ['2030-07-10', '2030-07-11', '2030-07-12', '2030-07-13']; // qua, qui, sex, sáb
+  await m.evaluate((DS) => {
+    closeAllSheets(); if (pendingIntent) cancelPendingTask(); undoBarHide();
+    const b = (id, date, st, dur, title, extra) => Object.assign({ id, date, startMin: st, duration: dur, title, type: 'focus', theme: 'focus', tagId: null, microblocks: [], completed: false, linkedNoteIds: [] }, extra || {});
+    db = db.filter((x) => !DS.includes(x.date)).concat([
+      b('f_n_a', DS[0], 480, 60, 'Reunião'),
+      b('f_n_b', DS[1], 540, 60, 'Almoço'),
+      b('f_n_s', DS[2], 480, 60, 'Rápidas', { cards: [] }),
+    ]);
+    saveDb(); localStorage.setItem('tb__dica_arrastar_dias', '3');
+    setTlDays(3, DS[0]);
+    const sc = document.getElementById('timeline-scroll'), cr = document.getElementById('blocks-container').getBoundingClientRect();
+    sc.scrollTop += cr.top + tlY(450) - 200; // 07:30 logo abaixo do topo
+  }, DS);
+  await m.waitForTimeout(350);
+  const miniSel = (id) => `#blocks-container .tl-mini[data-mini-id="${id}"]`;
+  const colMid = (i) => m.evaluate((i) => { const r = document.querySelectorAll('#blocks-container .tl-col')[i].getBoundingClientRect(); return r.left + r.width / 2; }, i);
+  const yDe = (min) => m.evaluate((min) => document.getElementById('blocks-container').getBoundingClientRect().top + tlY(min), min);
+  const dias = () => m.evaluate(() => tlMultiDays().join());
+  const getB = (id) => m.evaluate((id) => db.find((b) => b.id === id) || null, id);
+  const scTop = () => m.evaluate(() => document.getElementById('timeline-scroll').scrollTop);
+  // 1) quarta 08:00 → quinta 10:00
+  let ra = await rect(miniSel('f_n_a'));
+  const de = { x: ra.x, y: ra.top + 12 }, s0 = await scTop();
+  await press(de);
+  const para = { x: await colMid(1), y: (await yDe(600)) + 12 };
+  await glide(de, para, 10); await m.waitForTimeout(120);
+  const durante = await m.evaluate(() => { const t = document.querySelector('.tl-drag-tip'), el = document.querySelector('.tl-mini.tl-dragging'); return { tip: t ? t.textContent : null, col: el ? el.closest('.tl-col').dataset.date : null, src: !!document.querySelector('#blocks-container .tl-src') }; });
+  ok(durante.tip === 'Qui 11 · 10:00' && durante.col === DS[1] && durante.src, `segurar o bloco de verdade e levar pra coluna de quinta: ele vai junto, o balão diz "${durante.tip}" e o lugar de onde saiu fica tracejado`);
+  ok(Math.abs((await scTop()) - s0) < 2, 'a agenda não rola junto com o dedo');
+  await foto(m, 'cel-dias-arrastando.png');
+  await drop();
+  let a = await getB('f_n_a');
+  ok(a.date === DS[1] && a.startMin === 600 && await m.evaluate(() => !document.querySelector('.tl-drag-tip') && blkDrag === null && tlDays === 3), 'soltou: a Reunião foi pra quinta às 10:00 (e o dia não abriu)');
+  await m.waitForTimeout(450);
+  // 2) batendo no Almoço: encosta
+  ra = await rect(miniSel('f_n_a'));
+  await press({ x: ra.x, y: ra.top + 12 });
+  await glide({ x: ra.x, y: ra.top + 12 }, { x: ra.x, y: (await yDe(560)) + 12 }, 6); await m.waitForTimeout(100);
+  ok(await m.evaluate(() => document.querySelector('.tl-drag-tip').textContent) === 'Qui 11 · 10:00', 'em cima do Almoço (09:00–10:00) ele encosta logo depois: "Qui 11 · 10:00"');
+  await drop();
+  ok((await getB('f_n_a')).startMin === 600, 'soltou ali: continua às 10:00 (não mudou nada)');
+  await m.waitForTimeout(450);
+  // 3) parado na borda da direita: os dias andam
+  ra = await rect(miniSel('f_n_a'));
+  await press({ x: ra.x, y: ra.top + 12 });
+  const borda = await m.evaluate(() => document.getElementById('blocks-container').getBoundingClientRect().right - 4);
+  await glide({ x: ra.x, y: ra.top + 12 }, { x: borda, y: (await yDe(600)) + 12 }, 10);
+  await m.waitForTimeout(900);
+  ok((await dias()) === DS.slice(1).join(), 'parado na borda da direita: os dias andam (qui, sex, sáb)');
+  await glide({ x: borda, y: (await yDe(600)) + 12 }, { x: await colMid(2), y: (await yDe(600)) + 12 }, 4); await m.waitForTimeout(80);
+  ok(await m.evaluate(() => document.querySelector('.tl-drag-tip').textContent) === 'Sáb 13 · 10:00', 'balão: "Sáb 13 · 10:00"');
+  await drop();
+  a = await getB('f_n_a');
+  ok(a.date === DS[3] && a.startMin === 600, 'soltou: foi pro sábado às 10:00');
+  await m.waitForTimeout(450);
+  // 4) em cima da sublista: entra
+  await m.evaluate((d0) => setTlDays(3, d0), DS[1]); await m.waitForTimeout(250);
+  ra = await rect(miniSel('f_n_a'));
+  const rs = await rect(miniSel('f_n_s'));
+  await press({ x: ra.x, y: ra.top + 12 });
+  await glide({ x: ra.x, y: ra.top + 12 }, { x: rs.x, y: rs.y }, 10); await m.waitForTimeout(100);
+  ok(await m.evaluate(() => document.querySelector('#blocks-container .tl-mini[data-mini-id="f_n_s"]').classList.contains('sub-over') && document.querySelector('.tl-drag-tip').textContent === 'Soltar na sublista'), 'em cima da sublista de sexta: ela acende e o balão diz "Soltar na sublista"');
+  await foto(m, 'cel-dias-sublista.png');
+  await drop();
+  ok(!(await getB('f_n_a')) && (await getB('f_n_s')).cards.length === 1, 'soltou: a Reunião virou cartão da sublista');
+  await m.waitForTimeout(450);
+  // 5) deslizar rápido pro lado em cima de um bloco: anda um dia (não arrasta)
+  await m.evaluate((d0) => setTlDays(3, d0), DS[0]); await m.waitForTimeout(250);
+  const rb = await rect(miniSel('f_n_b'));
+  await touch('touchStart', { x: rb.x, y: rb.y }); await m.waitForTimeout(30);
+  for (let i = 1; i <= 6; i++) { await touch('touchMove', { x: rb.x - i * 25, y: rb.y + i }); await m.waitForTimeout(20); }
+  await touch('touchEnd'); await m.waitForTimeout(400);
+  ok((await dias()) === DS.slice(1).join() && (await getB('f_n_b')).date === DS[1] && await m.evaluate(() => blkDrag === null), 'deslizar rápido pro lado em cima de um bloco: anda um dia, sem arrastar');
+  // 6) tocar sem segurar abre o dia
+  const rb2 = await rect(miniSel('f_n_b'));
+  await m.touchscreen.tap(rb2.x, rb2.y); await m.waitForTimeout(400);
+  ok(await m.evaluate((d) => tlDays === 1 && getActiveDateStr() === d, DS[1]), 'tocar (sem segurar) num bloco continua abrindo o dia dele');
+  await m.evaluate((DS) => { db = db.filter((b) => !DS.includes(b.date)); saveDb(); setTlDays(1); activeDateObj = new Date(); renderTimeline(); }, DS);
+  }
   await fim(errs.length ? '\nERROS DE PÁGINA: ' + errs.slice(0, 3).join(' | ') : '');
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

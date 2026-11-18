@@ -34,6 +34,7 @@ const SUITES = [
     ['Tela do PC: Relatórios (as mesmas contas do celular) e Semana de segunda a domingo', 'test_kanban_v4029.js', [ROOT, DADOS]],
     ['Sublista arrastando no celular: cartão sai, muda de sublista e bloco entra', 'test_sublista_arrastar.js', [ROOT, DADOS]],
     ['Recorrente sem fim, até encerrar (celular, nuvem e PC)', 'test_recorrente.js', [ROOT, DADOS]],
+    ['Dias lado a lado: arrastar bloco de um dia pro outro (celular)', 'test_arrastar_dias.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

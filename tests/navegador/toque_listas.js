@@ -715,5 +715,93 @@ const { abrir } = require('./apoio');
   await foto(m, 'cel-iphone-periodos.png');
   await m.evaluate(() => { closeAllSheets(); document.documentElement.style.removeProperty('--faz-safe-top'); });
   }
+  { // V40.33.0 (bloco próprio)
+  console.log('\nP) Mudar a lista de lugar com o dedo (V40.33.0):');
+  await m.evaluate(() => { localStorage.clear(); }); await m.reload(); await m.waitForTimeout(900);
+  await m.evaluate(() => { openListSheet(); switchListTab('backlog'); setBacklogZoom(2); }); await m.waitForTimeout(700);
+  const C = await m.evaluate(() => backlogColumnsDb.map((c) => c.id));
+  const ord = () => m.evaluate(() => backlogColumnsDb.map((c) => c.id));
+  const dom = () => m.evaluate(() => [...document.getElementById('backlog-columns-wrapper').children].map((c) => c.dataset.columnId).filter(Boolean));
+  const volta = () => m.evaluate((C) => { backlogColumnsDb.sort((a, b) => C.indexOf(a.id) - C.indexOf(b.id)); saveBacklogColumns(); undoBarHide(); document.getElementById('backlog-columns-wrapper').scrollLeft = 0; renderBacklog(); }, C);
+  const hsel = (c) => `#backlog-columns-wrapper > [data-column-id="${c}"] .zoom-col-head`;
+  const meio = () => m.evaluate(() => {
+    const w = document.getElementById('backlog-columns-wrapper'), g = document.querySelector('.bl-col-ghost'), s = document.querySelector('#backlog-columns-wrapper > .zoom-col-slot'), src = document.querySelector('.bl-col-src');
+    const gr = g && g.getBoundingClientRect(), sr = s && s.getBoundingClientRect(), wr = w.getBoundingClientRect();
+    return { ghost: !!g, gw: g ? g.offsetWidth : 0, gl: gr ? Math.round(gr.left) : 0, gt: gr ? Math.round(gr.top) : 0, gOn: !!gr && gr.right > 0 && gr.left < innerWidth,
+      slot: !!s, sw: sr ? Math.round(sr.width) : 0, next: s && s.nextElementSibling ? s.nextElementSibling.dataset.columnId : null,
+      srcW: src ? Math.round(src.getBoundingClientRect().width) : -1, gone: !!src && src.classList.contains('bl-col-src-gone'), zoom3: w.classList.contains('zoom-3'), afast: w.classList.contains('lists-zoom'),
+      sl: w.scrollLeft, before: colDrag && colDrag.beforeId, wl: Math.round(wr.left), wr: Math.round(wr.right) };
+  });
+  ok(await m.evaluate(() => getComputedStyle(document.querySelector('.zoom-col-head')).userSelect === 'none' && getComputedStyle(document.getElementById('backlog-column-head')).userSelect === 'none'), 'o nome da lista não seleciona texto ao segurar (nem o título de cada lista, nem o lá de cima)');
+
+  // P1: afastado, segurar o título da 1ª e arrastar até passar o meio da 2ª
+  const h0 = await rect(hsel(C[0])), h1 = await rect(hsel(C[1]));
+  const col0w = await m.evaluate((c) => Math.round(document.querySelector(`#backlog-columns-wrapper > [data-column-id="${c}"]`).getBoundingClientRect().width), C[0]);
+  await press(h0);
+  const p0 = await meio();
+  ok(p0.ghost && p0.gw === col0w && !p0.slot && p0.srcW === col0w && !p0.gone, `segurou o título: a cópia da lista (${p0.gw}px) aparece e a de origem fica no lugar, apagada`);
+  await glide(h0, { x: h1.x + 40, y: h0.y + 6 });
+  const p1 = await meio();
+  ok(p1.slot && p1.next === C[2] && p1.gone && p1.srcW === 0 && Math.abs(p1.sw - col0w) <= 1, `arrastou pra direita: a lista de origem "sai" e o espaço tracejado (${p1.sw}px) abre depois da 2ª`);
+  ok(Math.abs(p1.gl - (p0.gl + (h1.x + 40 - h0.x))) <= 2 && p1.gt === p0.gt, 'a cópia anda com o dedo só na horizontal');
+  await foto(m, 'cel-lista-arrastando.png');
+  await drop();
+  ok((await ord()).join() === [C[1], C[0], C[2], C[3], C[4]].join() && (await dom()).join() === (await ord()).join(), 'soltou: a 1ª lista virou a 2ª (na tela e gravado)');
+  ok(await m.evaluate((c) => activeColumnId === c && !document.querySelector('.bl-col-ghost, .zoom-col-slot, .bl-col-src') && !_dragState && colDrag === null && document.getElementById('backlog-form-view').classList.contains('hidden'), C[0]), 'a lista movida fica ativa; não sobra nada na tela e nenhum cartão abriu');
+  await m.waitForTimeout(200);
+  ok(await m.evaluate(() => !document.getElementById('undo-bar').classList.contains('hidden') && document.getElementById('undo-bar-msg').textContent === 'Lista mudou de lugar'), 'barrinha: "Lista mudou de lugar"');
+  await m.tap('#undo-bar-undo'); await m.waitForTimeout(400);
+  ok((await ord()).join() === C.join() && (await dom()).join() === C.join(), 'Desfazer (com o dedo): a ordem volta');
+
+  // P2: segurar na borda: o quadro rola sozinho
+  await volta(); await m.waitForTimeout(300);
+  const wrR = await rect('#backlog-columns-wrapper'), hh = await rect(hsel(C[0]));
+  await press(hh); await glide(hh, { x: wrR.right - 8, y: hh.y + 4 }, 10); await m.waitForTimeout(1500);
+  const p2 = await meio();
+  await drop();
+  const o2 = await ord();
+  ok(p2.sl > 150 && o2.indexOf(C[0]) >= 3 && o2.length === 5, `segurando na borda direita o quadro rola sozinho (${Math.round(p2.sl)}px) e a lista cai lá na frente (${o2.indexOf(C[0]) + 1}ª)`);
+  ok(o2.join() === C.filter((c) => c !== C[0]).flatMap((c) => (c === p2.before ? [C[0], c] : [c])).concat(p2.before ? [] : [C[0]]).join(), 'cai exatamente onde o espaço tracejado estava');
+
+  // P3: rolar o quadro passando o dedo no título (sem segurar) continua rolando
+  await volta(); await m.waitForTimeout(300);
+  const hs = await rect(hsel(C[1]));
+  await touch('touchStart', hs); await m.waitForTimeout(30);
+  await glide(hs, { x: hs.x - 150, y: hs.y }, 6); await touch('touchEnd'); await m.waitForTimeout(600);
+  const p3 = await m.evaluate(() => ({ sl: document.getElementById('backlog-columns-wrapper').scrollLeft, d: colDrag }));
+  ok(p3.sl > 40 && p3.d === null && (await ord()).join() === C.join(), `passar o dedo no título sem segurar rola o quadro (${Math.round(p3.sl)}px), sem arrastar a lista`);
+
+  // P4: modo normal: segurar o nome lá em cima
+  await volta(); await m.evaluate(() => setBacklogZoom(1)); await m.waitForTimeout(400);
+  await m.evaluate((c) => scrollToColumn(c), C[1]); await m.waitForTimeout(900);
+  const prefs = await m.evaluate(() => [localStorage.getItem('tb__lista_afastada'), localStorage.getItem('tb__lista_zoom')].join());
+  const tt = await rect('#backlog-column-title');
+  await press(tt); await m.waitForTimeout(80);
+  const q0 = await meio();
+  ok(q0.afast && q0.zoom3 && q0.ghost && q0.gOn && q0.srcW > 50, 'modo normal: segurou o nome e o quadro se afastou (3 por tela) com a lista "levantada" no meio da tela');
+  await foto(m, 'cel-lista-normal-arrastando.png');
+  await glide(tt, { x: tt.x + 200, y: tt.y + 10 });
+  const q1 = await meio();
+  await drop(); await m.waitForTimeout(300);
+  const o4 = await ord(), exp4 = C.filter((c) => c !== C[1]);
+  exp4.splice(q1.before ? exp4.indexOf(q1.before) : exp4.length, 0, C[1]);
+  ok(q1.slot && o4.join() === exp4.join() && o4.indexOf(C[1]) >= 2, `arrastou pra direita e soltou: a 2ª lista foi pra ${o4.indexOf(C[1]) + 1}ª`);
+  const q2 = await m.evaluate(() => { const w = document.getElementById('backlog-columns-wrapper'), wr = w.getBoundingClientRect(); const vis = [...w.children].find((c) => { const r = c.getBoundingClientRect(); return Math.abs(r.left + r.width / 2 - (wr.left + wr.width / 2)) < 20; }); return { afast: w.classList.contains('lists-zoom'), vis: vis && vis.dataset.columnId, ativa: activeColumnId, titulo: document.getElementById('backlog-column-title').innerText, nome: (backlogColumnsDb.find((c) => c.id === activeColumnId) || {}).name, prefs: [localStorage.getItem('tb__lista_afastada'), localStorage.getItem('tb__lista_zoom')].join() }; });
+  ok(!q2.afast && q2.vis === C[1] && q2.ativa === C[1] && q2.titulo === q2.nome && q2.prefs === prefs, 'o quadro volta ao normal mostrando a mesma lista (no lugar novo) e o zoom escolhido não mudou');
+  await foto(m, 'cel-lista-normal-depois.png');
+
+  // P5: pelo menu dos 3 pontinhos
+  await volta(); await m.evaluate((c) => scrollToColumn(c), C[0]); await m.waitForTimeout(800);
+  await m.tap('#backlog-column-menu-btn'); await m.waitForTimeout(350);
+  const mm = await m.evaluate(() => { const md = document.getElementById('column-menu-modal'), r = md.getBoundingClientRect(); const l = document.getElementById('column-menu-left'), rr = document.getElementById('column-menu-right'); return { vis: !md.classList.contains('hidden'), dentro: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, pos: document.getElementById('column-menu-pos').textContent, l: l.disabled, r: rr.disabled, lr: l.getBoundingClientRect().right <= rr.getBoundingClientRect().left }; });
+  ok(mm.vis && mm.dentro && mm.pos === 'Posição 1 de 5' && mm.l && !mm.r && mm.lr, 'menu da lista: inteiro na tela, "Posição 1 de 5", Esquerda apagada e Direita do lado');
+  await m.tap('#column-menu-right'); await m.waitForTimeout(250); await m.tap('#column-menu-right'); await m.waitForTimeout(250);
+  ok((await ord()).indexOf(C[0]) === 2 && await m.evaluate(() => document.getElementById('column-menu-pos').textContent === 'Posição 3 de 5' && !document.getElementById('column-menu-modal').classList.contains('hidden')), 'dois toques em Direita: a lista vai pra 3ª e o menu continua aberto ("Posição 3 de 5")');
+  await foto(m, 'cel-lista-menu.png');
+  await m.tap('#column-menu-modal [data-voltar]'); await m.waitForTimeout(350);
+  ok(await m.evaluate(() => document.getElementById('column-menu-modal').classList.contains('hidden') && !document.getElementById('undo-bar').classList.contains('hidden') && document.getElementById('undo-bar-msg').textContent === 'Lista mudou de lugar'), 'Fechar: a barrinha do Desfazer aparece');
+  ok((await dom()).join() === (await ord()).join() && await m.evaluate((c) => { const w = document.getElementById('backlog-columns-wrapper'), el = document.querySelector(`#backlog-columns-wrapper > [data-column-id="${c}"]`), wr = w.getBoundingClientRect(), r = el.getBoundingClientRect(); return activeColumnId === c && Math.abs(r.left - wr.left) < 2; }, C[0]), 'no modo normal a tela já está na lista movida (lugar novo)');
+  await volta(); await m.waitForTimeout(200);
+  }
   await fim(errs.length ? '\nERROS DE PÁGINA: ' + errs.slice(0, 3).join(' | ') : '');
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

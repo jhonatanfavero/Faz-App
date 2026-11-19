@@ -36,6 +36,7 @@ const SUITES = [
     ['Recorrente sem fim, até encerrar (celular, nuvem e PC)', 'test_recorrente.js', [ROOT, DADOS]],
     ['Dias lado a lado: arrastar bloco de um dia pro outro (celular)', 'test_arrastar_dias.js', [ROOT, DADOS]],
     ['Configurações no PC: cor do app e horário do dia, nos 2 sentidos', 'test_preferencias.js', [ROOT, DADOS]],
+    ['Ordem das listas: arrastar e menu, no celular e no PC (Desfazer e nuvem)', 'test_ordem_listas.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

@@ -346,6 +346,25 @@ body { overflow-x: hidden; max-width: 100vw; }
 }
 .lists-zoom [data-column-id]:has(> .zoom-slot) > .opacity-50 { display: none; } /* lista vazia recebendo cartão */
 
+/* V40.33.0 — mudar a LISTA de lugar: segurar o nome (lá em cima, ou o título de cada lista no afastado) e arrastar.
+   A cópia anda com o dedo; a lista de origem fica apagada e, quando o destino é outro, "sai" (largura zero; o
+   margin negativo devolve o vão que ela ocupava) e o espaço tracejado aparece onde ela vai cair. */
+#backlog-column-head, .zoom-col-head { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.lists-zoom > [data-column-id].bl-col-src { opacity: 0.35; }
+.lists-zoom > [data-column-id].bl-col-src-gone {
+    width: 0 !important; min-width: 0 !important; padding: 0 !important; border-width: 0 !important;
+    margin-right: -8px !important; overflow: hidden !important; opacity: 0 !important;
+}
+.zoom-col-slot {
+    flex-shrink: 0; box-sizing: border-box; border-radius: 14px;
+    border: 2px dashed var(--theme-color, #4f46e5); background: rgba(0, 0, 0, 0.04);
+}
+.bl-col-ghost { position: fixed !important; z-index: 90; pointer-events: none !important; margin: 0 !important; padding: 0 !important; display: block !important; transform: rotate(1.5deg); }
+.bl-col-ghost > [data-column-id] {
+    overflow: hidden !important; border-color: var(--theme-color, #4f46e5) !important;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+}
+
 /* V40.16.0 — lupa: número de listas por tela (só quando afastado) e o menu com os níveis.
    O menu fica dentro da sheet (z-index local da sheet), por cima dos cartões e dos títulos das listas. */
 .zoom-badge {

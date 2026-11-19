@@ -937,6 +937,7 @@
             if (typeof mbDragActive !== 'undefined' && mbDragActive) return true;
             if (typeof subDrag !== 'undefined' && subDrag) return true; // V40.30.0: arrastando um cartão da sublista
             if (typeof blkDrag !== 'undefined' && blkDrag) return true; // V40.31.0: arrastando um bloco entre os dias
+            if (typeof colDrag !== 'undefined' && colDrag) return true; // V40.33.0: arrastando uma lista pro lado
             if (typeof pendingIntent !== 'undefined' && pendingIntent) return true;
             if (typeof _moveCardPendingId !== 'undefined' && _moveCardPendingId) return true;
             var form = $('backlog-form-view');

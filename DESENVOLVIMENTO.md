@@ -56,7 +56,8 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
 11. **Arrasto no celular não deixa a agenda redesenhar no meio (V40.30.0).** Enquanto `mbDragActive`,
     `subDrag` ou `blkDrag` (V40.31.0) estão ligados, o `renderTimeline()` não roda (só quando o próprio
     arrasto pede, como os dias andando: `blkDrag.paging`) e o sync espera (`appBusy()` no `sync.js`);
-    no fim do arrasto, redesenhe. O "segurar 400 ms" é o `fazLongPress`. Arrasto novo: segurar 400 ms, `touchstart` não-passivo no elemento
+    no fim do arrasto, redesenhe. Nas Listas, o arrasto de cartão (`_dragState`) e o de lista (`colDrag`,
+    V40.33.0) também seguram o sync; se o quadro for redesenhado mesmo assim, o arrasto solta sem mover. O "segurar 400 ms" é o `fazLongPress`. Arrasto novo: segurar 400 ms, `touchstart` não-passivo no elemento
     (sem isso o navegador não deixa parar a rolagem depois), trate o `touchcancel` e engula o clique
     que sobra ao soltar.
 12. **Despesa recorrente é sem fim (V40.30.0).** "Sem fim" = `durationMonths` / `duration_months` 1200

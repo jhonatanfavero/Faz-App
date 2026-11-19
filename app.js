@@ -3458,7 +3458,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.32.2',
+            version: 'v40.33.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -3959,10 +3959,13 @@ function renderBacklog() {
             wrapper.scrollLeft = zoomKeepLeft;
             if (actEl && (_zoomAlignActive || (_zoomLastActive !== activeColumnId && !backlogColVisible(wrapper, actEl)))) {
                 wrapper.scrollLeft = Math.max(0, backlogColLeft(wrapper, actEl) - 10);
+            } else if (actEl && _zoomReveal) {
+                backlogColReveal(wrapper, actEl); // V40.33.0: a lista que mudou de lugar continua inteira na tela
             } else {
                 backlogZoomSyncActive();
             }
             _zoomAlignActive = false;
+            _zoomReveal = false;
             _zoomLastActive = activeColumnId;
         } else if (activeIdx >= 0) {
             const cols = wrapper.children;
@@ -3988,7 +3991,7 @@ function onBacklogColumnsScroll() {
     if (_scrollDebounceTimer) clearTimeout(_scrollDebounceTimer);
     _scrollDebounceTimer = setTimeout(() => {
         const wrapper = document.getElementById('backlog-columns-wrapper');
-        if (!wrapper) return;
+        if (!wrapper || colDrag) return; // V40.33.0: lista sendo arrastada: o quadro rola sozinho, a lista ativa fica
         if (backlogZoomOut) { backlogZoomSyncActive(); return; } // V40.9.1
         // Centro visível do wrapper
         const viewportCenter = wrapper.scrollLeft + (wrapper.clientWidth / 2);
@@ -4048,6 +4051,7 @@ const DRAG_MOVE_THRESHOLD = 8; // pixels antes de cancelar long-press
 let _dragState = null; // { itemId, columnEl, cardEl, startY, longPressTimer, dragging }
 
 function backlogDragOnTouchStart(e) {
+    if (colDrag) return; // V40.33.0: uma lista está sendo arrastada (o 2º dedo não vira pinça nem arrasto de cartão)
     if (_dragState) backlogDragAbort(); // sobra de um toque que não terminou
     // V40.9.1: dois dedos = pinça (afastar/aproximar), nunca arrasto
     _pinchState = e.touches.length === 2
@@ -4055,6 +4059,7 @@ function backlogDragOnTouchStart(e) {
         : null;
     if (e.touches.length !== 1) return;
 
+    if (e.target.closest('.zoom-col-head')) { colDragPress(e); return; } // V40.33.0: segurar o título muda a lista de lugar
     const card = e.target.closest('[data-bl-card]');
     if (!card) return;
     
@@ -4102,6 +4107,7 @@ var backlogZoomOut = false;   // var (não let): renderBacklog pode rodar antes 
 var backlogZoomCols = 2;      // nível do afastado: 1.5, 2 ou 3 listas por tela
 var _zoomAlignActive = false; // true = no próximo desenho, encosta a lista ativa na esquerda
 var _zoomLastActive = null;   // lista ativa no último desenho afastado
+var _zoomReveal = false;      // V40.33.0: true = no próximo desenho afastado, rola o mínimo pra lista ativa aparecer inteira
 var _pinchState = null;       // { d0, pts, done } enquanto dois dedos estão na tela
 var _blClickBlockUntil = 0;   // depois de um arrasto, o "clique" que sobra não abre o cartão
 try {
@@ -4115,6 +4121,7 @@ function backlogZoomLevel() { return backlogZoomOut ? (backlogZoomCols || 2) : 1
 function backlogZoomLabel(n) { return n === 1.5 ? '1½' : String(n); }
 
 window.setBacklogZoom = function(n) {
+    colDragCancel(); // V40.33.0: trocar o zoom no meio do arrasto de uma lista = solta sem mover
     n = Number(n);
     if ([1, 1.5, 2, 3].indexOf(n) < 0 || n === backlogZoomLevel()) return;
     backlogDragAbort();
@@ -4185,6 +4192,12 @@ function backlogColLeft(wrapper, col) {
 function backlogColVisible(wrapper, col) { // pelo menos metade da lista está aparecendo
     const wr = wrapper.getBoundingClientRect(), r = col.getBoundingClientRect();
     return Math.min(r.right, wr.right) - Math.max(r.left, wr.left) >= r.width / 2;
+}
+// V40.33.0: rola o quadro o mínimo pra lista aparecer inteira (com 10px de folga na borda).
+function backlogColReveal(wrapper, col) {
+    const wr = wrapper.getBoundingClientRect(), r = col.getBoundingClientRect();
+    if (r.left < wr.left + 10) wrapper.scrollLeft -= (wr.left + 10 - r.left);
+    else if (r.right > wr.right - 10) wrapper.scrollLeft += Math.min(r.right - (wr.right - 10), r.left - (wr.left + 10));
 }
 // Afastado: a lista ativa só troca sozinha quando some da tela (senão o título ficaria pulando).
 function backlogZoomSyncActive() {
@@ -4441,6 +4454,14 @@ function attachBacklogDragListeners() {
     wrapper.addEventListener('touchmove', backlogDragOnTouchMove, { passive: false });
     wrapper.addEventListener('touchend', backlogDragOnTouchEnd, { passive: true });
     wrapper.addEventListener('touchcancel', backlogDragOnTouchEnd, { passive: true });
+    // V40.33.0: mudar a lista de lugar. Com o dedo, o título de cada lista (afastado) entra pelo touchstart de cima;
+    // com o mouse, por aqui. O nome lá em cima vale nos dois modos (não-passivo: depois de segurar, o arrasto para a rolagem).
+    wrapper.addEventListener('mousedown', (e) => { if (e.target.closest('.zoom-col-head')) colDragPress(e); });
+    const head = document.getElementById('backlog-column-head');
+    if (head) {
+        head.addEventListener('touchstart', colDragPress, { passive: false });
+        head.addEventListener('mousedown', colDragPress);
+    }
     // V40.9.1: o "clique" que o navegador gera ao soltar um arrasto não pode abrir o cartão
     wrapper.addEventListener('click', (e) => {
         if (Date.now() >= _blClickBlockUntil) return;
@@ -4449,6 +4470,234 @@ function attachBacklogDragListeners() {
         e.preventDefault();
     }, true);
     wrapper.dataset.dragListenersAttached = 'true';
+}
+
+// =====================================================
+// V40.33.0 — MUDAR A LISTA DE LUGAR
+// Arrastando: segurar o nome da lista 400 ms (como o cartão) e arrastar pro lado. No zoom afastado vale o título de
+// cada lista; o nome lá em cima vale sempre (é a lista ativa). No modo normal o quadro se afasta sozinho (3 listas por
+// tela) só enquanto o dedo arrasta e volta ao soltar, sem mudar o zoom escolhido. A lista "sai" e anda com o dedo na
+// horizontal; o espaço tracejado mostra onde ela vai cair; perto da borda o quadro rola. Toque cancelado pelo sistema,
+// troca de zoom ou o quadro redesenhado no meio (veio da nuvem) = solta sem mover nada.
+// Pelo menu (3 pontinhos): Esquerda / Direita, uma casa por toque, com o menu aberto.
+// A ordem é a do backlogColumnsDb; a nuvem vira "position" sozinha (só a da lista que mudou) e o Desfazer pega.
+// =====================================================
+var colDrag = null; // { colId, press, temp, prevCols, x0, x, colEl, ghost, slot, left0, w, edge, beforeId, hasTarget, timer }
+var _colMenuMoves = 0; // trocas de lugar feitas com o menu da lista aberto (ao fechar, a barrinha do Desfazer aparece)
+
+// Põe a lista `colId` logo antes da lista `beforeId` (null = no fim). Devolve true se a ordem mudou.
+function moveBacklogColumn(colId, beforeId) {
+    beforeId = beforeId || null;
+    const from = backlogColumnsDb.findIndex(c => c.id === colId);
+    if (from < 0 || colId === beforeId) return false;
+    if (beforeId && !backlogColumnsDb.some(c => c.id === beforeId)) return false;
+    const next = backlogColumnsDb[from + 1];
+    if ((next ? next.id : null) === beforeId) return false; // já está aí
+    const [col] = backlogColumnsDb.splice(from, 1);
+    const to = beforeId ? backlogColumnsDb.findIndex(c => c.id === beforeId) : backlogColumnsDb.length;
+    backlogColumnsDb.splice(to, 0, col);
+    saveBacklogColumns();
+    return true;
+}
+
+// Menu da lista: "Posição 2 de 5" e as setas (apagadas nas pontas; com uma lista só, some tudo).
+function columnMenuPosUi() {
+    const n = backlogColumnsDb.length, i = backlogColumnsDb.findIndex(c => c.id === activeColumnId);
+    const pos = document.getElementById('column-menu-pos'), row = document.getElementById('column-menu-move');
+    const left = document.getElementById('column-menu-left'), right = document.getElementById('column-menu-right');
+    if (pos) pos.textContent = n > 1 && i >= 0 ? `Posição ${i + 1} de ${n}` : '';
+    if (row) row.classList.toggle('hidden', n < 2);
+    if (left) left.disabled = i <= 0;
+    if (right) right.disabled = i < 0 || i >= n - 1;
+}
+window.moveActiveColumn = function(dir) {
+    const i = backlogColumnsDb.findIndex(c => c.id === activeColumnId), to = i + (dir < 0 ? -1 : 1);
+    if (i < 0 || to < 0 || to >= backlogColumnsDb.length) return;
+    const beforeId = dir < 0 ? backlogColumnsDb[to].id : (backlogColumnsDb[to + 1] ? backlogColumnsDb[to + 1].id : null);
+    if (!moveBacklogColumn(activeColumnId, beforeId)) return;
+    _colMenuMoves++;
+    _zoomReveal = true;
+    _zoomLastActive = activeColumnId;
+    renderBacklog();
+    columnMenuPosUi();
+};
+
+// Toque (ou mouse) no nome da lista: segurando parado, começa o arrasto.
+function colDragPress(e) {
+    if (colDrag || _dragState) return;
+    if (e.touches ? e.touches.length !== 1 : e.button !== 0) return;
+    if (backlogColumnsDb.length < 2) return; // uma lista só: não tem pra onde ir
+    const t = e.target && e.target.closest ? e.target : null;
+    const press = t && (t.closest('.zoom-col-head') || t.closest('#backlog-column-head'));
+    if (!press) return;
+    const colEl = press.classList.contains('zoom-col-head') ? press.closest('[data-column-id]') : null;
+    if (press.classList.contains('zoom-col-head') && (!colEl || !backlogZoomOut)) return;
+    fazLongPress(e, (x, y) => colDragBegin(colEl ? colEl.dataset.columnId : activeColumnId, press, x, y));
+}
+
+function colDragBegin(colId, press, x, y) {
+    const sheet = document.getElementById('list-sheet'), wrapper = document.getElementById('backlog-columns-wrapper');
+    if (colDrag || _dragState || !press.isConnected || !wrapper || backlogColumnsDb.length < 2) return;
+    if (!backlogColumnsDb.some(c => c.id === colId)) return;
+    if (!sheet || sheet.classList.contains('translate-y-full') || activeListTab !== 'backlog') return; // a Lista fechou no meio
+    closeBacklogZoomMenu();
+    const st = colDrag = { colId, press, temp: !backlogZoomOut, prevCols: backlogZoomCols, x0: x, x: x, edge: 0, beforeId: null, hasTarget: false };
+    activeColumnId = colId; // a lista que o dedo segurou vira a ativa (nome lá em cima e borda)
+    _zoomLastActive = colId;
+    document.addEventListener('touchmove', colDragMove, { passive: false });
+    document.addEventListener('touchend', colDragEnd);
+    document.addEventListener('touchcancel', colDragEnd);
+    document.addEventListener('mousemove', colDragMove);
+    document.addEventListener('mouseup', colDragEnd);
+    if (navigator.vibrate) navigator.vibrate(30);
+    if (st.temp) {
+        // modo normal: afasta pra 3 por tela só durante o arrasto (não grava a escolha do zoom)
+        backlogZoomOut = true;
+        backlogZoomCols = 3;
+        _zoomAlignActive = true;
+        renderBacklog();
+        requestAnimationFrame(() => { // depois do desenho (que acerta a rolagem): a lista no meio da tela e ela "sai"
+            if (colDrag !== st) return;
+            const el = Array.from(wrapper.children).find(c => c.dataset.columnId === colId);
+            if (el) wrapper.scrollLeft = Math.max(0, backlogColLeft(wrapper, el) + el.offsetWidth / 2 - wrapper.clientWidth / 2);
+            colDragLift(st);
+        });
+    } else {
+        updateActiveColumnHeader();
+        updateColumnDots();
+        colDragLift(st);
+    }
+}
+
+// A lista sai do quadro: a cópia que anda com o dedo, o espaço tracejado e o "fantasma" no lugar de origem.
+function colDragLift(st) {
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    const el = wrapper && Array.from(wrapper.children).find(c => c.dataset.columnId === st.colId);
+    if (!el) { colDragCancel(); return; }
+    const r = el.getBoundingClientRect(), lvl = backlogZoomLevel();
+    const ghost = document.createElement('div');
+    ghost.className = 'bl-col-ghost lists-zoom' + (lvl === 1.5 ? ' zoom-15' : lvl === 3 ? ' zoom-3' : '');
+    const copy = el.cloneNode(true);
+    // a cópia fica com os atributos (o visual do afastado depende deles), mas sem o id de verdade: quem procura
+    // a lista ou o cartão pelo id continua achando só o do quadro
+    copy.setAttribute('data-column-id', '');
+    copy.classList.remove('zoom-active', 'bl-col-src', 'bl-col-src-gone');
+    copy.querySelectorAll('[onclick]').forEach(n => n.removeAttribute('onclick'));
+    copy.querySelectorAll('[data-bl-card]').forEach(n => n.setAttribute('data-bl-card', ''));
+    copy.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+    copy.style.setProperty('height', r.height + 'px', 'important');
+    ghost.appendChild(copy);
+    ghost.style.width = r.width + 'px';
+    ghost.style.left = r.left + 'px';
+    ghost.style.top = (r.top - 6) + 'px';
+    document.body.appendChild(ghost);
+    const slot = document.createElement('div');
+    slot.className = 'zoom-col-slot';
+    slot.style.width = r.width + 'px';
+    slot.style.height = r.height + 'px';
+    el.classList.add('bl-col-src');
+    Object.assign(st, { colEl: el, ghost, slot, left0: r.left, w: r.width });
+    st.timer = setInterval(colDragTick, 16);
+    colDragPlace();
+}
+
+// Onde a cópia está agora (só anda na horizontal, sem sair mais que metade da tela).
+function colDragPlace() {
+    const st = colDrag;
+    if (!st || !st.ghost) return;
+    const wr = document.getElementById('backlog-columns-wrapper').getBoundingClientRect();
+    const left = Math.max(wr.left - st.w / 2, Math.min(wr.right - st.w / 2, st.left0 + st.x - st.x0));
+    st.ghost.style.left = left + 'px';
+    st.gx = left + st.w / 2; // meio da cópia: é ele que decide o lugar
+    const lo = Math.min(st.x, st.gx), hi = Math.max(st.x, st.gx);
+    st.edge = lo < wr.left + 36 ? -1 : (hi > wr.right - 36 ? 1 : 0);
+    colDragTarget();
+}
+
+// Decide onde a lista cairia agora (antes da primeira outra lista cujo meio está à direita do meio da cópia) e
+// mostra o espaço lá. Soltar onde ela já está não é mover: sem espaço e a lista de origem continua no lugar.
+function colDragTarget() {
+    const st = colDrag;
+    if (!st || !st.ghost) return;
+    const wrapper = document.getElementById('backlog-columns-wrapper');
+    const order = Array.from(wrapper.children).filter(el => el.dataset.columnId);
+    const others = order.filter(el => el !== st.colEl);
+    let ref = null;
+    for (const el of others) {
+        const r = el.getBoundingClientRect();
+        if (st.gx < r.left + r.width / 2) { ref = el; break; }
+    }
+    const same = ref === (order[order.indexOf(st.colEl) + 1] || null);
+    st.beforeId = ref ? ref.dataset.columnId : null;
+    st.hasTarget = !same;
+    st.colEl.classList.toggle('bl-col-src-gone', !same);
+    if (same) { st.slot.remove(); return; }
+    if (ref) {
+        if (st.slot.parentNode !== wrapper || st.slot.nextElementSibling !== ref) wrapper.insertBefore(st.slot, ref);
+    } else if (st.slot.parentNode !== wrapper || wrapper.lastElementChild !== st.slot) {
+        wrapper.appendChild(st.slot);
+    }
+}
+
+function colDragMove(e) {
+    const st = colDrag;
+    if (!st) return;
+    const p = e.touches ? e.touches[0] : e;
+    if (!p) return;
+    if (e.cancelable) e.preventDefault(); // nem o quadro nem a lista rolam junto com o dedo
+    st.x = p.clientX;
+    colDragPlace();
+}
+
+function colDragTick() {
+    const st = colDrag;
+    if (!st) return;
+    if (!st.press.isConnected || (st.colEl && !st.colEl.isConnected)) { colDragCancel(); return; } // redesenhou no meio
+    if (!st.edge || !st.ghost) return;
+    const wrapper = document.getElementById('backlog-columns-wrapper'), before = wrapper.scrollLeft;
+    wrapper.scrollLeft += st.edge * 7;
+    if (wrapper.scrollLeft !== before) colDragTarget(); // o dedo está parado, mas o que está embaixo dele mudou
+}
+
+// Tira o visual do arrasto, os ouvintes e o relógio. Não mexe na ordem nem no zoom.
+function colDragStop() {
+    const st = colDrag;
+    if (!st) return null;
+    colDrag = null;
+    clearInterval(st.timer);
+    document.removeEventListener('touchmove', colDragMove);
+    document.removeEventListener('touchend', colDragEnd);
+    document.removeEventListener('touchcancel', colDragEnd);
+    document.removeEventListener('mousemove', colDragMove);
+    document.removeEventListener('mouseup', colDragEnd);
+    if (st.ghost) st.ghost.remove();
+    if (st.slot) st.slot.remove();
+    if (st.colEl) st.colEl.classList.remove('bl-col-src', 'bl-col-src-gone');
+    _blClickBlockUntil = Date.now() + 350; // o "clique" que sobra ao soltar não abre nada
+    return st;
+}
+
+// Solta sem mover (e volta pro modo normal, se foi o arrasto que afastou o quadro).
+function colDragCancel() {
+    const st = colDragStop();
+    if (!st || !st.temp) return;
+    backlogZoomOut = false;
+    backlogZoomCols = st.prevCols;
+    renderBacklog();
+}
+
+function colDragEnd(e) {
+    const st = colDrag;
+    if (!st) return;
+    if (e && e.type === 'touchcancel') { colDragCancel(); return; } // toque cancelado pelo sistema: não move nada
+    if (st.ghost) colDragTarget(); // o último lugar (o quadro pode ter rolado depois do último movimento)
+    colDragStop();
+    if (st.temp) { backlogZoomOut = false; backlogZoomCols = st.prevCols; }
+    const moved = st.hasTarget && moveBacklogColumn(st.colId, st.beforeId);
+    activeColumnId = st.colId;
+    _zoomLastActive = st.colId;
+    if (!st.temp && moved) _zoomReveal = true;
+    if (moved || st.temp) renderBacklog();
 }
 
 // V40.5.0: ir programaticamente pra uma coluna (toque no dot)
@@ -6926,6 +7175,8 @@ window.openColumnMenuFromHeader = function() {
     if (!col) return;
     
     document.getElementById('column-menu-title').innerText = col.name;
+    columnMenuPosUi(); // V40.33.0
+    _colMenuMoves = 0;
     
     // K8: coluna padrão NÃO mostra botão Apagar
     const deleteBtn = document.getElementById('column-menu-delete-btn');
@@ -6940,6 +7191,13 @@ window.openColumnMenuFromHeader = function() {
 
 window.closeColumnMenu = function() {
     hideModal('column-menu-modal');
+    // V40.33.0: com a janelinha aberta a barrinha do Desfazer não aparece; ao fechar, ela mostra a última troca de lugar
+    if (_colMenuMoves) {
+        _colMenuMoves = 0;
+        undoClose();
+        const top = undoStack[undoStack.length - 1];
+        if (top && top.keys && top.keys.listas) undoBarShow(top.label, 'did', 5000);
+    }
 };
 
 window.openRenameColumn = function() {
@@ -8299,7 +8557,7 @@ function undoLabel(keys) {
         if (k === 'blocos' && s.m.every((c) => undoModLabel(k, c) === undoModLabel(k, s.m[0]) && /movid/.test(undoModLabel(k, c)))) return s.m.length + ' blocos movidos';
         return undoWord(k, s.m.length, 'editad');
     }
-    if (!s.n.length && !s.d.length && !s.m.length && s.o) return k === 'tarefas' ? 'Cartão mudou de lugar' : 'Ordem mudada';
+    if (!s.n.length && !s.d.length && !s.m.length && s.o) return k === 'tarefas' ? 'Cartão mudou de lugar' : k === 'listas' ? 'Lista mudou de lugar' : 'Ordem mudada';
     return 'Alteração';
 }
 
@@ -8333,7 +8591,12 @@ function undoApply(step, dir) { // dir 'b' = desfazer (volta pro antes) · 'a' =
                 }
                 byId.set(c.id, o);
             });
-            if (R.ob && R.oa) { arr = undoOrder(arr, dir === 'b' ? R.ob : R.oa, idOf); touched = true; }
+            if (R.ob && R.oa) {
+                const was = arr.map(idOf).join('\n');
+                arr = undoOrder(arr, dir === 'b' ? R.ob : R.oa, idOf);
+                touched = true;
+                if (arr.map(idOf).join('\n') !== was) res.done++; // V40.33.0: só a ordem (lista ou cartão que trocou de lugar) também é desfazer de verdade
+            }
             if (touched) { K.set(arr); K.save(); res.keys[key] = true; }
         });
     } finally { undoMute--; }

@@ -148,6 +148,7 @@ const IPHONES = [
         ['Períodos (agendar)', 'closeAllSheets(); openPeriodSelectSheet();', '#period-select-sheet', { fim: true }],
         ['Duplicar', `closeAllSheets(); duplicateTask(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} });`, '#clone-sheet', { fim: true }],
         ['Vincular nota', `closeAllSheets(); openLinkNoteSheet(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} });`, '#link-note-sheet', { fim: true }],
+        ['Janelinha: menu da lista', "closeAllSheets(); openListSheet(); switchListTab('backlog'); scrollToColumn(backlogColumnsDb[1].id); openColumnMenuFromHeader();", '#column-menu-modal', { depois: 'closeColumnMenu(); closeAllSheets();' }], // V40.33.0: setas Esquerda/Direita
         ['Janelinha: editar bloco', `closeAllSheets(); openEditModal(db.find((x) => x.date === '2026-11-16').id);`, '#edit-task-modal', { depois: 'cancelEdit();' }],
         ['Janelinha: apagar bloco', `closeAllSheets(); openDeleteModal(db.find((x) => x.date === '2026-11-16').id);`, '#delete-task-modal', { depois: 'cancelDelete();' }],
         ['Janelinha: horário', `closeAllSheets(); openTimePicker(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} });`, '#time-picker-modal', { depois: 'cancelTimePicker();' }],

@@ -8,6 +8,7 @@
 // V40.28.0: Semana — puxar a borda de baixo muda a duração; arrastar no próprio dia vale também pra antes de agora;
 // Duplicar nos 3 pontinhos; cartão sai da sublista arrastando (vira bloco) e bloco entra nela (vira cartão).
 // V40.29.0: Relatórios na barra da Agenda; Semana sempre de segunda a domingo (com zoom, o dia aberto fica à vista).
+// V40.33.0: mudar a lista de lugar arrastando pelo título (e pelo menu dos 3 pontinhos).
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -775,6 +776,73 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(m3.faz_theme === '#10b981' && JSON.stringify(m3.faz_hours) === '[7,24]', 'voltou pro verde, 07:00 às 24:00');
   await p.keyboard.press('Escape'); await p.waitForTimeout(200);
   ok(await p.evaluate(() => document.getElementById('modal-cfg').classList.contains('hidden')), 'Esc fecha');
+  }
+
+  { // V40.33.0 (bloco próprio)
+  console.log('\nV) Mudar a lista de lugar arrastando pelo título (V40.33.0):');
+  await p.keyboard.press('Escape'); await p.locator('#tab-listas').click(); await p.waitForTimeout(300);
+  if (await p.evaluate(() => document.getElementById('columns').classList.contains('zoomed'))) { await p.locator('#zoom-reset').click(); await p.waitForTimeout(300); }
+  await p.evaluate(() => { document.getElementById('board').scrollLeft = 0; }); await p.waitForTimeout(100);
+  const nomes = () => p.evaluate(() => [...document.querySelectorAll('#columns > section.col h2')].map((h) => h.textContent).join(','));
+  const pos = (n) => p.evaluate(([uid, n]) => window.__nuvem.alive('listas', uid).find((l) => l.name === n).position, [UID, n]);
+  const N0 = await nomes();
+  ok(N0 === 'ALFA,BETA,GAMA,DELTA,OMEGA', 'listas: ' + N0);
+  const cabeca = (n) => p.locator('#columns > section.col', { has: p.locator('h2', { hasText: new RegExp('^' + n + '$') }) }).locator(':scope > header');
+  const meioDe = (n) => p.evaluate((n) => { const s = [...document.querySelectorAll('#columns > section.col')].find((c) => c.querySelector('h2').textContent === n), r = s.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 20, l: r.left, r: r.right }; }, n);
+  ok(await p.evaluate(() => getComputedStyle(document.querySelector('#columns > section.col > header')).cursor) === 'grab', 'o mouse em cima do título vira a "mãozinha" de arrastar');
+  const hb = await cabeca('ALFA').boundingBox(), gm = await meioDe('GAMA');
+  const [pg, pd] = [await pos('GAMA'), await pos('DELTA')];
+  await p.mouse.move(hb.x + 40, hb.y + 14); await p.mouse.down(); await p.mouse.move(hb.x + 70, hb.y + 30, { steps: 4 }); await p.waitForTimeout(200);
+  await p.mouse.move(gm.x + 60, gm.y + 200, { steps: 12 }); await p.mouse.move(gm.x + 62, gm.y + 201); await p.mouse.move(gm.x + 63, gm.y + 202); await p.waitForTimeout(150);
+  const meio = await p.evaluate(() => { const l = document.getElementById('col-drop'), src = document.querySelector('section.col.col-dragging'); const lr = l && l.getBoundingClientRect(); const cs = [...document.querySelectorAll('#columns > section.col')].map((c) => c.getBoundingClientRect()); return { linha: !!l, x: lr ? lr.left + lr.width / 2 : 0, h: lr ? lr.height : 0, top: lr ? lr.top : 0, src: src && src.querySelector('h2').textContent, op: src ? getComputedStyle(src).opacity : '', vao: [cs[2].right, cs[3].left], topo: cs[0].top, deitada: document.querySelectorAll('.drop-line').length, arq: getComputedStyle(document.getElementById('drop-archive')).display }; });
+  ok(meio.linha && meio.src === 'ALFA' && meio.op === '0.35' && meio.x > meio.vao[0] && meio.x < meio.vao[1] && Math.abs(meio.top - meio.topo) < 2 && meio.h > 150, `arrastando ALFA pelo título: ALFA fica apagada e uma linha em pé (${Math.round(meio.h)}px) marca o vão entre GAMA e DELTA`);
+  ok(meio.deitada === 0 && meio.arq === 'none', 'sem a linha deitada dos cartões e sem o campo de arquivar (lista não arquiva)');
+  await foto(p, 'pc-lista-arrastando.png');
+  await solta();
+  ok(await nomes() === 'BETA,GAMA,ALFA,DELTA,OMEGA' && await pos('ALFA') === (pg + pd) / 2, 'soltou: ALFA foi pra entre GAMA e DELTA (na tela e na nuvem, posição no meio das duas)');
+  ok(await p.evaluate(() => !document.getElementById('col-drop') && !document.querySelector('.col-dragging') && document.getElementById('modal-task').classList.contains('hidden')), 'sem linha, sem lista apagada, nenhum cartão abriu');
+  ok(await p.evaluate(() => document.getElementById('btn-undo').title) === 'Desfazer: Lista mudou de lugar (Ctrl+Z)', 'botão ↶: "Desfazer: Lista mudou de lugar"');
+  await foto(p, 'pc-lista-depois.png');
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(500);
+  ok(await nomes() === N0, 'Ctrl+Z: volta a ordem');
+  // pra última posição, passando do meio da última (o quadro rolado até o fim, pra OMEGA aparecer inteira)
+  await p.evaluate(() => { const b = document.getElementById('board'); b.scrollLeft = b.scrollWidth; }); await p.waitForTimeout(150);
+  const hb2 = await cabeca('DELTA').boundingBox(), om = await meioDe('OMEGA');
+  await p.mouse.move(hb2.x + 40, hb2.y + 14); await p.mouse.down(); await p.mouse.move(hb2.x + 70, hb2.y + 30, { steps: 4 }); await p.waitForTimeout(200);
+  await p.mouse.move(om.x + 40, om.y + 150, { steps: 14 }); await p.mouse.move(om.x + 42, om.y + 151); await p.mouse.move(om.x + 43, om.y + 152); await p.waitForTimeout(250);
+  await solta();
+  const nf = await nomes();
+  ok(nf === 'ALFA,BETA,GAMA,OMEGA,DELTA', 'passando do meio da última: DELTA vai pro fim (' + nf + ')');
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(500);
+  // Esc no meio: nada muda
+  const hb3 = await cabeca('GAMA').boundingBox();
+  await p.mouse.move(hb3.x + 40, hb3.y + 14); await p.mouse.down(); await p.mouse.move(hb3.x + 70, hb3.y + 30, { steps: 4 }); await p.waitForTimeout(150);
+  await p.mouse.move(60, hb3.y + 200, { steps: 10 }); await p.waitForTimeout(150);
+  await p.keyboard.press('Escape'); await p.mouse.up(); await p.waitForTimeout(300);
+  ok(await nomes() === N0 && await p.evaluate(() => !document.getElementById('col-drop') && !document.querySelector('.col-dragging')), 'Esc no meio do arraste: nada muda e a tela fica limpa');
+  // clique no título só (sem arrastar) não faz nada; 3 pontinhos continuam abrindo o menu
+  await cabeca('DELTA').locator('h2').click(); await p.waitForTimeout(200);
+  ok(await nomes() === N0 && await p.evaluate(() => !document.querySelector('body > div.fixed.z-40.w-52') && document.getElementById('modal-task').classList.contains('hidden')), 'clicar no título sem arrastar não muda nada');
+  await cabeca('BETA').locator('.col-menu-btn').click(); await p.waitForTimeout(200);
+  const mn = await p.evaluate(() => { const m = document.querySelector('body > div.fixed.z-40.w-52'); if (!m) return null; const r = m.getBoundingClientRect(); return { itens: [...m.querySelectorAll('button')].map((b) => b.innerText.trim() + (b.disabled ? '(off)' : '')), dentro: r.right <= innerWidth && r.bottom <= innerHeight }; });
+  ok(!!mn && mn.itens.join('|') === 'Renomear lista|Mover pra esquerda|Mover pra direita|Apagar lista' && mn.dentro, 'menu da lista: Renomear | Mover pra esquerda | Mover pra direita | Apagar');
+  await foto(p, 'pc-lista-menu.png');
+  await p.locator('body > div.fixed.z-40.w-52 [data-act="right"]').click(); await p.waitForTimeout(400);
+  ok(await nomes() === 'ALFA,GAMA,BETA,DELTA,OMEGA', 'Mover pra direita: BETA passa GAMA');
+  await cabeca('ALFA').locator('.col-menu-btn').click(); await p.waitForTimeout(200);
+  ok(await p.evaluate(() => document.querySelector('body > div.fixed.z-40.w-52 [data-act="left"]').disabled), 'na primeira lista, "Mover pra esquerda" fica apagado');
+  await p.keyboard.press('Escape'); await p.mouse.click(700, 860); await p.waitForTimeout(150);
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(500);
+  ok(await nomes() === N0, 'Ctrl+Z: volta');
+  // arrastar cartão continua igual (pelo cartão não arrasta a lista)
+  const card = await p.locator('#columns > section.col').nth(1).locator('.card').first();
+  const cid = await card.getAttribute('data-id'), cbx = await card.boundingBox(), alvo = await p.locator('#columns > section.col').nth(3).locator('.col-list').boundingBox();
+  await p.mouse.move(cbx.x + 60, cbx.y + 20); await p.mouse.down(); await p.mouse.move(cbx.x + 90, cbx.y + 60, { steps: 4 }); await p.waitForTimeout(200);
+  const durante = await p.evaluate(() => ({ lista: !!document.querySelector('.col-dragging'), linhaLista: !!document.getElementById('col-drop') }));
+  await p.mouse.move(alvo.x + 100, alvo.y + 40, { steps: 10 }); await p.mouse.move(alvo.x + 102, alvo.y + 41); await p.mouse.move(alvo.x + 103, alvo.y + 42); await p.waitForTimeout(150);
+  await solta();
+  const foi = await p.evaluate(([uid, id]) => window.__nuvem.get('tarefas', uid, id).column_id, [UID, cid]);
+  ok(!durante.lista && !durante.linhaLista && foi === await p.locator('#columns > section.col').nth(3).getAttribute('data-col') && await nomes() === N0, 'arrastar um cartão continua levando só o cartão pra outra lista (as listas ficam no lugar)');
   }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));

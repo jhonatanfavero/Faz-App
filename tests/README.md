@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 31 suítes (cerca de 2 minutos)
+npm test        # confere o CSS pronto e roda as 32 suítes (cerca de 2 minutos)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -43,6 +43,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_recorrente.js` | o app do celular e `kanban.html` de verdade, a mesma nuvem | V40.30.0: Recorrente sem fim (1200 meses): criar, editar sem mexer no fim, "neste e nos próximos" sem escrever 1200 meses, Encerrar depois do mês da tela, Repetir sem fim de novo, encerrar no 1º mês (vira avulsa), as antigas de 12 meses, Desfazer, a nuvem e o PC com as mesmas regras |
 | `test_arrastar_dias.js` | `index.html` + `app.js` + `sync.js` de verdade, com uma "tela" de mentira pras posições | V40.31.0: com 2 ou 3 dias, segurar um bloco e levar pra outro dia e/ou horário (encaixe no vago mais perto, vermelho quando não cabe, balão com dia e hora, sublista, passado/adiado, Desfazer), os dias andando na borda, toque cancelado, o clique que sobra, o "pro lado anda um dia" e o tocar pra abrir que continuam, tarefa na mão, a dica e a nuvem |
 | `test_preferencias.js` | o app do celular (dois aparelhos) e `kanban.html` de verdade, a mesma nuvem | V40.32.0: cor do app e horário do dia nos 2 sentidos: as regras de quem ganha (a mudança mais nova; conta de antes desta versão; conta com dado estragado), o celular sobe e recebe (avisos, régua, Config → Aparência), não volta pra trás com mudança mais velha, espera o arraste terminar, restaurar backup, aparelho novo pega o da conta; no PC a janela Configurações (8 cores, Começa/Termina, começo depois do fim, sem internet volta como estava, Esc, fundo), a Agenda no horário novo, o que o celular mudou aparece ao abrir, sair da conta fecha |
+| `test_ordem_listas.js` | o app do celular e `kanban.html` de verdade, com uma "tela" de mentira pras posições | V40.33.0: mudar a ordem das listas. Celular: menu (Esquerda/Direita, "Posição 2 de 5", o menu fica aberto, a barrinha do Desfazer ao fechar), segurar o título no afastado (cópia, espaço tracejado, lista que "sai", soltar, Desfazer/Refazer), o que não move (mesmo lugar, toque cancelado, rolar, redesenho no meio, trocar o zoom), modo normal (o quadro se afasta só durante o arrasto, sem gravar o zoom), mouse com a borda rolando, uma lista só; nuvem nos 2 sentidos (sobe só a lista movida) e o sync esperando o arrasto. PC: arrastar pelo título (linha em pé, mesmo lugar, soltar fora, tempo real esperando, cartão continua sendo cartão), menu Mover pra esquerda/direita, vizinhas coladas (renumera num passo só), Ctrl+Z e a ordem vinda do celular |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)
@@ -69,10 +70,10 @@ Para isso existem quatro testes que abrem um Chrome de verdade:
 
 ```
 npm i -D playwright && npx playwright install chromium    # uma vez
-node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo; sublista e vagos ocultos; desfazer; dois toques; agenda afastada com pinça de verdade; cartão da sublista e bloco arrastando com o dedo; bloco de um dia pro outro com os dias lado a lado; o topo das telas e os Períodos no iPhone (área segura simulada)
+node tests/navegador/toque_listas.js    # celular: listas afastadas e arrastar com o dedo; sublista e vagos ocultos; desfazer; dois toques; agenda afastada com pinça de verdade; cartão da sublista e bloco arrastando com o dedo; bloco de um dia pro outro com os dias lado a lado; o topo das telas e os Períodos no iPhone (área segura simulada); mudar a lista de lugar com o dedo (afastado, na borda, modo normal, menu)
 node tests/navegador/offline.js         # o app abre completo sem internet?
 node tests/navegador/iphone.js          # iPhone 13 e 13 mini simulados (barra de status e risco de início): percorre as telas e acha botão escondido, coberto ou vazando
-node tests/navegador/tela_pc.js         # tela do PC com mouse: arrastar e esticar blocos (Dia e Semana), 3 pontinhos, campo de arquivar, zoom, tags, sublista; Configurações (cor e horário) e o topo de 1024 a 1440 px
+node tests/navegador/tela_pc.js         # tela do PC com mouse: arrastar e esticar blocos (Dia e Semana), 3 pontinhos, campo de arquivar, zoom, tags, sublista; Configurações (cor e horário) e o topo de 1024 a 1440 px; mudar a lista de lugar arrastando pelo título e pelo menu
 node tests/navegador/voltar.js          # celular: botão voltar (CloseWatcher de verdade; o Esc faz o papel do voltar) e, sem CloseWatcher, pelo histórico
 ```
 

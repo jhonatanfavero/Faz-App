@@ -34,6 +34,21 @@ const IPHONES = [
         m.on('pageerror', (e) => errs.push(String(e)));
         await m.goto(base + 'index.html');
         await m.waitForTimeout(900);
+        // V40.34.0: metas de exemplo (as linhas "Meta" só aparecem com meta criada), 2 blocos ligados e concluídos
+        // (selo na agenda e barras no gráfico) e uma sublista com um cartão ligado (janelinha do cartão)
+        await m.evaluate(() => {
+            [4, 1, 0].forEach((i) => { openGoalForm(); applyGoalTemplate(i); saveGoalForm(); });
+            const ler = goalsDb.find((g) => g.title === 'Ler'), agua = goalsDb.find((g) => g.title === 'Beber água'), correr = goalsDb.find((g) => g.title === 'Correr');
+            db.filter((x) => x.date === '2026-11-16' && !Array.isArray(x.cards)).sort((a, b) => a.startMin - b.startMin).slice(1, 3).forEach((b) => { b.goalId = ler.id; b.completed = true; });
+            const col0 = backlogColumnsDb[0] && backlogColumnsDb[0].id, t0 = backlogDb.find((t) => (t.columnId || 'col_geral') === col0) || backlogDb[0];
+            if (t0) { t0.goalId = ler.id; saveBacklog(); }
+            if (routinesDb[0]) { routinesDb[0].goalId = correr.id; saveRoutinesDb(); }
+            db.push({ id: 'f_ip_sub', type: 'focus', title: 'Pendências', startMin: 22 * 60, duration: 60, date: '2026-11-16', microblocks: [], completed: false, theme: 'focus', tagId: null, linkedNoteIds: [], expanded: false,
+                cards: [{ id: 'cd_ip1', title: 'Copo de água', done: false, microblocks: [], goalId: agua.id }, { id: 'cd_ip2', title: 'Ligar pro banco', done: true, microblocks: [] }] });
+            saveDb(); closeAllSheets(); renderTimeline(); renderBacklog(); renderRoutinesList();
+            if (typeof undoBarHide === 'function') undoBarHide();
+        });
+        await m.waitForTimeout(400);
         // a barra de status e o risco de início de mentira (só pra foto; o dedo passa por eles)
         await m.evaluate((ip) => {
             const top = document.createElement('div');
@@ -105,7 +120,12 @@ const IPHONES = [
                 const porCimaDeProposito = hb && eb && hb !== eb && Number(getComputedStyle(hb).zIndex) > Number(getComputedStyle(eb).zIndex) ||
                     // os botões redondos (+ e Lista) flutuam sobre a agenda, que rola: o bloco sai de baixo deles
                     !!(hit && hit.closest('#fab-btn, #list-btn') && el.closest('#timeline-scroll'));
-                if (hit && !porCimaDeProposito && !(hit === el || el.contains(hit) || hit.contains(el) || hit.closest('label') === el.closest('label') && el.closest('label')))
+                // V40.34.0: numa lista que ainda rola pra baixo, o que está embaixo do rodapé fixo (ex.: "Salvar meta", fora da
+                // lista) sai de baixo dele rolando: só conta quando a lista não rola mais (as telas com fim: true)
+                let sc = null;
+                for (let p = el.parentElement; p; p = p.parentElement) { const ps = getComputedStyle(p); if (/(auto|scroll)/.test(ps.overflowY) && p.scrollHeight > p.clientHeight + 2) { sc = p; break; } }
+                const debaixoDoRodape = !!(hit && sc && !sc.contains(hit) && sc.scrollTop < sc.scrollHeight - sc.clientHeight - 2 && hit.getBoundingClientRect().top >= sc.getBoundingClientRect().top + sc.clientHeight / 2);
+                if (hit && !porCimaDeProposito && !debaixoDoRodape && !(hit === el || el.contains(hit) || hit.contains(el) || hit.closest('label') === el.closest('label') && el.closest('label')))
                     out.push({ tipo: 'coberto por ' + name(hit), quem, rect });
             });
             if (raiz === null) { // o nome do dia no topo da agenda não pode ficar cortado
@@ -136,6 +156,8 @@ const IPHONES = [
         ['Lista: nova despesa', 'openFinancialForm();', '#list-sheet', { fim: true }],
         ['Lista: Metas', "closeAllSheets(); openListSheet(); switchListTab('goals');", '#list-sheet', { fim: true }],
         ['Lista: nova meta', 'openGoalForm(null);', '#list-sheet', { fim: true }],
+        ['Lista: meta com gráfico', "openGoalForm(goalsDb.find((g) => g.title === 'Ler').id);", '#list-sheet'], // V40.34.0: o gráfico fica no topo
+        ['Agenda: selos das metas', `closeAllSheets(); activeDateObj = new Date(2026, 10, 16); renderTimeline(); setTimeout(() => { const el = document.querySelector('.block-item .goal-badge'); if (el) el.closest('.block-item').scrollIntoView({ block: 'center' }); }, 50);`, null], // V40.34.0
         ['Config', 'closeAllSheets(); openConfigSheet();', '#config-sheet', { fim: true }],
         ['Config: Horário', 'openConfigHours();', '#config-sheet', { fim: true }],
         ['Config: Aparência', 'openConfigSheet(); openConfigAppearance();', '#config-sheet', { fim: true }],
@@ -150,6 +172,7 @@ const IPHONES = [
         ['Vincular nota', `closeAllSheets(); openLinkNoteSheet(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} });`, '#link-note-sheet', { fim: true }],
         ['Janelinha: menu da lista', "closeAllSheets(); openListSheet(); switchListTab('backlog'); scrollToColumn(backlogColumnsDb[1].id); openColumnMenuFromHeader();", '#column-menu-modal', { depois: 'closeColumnMenu(); closeAllSheets();' }], // V40.33.0: setas Esquerda/Direita
         ['Janelinha: editar bloco', `closeAllSheets(); openEditModal(db.find((x) => x.date === '2026-11-16').id);`, '#edit-task-modal', { depois: 'cancelEdit();' }],
+        ['Janelinha: cartão da sublista', "closeAllSheets(); openSublistCard('f_ip_sub', 'cd_ip1', { stopPropagation() {} });", '#sub-card-modal', { depois: 'closeSubCard();' }], // V40.34.0: + linha Meta
         ['Janelinha: apagar bloco', `closeAllSheets(); openDeleteModal(db.find((x) => x.date === '2026-11-16').id);`, '#delete-task-modal', { depois: 'cancelDelete();' }],
         ['Janelinha: horário', `closeAllSheets(); openTimePicker(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} });`, '#time-picker-modal', { depois: 'cancelTimePicker();' }],
         ['Tarefa na mão', `closeAllSheets(); scheduleBacklogItem(backlogDb[0].id);`, '#floating-task', { depois: 'cancelPendingTask();' }],

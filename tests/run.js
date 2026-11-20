@@ -37,6 +37,7 @@ const SUITES = [
     ['Dias lado a lado: arrastar bloco de um dia pro outro (celular)', 'test_arrastar_dias.js', [ROOT, DADOS]],
     ['Configurações no PC: cor do app e horário do dia, nos 2 sentidos', 'test_preferencias.js', [ROOT, DADOS]],
     ['Ordem das listas: arrastar e menu, no celular e no PC (Desfazer e nuvem)', 'test_ordem_listas.js', [ROOT, DADOS]],
+    ['Metas etapa 2: bloco, tarefa, rotina e cartão ligados a uma meta; gráfico (celular, nuvem e PC)', 'test_metas_etapa2.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

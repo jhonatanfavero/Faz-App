@@ -247,6 +247,11 @@
                 <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2" id="tag-selector-container">
                 </div>
             </div>
+            <!-- V40.34.0: meta ligada (concluir o bloco conta na meta). Some quando não tem meta nenhuma. -->
+            <div class="mb-8 -mt-4 hidden" id="goal-pick-new-wrap">
+                <p class="text-xs text-zinc-500 font-medium mb-3 uppercase tracking-wider">Meta (Opcional)</p>
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2" id="goal-pick-new"></div>
+            </div>
 
             <button id="commit-intent-btn" onclick="commitIntent()" class="w-full bg-app-focus text-white font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition flex items-center justify-center gap-1.5 text-sm">
                 <i class="ph ph-calendar-plus text-base"></i> Inserir na Agenda
@@ -403,6 +408,11 @@
                                 <!-- preenchido por updateBacklogFormVisuals() -->
                             </div>
                         </div>
+                        <!-- V40.34.0: meta ligada (vai junto quando a tarefa vira bloco) -->
+                        <div id="bl-form-goal-wrap" class="mb-6 hidden">
+                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Meta (Opcional)</label>
+                            <div id="bl-form-goal-container" class="flex gap-2 overflow-x-auto no-scrollbar pb-1"></div>
+                        </div>
 
                         <!-- V40.9.0: cor livre do cartão (independente da tag) -->
                         <div class="mb-5">
@@ -509,6 +519,11 @@
                             <div id="rt-form-tag-container" class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                                 <!-- preenchido por updateRtFormVisuals() -->
                             </div>
+                        </div>
+                        <!-- V40.34.0: meta ligada (cada bloco que a rotina criar conta nela) -->
+                        <div id="rt-form-goal-wrap" class="mb-6 hidden">
+                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Meta (Opcional)</label>
+                            <div id="rt-form-goal-container" class="flex gap-2 overflow-x-auto no-scrollbar pb-1"></div>
                         </div>
 
                         <div>
@@ -745,6 +760,10 @@
                     </div>
 
                     <div class="flex-1 overflow-y-auto no-scrollbar p-4 pb-24">
+                        <!-- V40.34.0: gráfico da meta (só ao abrir uma que já existe) -->
+                        <div id="goal-chart-wrap" class="hidden mb-5 bg-zinc-50 border border-zinc-100 rounded-2xl p-3.5">
+                            <div id="goal-chart"></div>
+                        </div>
                         <!-- Sugestões (só ao criar) -->
                         <div id="goal-templates-wrap" class="mb-5">
                             <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Sugestões</label>
@@ -1246,6 +1265,11 @@
             <input type="text" id="edit-task-title" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-4 text-sm text-center">
             <p class="text-xs text-zinc-500 font-medium mb-2 uppercase tracking-wider text-center">Etiqueta</p>
             <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-2" id="edit-tag-selector-container"></div>
+            <!-- V40.34.0: meta ligada -->
+            <div id="edit-goal-wrap" class="hidden">
+                <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Meta</p>
+                <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-2" id="edit-goal-pick"></div>
+            </div>
             <!-- V40.9.0: cor livre do cartão -->
             <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Cor do cartão</p>
             <div class="flex flex-wrap items-center gap-2 mb-6" id="edit-color-picker"></div>
@@ -1262,6 +1286,11 @@
             <input type="text" id="sub-card-title" maxlength="200" autocomplete="off" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-4 text-sm text-center">
             <p class="text-xs text-zinc-500 font-medium mb-2 uppercase tracking-wider text-center">Etiqueta</p>
             <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-2" id="sub-card-tags"></div>
+            <!-- V40.34.0: meta ligada (o cartão feito conta nela) -->
+            <div id="sub-card-goal-wrap" class="hidden">
+                <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Meta</p>
+                <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-2" id="sub-card-goals"></div>
+            </div>
             <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Cor do cartão</p>
             <div class="flex flex-wrap items-center gap-2 mb-4" id="sub-card-colors"></div>
             <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Checklist</p>
@@ -1516,7 +1545,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.33.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.34.0</div>
 
     </div>
 

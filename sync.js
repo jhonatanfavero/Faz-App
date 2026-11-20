@@ -60,15 +60,15 @@
     var ORDERED = { listas: true, tags: true, tarefas: true, blocos: false, rotinas: false, notas: false, financas: false, metas_listas: true, metas: true, metas_dias: false };
     var NEWEST_FIRST = { rotinas: true, notas: true };
     var FIELDS = {
-        tarefas: ['column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived'],
+        tarefas: ['column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived', 'goal_id'], // V40.34.0: + goal_id (meta ligada)
         listas: ['name', 'is_default', 'position', 'created_ms'],
         tags: ['name', 'color', 'position'],
-        blocos: ['date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'cards'],
-        rotinas: ['title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms'],
+        blocos: ['date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'cards', 'goal_id'],
+        rotinas: ['title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms', 'goal_id'],
         notas: ['title', 'content', 'created_ms', 'updated_ms'],
         financas: ['title', 'amount', 'start_month', 'duration_months', 'is_recurring', 'due_day', 'tag_id', 'paid_months', 'amount_overrides', 'created_ms'],
         metas_listas: ['name', 'is_default', 'position', 'created_ms'],
-        metas: ['list_id', 'title', 'emoji', 'period', 'unit', 'target', 'step', 'position', 'created_ms'],
+        metas: ['list_id', 'title', 'emoji', 'period', 'unit', 'target', 'step', 'position', 'created_ms', 'count_from'], // V40.34.0: + count_from
         metas_dias: ['goal_id', 'date', 'amount', 'target']
     };
     var FIELD_DEFAULTS = { archived: false, completed: false, was_delayed: false, is_default: false, microblocks: [], linked_note_ids: [], is_recurring: false, paid_months: [], amount_overrides: {} };
@@ -150,9 +150,11 @@
             if (hex6(c.color)) o.color = String(c.color);
             if (c.duration != null && c.duration !== '' && Number.isFinite(Number(c.duration))) o.duration = clampInt(c.duration, 30, 5, 1440);
             if (c.columnId != null && SAFE_ID.test(String(c.columnId))) o.columnId = String(c.columnId);
+            if (goalRef(c.goalId)) o.goalId = goalRef(c.goalId); // V40.34.0
             return o;
         });
     }
+    function goalRef(v) { return v != null && v !== '' && SAFE_ID.test(String(v)) ? String(v) : null; } // V40.34.0: meta ligada
     function goalNum(v, def) { // alvo/passo de meta: > 0, até 1 bilhão, com 2 casas
         var n = Number(v), r = v != null && v !== '' && Number.isFinite(n) ? Math.min(GOAL_MAX, Math.round(n * 100) / 100) : 0;
         return r > 0 ? r : def;
@@ -190,11 +192,13 @@
                     tag_id: it.tagId ? String(it.tagId) : null,
                     microblocks: Array.isArray(it.microblocks) ? clone(it.microblocks) : [],
                     color: hex6(it.color),
-                    archived: !!it.__archived
+                    archived: !!it.__archived,
+                    goal_id: goalRef(it.goalId) // V40.34.0
                 };
             },
             item: function (r, prev) {
                 var it = prev ? Object.assign({}, prev) : { id: r.id };
+                if (goalRef(r.goal_id)) it.goalId = goalRef(r.goal_id); else delete it.goalId; // V40.34.0
                 it.title = r.title;
                 it.duration = r.duration;
                 it.tagId = r.tag_id || null;
@@ -256,7 +260,8 @@
                     linked_note_ids: Array.isArray(b.linkedNoteIds) ? clone(b.linkedNoteIds) : [],
                     color: hex6(b.color),
                     archived: !!b.__archived,
-                    cards: Array.isArray(b.cards) ? safeCards(b.cards) : null // V40.24.0: sublista
+                    cards: Array.isArray(b.cards) ? safeCards(b.cards) : null, // V40.24.0: sublista
+                    goal_id: goalRef(b.goalId) // V40.34.0: meta ligada
                 };
             },
             item: function (r, prev) {
@@ -274,6 +279,7 @@
                 b.linkedNoteIds = clone(r.linked_note_ids || []);
                 if (r.color) b.color = r.color; else delete b.color;
                 if (Array.isArray(r.cards)) b.cards = clone(r.cards); else delete b.cards; // V40.24.0: sublista
+                if (goalRef(r.goal_id)) b.goalId = goalRef(r.goal_id); else delete b.goalId; // V40.34.0
                 delete b.__archived;
                 return b;
             }
@@ -290,7 +296,8 @@
                     theme: WORD.test(theme) ? theme : 'focus',
                     tag_id: x.tagId ? String(x.tagId) : null,
                     microblocks: Array.isArray(x.microblocks) ? clone(x.microblocks) : [],
-                    created_ms: msOrNull(x.createdAt)
+                    created_ms: msOrNull(x.createdAt),
+                    goal_id: goalRef(x.goalId) // V40.34.0
                 };
             },
             item: function (r, prev) {
@@ -302,6 +309,7 @@
                 x.tagId = r.tag_id || null;
                 x.microblocks = clone(r.microblocks || []);
                 x.createdAt = r.created_ms != null ? Number(r.created_ms) : (prev && prev.createdAt) || 0;
+                if (goalRef(r.goal_id)) x.goalId = goalRef(r.goal_id); else delete x.goalId; // V40.34.0
                 return x;
             }
         },
@@ -389,7 +397,8 @@
                     unit: unit,
                     target: goalNum(g.target, GOAL_UNITS[unit][1]),
                     step: goalNum(g.step, GOAL_UNITS[unit][0]),
-                    created_ms: msOrNull(g.createdAt)
+                    created_ms: msOrNull(g.createdAt),
+                    count_from: validDate(String(g.countFrom || '')) ? String(g.countFrom) : null // V40.34.0: recomeçou a contagem (os blocos de antes não contam)
                 };
             },
             item: function (r, prev) {
@@ -402,6 +411,7 @@
                 g.target = r.target;
                 g.step = r.step;
                 g.createdAt = r.created_ms != null ? Number(r.created_ms) : (prev && prev.createdAt) || 0;
+                if (r.count_from && validDate(String(r.count_from))) g.countFrom = String(r.count_from); else delete g.countFrom; // V40.34.0
                 return g;
             }
         },
@@ -874,16 +884,16 @@
     var LIB_URL = 'libs/supabase-js/supabase.js'; // V40.10.0: cópia local, versão travada (ver libs/README.md)
     var KINDS = CORE.KINDS;
     var SELECT = {
-        tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,deleted',
+        tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,goal_id,deleted', // V40.34.0: + goal_id
         listas: 'id,name,is_default,position,created_ms,deleted',
         tags: 'id,name,color,position,deleted',
-        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,deleted,updated_at', // V40.24.0: + cards (sublista)
-        rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,deleted',
+        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,goal_id,deleted,updated_at', // V40.24.0: + cards (sublista); V40.34.0: + goal_id
+        rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,goal_id,deleted',
         notas: 'id,title,content,created_ms,updated_ms,deleted',
         financas: 'id,title,amount,start_month,duration_months,is_recurring,due_day,tag_id,paid_months,amount_overrides,created_ms,deleted',
         // V40.21.0: metas
         metas_listas: 'id,name,is_default,position,created_ms,deleted',
-        metas: 'id,list_id,title,emoji,period,unit,target,step,position,created_ms,deleted',
+        metas: 'id,list_id,title,emoji,period,unit,target,step,position,created_ms,count_from,deleted', // V40.34.0: + count_from
         metas_dias: 'id,goal_id,date,amount,target,deleted,updated_at'
     };
     var GOAL_KINDS = ['metas_listas', 'metas', 'metas_dias'];
@@ -960,7 +970,8 @@
             }
             // V40.8.0: digitando em algum campo do app (ex.: item de checklist)? Não redesenha por baixo.
             var a = document.activeElement;
-            if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !(a.closest && a.closest('#config-sheet'))) return true;
+            // V40.34.0: campo de uma tela já fechada (translate-y-full) não conta: ninguém está digitando nele.
+            if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !(a.closest && (a.closest('#config-sheet') || a.closest('.translate-y-full')))) return true;
         } catch (e) {}
         return false;
     }
@@ -1028,7 +1039,10 @@
         for (var i = 0; i < KINDS.length; i++) if (!INCREMENTAL[KINDS[i]]) out[KINDS[i]] = await fetchRows(KINDS[i], uid, 0);
         for (var k in INCREMENTAL) {
             var cursor = (st && st[INCREMENTAL[k]]) || 0;
-            var incremental = !!(st && st.base && st.base[k] && cursor);
+            // V40.34.0: quem vem de antes guardou os blocos sem o goal_id (a versão antiga nem lia). Lê a agenda
+            // inteira uma vez só: senão a meta que o PC ligou enquanto o celular estava na versão antiga não chega,
+            // e mexer naquele bloco aqui mandaria goal_id vazio por cima dela.
+            var incremental = !!(st && st.base && st.base[k] && cursor) && !(k === 'blocos' && !st.goalIds);
             var rows = await fetchRows(k, uid, incremental ? cursor - 30000 : 0);
             rows.forEach(function (r) { var t = Date.parse(r.updated_at); if (t > cursor) cursor = t; });
             if (incremental) {
@@ -1152,7 +1166,7 @@
         if (p.changed.rotinas) { try { if (typeof renderRoutinesList === 'function') renderRoutinesList(); } catch (e) { console.warn('[FazSync] rotinas', e); } }
         if (p.changed.notas) { try { if (typeof renderNotes === 'function') renderNotes(); } catch (e) { console.warn('[FazSync] notas', e); } }
         if (p.changed.financas) { try { if (typeof renderFinancial === 'function') renderFinancial(); } catch (e) { console.warn('[FazSync] finanças', e); } }
-        if (!p.noGoals && (p.changed.metas_listas || p.changed.metas || p.changed.metas_dias)) { try { if (typeof renderGoals === 'function') renderGoals(); } catch (e) { console.warn('[FazSync] metas', e); } }
+        if (!p.noGoals && (p.changed.metas_listas || p.changed.metas || p.changed.metas_dias || p.changed.blocos)) { try { if (typeof renderGoals === 'function') renderGoals(); } catch (e) { console.warn('[FazSync] metas', e); } } // V40.34.0: bloco ligado concluído conta na meta
         try { if (typeof ensureDefaultColumn === 'function') ensureDefaultColumn(); } catch (e) {}
         try {
             if (typeof activeColumnId !== 'undefined' && !backlogColumnsDb.some(function (c) { return c.id === activeColumnId; })) {
@@ -1210,7 +1224,7 @@
             if (KINDS.some(function (k) { return p.changed[k]; })) applyLocal(p);
 
             await pushAll(uid, p.push);
-            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), cursorBlocos: fetched.cursors.blocos, cursorMetasDias: fetched.cursors.metas_dias, arch: 1, lastSyncAt: Date.now() });
+            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), cursorBlocos: fetched.cursors.blocos, cursorMetasDias: fetched.cursors.metas_dias, arch: 1, goalIds: 1, lastSyncAt: Date.now() }); // goalIds: V40.34.0
             lastError = null;
             if (manual || firstSync) toast('Sincronizado ✅');
             else if (novosTipos) toast('☁️ Rotinas, notas e finanças agora também vão pro computador');

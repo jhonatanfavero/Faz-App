@@ -1,5 +1,5 @@
 /* ===========================================================================
- * Faz / TimeBlock — METAS (V40.21.0, etapa 1)
+ * Faz / TimeBlock — METAS (V40.21.0, etapa 1; V40.34.0, etapa 2: blocos ligados e gráfico)
  * ---------------------------------------------------------------------------
  * As regras das metas num lugar só, iguais no celular, no PC e no Assistente:
  * período (dia, semana ou mês), progresso, estrelas, sequência, pontos e nível.
@@ -7,7 +7,8 @@
  *
  * Formato que as telas entregam:
  *   lista { id, name }   (na tela, desde a V40.23.0, se chama "categoria": Pessoal, Profissional, Financeiro...)
- *   meta  { id, listId, title, emoji, period 'dia'|'semana'|'mes', unit 'vezes'|'minutos'|'reais', target, step }
+ *   meta  { id, listId, title, emoji, period 'dia'|'semana'|'mes', unit 'vezes'|'minutos'|'reais', target, step, countFrom? }
+ *         countFrom (V40.34.0) = dia em que a contagem recomeçou (mudou frequência ou medida): bloco de antes não conta
  *   dia   { id, goalId, date 'YYYY-MM-DD', amount, target }
  *         o quanto foi feito naquele dia; id = <meta>_<AAAAMMDD>; target = o alvo da meta quando foi marcado
  *
@@ -19,7 +20,12 @@
  *   - Pontos: estrela diária 10, semanal 50, mensal 200.
  *   - Nível n começa em 25·(n−1)·(n+2) pontos: 0, 100, 250, 450, 700, 1000...
  *   - Apagar uma meta tira as estrelas dela da conta (a tela avisa antes).
- * Etapa 2 (depois): cartões da agenda ligados às metas também contam, e gráficos.
+ *
+ * Etapa 2 (V40.34.0): bloco da agenda (e cartão da sublista) ligado a uma meta (goalId) conta quando concluído,
+ * no dia dele, como um toque no "+" (em meta de minutos, conta o tempo dele). Não grava nada: autoDays() monta
+ * "dias de mentira" a partir dos blocos e as telas somam com os dias de verdade (withAuto). Arquivado continua
+ * contando; apagado deixa de contar. Mudou o alvo? targetMarks() guarda o alvo antigo nos períodos que já
+ * passaram e só tinham blocos (senão subir o alvo tiraria estrela antiga). history() dá as barras do gráfico.
  * ======================================================================== */
 
 (function (root, factory) {
@@ -123,16 +129,17 @@
 
     // ---------- progresso ----------
     // { chaveDoPeríodo: { total, target (o guardado no dia mais recente daquele período), last } }
+    // V40.34.0: o alvo vem do dia mais recente que guardou um alvo (mesmo com 0 feito: é a marca do targetMarks);
+    // dia sem alvo (os dos blocos ligados) só soma.
     function sums(goal, days) {
         var g = normalize(goal), out = {};
         (days || []).forEach(function (d) {
             if (!d || String(d.goalId) !== String(g.id) || !isDay(d.date)) return;
-            var a = Number(d.amount) || 0;
-            if (!(a > 0)) return;
+            var a = Number(d.amount) || 0, t = Number(d.target), hasT = Number.isFinite(t) && t > 0;
+            if (!(a > 0) && !hasT) return;
             var k = periodKey(g.period, d.date), s = out[k] || (out[k] = { total: 0, target: 0, last: '' });
-            s.total = round2(s.total + a);
-            var t = Number(d.target);
-            if (d.date >= s.last) { s.last = d.date; s.target = Number.isFinite(t) && t > 0 ? t : 0; }
+            if (a > 0) s.total = round2(s.total + a);
+            if (hasT && d.date >= s.last) { s.last = d.date; s.target = t; }
         });
         return out;
     }
@@ -168,6 +175,80 @@
         list.forEach(function (s) { stars += s.stars; points += s.points; if (s.goal.period === 'dia') { due++; if (s.complete) done++; } });
         return Object.assign({ stars: stars, points: points, todayDone: done, todayTotal: due, statuses: list }, levelOf(points));
     }
+    // ---------- V40.34.0: blocos e cartões ligados a uma meta ----------
+    // Quanto um bloco (ou cartão) concluído vale na meta: um toque no "+"; em minutos, o tempo dele.
+    function credit(goal, dur) {
+        var g = normalize(goal);
+        if (g.unit === 'minutos') { var m = Math.round(Number(dur) || 0); return m > 0 ? Math.min(MAX, m) : g.step; }
+        return g.step;
+    }
+    // Os "dias de mentira" dos blocos: [{ goalId, date, amount, auto: true }], um por meta e dia (sem alvo).
+    // blocks no formato do celular ({ date, goalId, completed, duration, cards }) — o PC converte antes.
+    function autoDays(goals, blocks) {
+        var byId = {}, acc = {}, order = [];
+        (goals || []).forEach(function (g) { if (g && g.id != null) byId[String(g.id)] = g; });
+        function add(goalId, date, dur) {
+            var g = goalId != null && own(byId, goalId) ? byId[String(goalId)] : null;
+            if (!g || !isDay(date)) return;
+            if (g.countFrom && isDay(g.countFrom) && date < g.countFrom) return; // a contagem recomeçou depois disso
+            var k = String(goalId) + '|' + date;
+            if (!acc[k]) { acc[k] = { goalId: String(goalId), date: String(date).slice(0, 10), amount: 0, auto: true }; order.push(k); }
+            acc[k].amount = Math.min(MAX, round2(acc[k].amount + credit(g, dur)));
+        }
+        (blocks || []).forEach(function (b) {
+            if (!b) return;
+            var date = String(b.date || '').slice(0, 10);
+            if (b.completed && b.goalId) add(b.goalId, date, b.duration);
+            if (Array.isArray(b.cards)) b.cards.forEach(function (c) { if (c && c.done && c.goalId) add(c.goalId, date, c.duration); });
+        });
+        return order.map(function (k) { return acc[k]; });
+    }
+    function withAuto(days, goals, blocks) { return (days || []).concat(autoDays(goals, blocks)); }
+    // Antes de mudar o alvo de uma meta: os períodos que já passaram e só tinham blocos (nenhum dia guardou alvo)
+    // ganham uma marca com o alvo antigo (feito 0), no último dia com bloco. Devolve as linhas pra gravar.
+    function targetMarks(goalBefore, days, auto, now) {
+        var g = normalize(goalBefore), cur = periodKey(g.period, ymd(now || new Date())), stored = {}, last = {}, rows = {};
+        (days || []).forEach(function (d) {
+            if (!d || String(d.goalId) !== String(g.id) || !isDay(d.date)) return;
+            rows[d.id] = d;
+            var t = Number(d.target);
+            if (Number.isFinite(t) && t > 0) stored[periodKey(g.period, d.date)] = true;
+        });
+        (auto || []).forEach(function (d) {
+            if (!d || String(d.goalId) !== String(g.id) || !isDay(d.date) || !(Number(d.amount) > 0)) return;
+            var k = periodKey(g.period, d.date);
+            if (k < cur && !stored[k] && (!last[k] || d.date > last[k])) last[k] = d.date;
+        });
+        return Object.keys(last).sort().map(function (k) {
+            var id = dayId(g.id, last[k]), prev = rows[id];
+            return { id: id, goalId: String(g.id), date: last[k], amount: prev ? Number(prev.amount) || 0 : 0, target: g.target };
+        });
+    }
+    // Barras do gráfico: os últimos n períodos (padrão: 7 dias, 8 semanas ou 6 meses), do mais antigo pro de agora.
+    var WEEKDAYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'], MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    function history(goal, days, now, n) {
+        var g = normalize(goal), s = sums(g, days), key = periodKey(g.period, ymd(now || new Date()));
+        n = n || (g.period === 'dia' ? 7 : g.period === 'semana' ? 8 : 6);
+        var keys = [key];
+        while (keys.length < n) keys.unshift(prevKey(g.period, keys[0]));
+        return keys.map(function (k) {
+            var x = s[k], total = x ? x.total : 0, t = k === key || !x || !x.target ? g.target : x.target, label, sub = '';
+            if (g.period === 'dia') { var d = dateOf(k); label = WEEKDAYS[d.getDay()]; sub = String(d.getDate()); }
+            else if (g.period === 'semana') { var w = dateOf(k); label = pad(w.getDate()) + '/' + pad(w.getMonth() + 1); }
+            else { var p = k.split('-').map(Number); label = MONTHS[p[1] - 1]; sub = p[1] === 1 ? String(p[0]) : ''; }
+            return { key: k, label: label, sub: sub, total: total, target: t, met: total >= t - EPS, current: k === key, text: fmtOf(g.unit, total, t) };
+        });
+    }
+    // Melhor sequência de períodos cumpridos (de todos os tempos) e o total feito.
+    function records(goal, days, now) {
+        var g = normalize(goal), s = sums(g, days), key = periodKey(g.period, ymd(now || new Date()));
+        function met(k) { var x = s[k]; if (!x) return false; var t = k === key || !x.target ? g.target : x.target; return x.total >= t - EPS; }
+        var keys = Object.keys(s).filter(function (k) { return k <= key && met(k); }).sort(), best = 0, run = 0, prev = null, total = 0;
+        keys.forEach(function (k) { run = prev !== null && prevKey(g.period, k) === prev ? run + 1 : 1; if (run > best) best = run; prev = k; });
+        Object.keys(s).forEach(function (k) { if (k <= key) total = round2(total + s[k].total); });
+        return { best: best, bestText: best ? streakLabel(g.period, best) : '', total: total, totalText: fmt(g.unit, total) };
+    }
+
     // Soma (ou tira) no dia: devolve a lista nova de dias e a linha mexida. O total do dia nunca fica negativo.
     // A linha guarda o alvo de agora (é ele que vale pra esse período quando ele passar).
     function bump(days, goal, day, delta) {
@@ -217,6 +298,7 @@
         normalize: normalize, periodKey: periodKey, prevKey: prevKey, dayId: dayId, ymd: ymd, addDays: addDays,
         sums: sums, status: status, summary: summary, levelOf: levelOf, bump: bump, gain: gain, gainText: gainText,
         listOf: listOf, forAssistant: forAssistant,
+        credit: credit, autoDays: autoDays, withAuto: withAuto, targetMarks: targetMarks, history: history, records: records, // V40.34.0
         fmt: fmt, fmtOf: fmtOf, addLabel: addLabel, goalLabel: goalLabel, streakLabel: streakLabel, brl: brl, firstGrapheme: firstGrapheme
     };
 });

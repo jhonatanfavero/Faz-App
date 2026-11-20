@@ -9,6 +9,7 @@
 // Duplicar nos 3 pontinhos; cartão sai da sublista arrastando (vira bloco) e bloco entra nela (vira cartão).
 // V40.29.0: Relatórios na barra da Agenda; Semana sempre de segunda a domingo (com zoom, o dia aberto fica à vista).
 // V40.33.0: mudar a lista de lugar arrastando pelo título (e pelo menu dos 3 pontinhos).
+// V40.34.0: campo "Meta" no cartão (vai pra nuvem, selo no cartão) e o gráfico ao abrir a meta.
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -844,6 +845,29 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   const foi = await p.evaluate(([uid, id]) => window.__nuvem.get('tarefas', uid, id).column_id, [UID, cid]);
   ok(!durante.lista && !durante.linhaLista && foi === await p.locator('#columns > section.col').nth(3).getAttribute('data-col') && await nomes() === N0, 'arrastar um cartão continua levando só o cartão pra outra lista (as listas ficam no lugar)');
   }
+
+  console.log('\nW) Meta ligada no cartão e o gráfico da meta (V40.34.0):');
+  await p.keyboard.press('Escape'); await p.locator('#tab-listas').click(); await p.waitForTimeout(300);
+  const c0 = await p.evaluate(() => { document.getElementById('board').scrollLeft = 0; return document.querySelector('#columns > section.col .card').dataset.id; });
+  await p.locator(`.card[data-id="${c0}"]`).click({ position: { x: 30, y: 14 } }); await p.waitForTimeout(250);
+  const gsel = await p.evaluate(() => { const w = document.getElementById('f-goal-wrap'), s = document.getElementById('f-goal'), r = document.querySelector('#modal-task > div').getBoundingClientRect();
+    return { vis: !w.classList.contains('hidden') && w.getBoundingClientRect().height > 0, opts: [...s.options].map((o) => o.textContent.trim()), cabe: r.top >= 0 && r.bottom <= innerHeight }; });
+  ok(gsel.vis && gsel.opts[0] === 'Sem meta' && gsel.opts.length >= 4 && gsel.cabe, 'cartão da Lista: o campo "Meta" aparece ("Sem meta" + ' + (gsel.opts.length - 1) + ' metas) e a janela cabe na tela');
+  const gid = await p.evaluate(() => { const s = document.getElementById('f-goal'); return [...s.options].find((o) => o.value).value; });
+  await p.selectOption('#f-goal', gid); await p.waitForTimeout(100);
+  await p.evaluate(() => { const s = document.getElementById('f-goal'); s.scrollIntoView({ block: 'center' }); }); await p.waitForTimeout(100);
+  await foto(p, 'pc-meta-no-cartao.png');
+  await p.locator('#f-save').click(); await p.waitForTimeout(500);
+  const gfoi = await p.evaluate(([uid, id]) => ({ nuvem: window.__nuvem.get('tarefas', uid, id).goal_id, selo: !!document.querySelector(`.card[data-id="${id}"] .goal-badge`) }), [UID, c0]);
+  ok(gfoi.nuvem === gid && gfoi.selo, 'Salvar: a meta vai pra nuvem (goal_id) e o selo aparece no cartão');
+  await p.locator('#tab-metas').click(); await p.waitForTimeout(400);
+  await p.locator(`#mt-sections [data-goal="${gid}"] h3, #mt-sections [data-goal="${gid}"] .mt-title`).first().click().catch(async () => { await p.evaluate((id) => document.querySelector(`#mt-sections [data-goal="${id}"]`).click(), gid); });
+  await p.waitForTimeout(300);
+  const gch = await p.evaluate(() => { const m = document.getElementById('modal-goal'), w = document.getElementById('mt-f-chart-wrap'), r = m.querySelector(':scope > div').getBoundingClientRect(), bars = w.querySelectorAll('[data-goal-bar]');
+    return { aberta: !m.classList.contains('hidden'), vis: !w.classList.contains('hidden') && w.getBoundingClientRect().height > 60, barras: bars.length, cabe: r.top >= 0 && r.bottom <= innerHeight, vaza: [...w.querySelectorAll('*')].some((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX !== 'visible') || w.scrollWidth > w.clientWidth + 1 }; });
+  ok(gch.aberta && gch.vis && (gch.barras === 7 || gch.barras === 8 || gch.barras === 6) && gch.cabe && !gch.vaza, 'abrir a meta: o gráfico aparece em cima (' + gch.barras + ' barras), sem vazar, e a janela cabe na tela');
+  await foto(p, 'pc-meta-grafico.png');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));
   await fim();

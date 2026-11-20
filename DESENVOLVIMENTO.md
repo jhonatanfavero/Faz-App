@@ -36,7 +36,10 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
    script do CDN cobre a classe nova; offline quem vale é o CSS pronto.
 7. **Quem já usa o app não pode perceber a atualização nos dados.** Mudou o formato de algo gravado no
    aparelho (`tb_*` ou `tb__sync`)? A versão nova tem que abrir o formato antigo sem perguntar nada e
-   sem reenviar tudo para a nuvem. `tests/test_atualizacao.js` é o modelo.
+   sem reenviar tudo para a nuvem. `tests/test_atualizacao.js` é o modelo. Campo novo nos blocos (a agenda é
+   lida de forma incremental): quem vem de antes precisa reler a agenda inteira uma vez, senão o que o PC gravou
+   nesse campo enquanto o celular estava na versão antiga nunca chega, e mexer no bloco apaga por cima. Veja o
+   `goalIds` no `fetchAll` do `sync.js` (V40.34.0).
 8. **`npm test` verde antes de publicar.** Mexeu em arrasto, rolagem, `sw.js` ou `libs/`? Rode também
    os testes de navegador. Tela, janelinha ou botão novo no celular: rode o `tests/navegador/iphone.js`
    (V40.32.2: iPhone simulado, com a barra de status e o risco de início por cima do app).
@@ -72,6 +75,14 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     Mudou a cor ou o horário no celular? Chame `fazPrefsTouch()` (só quando o valor mudou de fato). No PC,
     grave pelo `savePrefs()`. A hora é sempre maior que a última vista (`Math.max(agora, última + 1)`):
     relógio adiantado em outro aparelho não faz uma mudança nova perder.
+14. **Meta ligada conta sozinha, sem gravar nada (V40.34.0).** Bloco, tarefa, rotina e cartão de sublista
+    podem ter `goalId` (`goal_id` na nuvem; a sublista em si não tem meta, só os cartões dela). Bloco concluído
+    ou cartão marcado com meta entra na conta pelos "dias de mentira" do `FazMetas.autoDays()`/`withAuto()`:
+    nada é gravado em `metas_dias`, e desmarcar desconta sozinho. Para somar uma meta use `goalAllDays()` no
+    celular e `mtAllDays(id)` no PC, nunca só os dias gravados. Mudou o alvo? Os períodos passados que só
+    tinham blocos ganham uma marca com o alvo antigo (`FazMetas.targetMarks`), senão a estrela antiga mudaria.
+    Recomeçar grava `countFrom` (`count_from`): bloco de antes não conta mais. Tarefa e rotina passam a meta
+    para o bloco que viram (agendar, na mão, rotina na agenda, voltar pra lista, duplicar, repetir).
 
 ## Publicar uma versão
 

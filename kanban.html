@@ -173,6 +173,8 @@
     .col > header[draggable="true"] { cursor: grab; -webkit-user-select: none; user-select: none; }
     .col.col-dragging { opacity: .35; }
     .col-drop { position: absolute; width: 4px; border-radius: 4px; background: var(--focus); pointer-events: none; z-index: 5; }
+    /* V40.34.0: ligado a uma meta: o emoji dela antes do nome */
+    .goal-badge { display: inline-block; margin-right: 4px; font-size: .95em; line-height: 1; font-style: normal; text-decoration: none; }
     #toast { transition: opacity .2s, transform .2s; }
     @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { transition: none !important; animation: none !important; }
@@ -558,6 +560,8 @@
     <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
         <div class="p-5 pb-3 overflow-y-auto thin-scroll">
             <h3 id="mt-f-head" class="text-base font-bold text-zinc-900">Nova meta</h3>
+            <!-- V40.34.0: gráfico da meta (só ao abrir uma que já existe) -->
+            <div id="mt-f-chart-wrap" class="hidden mt-3 bg-zinc-50 border border-zinc-200 rounded-xl p-3"><div id="mt-f-chart"></div></div>
             <div id="mt-f-tpl-wrap" class="mt-3">
                 <span class="text-xs font-semibold text-zinc-500">Sugestões</span>
                 <div id="mt-f-tpl" class="mt-1.5 flex flex-wrap gap-1.5"></div>
@@ -657,6 +661,11 @@
                 <span class="text-xs font-semibold text-zinc-500">Tag</span>
                 <div id="rt-f-tags" class="mt-1.5 flex flex-wrap gap-1.5"></div>
             </div>
+            <!-- V40.34.0: meta ligada (cada bloco que a rotina colocar na Agenda conta nela) -->
+            <label id="rt-f-goal-wrap" class="hidden mt-4 block">
+                <span class="text-xs font-semibold text-zinc-500">Meta</span>
+                <select id="rt-f-goal" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
+            </label>
             <div class="mt-4">
                 <span class="text-xs font-semibold text-zinc-500">Checklist</span>
                 <div id="rt-f-mbs" class="mt-1 flex flex-col"></div>
@@ -722,6 +731,11 @@
                 <span class="text-xs font-semibold text-zinc-500">Tag</span>
                 <div id="f-tags" class="mt-1.5 flex flex-wrap gap-1.5"></div>
             </div>
+            <!-- V40.34.0: meta ligada (bloco ou cartão concluído conta nela; a tarefa leva a meta pro bloco). Some sem metas. -->
+            <label id="f-goal-wrap" class="hidden mt-4 block">
+                <span class="text-xs font-semibold text-zinc-500">Meta</span>
+                <select id="f-goal" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
+            </label>
             <div class="mt-4">
                 <span class="text-xs font-semibold text-zinc-500">Cor do cartão</span>
                 <div id="f-colors" class="mt-1.5 flex flex-wrap items-center gap-2"></div>
@@ -889,7 +903,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.33.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.34.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -915,17 +929,17 @@
     var DURATIONS = [5, 10, 15, 30, 45, 60, 75, 90, 120, 150, 180, 240]; // V40.8.0: mínimo 5 min
     var KINDS = ['listas', 'tags', 'tarefas', 'blocos', 'rotinas', 'notas', 'financas', 'metas_listas', 'metas', 'metas_dias']; // V40.21.0: + metas
     var SELECT = {
-        tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,deleted',
+        tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,goal_id,deleted', // V40.34.0: + goal_id (meta ligada)
         listas: 'id,name,is_default,position,created_ms,deleted',
         tags: 'id,name,color,position,deleted',
-        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,deleted', // V40.22.0: + linked_note_ids (notas vinculadas); V40.24.0: + cards (sublista)
+        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,goal_id,deleted', // V40.22.0: + linked_note_ids (notas vinculadas); V40.24.0: + cards (sublista); V40.34.0: + goal_id
         // V40.17.0: rotinas, notas e finanças (as mesmas do celular)
-        rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,deleted',
+        rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,goal_id,deleted',
         notas: 'id,title,content,created_ms,updated_ms,deleted',
         financas: 'id,title,amount,start_month,duration_months,is_recurring,due_day,tag_id,paid_months,amount_overrides,created_ms,deleted',
         // V40.21.0: metas (as mesmas do celular)
         metas_listas: 'id,name,is_default,position,created_ms,deleted',
-        metas: 'id,list_id,title,emoji,period,unit,target,step,position,created_ms,deleted',
+        metas: 'id,list_id,title,emoji,period,unit,target,step,position,created_ms,count_from,deleted', // V40.34.0: + count_from
         metas_dias: 'id,goal_id,date,amount,target,deleted'
     };
     var S = {
@@ -1351,7 +1365,7 @@
         return '<article class="card ' + paint.cls + 'bg-white border border-zinc-200 border-l-4 rounded-xl px-3 py-2.5 cursor-pointer hover:border-zinc-300 hover:shadow-sm transition-shadow" ' +
             'style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" draggable="true" tabindex="0" data-id="' + esc(t.id) + '">' +
             '<div class="flex items-start gap-1">' +
-            '<p class="min-w-0 flex-1 text-[13.5px] font-semibold text-zinc-800 leading-snug break-words">' + (esc(t.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
+            '<p class="min-w-0 flex-1 text-[13.5px] font-semibold text-zinc-800 leading-snug break-words">' + goalBadge(t.goal_id) + (esc(t.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
             // V40.15.0: os botões do cartão ficam colados (sem espaço entre eles) pra não roubar largura do nome
             '<div class="shrink-0 flex -mr-1.5 -mt-1">' +
             '<button type="button" class="card-sched w-6 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-sched="' + esc(t.id) + '" title="Agendar" aria-label="Agendar esta tarefa"><i class="ph ph-calendar-plus text-base"></i></button>' +
@@ -1504,7 +1518,7 @@
             '<div class="flex items-center"><p class="ag-tm min-w-0 flex-1 text-[11px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + '<span class="font-medium text-zinc-400"> · ' + fmtDur(b.duration) + '</span></p>' +
             // V40.15.0: 3 pontinhos (Arquivar / Apagar) sem abrir o cartão; com tarefa na mão os blocos não são mexidos
             (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100" data-more="' + esc(b.id) + '" title="Duplicar, arquivar ou apagar" aria-label="Mais opções deste bloco" aria-haspopup="menu"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
-            '<p class="text-[13px] font-semibold leading-snug break-words ' + (b.completed ? 'line-through text-zinc-400' : 'text-zinc-800') + '">' + (esc(b.title) || 'Sem nome') + '</p>' +
+            '<p class="text-[13px] font-semibold leading-snug break-words ' + (b.completed ? 'line-through text-zinc-400' : 'text-zinc-800') + '">' + goalBadge(b.goal_id) + (esc(b.title) || 'Sem nome') + '</p>' +
             ((tag || mb.n || b.completed || nn) ? '<div class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-zinc-500">' +
                 (b.completed ? '<span class="inline-flex items-center gap-1 text-emerald-600 font-medium"><i class="ph-fill ph-check-circle"></i>Concluído</span>' : '') +
                 (tag ? '<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
@@ -1619,12 +1633,12 @@
         return doneBtnHtml(b, '') +
             (compact
                 ? '<span class="text-[10.5px] leading-none font-semibold text-zinc-500 tabular-nums shrink-0">' + clock(b.start_min) + '</span>' +
-                  '<span class="text-[11.5px] leading-none font-semibold truncate ' + titleCls + '">' + (esc(b.title) || 'Sem nome') + '</span>' +
+                  '<span class="text-[11.5px] leading-none font-semibold truncate ' + titleCls + '">' + goalBadge(b.goal_id) + (esc(b.title) || 'Sem nome') + '</span>' +
                   '<span class="ml-auto text-[10.5px] leading-none text-zinc-400 shrink-0">' + fmtDur(b.duration) + warn + '</span>'
                 : '<span class="min-w-0 flex-1 flex flex-col justify-center">' +
                   '<span class="text-[10.5px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration) + (tag ? ' · ' + esc(tag.name) : '') +
                   (nn ? '<span class="ag-notes" title="' + nn + (nn === 1 ? ' nota vinculada' : ' notas vinculadas') + '"> · <i class="ph ph-note"></i>' + nn + '</span>' : '') + warn + '</span>' +
-                  '<span class="text-[13px] font-semibold truncate ' + titleCls + '">' + (esc(b.title) || 'Sem nome') + '</span></span>') +
+                  '<span class="text-[13px] font-semibold truncate ' + titleCls + '">' + goalBadge(b.goal_id) + (esc(b.title) || 'Sem nome') + '</span></span>') +
             '<span class="ag-rz' + (b.duration < 10 ? ' s' : '') + '" title="Puxe pra mudar a duração" aria-hidden="true"></span>';
     }
     function renderDay(day, map, today, nm) {
@@ -2239,6 +2253,7 @@
         closeComposer();
         var isB = kind === 'blocos', isNew = !!draft;
         S.editing = { kind: kind, id: isNew ? null : id, isNew: isNew, orig: JSON.parse(JSON.stringify(r)), tag: tagOf(r.tag_id) ? r.tag_id : null, mbs: isB ? blockMbs(r.microblocks) : normMbs(r.microblocks), color: hex6(r.color) };
+        S.editing.goal = S.editing.goal0 = goalKeep(r.goal_id); // V40.34.0
         $('f-title').value = r.title || '';
         $('f-title').placeholder = isNew ? 'Nome do compromisso' : (isB ? 'Nome do bloco' : 'Nome da tarefa');
         $('f-col-wrap').classList.toggle('hidden', isB);
@@ -2284,6 +2299,8 @@
         $('f-sub-wrap').classList.toggle('hidden', !(isB && isNew));
         $('f-sub-wrap').classList.toggle('inline-flex', isB && isNew);
         $('f-mbs-wrap').classList.toggle('hidden', sub);
+        fillGoalSelect('f-goal-wrap', 'f-goal', S.editing.goal); // V40.34.0
+        if (sub) $('f-goal-wrap').classList.add('hidden');
         if (sub) {
             $('f-title').placeholder = 'Nome da sublista';
             $('f-delete').textContent = 'Apagar sublista';
@@ -2320,7 +2337,7 @@
         var drag = S.agView === 'week' && !S.placing ? ' draggable="true" data-sub-drag="' + esc(b.id) + '" data-card="' + esc(c.id) + '"' : ''; // V40.28.0
         return '<div class="ag-sub-card' + (c.done ? ' done' : '') + (col && isDark(col) ? ' dark' : '') + '"' + drag + ' style="border-left-color:' + (tag ? esc(safeColor(tag.color)) : 'transparent') + (col ? ';background-color:' + col : '') + '">' +
             '<button type="button" class="ag-sub-ck" data-sub-ck="' + esc(b.id) + '" data-card="' + esc(c.id) + '" aria-pressed="' + (c.done ? 'true' : 'false') + '" aria-label="' + (c.done ? 'Desmarcar' : 'Marcar como feito') + '" title="' + (c.done ? 'Desmarcar' : 'Marcar como feito') + '"><i class="ph-bold ph-check"></i></button>' +
-            '<button type="button" class="ag-sub-t" data-sub-open="' + esc(b.id) + '" data-card="' + esc(c.id) + '" title="Abrir o cartão">' + (esc(c.title) || 'Sem nome') + '</button>' +
+            '<button type="button" class="ag-sub-t" data-sub-open="' + esc(b.id) + '" data-card="' + esc(c.id) + '" title="Abrir o cartão">' + goalBadge(c.goalId) + (esc(c.title) || 'Sem nome') + '</button>' +
             (mbs.length ? '<span class="ag-sub-mb"><i class="ph ph-check-square"></i>' + md + '/' + mbs.length + '</span>' : '') + (extra || '') + '</div>';
     }
     function subRowsHtml(b, max) {
@@ -2366,13 +2383,13 @@
         if (!f) return toast('Esse cartão não está mais na sublista.');
         var was = !!f.b.completed, next = subCards(f.b).map(function (c) { return c.id === cid ? Object.assign({}, c, { done: !c.done }) : c; });
         var all = next.every(function (c) { return c.done; });
-        var p = subSave(f.b, next, !was && all ? 'Sublista concluída! 🎉' : null);
+        var p = mtWatch(function () { return subSave(f.b, next, !was && all ? 'Sublista concluída! 🎉' : null); }); // V40.34.0
         renderSubCards();
         p.then(renderSubCards);
     }
     function subToggleAll(b) {
         var cards = subCards(b), all = cards.every(function (c) { return c.done; });
-        var p = subSave(b, cards.map(function (c) { return Object.assign({}, c, { done: !all }); }), all ? 'Cartões desmarcados' : 'Todos os cartões feitos');
+        var p = mtWatch(function () { return subSave(b, cards.map(function (c) { return Object.assign({}, c, { done: !all }); }), all ? 'Cartões desmarcados' : 'Todos os cartões feitos'); }); // V40.34.0
         var sync = function () { if (S.editing && S.editing.kind === 'blocos' && S.editing.id === b.id) { S.editing.orig.completed = !!S.blocos[b.id].completed; renderDone(); renderSubCards(); } };
         sync(); p.then(sync);
     }
@@ -2383,12 +2400,13 @@
         if (hex6(src.color)) c.color = hex6(src.color);
         if (Number(src.dur) > 0) c.duration = Math.round(Number(src.dur));
         if (src.col) c.columnId = src.col;
+        if (goalKeep(src.goal)) c.goalId = String(src.goal); // V40.34.0
         return c;
     }
     // Primeiro entra o cartão na sublista, depois a tarefa sai da lista (se não der, nada se perde: no máximo fica nos dois)
     async function subAddFromTask(b, t) {
         if (subCards(b).length >= SUB_MAX) { toast('Uma sublista cabe até ' + SUB_MAX + ' cartões.'); return false; }
-        var card = subCardFromSrc({ title: t.title, tag: tagOf(t.tag_id) ? t.tag_id : null, color: t.color, mbs: t.microblocks, dur: t.duration, col: t.column_id });
+        var card = subCardFromSrc({ title: t.title, tag: tagOf(t.tag_id) ? t.tag_id : null, color: t.color, mbs: t.microblocks, dur: t.duration, col: t.column_id, goal: t.goal_id });
         if (!(await subSave(b, subCards(b).concat([card])))) return false;
         await patchRow('tarefas', t.id, { deleted: true }, 'Entrou na sublista ' + (b.title || ''));
         return true;
@@ -2402,7 +2420,7 @@
         S.placing = null;
         renderAgenda();
         var col = src.kind === 'rotinas' ? null : ((S.tarefas[src.id] || {}).column_id || null);
-        var card = subCardFromSrc({ title: src.title, tag: src.tag, color: src.color, mbs: src.mbs, dur: src.dur, col: col });
+        var card = subCardFromSrc({ title: src.title, tag: src.tag, color: src.color, mbs: src.mbs, dur: src.dur, col: col, goal: src.goal });
         if (!(await subSave(b, subCards(b).concat([card])))) { if (placingAlive(src)) { S.placing = src; renderAgenda(); } return; } // não deu: volta pra mão
         if (src.kind === 'rotinas') return toast('Rotina na sublista ' + (b.title || '')); // a rotina continua existindo
         await patchRow('tarefas', src.id, { deleted: true }, 'Entrou na sublista ' + (b.title || ''));
@@ -2422,7 +2440,8 @@
             user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: st, duration: dur, title: f.c.title || 'Sem nome',
             type: blockType(day, st, dur), theme: 'focus', tag_id: tagOf(f.c.tagId) ? f.c.tagId : null,
             microblocks: normMbs(f.c.microblocks).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: m.done }; }),
-            completed: !!f.c.done, was_delayed: false, linked_note_ids: [], color: hex6(f.c.color), archived: false, deleted: false
+            completed: !!f.c.done, was_delayed: false, linked_note_ids: [], color: hex6(f.c.color), archived: false, deleted: false,
+            goal_id: goalKeep(f.c.goalId) // V40.34.0
         };
         if (!(await insertRow('blocos', block))) return;
         var cur = S.blocos[bid];
@@ -2450,6 +2469,7 @@
         var card = { id: subNewId(), title: String(b.title || '').trim() || 'Sem nome', done: !!b.completed, microblocks: normMbs(b.microblocks), duration: Number(b.duration) || 30 };
         if (tagOf(b.tag_id)) card.tagId = b.tag_id;
         if (hex6(b.color)) card.color = hex6(b.color);
+        if (goalKeep(b.goal_id)) card.goalId = String(b.goal_id); // V40.34.0
         var cur = S.blocos[subId];
         if (!cur || cur.deleted || !(await subSave(cur, subCards(cur).concat([card])))) return;
         await patchRow('blocos', id, { deleted: true }, 'Entrou na sublista ' + (cur.title || ''));
@@ -2467,7 +2487,8 @@
             user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: slot, duration: dur, title: b.title || '',
             type: blockType(day, slot, dur), theme: b.theme || 'focus', tag_id: tagOf(b.tag_id) ? b.tag_id : null,
             microblocks: normMbs(b.microblocks).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: false }; }),
-            completed: false, was_delayed: false, linked_note_ids: [], color: hex6(b.color), archived: false, deleted: false
+            completed: false, was_delayed: false, linked_note_ids: [], color: hex6(b.color), archived: false, deleted: false,
+            goal_id: isSub(b) ? null : goalKeep(b.goal_id) // V40.34.0
         };
         if (isSub(b)) row.cards = subCards(b).map(function (c) {
             var o = JSON.parse(JSON.stringify(c));
@@ -2485,7 +2506,8 @@
         var task = {
             user_id: S.uid, id: newId('bl_', 'tarefas'), column_id: listId, title: f.c.title || 'Sem nome', duration: Number(f.c.duration) > 0 ? Number(f.c.duration) : 30,
             tag_id: tagOf(f.c.tagId) ? f.c.tagId : null, microblocks: normMbs(f.c.microblocks).map(function (m) { return { title: m.title, done: false }; }),
-            position: maxPos('tarefas') + STEP, color: hex6(f.c.color), archived: false, deleted: false
+            position: maxPos('tarefas') + STEP, color: hex6(f.c.color), archived: false, deleted: false,
+            goal_id: goalKeep(f.c.goalId) // V40.34.0
         };
         if (!(await insertRow('tarefas', task))) return false;
         var cur = S.blocos[bid];
@@ -2529,7 +2551,7 @@
             return '<div class="fc-row group flex items-center gap-1.5 px-1 py-0.5 rounded-lg hover:bg-zinc-50' + (c.done ? ' done' : '') + '">' +
                 '<button type="button" class="ag-sub-ck" data-fc-ck="' + esc(c.id) + '" aria-pressed="' + (c.done ? 'true' : 'false') + '" aria-label="' + (c.done ? 'Desmarcar' : 'Marcar como feito') + '"><i class="ph-bold ph-check"></i></button>' +
                 '<span class="w-1 h-5 rounded-full shrink-0" style="background:' + (tag ? esc(safeColor(tag.color)) : (hex6(c.color) || 'transparent')) + '"></span>' +
-                '<button type="button" class="fc-t min-w-0 flex-1 text-left text-sm text-zinc-800 truncate hover:underline" data-fc-open="' + esc(c.id) + '" title="Abrir o cartão">' + (esc(c.title) || 'Sem nome') + '</button>' +
+                '<button type="button" class="fc-t min-w-0 flex-1 text-left text-sm text-zinc-800 truncate hover:underline" data-fc-open="' + esc(c.id) + '" title="Abrir o cartão">' + goalBadge(c.goalId) + (esc(c.title) || 'Sem nome') + '</button>' +
                 (mbs.length ? '<span class="shrink-0 text-[11px] text-zinc-400 inline-flex items-center gap-0.5"><i class="ph ph-check-square"></i>' + md + '/' + mbs.length + '</span>' : '') +
                 '<button type="button" data-fc-list="' + esc(c.id) + '" class="w-7 h-7 shrink-0 rounded-md flex items-center justify-center text-zinc-400 hover:text-emerald-700 hover:bg-emerald-50 opacity-0 group-hover:opacity-100 focus:opacity-100" title="Voltar pra lista" aria-label="Voltar pra lista"><i class="ph ph-arrow-u-up-left"></i></button>' +
                 '<button type="button" data-fc-del="' + esc(c.id) + '" class="w-7 h-7 shrink-0 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus:opacity-100" title="Apagar o cartão" aria-label="Apagar o cartão"><i class="ph ph-x"></i></button>' +
@@ -2563,6 +2585,7 @@
         if (!f) return toast('Esse cartão não está mais na sublista.');
         closeComposer();
         S.editing = { kind: 'card', block: bid, id: cid, isNew: false, orig: JSON.parse(JSON.stringify(f.c)), tag: tagOf(f.c.tagId) ? f.c.tagId : null, mbs: normMbs(f.c.microblocks), color: hex6(f.c.color) };
+        S.editing.goal = S.editing.goal0 = goalKeep(f.c.goalId); // V40.34.0
         $('f-title').value = f.c.title || '';
         $('f-title').placeholder = 'Nome do cartão';
         $('f-grid').classList.add('hidden');
@@ -2576,6 +2599,7 @@
         back.querySelector('span').textContent = f.b.title || 'Sublista';
         back.classList.remove('hidden'); back.classList.add('inline-flex');
         $('f-mb-new').value = '';
+        fillGoalSelect('f-goal-wrap', 'f-goal', S.editing.goal); // V40.34.0
         renderTagChips(); renderMbs(); renderColors(); renderDone();
         var m = $('modal-task');
         m.classList.remove('hidden'); m.classList.add('flex');
@@ -2595,6 +2619,7 @@
         var c = Object.assign({}, f.c, { title: title.slice(0, 200), microblocks: normMbs(ed.mbs) });
         if (ed.tag && tagOf(ed.tag)) c.tagId = ed.tag; else delete c.tagId;
         if (ed.color) c.color = ed.color; else delete c.color;
+        if (ed.goal !== ed.goal0) { if (goalKeep(ed.goal)) c.goalId = ed.goal; else delete c.goalId; } // V40.34.0
         var changed = JSON.stringify(c) !== JSON.stringify(f.c), bid = ed.block;
         closeTask();
         if (changed) await subSave(f.b, subCards(f.b).map(function (x) { return x.id === c.id ? c : x; }), 'Cartão salvo');
@@ -2643,7 +2668,8 @@
         var row = {
             user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: slot, duration: dur, title: title,
             type: blockType(day, slot, dur), theme: 'focus', tag_id: ed.tag || null, microblocks: mbsForSave(ed),
-            completed: false, was_delayed: false, linked_note_ids: [], color: ed.color || null, archived: false, deleted: false
+            completed: false, was_delayed: false, linked_note_ids: [], color: ed.color || null, archived: false, deleted: false,
+            goal_id: asSub ? null : goalKeep(ed.goal) // V40.34.0
         };
         if (asSub) { row.cards = []; row.microblocks = []; } // V40.24.0: sublista nasce vazia (os cartões entram depois)
         closeTask();
@@ -2756,7 +2782,7 @@
         if (!b || b.deleted) return;
         if (isSub(b) && subCards(b).length) return subToggleAll(b); // V40.24.0
         var done = !b.completed;
-        var p = patchRow('blocos', id, { completed: done }, done ? 'Bloco concluído' : 'Bloco reaberto');
+        var p = mtWatch(function () { return patchRow('blocos', id, { completed: done }, done ? 'Bloco concluído' : 'Bloco reaberto'); }); // V40.34.0
         var sync = function () { if (S.editing && S.editing.kind === 'blocos' && S.editing.id === id) { S.editing.orig.completed = !!S.blocos[id].completed; renderDone(); } };
         sync(); p.then(sync);
     }
@@ -2825,6 +2851,7 @@
         var mbs = mbsForSave(ed);
         if (JSON.stringify(mbs) !== JSON.stringify(isB ? blockMbs(ed.orig.microblocks) : normMbs(ed.orig.microblocks))) fields.microblocks = mbs;
         if ((ed.color || null) !== hex6(ed.orig.color)) fields.color = ed.color || null;
+        if (ed.goal !== ed.goal0 && !(isB && isSub(t))) fields.goal_id = goalKeep(ed.goal); // V40.34.0
         closeTask();
         if (Object.keys(fields).length) patchRow(ed.kind, ed.id, fields, (isB ? 'Bloco salvo' : 'Tarefa salva') + note);
     }
@@ -2879,7 +2906,8 @@
             user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: slot, duration: src.dur, title: src.title,
             type: blockType(day, slot, src.dur), theme: src.theme === 'rest' ? 'rest' : 'focus', tag_id: src.tag || null,
             microblocks: normMbs(src.mbs).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: false }; }),
-            completed: false, was_delayed: false, linked_note_ids: [], color: src.color || null, archived: false, deleted: false
+            completed: false, was_delayed: false, linked_note_ids: [], color: src.color || null, archived: false, deleted: false,
+            goal_id: goalKeep(src.goal) // V40.34.0
         };
         if (!(await insertRow('blocos', block))) return false;
         var where = dayLabel(day) + ' às ' + clock(slot) + (asked != null && slot !== asked ? ' (às ' + clock(asked) + ' já tinha bloco)' : '');
@@ -2894,7 +2922,7 @@
         if (!t || t.deleted) { closeTask(); toast('Essa tarefa foi apagada em outro aparelho.'); return null; }
         var title = $('f-title').value.trim();
         if (!title) { $('f-title').focus(); toast('Dê um nome pra tarefa.'); return null; }
-        return { id: ed.id, title: title, dur: schedDur(), tag: ed.tag || null, color: ed.color || null, mbs: normMbs(ed.mbs) };
+        return { id: ed.id, title: title, dur: schedDur(), tag: ed.tag || null, color: ed.color || null, mbs: normMbs(ed.mbs), goal: goalKeep(ed.goal) }; // V40.34.0: + meta
     }
     async function scheduleTask() {
         var src = formAsSource();
@@ -2916,7 +2944,7 @@
     function startPlacingFromTask(id) {
         var t = S.tarefas[id];
         if (!t || t.deleted) return;
-        startPlacing({ id: id, title: t.title || '', dur: Number(t.duration) > 0 ? Number(t.duration) : 30, tag: tagOf(t.tag_id) ? t.tag_id : null, color: hex6(t.color), mbs: normMbs(t.microblocks) });
+        startPlacing({ id: id, title: t.title || '', dur: Number(t.duration) > 0 ? Number(t.duration) : 30, tag: tagOf(t.tag_id) ? t.tag_id : null, color: hex6(t.color), mbs: normMbs(t.microblocks), goal: goalKeep(t.goal_id) });
     }
     function cancelPlacing() {
         if (!S.placing) return;
@@ -2952,7 +2980,7 @@
             '<div class="flex items-start gap-3">' +
             '<span class="w-10 h-10 shrink-0 rounded-xl bg-zinc-100 flex items-center justify-center text-xl leading-none">' + (esc(r.emoji) || '✨') + '</span>' +
             '<div class="min-w-0 flex-1">' +
-            '<h3 class="text-[14px] font-bold text-zinc-900 leading-snug break-words">' + (esc(r.title) || '<span class="text-zinc-400">Sem nome</span>') + '</h3>' +
+            '<h3 class="text-[14px] font-bold text-zinc-900 leading-snug break-words">' + goalBadge(r.goal_id) + (esc(r.title) || '<span class="text-zinc-400">Sem nome</span>') + '</h3>' +
             '<p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">' +
             '<span class="inline-flex items-center gap-1"><i class="ph ph-clock"></i>' + fmtDur(r.duration) + '</span>' +
             '<span class="inline-flex items-center gap-1"><i class="ph ' + (r.theme === 'rest' ? 'ph-coffee' : 'ph-lightning') + '"></i>' + (THEME_LABEL[r.theme] || 'Foco') + '</span>' +
@@ -2984,6 +3012,7 @@
         var r = id ? S.rotinas[id] : null;
         if (id && (!r || r.deleted)) return;
         S.rtEdit = { id: id || null, tag: r && tagOf(r.tag_id) ? r.tag_id : null, theme: r && r.theme === 'rest' ? 'rest' : 'focus', mbs: rtTitles(r && r.microblocks) };
+        S.rtEdit.goal = S.rtEdit.goal0 = goalKeep(r && r.goal_id); // V40.34.0
         $('rt-f-emoji').value = r ? (r.emoji || '') : '✨';
         $('rt-f-title').value = r ? (r.title || '') : '';
         var dur = r ? Math.max(5, Math.min(1440, Math.round(Number(r.duration) || 60))) : 60;
@@ -2991,6 +3020,7 @@
         $('rt-f-delete').classList.toggle('hidden', !id);
         $('rt-f-mb-new').value = '';
         renderRtTheme(); renderRtTags(); renderRtMbs();
+        fillGoalSelect('rt-f-goal-wrap', 'rt-f-goal', S.rtEdit.goal); // V40.34.0
         var m = $('modal-rt');
         m.classList.remove('hidden');
         m.classList.add('flex');
@@ -3036,7 +3066,8 @@
             duration: parseInt($('rt-f-dur').value, 10) || 60,
             theme: ed.theme,
             tag_id: ed.tag && tagOf(ed.tag) ? ed.tag : null,
-            microblocks: ed.mbs.map(function (t) { return String(t || '').trim(); }).filter(Boolean).map(function (t) { return { title: t }; })
+            microblocks: ed.mbs.map(function (t) { return String(t || '').trim(); }).filter(Boolean).map(function (t) { return { title: t }; }),
+            goal_id: goalKeep(ed.goal) // V40.34.0
         };
     }
     // Salva a rotina aberta. Devolve o id (ou null se não deu). Só os campos que mudaram sobem.
@@ -3049,6 +3080,7 @@
             var r = S.rotinas[ed.id];
             if (!r || r.deleted) { closeRoutine(); toast('Essa rotina foi apagada em outro aparelho.'); return null; }
             var changed = {};
+            if (ed.goal === ed.goal0) delete f.goal_id; // V40.34.0: a meta só sobe se mudaram o seletor
             Object.keys(f).forEach(function (k) { if (JSON.stringify(f[k]) !== JSON.stringify(r[k] == null ? null : r[k])) changed[k] = f[k]; });
             var id = ed.id;
             closeRoutine();
@@ -3074,7 +3106,8 @@
         startPlacing({
             kind: 'rotinas', id: id, title: (r.emoji ? r.emoji + ' ' : '') + (r.title || ''), // o app põe o emoji na frente do nome
             dur: Number(r.duration) > 0 ? Number(r.duration) : 30, tag: tagOf(r.tag_id) ? r.tag_id : null,
-            theme: r.theme === 'rest' ? 'rest' : 'focus', color: null, mbs: rtTitles(r.microblocks).map(function (t) { return { title: t, done: false }; })
+            theme: r.theme === 'rest' ? 'rest' : 'focus', color: null, mbs: rtTitles(r.microblocks).map(function (t) { return { title: t, done: false }; }),
+            goal: goalKeep(r.goal_id) // V40.34.0: cada bloco da rotina conta na meta dela
         });
     }
 
@@ -3233,7 +3266,7 @@
                 return { id: f.id, title: f.title, amount: Number(f.amount) || 0, start: f.start_month, months: fnDur(f), recurring: !!f.is_recurring, dueDay: f.due_day || null, paid: Array.isArray(f.paid_months) ? f.paid_months : [], overrides: f.amount_overrides || {} };
             }),
             // V40.21.0: as metas já chegam prontas (progresso, estrelas, nível), calculadas pelo metas.js
-            goals: window.FazMetas ? window.FazMetas.forAssistant(mtLists(), mtGoals(), mtDays(), new Date()) : null
+            goals: window.FazMetas ? window.FazMetas.forAssistant(mtLists(), mtGoals(), mtAllDays(), new Date()) : null
         };
     }
     function asMsgHtml(m) {
@@ -3589,14 +3622,82 @@
     // estrelas, sequência, pontos e nível. Aqui as linhas da nuvem viram o formato das regras (listId, goalId...).
     // Listas de metas em colunas; cada meta tem o "+" (soma no dia de hoje) e o "−" (desfaz o de hoje). ----------
     function mtLists() { return alive('metas_listas').map(function (r) { return { id: r.id, name: r.name }; }); }
-    function mtGoal(r) { return { id: r.id, listId: r.list_id, title: r.title, emoji: r.emoji, period: r.period, unit: r.unit, target: Number(r.target), step: Number(r.step) }; }
+    function mtGoal(r) { var g = { id: r.id, listId: r.list_id, title: r.title, emoji: r.emoji, period: r.period, unit: r.unit, target: Number(r.target), step: Number(r.step) }; if (isYmd(r.count_from)) g.countFrom = r.count_from; return g; }
     function mtGoals() { return alive('metas').map(mtGoal); }
     function mtDays(goalId) {
         return Object.keys(S.metas_dias).map(function (k) { return S.metas_dias[k]; })
             .filter(function (r) { return !r.deleted && (!goalId || r.goal_id === goalId); })
             .map(function (r) { return { id: r.id, goalId: r.goal_id, date: r.date, amount: Number(r.amount) || 0, target: r.target }; });
     }
+    // V40.34.0: os dias de verdade + os "dias de mentira" dos blocos e cartões ligados e concluídos (metas.js: autoDays).
+    // Os blocos vão no formato do celular; arquivado continua contando, apagado não.
+    function mtBlocks() {
+        return Object.keys(S.blocos).map(function (k) { return S.blocos[k]; }).filter(function (b) { return b && !b.deleted; })
+            .map(function (b) { return { date: String(b.date || '').slice(0, 10), goalId: b.goal_id || null, completed: !!b.completed, duration: Number(b.duration) || 0, cards: Array.isArray(b.cards) ? b.cards : null }; });
+    }
+    function mtAllDays(goalId) {
+        var M = window.FazMetas, d = M ? M.withAuto(mtDays(), mtGoals(), mtBlocks()) : mtDays();
+        return goalId ? d.filter(function (x) { return String(x.goalId) === String(goalId); }) : d;
+    }
     function mtNum(n) { return String(Math.round((Number(n) || 0) * 100) / 100).replace('.', ','); }
+    // ---------- V40.34.0: METAS ETAPA 2 — bloco, tarefa, rotina e cartão da sublista ligados a uma meta (goal_id) ----------
+    // Bloco (ou cartão) concluído conta na meta no dia dele, como um clique no "+" (em minutos, o tempo dele). A tarefa e
+    // a rotina só levam a meta pro bloco que virarem. Meta apagada vale como "sem meta" (o selo some, não conta).
+    function goalOf(id) { var r = id ? S.metas[id] : null; return r && !r.deleted ? r : null; }
+    function goalKeep(id) { return goalOf(id) ? String(id) : null; }
+    function goalBadge(id) {
+        var g = goalOf(id);
+        return g ? '<span class="goal-badge" title="Meta: ' + esc(g.title || 'Sem nome') + '" aria-label="Meta: ' + esc(g.title || 'Sem nome') + '">' + esc(g.emoji || '🎯') + '</span>' : '';
+    }
+    // <select> da meta: "Sem meta" e as metas, agrupadas por categoria. Sem nenhuma meta, a linha some.
+    function fillGoalSelect(wrapId, selId, cur) {
+        var M = window.FazMetas, goals = M ? mtGoals() : [], lists = mtLists();
+        $(wrapId).classList.toggle('hidden', !goals.length);
+        if (!goals.length) { $(selId).innerHTML = ''; return; }
+        cur = goalKeep(cur);
+        var html = '<option value="">Sem meta</option>';
+        lists.forEach(function (l) {
+            var gs = goals.filter(function (g) { return M.listOf(g, lists) === l.id; });
+            if (gs.length) html += '<optgroup label="' + esc(l.name || 'Sem nome') + '">' + gs.map(function (g) { return '<option value="' + esc(g.id) + '">' + esc((g.emoji || '🎯') + ' ' + (g.title || 'Sem nome')) + '</option>'; }).join('') + '</optgroup>';
+        });
+        $(selId).innerHTML = html;
+        $(selId).value = cur || '';
+    }
+    // Concluir um bloco/cartão ligado que cumpriu a meta: o mesmo aviso do "+" (⭐, pontos, nível), depois do aviso do bloco.
+    function mtWatch(fn) {
+        var M = window.FazMetas;
+        if (!M || !alive('metas').length) return fn();
+        var now = new Date(), before = M.summary(mtGoals(), mtAllDays(), now), p = fn();
+        var msg = M.gainText(M.gain(before, M.summary(mtGoals(), mtAllDays(), now)));
+        if (msg) Promise.resolve(p).then(function (ok) { if (ok !== false) toast(msg, 3200); });
+        return p;
+    }
+    // Gráfico da meta (na janela dela): os últimos 7 dias, 8 semanas ou 6 meses, com a linha da meta de cada um.
+    function mtChartHtml(g) {
+        var M = window.FazMetas, now = new Date(), days = mtAllDays(g.id);
+        var hist = M.history(g, days, now), rec = M.records(g, days, now), x = M.status(g, days, now);
+        var top = Math.max.apply(null, [1].concat(hist.map(function (h) { return Math.max(h.total, h.target); })));
+        var per = g.period === 'semana' ? 'Últimas 8 semanas' : g.period === 'mes' ? 'Últimos 6 meses' : 'Últimos 7 dias';
+        var bars = hist.map(function (h) {
+            var hp = Math.round(Math.min(1, h.total / top) * 100), tp = Math.round(Math.min(1, h.target / top) * 100);
+            var cls = h.met ? 'bg-emerald-500' : h.current ? 'bg-focus' : 'bg-zinc-300', lbl = h.label + (h.sub ? ' ' + h.sub : '') + ': ' + h.text;
+            return '<div class="flex-1 min-w-0 flex flex-col items-center gap-1" data-goal-bar="' + esc(h.key) + '" title="' + esc(lbl) + '" aria-label="' + esc(lbl) + '">' +
+                '<div class="relative w-full h-20 flex items-end justify-center"><div class="mt-bar w-[60%] max-w-[22px] rounded-t ' + cls + '" style="height:' + (h.total > 0 ? Math.max(4, hp) : 0) + '%"></div>' +
+                '<div class="absolute left-[10%] right-[10%] border-t-2 border-dashed border-zinc-400/70" style="bottom:' + tp + '%"></div></div>' +
+                '<span class="text-[10.5px] leading-none font-semibold ' + (h.current ? 'text-zinc-800' : 'text-zinc-400') + '">' + esc(h.label) + '</span>' +
+                (h.sub ? '<span class="text-[10.5px] leading-none ' + (h.current ? 'text-zinc-700 font-semibold' : 'text-zinc-400') + '">' + esc(h.sub) + '</span>' : '') + '</div>';
+        }).join('');
+        var stats = [];
+        if (rec.best) stats.push('🏆 Melhor: ' + rec.bestText);
+        if (x.streak) stats.push('🔥 ' + M.streakLabel(g.period, x.streak));
+        stats.push('⭐ ' + x.stars);
+        stats.push('Total: ' + rec.totalText);
+        return '<div class="flex items-center justify-between gap-2 mb-2"><span class="text-[11px] font-bold uppercase tracking-wider text-zinc-500">' + per + '</span>' +
+            '<span class="mt-chart-now text-[12px] font-semibold ' + (x.complete ? 'text-emerald-600' : 'text-zinc-600') + '">' + esc(x.text) + '</span></div>' +
+            '<div class="mt-bars flex items-end gap-1.5">' + bars + '</div>' +
+            '<p class="mt-chart-stats mt-2.5 text-[11.5px] text-zinc-500">' + esc(stats.join(' · ')) + '</p>' +
+            '<p class="mt-1 text-[11px] text-zinc-400">A linha tracejada é a meta. Blocos e cartões ligados a ela contam sozinhos quando são concluídos.</p>';
+    }
     function mtToday(goalId) { var M = window.FazMetas, r = S.metas_dias[M.dayId(goalId, M.ymd(new Date()))]; return r && !r.deleted ? Number(r.amount) || 0 : 0; }
     // Sem nenhuma lista de metas na nuvem (nem apagada): cria Pessoal, Profissional e Financeiro (os mesmos ids do celular).
     function mtEnsureLists() {
@@ -3648,7 +3749,7 @@
         if (!M) { cols.innerHTML = '<p class="text-sm text-zinc-500">Não consegui carregar as metas. Recarregue a página.</p>'; return; }
         if (!S.lastLoad) { cols.innerHTML = '<p class="text-sm text-zinc-500">Carregando suas metas…</p>'; return; }
         mtEnsureLists();
-        var lists = mtLists(), goals = mtGoals(), now = new Date(), sum = M.summary(goals, mtDays(), now), st = {}, by = {};
+        var lists = mtLists(), goals = mtGoals(), now = new Date(), sum = M.summary(goals, mtAllDays(), now), st = {}, by = {}; // V40.34.0: + blocos ligados
         sum.statuses.forEach(function (x) { st[x.goal.id] = x; });
         lists.forEach(function (l) { by[l.id] = []; });
         goals.forEach(function (g) { var l = M.listOf(g, lists); if (l) by[l].push(g); });
@@ -3661,12 +3762,13 @@
         cols.innerHTML = (goals.length ? '' : '<p class="pt-4 text-[13px] text-zinc-500">Crie sua primeira meta: beber água, correr, meditar, ler, guardar dinheiro... Clique no <b>+</b> dela quando fizer e ganhe ⭐ estrelas e pontos.</p>') +
             lists.map(function (l) { return mtSectionHtml(l, by[l.id], st); }).join(''); // V40.23.0: uma página só, por categoria (a rolagem da página fica onde estava)
         if (S.mtEdit && S.mtEdit.id && !(S.metas[S.mtEdit.id] && !S.metas[S.mtEdit.id].deleted)) { closeGoal(); toast('Essa meta foi apagada em outro aparelho.'); }
+        else if (S.mtEdit && S.mtEdit.id) $('mt-f-chart').innerHTML = mtChartHtml(M.normalize(mtGoal(S.metas[S.mtEdit.id]))); // V40.34.0: o gráfico acompanha
     }
     // "+" (ou "−"): soma no dia de hoje. Cumpriu? Estrela e pontos (e às vezes um nível novo).
     function mtBump(id, dir) {
         var M = window.FazMetas, r = S.metas[id];
         if (!M || !r || r.deleted) return;
-        var g = mtGoal(r), now = new Date(), today = M.ymd(now), before = M.summary(mtGoals(), mtDays(), now);
+        var g = mtGoal(r), now = new Date(), today = M.ymd(now), before = M.summary(mtGoals(), mtAllDays(), now);
         var res = M.bump(mtDays(id), g, today, (dir < 0 ? -1 : 1) * M.normalize(g).step);
         if (!res.changed) return;
         var row = { user_id: S.uid, id: res.row.id, goal_id: id, date: today, amount: res.row.amount, target: res.row.target, deleted: false };
@@ -3674,7 +3776,7 @@
         var ch = { kind: 'metas_dias', id: row.id, b: was && !was.deleted ? undoPick(was, F) : null, a: undoPick(row, F), row: undoClone(row), q: true };
         S.metas_dias[row.id] = row;
         undoRec(S.gesture, [ch]);
-        var msg = dir > 0 ? M.gainText(M.gain(before, M.summary(mtGoals(), mtDays(), now))) : '';
+        var msg = dir > 0 ? M.gainText(M.gain(before, M.summary(mtGoals(), mtAllDays(), now))) : '';
         renderMetas();
         if (msg) toast(msg, 3200);
         mtWrite(row);
@@ -3731,6 +3833,8 @@
         $('mt-f-target').value = mtNum(g ? g.target : M.UNITS.vezes.target);
         $('mt-f-step').value = mtNum(g ? g.step : M.UNITS.vezes.step);
         $('mt-f-delete').classList.toggle('hidden', !r);
+        $('mt-f-chart-wrap').classList.toggle('hidden', !r); // V40.34.0
+        $('mt-f-chart').innerHTML = r ? mtChartHtml(g) : '';
         mtFormUi();
         var box = $('modal-goal');
         box.classList.remove('hidden');
@@ -3776,7 +3880,7 @@
         var r = S.metas[ed.id];
         if (!r || r.deleted) { closeGoal(); return toast('Essa meta foi apagada em outro aparelho.'); }
         var restart = r.period !== ed.period || r.unit !== ed.unit;
-        if (restart && mtDays(r.id).some(function (d) { return d.amount > 0; })) {
+        if (restart && mtAllDays(r.id).some(function (d) { return d.amount > 0; })) {
             ed.busy = true;
             var yes = await dialog({ title: 'Mudar a frequência ou a medida?', text: 'A contagem desta meta recomeça do zero: o que já foi marcado e as estrelas dela saem da pontuação.', okLabel: 'Mudar e recomeçar', danger: true });
             ed.busy = false;
@@ -3790,14 +3894,23 @@
         if (ed.unit !== r.unit) fields.unit = ed.unit;
         if (target !== Number(r.target)) fields.target = target;
         if (step !== Number(r.step)) fields.step = step;
+        // V40.34.0: recomeçar a contagem também tira da conta os blocos concluídos antes de hoje (count_from); mudar só o
+        // alvo guarda o alvo antigo nos períodos que já passaram e só tinham blocos ligados (a estrela deles não muda)
+        if (restart) fields.count_from = M.ymd(new Date());
+        var g0 = mtGoal(r), marks = !restart && fields.target != null ? M.targetMarks(g0, mtDays(r.id), M.autoDays([g0], mtBlocks()), new Date()) : [];
+        var gst = S.gesture;
         closeGoal();
-        if (restart) await mtClearDays(r.id, S.gesture);
+        if (restart) await mtClearDays(r.id, gst);
+        for (var i = 0; i < marks.length; i++) {
+            var mk = marks[i];
+            if (!(await insertRow('metas_dias', { user_id: S.uid, id: mk.id, goal_id: r.id, date: mk.date, amount: mk.amount, target: mk.target, deleted: false }))) return;
+        }
         if (Object.keys(fields).length) patchRow('metas', r.id, fields, restart ? 'Meta salva. A contagem recomeçou.' : 'Meta salva');
     }
     async function deleteGoal(id) {
         var M = window.FazMetas, r = S.metas[id];
         if (!M || !r || r.deleted) return;
-        var x = M.status(mtGoal(r), mtDays(id), new Date());
+        var x = M.status(mtGoal(r), mtAllDays(id), new Date());
         var yes = await dialog({ title: 'Apagar a meta "' + (r.title || 'Sem nome') + '"?', text: (x.stars ? 'Ela tem ⭐ ' + x.stars + (x.stars === 1 ? ' estrela' : ' estrelas') + ' (' + x.points + ' pontos), que saem da sua pontuação. ' : '') + 'Ela sai daqui e do celular.', okLabel: 'Apagar meta', danger: true });
         if (!yes || !S.metas[id] || S.metas[id].deleted) return;
         if (S.mtEdit && S.mtEdit.id === id) closeGoal();
@@ -3823,7 +3936,7 @@
         var lists = mtLists();
         if (lists.length <= 1) return toast('Precisa ter pelo menos uma categoria.');
         var goals = mtGoals().filter(function (g) { return M.listOf(g, lists) === id; });
-        var stars = goals.reduce(function (a, g) { return a + M.status(g, mtDays(g.id), new Date()).stars; }, 0);
+        var stars = goals.reduce(function (a, g) { return a + M.status(g, mtAllDays(g.id), new Date()).stars; }, 0);
         var yes = await dialog({
             title: 'Apagar a categoria "' + (l.name || 'Sem nome') + '"?',
             text: goals.length ? (goals.length === 1 ? 'A meta dela também será apagada' : 'As ' + goals.length + ' metas dela também serão apagadas') + (stars ? ' (e as ⭐ ' + stars + ' saem da pontuação)' : '') + ', aqui e no celular.' : 'Ela está vazia. Sai daqui e do celular.',
@@ -4154,7 +4267,8 @@
         var task = {
             user_id: S.uid, id: newId('bl_', 'tarefas'), column_id: listId, title: title, duration: Number.isFinite(dur) ? dur : (Number(b.duration) || 30),
             tag_id: ed.tag || null, microblocks: normMbs(ed.mbs).map(function (m) { return { title: m.title, done: false }; }),
-            position: maxPos('tarefas') + STEP, color: ed.color || null, archived: false, deleted: false
+            position: maxPos('tarefas') + STEP, color: ed.color || null, archived: false, deleted: false,
+            goal_id: goalKeep(ed.goal) // V40.34.0
         };
         closeTask();
         if (!(await insertRow('tarefas', task))) return; // não entrou na lista: o bloco continua na agenda
@@ -4585,6 +4699,7 @@
         $('f-title').addEventListener('input', function () { autoGrow(this); });
         $('f-title').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveTask(); } });
         $('f-save').addEventListener('click', saveTask);
+        $('f-goal').addEventListener('change', function () { if (S.editing) S.editing.goal = this.value || null; }); // V40.34.0
         $('f-cancel').addEventListener('click', closeTaskUi);
         $('f-delete').addEventListener('click', deleteTask);
         $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeTaskUi(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
@@ -4604,6 +4719,7 @@
         $('modal-rt').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeRoutine(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('rt-f-cancel').addEventListener('click', closeRoutine);
         $('rt-f-save').addEventListener('click', function () { saveRoutine(); });
+        $('rt-f-goal').addEventListener('change', function () { if (S.rtEdit) S.rtEdit.goal = this.value || null; }); // V40.34.0
         $('rt-f-delete').addEventListener('click', function () { deleteRoutine(); });
         $('rt-f-hand').addEventListener('click', async function () { var id = await saveRoutine(); if (id) startPlacingRoutine(id); });
         $('rt-f-theme').addEventListener('click', function (e) {

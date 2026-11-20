@@ -2,29 +2,29 @@
 const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
 const COLUMNS = {
-  tarefas: ['user_id', 'id', 'column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived', 'deleted', 'updated_at'],
-  blocos: ['user_id', 'id', 'date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'cards', 'deleted', 'updated_at'], // V40.24.0: + cards (sublista)
+  tarefas: ['user_id', 'id', 'column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived', 'goal_id', 'deleted', 'updated_at'], // V40.34.0: + goal_id
+  blocos: ['user_id', 'id', 'date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'cards', 'goal_id', 'deleted', 'updated_at'], // V40.24.0: + cards (sublista); V40.34.0: + goal_id
   listas: ['user_id', 'id', 'name', 'is_default', 'position', 'created_ms', 'deleted', 'updated_at'],
   tags: ['user_id', 'id', 'name', 'color', 'position', 'deleted', 'updated_at'],
   // V40.17.0
-  rotinas: ['user_id', 'id', 'title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms', 'deleted', 'updated_at'],
+  rotinas: ['user_id', 'id', 'title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms', 'goal_id', 'deleted', 'updated_at'],
   notas: ['user_id', 'id', 'title', 'content', 'created_ms', 'updated_ms', 'deleted', 'updated_at'],
   financas: ['user_id', 'id', 'title', 'amount', 'start_month', 'duration_months', 'is_recurring', 'due_day', 'tag_id', 'paid_months', 'amount_overrides', 'created_ms', 'deleted', 'updated_at'],
   // V40.21.0
   metas_listas: ['user_id', 'id', 'name', 'is_default', 'position', 'created_ms', 'deleted', 'updated_at'],
-  metas: ['user_id', 'id', 'list_id', 'title', 'emoji', 'period', 'unit', 'target', 'step', 'position', 'created_ms', 'deleted', 'updated_at'],
+  metas: ['user_id', 'id', 'list_id', 'title', 'emoji', 'period', 'unit', 'target', 'step', 'position', 'created_ms', 'count_from', 'deleted', 'updated_at'], // V40.34.0: + count_from
   metas_dias: ['user_id', 'id', 'goal_id', 'date', 'amount', 'target', 'deleted', 'updated_at'],
 };
 const DEFAULTS = {
-  tarefas: { column_id: 'col_geral', title: '', duration: 30, tag_id: null, microblocks: [], position: 0, color: null, archived: false, deleted: false },
-  blocos: { title: '', type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, cards: null, deleted: false },
+  tarefas: { column_id: 'col_geral', title: '', duration: 30, tag_id: null, microblocks: [], position: 0, color: null, archived: false, goal_id: null, deleted: false },
+  blocos: { title: '', type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, cards: null, goal_id: null, deleted: false },
   listas: { name: '', is_default: false, position: 0, created_ms: null, deleted: false },
   tags: { name: '', color: '#a1a1aa', position: 0, deleted: false },
-  rotinas: { title: '', emoji: '', duration: 60, theme: 'focus', tag_id: null, microblocks: [], created_ms: null, deleted: false },
+  rotinas: { title: '', emoji: '', duration: 60, theme: 'focus', tag_id: null, microblocks: [], created_ms: null, goal_id: null, deleted: false },
   notas: { title: '', content: '', created_ms: null, updated_ms: null, deleted: false },
   financas: { title: '', amount: 0, duration_months: 1, is_recurring: false, due_day: null, tag_id: null, paid_months: [], amount_overrides: {}, created_ms: null, deleted: false },
   metas_listas: { name: '', is_default: false, position: 0, created_ms: null, deleted: false },
-  metas: { list_id: null, title: '', emoji: '', period: 'dia', unit: 'vezes', target: 1, step: 1, position: 0, created_ms: null, deleted: false },
+  metas: { list_id: null, title: '', emoji: '', period: 'dia', unit: 'vezes', target: 1, step: 1, position: 0, created_ms: null, count_from: null, deleted: false },
   metas_dias: { amount: 0, target: null, deleted: false },
 };
 
@@ -34,6 +34,8 @@ function check(table, r) { // mesmas CHECKs da migration
   if (typeof r.id !== 'string' || r.id.length < 1 || r.id.length > 64) return bad('id');
   if ('color' in r && table !== 'tags' && r.color !== null && !/^#[0-9a-fA-F]{6}$/.test(String(r.color))) return bad('color');
   if ('archived' in r && typeof r.archived !== 'boolean') return bad('archived');
+  if ('goal_id' in r && r.goal_id !== null && (typeof r.goal_id !== 'string' || r.goal_id.length < 1 || r.goal_id.length > 64)) return bad('goal_id'); // V40.34.0 (migration faz_v40_34_0_meta_ligada)
+  if ('count_from' in r && r.count_from !== null && !/^\d{4}-\d{2}-\d{2}$/.test(String(r.count_from))) return bad('count_from'); // V40.34.0
   if (table === 'blocos') {
     if ('date' in r && !/^\d{4}-\d{2}-\d{2}$/.test(String(r.date))) return bad('date');
     for (const k of ['start_min', 'duration']) if (k in r && (!Number.isInteger(r[k]) || r[k] < 0 || r[k] > 1440)) return bad(k);

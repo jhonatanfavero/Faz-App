@@ -295,6 +295,9 @@ const UID = '11111111-1111-1111-1111-111111111111';
   ev("activeDateObj = new Date(2026, 10, 23); renderTimeline();");
   ok(L('tb__vagos_compactos') === '0' && gaps().length === 0 && top('f_va') === '181px' && ev('tlSegs') === null, 'desligou: volta tudo ao normal');
   ok(!Object.keys(JSON.parse(JSON.stringify(ev('collectFazData()')))).includes('tb__vagos_compactos'), 'a preferência não entra no backup');
+  // V40.34.0: abriu e fechou o + antes dos 350 ms: o foco atrasado não pode cair no campo escondido (segurava o sync)
+  w.openSheet(); w.closeAllSheets(); await sleep(420);
+  ok(d.activeElement !== $('task-input'), 'abrir e fechar o + rápido não deixa o foco no campo escondido');
 
   // ======================================================================================================
   console.log('\nF) Na nuvem (celular <-> PC):');
@@ -314,8 +317,12 @@ const UID = '11111111-1111-1111-1111-111111111111';
   ok(get(S1).cards.length === 11 && get(S1).cards[1].done === true && get(S1).cards[10].title === 'Criado no PC' && /Criado no PC/.test(subEl(S1) ? (w.toggleExpandBlock(S1, { stopPropagation() {} }), subEl(S1).textContent) : ''), 'o que o PC fez nos cartões chegou no celular e aparece na agenda');
   ev('collapseAllBlocks()');
   // o celular marca: sobe sozinho
+  $('task-input').focus(); // V40.34.0: campo de uma tela FECHADA com o foco não segura a sincronização
+  const focoPreso = d.activeElement === $('task-input') && $('bottom-sheet').classList.contains('translate-y-full');
   w.toggleSublistCard(S1, 'cd_pc1', {});
   ok(await waitFor(() => (server.get('blocos', UID, S1).cards.find((c) => c.id === 'cd_pc1') || {}).done === true), 'marcar no celular sobe sozinho pra nuvem');
+  ok(focoPreso, '...mesmo com o foco preso no campo do + fechado');
+  $('task-input').blur();
   // o PC transforma em bloco normal? (cards null) → o celular acompanha
   // cartão aberto segura o redesenho
   w.openSublistCard(S1, 'cd_pc1', {});

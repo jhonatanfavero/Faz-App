@@ -173,6 +173,30 @@
     .col > header[draggable="true"] { cursor: grab; -webkit-user-select: none; user-select: none; }
     .col.col-dragging { opacity: .35; }
     .col-drop { position: absolute; width: 4px; border-radius: 4px; background: var(--focus); pointer-events: none; z-index: 5; }
+    /* V40.35.0: busca na agenda. Sem espaço na barra, os botões ficam só com o ícone (Semana: abaixo de 1280 px; Dia, que
+       tem o nome do dia comprido e o "Compactar vagos": abaixo de 1536 px) */
+    @media (max-width: 1279.98px) { .ag-txt { display: none; } }
+    @media (max-width: 1535.98px) { #agenda.ag-dayview .ag-txt { display: none; } }
+    .ag-search:focus-within { border-color: var(--focus); color: var(--focus); }
+    mark.ag-hl { background: #fde68a; color: inherit; border-radius: 3px; padding: 0 1px; }
+    .ag-sres-head { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; gap: 8px; padding: 9px 14px; background: #fff; border-bottom: 1px solid #f4f4f5; font-size: 12px; font-weight: 700; color: #3f3f46; }
+    .ag-sres-sec { padding: 10px 14px 2px; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #a1a1aa; }
+    .ag-sres-sec span { margin-left: 4px; color: #d4d4d8; }
+    .ag-sres-day { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 14px 3px; font-size: 12px; font-weight: 700; color: #52525b; text-align: left; }
+    .ag-sres-day .rel { padding: 0 6px; border-radius: 9999px; background: #f4f4f5; font-size: 10.5px; color: #71717a; }
+    .ag-sres-day .go { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--focus); opacity: 0; }
+    .ag-sres-day:hover .go, .ag-sres-day:focus-visible .go { opacity: 1; }
+    .ag-sres-row { display: flex; align-items: flex-start; gap: 10px; width: calc(100% - 12px); margin: 0 6px; padding: 7px 8px; border-radius: 10px; text-align: left; }
+    .ag-sres-row.on { background: #f4f4f5; }
+    .ag-sres-time { flex: none; width: 44px; display: flex; flex-direction: column; font-size: 12px; font-weight: 700; color: #3f3f46; line-height: 1.25; }
+    .ag-sres-time small { font-size: 10.5px; font-weight: 500; color: #a1a1aa; }
+    .ag-sres-title { font-size: 13.5px; font-weight: 600; color: #18181b; line-height: 1.3; overflow-wrap: anywhere; }
+    .ag-sres-title.done { text-decoration: line-through; color: #a1a1aa; }
+    .ag-sres-hit { display: flex; align-items: center; gap: 5px; min-width: 0; font-size: 12px; color: #52525b; }
+    .ag-sres-hit i { flex: none; color: #a1a1aa; }
+    .ag-sres-hit.done > span { text-decoration: line-through; color: #a1a1aa; }
+    .ag-found { animation: agFound 2.6s ease-out; }
+    @keyframes agFound { 0%, 55% { box-shadow: 0 0 0 3px var(--focus); } 100% { box-shadow: 0 0 0 3px transparent; } }
     /* V40.34.0: ligado a uma meta: o emoji dela antes do nome */
     .goal-badge { display: inline-block; margin-right: 4px; font-size: .95em; line-height: 1; font-style: normal; text-decoration: none; }
     #toast { transition: opacity .2s, transform .2s; }
@@ -317,12 +341,23 @@
                 <i class="ph ph-funnel"></i>
                 <select id="ag-tag" class="max-w-[150px] bg-transparent outline-none text-[13px] font-semibold text-zinc-700 pr-1 cursor-pointer" aria-label="Filtrar a agenda por tag"></select>
             </label>
-            <button id="ag-hide-done" type="button" aria-pressed="false" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50" title="Esconder os blocos já concluídos"><i class="ph ph-eye-slash"></i>Ocultar concluídos</button>
+            <button id="ag-hide-done" type="button" aria-pressed="false" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50" title="Esconder os blocos já concluídos"><i class="ph ph-eye-slash"></i><span class="ag-txt">Ocultar concluídos</span></button>
             <!-- V40.22.0: só na visão Dia: encolhe os horários vagos (lembrado neste computador) -->
             <button id="ag-compact" type="button" aria-pressed="false" class="hidden items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50" title="Encolher os horários vagos do dia (30 min ou mais)"><i class="ph ph-arrows-in-line-vertical"></i>Compactar vagos</button>
             <!-- V40.29.0: Relatórios (o "Produtividade" do celular) -->
-            <button id="ag-rep" type="button" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50" title="Produtividade: quanto foi feito hoje, em 7 e em 30 dias, por tag"><i class="ph ph-chart-bar"></i>Relatórios</button>
-            <div class="ml-auto inline-flex p-1 bg-white border border-zinc-200 rounded-xl" role="tablist" aria-label="Visualização">
+            <button id="ag-rep" type="button" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50" title="Produtividade: quanto foi feito hoje, em 7 e em 30 dias, por tag" aria-label="Relatórios"><i class="ph ph-chart-bar"></i><span class="ag-txt">Relatórios</span></button>
+            <!-- V40.35.0: busca na agenda (todos os dias): nome, checklist, cartões da sublista e tag. Pra barra caber numa
+                 linha, "Ocultar concluídos", "Compactar vagos" e "Relatórios" ficam só com o ícone abaixo de 1280 px (na
+                 Semana) ou de 1536 px (no Dia, que tem o nome do dia comprido e o "Compactar vagos"): .ag-txt no <style> -->
+            <div id="ag-search-wrap" class="ml-auto relative">
+                <label class="ag-search inline-flex items-center gap-1.5 h-9 w-40 xl:w-56 pl-2.5 pr-1 rounded-lg bg-white border border-zinc-200 text-zinc-400" title="Buscar na agenda: nome, checklist, cartões da sublista e tag">
+                    <i class="ph ph-magnifying-glass text-[15px]"></i>
+                    <input id="ag-search" type="text" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="80" placeholder="Buscar na agenda" role="combobox" aria-expanded="false" aria-controls="ag-sres" aria-autocomplete="list" aria-label="Buscar na agenda" class="min-w-0 flex-1 bg-transparent outline-none text-[13px] font-medium text-zinc-800 placeholder-zinc-400">
+                    <button id="ag-search-x" type="button" class="hidden shrink-0 w-6 h-6 rounded-md items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100" aria-label="Limpar a busca" title="Limpar a busca"><i class="ph-bold ph-x text-[12px]"></i></button>
+                </label>
+                <div id="ag-sres" class="hidden absolute right-0 top-full mt-1.5 z-40 w-[560px] max-w-[calc(100vw-2rem)] max-h-[min(70vh,640px)] overflow-y-auto thin-scroll bg-white border border-zinc-200 rounded-xl shadow-xl" role="listbox" aria-label="Resultados da busca na agenda"></div>
+            </div>
+            <div class="inline-flex p-1 bg-white border border-zinc-200 rounded-xl" role="tablist" aria-label="Visualização">
                 <button data-view="week" class="ag-view px-3 py-1.5 rounded-lg text-[13px] font-semibold">Semana</button>
                 <button data-view="day" class="ag-view px-3 py-1.5 rounded-lg text-[13px] font-semibold">Dia</button>
             </div>
@@ -903,7 +938,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.34.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.35.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1562,7 +1597,10 @@
         var hb = $('ag-hide-done');
         hb.classList.toggle('ag-filter-on', !!S.agHideDone);
         hb.setAttribute('aria-pressed', S.agHideDone ? 'true' : 'false');
-        hb.innerHTML = S.agHideDone ? '<i class="ph ph-eye"></i>Mostrar concluídos' : '<i class="ph ph-eye-slash"></i>Ocultar concluídos';
+        // V40.35.0: sem espaço na barra, fica só o ícone (o título diz o que o botão faz; ver .ag-txt no <style>)
+        hb.innerHTML = S.agHideDone ? '<i class="ph ph-eye"></i><span class="ag-txt">Mostrar concluídos</span>' : '<i class="ph ph-eye-slash"></i><span class="ag-txt">Ocultar concluídos</span>';
+        hb.title = S.agHideDone ? 'Mostrar de novo os blocos concluídos' : 'Esconder os blocos já concluídos';
+        hb.setAttribute('aria-label', S.agHideDone ? 'Mostrar concluídos' : 'Ocultar concluídos');
     }
     function weekListHtml(all, day, today, nm) {
         var list = all.filter(agVisible); // o que aparece; os espaços livres (tarefa na mão) contam todos os blocos
@@ -1578,6 +1616,179 @@
         while (gi < gaps.length) html += gapHtml(day, gaps[gi++]);
         return html;
     }
+    // ===================== V40.35.0: BUSCA NA AGENDA =====================
+    // Procura em TODOS os dias (menos arquivados e apagados): no nome do bloco, no checklist, nos cartões da sublista
+    // (e no checklist deles) e no nome da tag. Sem ligar pra acento nem maiúscula ("esperanca" acha "ESPERANÇA"); cada
+    // palavra digitada tem que aparecer em algum desses lugares ("geo qualite" acha "GEO ADAO" da tag QUALITÊ). As
+    // mesmas regras do celular (cardMatchesSearch no app.js). Primeiro de hoje em diante (do mais perto pro mais
+    // longe), depois os de antes (do mais recente pro mais antigo). Clicar abre o bloco e leva a Agenda até o dia dele.
+    var AGS = { q: '', open: false, active: 0, rows: [], t: null, dirty: false };
+    var AGS_MAX = 100; // linhas no painel; o resto pede pra afinar a busca
+    function agsWords(q) {
+        var seen = {};
+        return subNorm(q).split(/\s+/).filter(function (w) { if (!w || seen[w]) return false; seen[w] = 1; return true; });
+    }
+    function agsParts(b) { // os textos onde a busca procura (k: t = nome, mb = checklist, card = cartão, cmb = checklist do cartão, tag)
+        var out = [{ k: 't', s: String(b.title || '') }];
+        (Array.isArray(b.microblocks) ? b.microblocks : []).forEach(function (m) { if (m && m.title) out.push({ k: 'mb', s: String(m.title), done: !!m.done }); });
+        if (isSub(b)) b.cards.forEach(function (c) {
+            if (!c) return;
+            if (c.title) out.push({ k: 'card', s: String(c.title), done: !!c.done });
+            (Array.isArray(c.microblocks) ? c.microblocks : []).forEach(function (m) { if (m && m.title) out.push({ k: 'cmb', s: String(m.title), card: String(c.title || ''), done: !!m.done }); });
+        });
+        var tag = tagOf(b.tag_id);
+        if (tag && tag.name) out.push({ k: 'tag', s: String(tag.name) });
+        return out;
+    }
+    function agsSearch(q) {
+        var words = agsWords(q);
+        if (!words.length) return null;
+        var today = todayStr(), fut = [], past = [];
+        Object.keys(S.blocos).forEach(function (id) {
+            var b = S.blocos[id];
+            if (!b || b.deleted || b.archived || !/^\d{4}-\d{2}-\d{2}/.test(String(b.date))) return;
+            var parts = agsParts(b), hay = subNorm(parts.map(function (x) { return x.s; }).join('\n'));
+            if (!words.every(function (w) { return hay.indexOf(w) >= 0; })) return;
+            var it = { b: b, day: String(b.date).slice(0, 10), parts: parts };
+            (it.day >= today ? fut : past).push(it);
+        });
+        fut.sort(function (x, y) { return x.day < y.day ? -1 : x.day > y.day ? 1 : (x.b.start_min - y.b.start_min) || (x.b.id < y.b.id ? -1 : 1); });
+        past.sort(function (x, y) { return x.day < y.day ? 1 : x.day > y.day ? -1 : (x.b.start_min - y.b.start_min) || (x.b.id < y.b.id ? -1 : 1); });
+        return { words: words, fut: fut, past: past };
+    }
+    // Texto com as palavras achadas marcadas. Compara letra a letra sem acento, mas marca o texto original.
+    function agsHl(s, words) {
+        s = String(s || '');
+        var flat = '', at = [], i, k;
+        for (i = 0; i < s.length; i++) { var n = subNorm(s[i]); for (k = 0; k < n.length; k++) { flat += n[k]; at.push(i); } }
+        var marks = [];
+        words.forEach(function (w) { for (var p = flat.indexOf(w); p >= 0 && w; p = flat.indexOf(w, p + 1)) marks.push([at[p], at[p + w.length - 1] + 1]); });
+        if (!marks.length) return esc(s);
+        marks.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+        var html = '', cur = 0, m0 = marks[0][0], m1 = marks[0][1];
+        function flush() { html += esc(s.slice(cur, m0)) + '<mark class="ag-hl">' + esc(s.slice(m0, m1)) + '</mark>'; cur = m1; }
+        for (i = 1; i < marks.length; i++) {
+            if (marks[i][0] <= m1) { m1 = Math.max(m1, marks[i][1]); continue; }
+            flush(); m0 = marks[i][0]; m1 = marks[i][1];
+        }
+        flush();
+        return html + esc(s.slice(cur));
+    }
+    function agsHit(s, words) { var n = subNorm(s); return words.some(function (w) { return n.indexOf(w) >= 0; }); }
+    function agsDayLabel(day, today) {
+        var d = parseYmd(day), rel = day === today ? 'Hoje' : day === addDays(today, 1) ? 'Amanhã' : day === addDays(today, -1) ? 'Ontem' : '';
+        return { txt: WD3[d.getDay()] + ', ' + d.getDate() + ' de ' + MES[d.getMonth()] + (d.getFullYear() !== parseYmd(today).getFullYear() ? ' de ' + d.getFullYear() : ''), rel: rel };
+    }
+    function agsRowHtml(it, idx, words) {
+        var b = it.b, tag = tagOf(b.tag_id), mb = mbCount(b), sub = isSub(b);
+        var hits = it.parts.filter(function (x) { return x.k !== 't' && x.k !== 'tag' && agsHit(x.s, words); });
+        var hitHtml = hits.slice(0, 3).map(function (x) {
+            var ico = x.k === 'card' ? (x.done ? 'ph-check-circle' : 'ph-circle') : (x.done ? 'ph-check-square' : 'ph-square'); // cartão da sublista: bolinha; checklist: quadradinho
+            return '<span class="ag-sres-hit' + (x.done ? ' done' : '') + '"><i class="ph ' + ico + '"></i><span class="min-w-0 truncate">' +
+                (x.k === 'cmb' ? '<span class="text-zinc-400">' + esc(x.card) + ' › </span>' : '') + agsHl(x.s, words) + '</span></span>';
+        }).join('') + (hits.length > 3 ? '<span class="ag-sres-hit text-zinc-400">+' + (hits.length - 3) + ' no checklist</span>' : '');
+        var cards = sub ? b.cards.filter(Boolean) : [];
+        var meta = (b.completed ? '<span class="inline-flex items-center gap-1 text-emerald-600 font-medium"><i class="ph-fill ph-check-circle"></i>Concluído</span>' : '') +
+            (tag ? '<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + agsHl(tag.name, words) + '</span>' : '') +
+            (sub ? '<span class="inline-flex items-center gap-1"><i class="ph ph-list-checks"></i>' + cards.filter(function (c) { return c.done; }).length + '/' + cards.length + '</span>' :
+                mb.n ? '<span class="inline-flex items-center gap-1"><i class="ph ph-check-square"></i>' + mb.done + '/' + mb.n + '</span>' : '');
+        return '<button type="button" role="option" id="ags-o' + idx + '" aria-selected="' + (idx === AGS.active ? 'true' : 'false') + '" class="ag-sres-row' + (idx === AGS.active ? ' on' : '') + '" data-sres="' + idx + '">' +
+            '<span class="ag-sres-time tabular-nums">' + clock(b.start_min) + '<small>' + fmtDur(b.duration) + '</small></span>' +
+            '<span class="min-w-0 flex-1 flex flex-col gap-0.5">' +
+            '<span class="ag-sres-title' + (b.completed ? ' done' : '') + '">' + (sub ? '<i class="ph ph-list-checks text-amber-600 mr-1"></i>' : '') + goalBadge(b.goal_id) + (agsHl(b.title, words) || 'Sem nome') + '</span>' +
+            (meta ? '<span class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11.5px] text-zinc-500">' + meta + '</span>' : '') + hitHtml +
+            '</span></button>';
+    }
+    function agsRender() {
+        clearTimeout(AGS.t);
+        AGS.dirty = false;
+        var box = $('ag-sres'), inp = $('ag-search'), r = AGS.open ? agsSearch(AGS.q) : null;
+        if (!r) { box.classList.add('hidden'); inp.setAttribute('aria-expanded', 'false'); inp.removeAttribute('aria-activedescendant'); AGS.rows = []; return; }
+        var today = todayStr(), total = r.fut.length + r.past.length, rows = [], html = '', keep = box.classList.contains('hidden') ? 0 : box.scrollTop;
+        html += '<div class="ag-sres-head"><span>' + (total ? total + (total === 1 ? ' bloco' : ' blocos') : 'Nada encontrado') + '</span>' +
+            '<span class="text-zinc-400 font-medium">nome, checklist, sublista e tag</span></div>';
+        if (!total) html += '<p class="px-4 pt-3 pb-5 text-center text-[13px] text-zinc-500">Nenhum bloco com “' + esc(AGS.q.trim()) + '”.<br><span class="text-[12px] text-zinc-400">Os arquivados não entram na busca.</span></p>';
+        [['De hoje em diante', r.fut], ['Antes de hoje', r.past]].forEach(function (sec) {
+            if (!sec[1].length || rows.length >= AGS_MAX) return;
+            html += '<div class="ag-sres-sec">' + sec[0] + ' <span>' + sec[1].length + '</span></div>';
+            var last = null;
+            sec[1].forEach(function (it) {
+                if (rows.length >= AGS_MAX) return;
+                if (it.day !== last) {
+                    last = it.day;
+                    var lb = agsDayLabel(it.day, today);
+                    html += '<button type="button" class="ag-sres-day" data-sday="' + it.day + '" title="Abrir este dia na Agenda">' + esc(lb.txt) + (lb.rel ? '<span class="rel">' + lb.rel + '</span>' : '') + '<span class="go">Ver o dia <i class="ph ph-arrow-right"></i></span></button>';
+                }
+                html += agsRowHtml(it, rows.length, r.words);
+                rows.push(it);
+            });
+        });
+        if (total > rows.length) html += '<p class="px-4 py-3 text-[12px] text-zinc-500 text-center">Mais ' + (total - rows.length) + ' que não couberam aqui. Escreva mais uma palavra pra afinar a busca.</p>';
+        AGS.rows = rows;
+        if (AGS.active >= rows.length) AGS.active = Math.max(0, rows.length - 1);
+        box.innerHTML = html;
+        box.classList.remove('hidden');
+        box.scrollTop = keep;
+        inp.setAttribute('aria-expanded', 'true');
+        if (rows.length) inp.setAttribute('aria-activedescendant', 'ags-o' + AGS.active); else inp.removeAttribute('aria-activedescendant');
+    }
+    function agsSetActive(i, show) {
+        if (!AGS.rows.length) return;
+        AGS.active = Math.max(0, Math.min(AGS.rows.length - 1, i));
+        $('ag-sres').querySelectorAll('.ag-sres-row').forEach(function (el) {
+            var on = Number(el.dataset.sres) === AGS.active;
+            el.classList.toggle('on', on);
+            el.setAttribute('aria-selected', on ? 'true' : 'false');
+            if (on && show && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+        });
+        $('ag-search').setAttribute('aria-activedescendant', 'ags-o' + AGS.active);
+    }
+    function agsOpen() { if (!AGS.q.trim()) return; AGS.open = true; agsRender(); }
+    function agsClose(clear) {
+        clearTimeout(AGS.t);
+        AGS.open = false;
+        if (clear) { AGS.q = ''; $('ag-search').value = ''; AGS.active = 0; }
+        $('ag-search-x').classList.toggle('hidden', !AGS.q);
+        $('ag-search-x').classList.toggle('inline-flex', !!AGS.q);
+        agsRender();
+    }
+    // Leva a Agenda até o bloco (o mesmo modo, Semana ou Dia). Escondido pelo filtro? Tira o filtro, senão ele não apareceria.
+    function agsReveal(id) {
+        var b = S.blocos[id];
+        if (!b || b.deleted || b.archived) return false;
+        var off = [];
+        if (S.agHideDone && b.completed) { S.agHideDone = false; off.push('“Ocultar concluídos”'); try { localStorage.setItem('faz_pc_ag_hidedone', '0'); } catch (e) {} }
+        if (!agVisible(b)) { S.agTag = ''; off.push('o filtro de tag'); try { localStorage.setItem('faz_pc_ag_tag', ''); } catch (e) {} }
+        var day = String(b.date).slice(0, 10);
+        S.agAnchor = day;
+        S.agScrolled = day; // na visão Dia, quem rola até o bloco é a busca (não o "agora")
+        S.agWeekShown = null; // na Semana com zoom, o dia dele fica à vista
+        renderAgenda();
+        var el = document.querySelector((S.agView === 'day' ? '#ag-timeline' : '#ag-cols') + ' [data-block="' + CSS.escape(id) + '"]');
+        if (el) {
+            if (el.scrollIntoView) el.scrollIntoView({ block: 'center', inline: 'nearest' });
+            el.classList.remove('ag-found'); void el.offsetWidth; el.classList.add('ag-found');
+            setTimeout(function () { el.classList.remove('ag-found'); }, 2600);
+        }
+        if (off.length) toast('Tirei ' + off.join(' e ') + ' pra mostrar o bloco.');
+        return true;
+    }
+    function agsGo(idx) {
+        var it = AGS.rows[idx];
+        if (!it) return;
+        if (!agsReveal(it.b.id)) { toast('Esse bloco não está mais na agenda.'); return agsRender(); }
+        if (S.placing) return toast('Fui até o dia do bloco. Clique num espaço livre pra colocar a tarefa.'); // com tarefa na mão: só mostra o dia
+        openBlock(it.b.id);
+    }
+    function agsGoDay(day) {
+        agsClose(false);
+        S.agAnchor = day;
+        S.agView = 'day';
+        try { localStorage.setItem('faz_pc_agview', 'day'); } catch (e) {}
+        S.agScrolled = null;
+        renderAgenda();
+    }
+
     // V40.29.0: a Semana é sempre de segunda a domingo (pedido do Jhonatan: "na semana mostra sempre de segunda a
     // domingo"; antes eram 7 dias a partir do dia de referência, e o "Hoje" começava em hoje). S.agAnchor continua sendo
     // o dia de referência (hoje, o dia aberto no Dia...); a Semana na tela é a dele. Com menos dias por tela (zoom), ao
@@ -1973,14 +2184,17 @@
         renderAgFilter();
         $('ag-week').classList.toggle('hidden', S.agView !== 'week');
         $('ag-day').classList.toggle('hidden', S.agView !== 'day');
+        $('agenda').classList.toggle('ag-dayview', S.agView === 'day'); // V40.35.0: no Dia a barra tem mais coisa (ver .ag-txt)
         var cb = $('ag-compact'); // V40.22.0: "Compactar vagos", só no Dia
         cb.classList.toggle('hidden', S.agView !== 'day');
         cb.classList.toggle('inline-flex', S.agView === 'day');
         cb.classList.toggle('ag-filter-on', !!S.agCompact);
         cb.setAttribute('aria-pressed', S.agCompact ? 'true' : 'false');
         cb.title = S.agCompact ? 'Mostrar o dia inteiro, com os horários vagos' : 'Encolher os horários vagos do dia (30 min ou mais)';
-        cb.innerHTML = S.agCompact ? '<i class="ph ph-arrows-out-line-vertical"></i>Mostrar vagos' : '<i class="ph ph-arrows-in-line-vertical"></i>Compactar vagos';
+        cb.innerHTML = S.agCompact ? '<i class="ph ph-arrows-out-line-vertical"></i><span class="ag-txt">Mostrar vagos</span>' : '<i class="ph ph-arrows-in-line-vertical"></i><span class="ag-txt">Compactar vagos</span>'; // V40.35.0: sem espaço, só o ícone
+        cb.setAttribute('aria-label', S.agCompact ? 'Mostrar vagos' : 'Compactar vagos');
         $('board-summary').textContent = S.agView === 'day' ? renderDay(S.agAnchor, map, today, nowMin()) : renderWeek(weekStart(S.agAnchor), map, today, nowMin()); // V40.29.0: segunda a domingo
+        if (AGS.open) agsRender(); // V40.35.0: a busca aberta acompanha o que mudou
     }
 
     var TABS = ['assistente', 'listas', 'agenda', 'rotinas', 'notas', 'financas', 'metas']; // V40.17.0: + Rotinas e Notas; V40.19.0: + Finanças; V40.20.0: Assistente na frente; V40.21.0: + Metas
@@ -1988,6 +2202,7 @@
         var prev = S.tab;
         S.tab = TABS.indexOf(tab) >= 0 ? tab : 'listas';
         if (prev === 'notas' && S.tab !== 'notas') ntFlush(); // saindo das Notas: salva o que está escrito
+        if (S.tab !== 'agenda' && AGS.open) agsClose(false); // V40.35.0
         try { localStorage.setItem('faz_pc_tab', S.tab); } catch (e) {}
         $('board').classList.toggle('hidden', S.tab !== 'listas');
         ['assistente', 'agenda', 'rotinas', 'notas', 'financas', 'metas'].forEach(function (t) {
@@ -4921,6 +5136,7 @@
             if (menuEl) return closeColMenu();
             if (!$('f-card-pick').classList.contains('hidden')) { cardPick(false); return $('f-card-pull').focus(); } // V40.24.0: Esc fecha só a busca
             if (S.editing) return closeTaskUi();
+            if (AGS.open) return agsClose(false); // V40.35.0: fecha a busca (o texto fica; clicar no campo reabre)
             if (S.placing) return cancelPlacing();
             if (S.composer) closeComposer();
         });
@@ -4948,6 +5164,50 @@
             S.agScrolled = null; // reposiciona no horário de agora (ou no primeiro bloco)
             renderAgenda();
         });
+        // V40.35.0: busca na agenda
+        $('ag-search').addEventListener('input', function () {
+            AGS.q = this.value;
+            AGS.active = 0;
+            $('ag-search-x').classList.toggle('hidden', !AGS.q);
+            $('ag-search-x').classList.toggle('inline-flex', !!AGS.q);
+            clearTimeout(AGS.t);
+            if (!AGS.q.trim()) { AGS.open = false; return agsRender(); }
+            AGS.open = true;
+            AGS.dirty = true;
+            AGS.t = setTimeout(agsRender, 90);
+        });
+        $('ag-search').addEventListener('focus', function () { if (AGS.q.trim() && !AGS.open) agsOpen(); });
+        $('ag-search').addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); if (AGS.q) agsClose(true); else this.blur(); return; }
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (!AGS.open) return agsOpen();
+                if (AGS.dirty) agsRender(); // ainda não desenhou o que acabou de ser digitado
+                return agsSetActive(AGS.active + (e.key === 'ArrowDown' ? 1 : -1), true);
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (!AGS.q.trim()) return;
+                if (!AGS.open || AGS.dirty) { AGS.open = true; agsRender(); }
+                if (AGS.rows.length) agsGo(AGS.active);
+            }
+        });
+        $('ag-search-x').addEventListener('click', function () { agsClose(true); $('ag-search').focus(); });
+        $('ag-sres').addEventListener('mousedown', function (e) { e.preventDefault(); }); // o cursor fica no campo
+        $('ag-sres').addEventListener('mousemove', function (e) {
+            var row = e.target.closest('.ag-sres-row');
+            if (row && Number(row.dataset.sres) !== AGS.active) agsSetActive(Number(row.dataset.sres), false);
+        });
+        $('ag-sres').addEventListener('click', function (e) {
+            var day = e.target.closest('[data-sday]');
+            if (day) return agsGoDay(day.dataset.sday);
+            var row = e.target.closest('.ag-sres-row');
+            if (row) agsGo(Number(row.dataset.sres));
+        });
+        document.addEventListener('mousedown', function (e) { // clicou fora (sem janela aberta por cima): fecha o painel
+            if (!AGS.open || anyLayerOpen() || e.target.closest('#ag-search-wrap')) return;
+            agsClose(false);
+        }, true);
         $('ag-hide-done').addEventListener('click', function () {
             S.agHideDone = !S.agHideDone;
             try { localStorage.setItem('faz_pc_ag_hidedone', S.agHideDone ? '1' : '0'); } catch (e) {}

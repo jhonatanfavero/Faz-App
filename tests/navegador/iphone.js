@@ -46,9 +46,11 @@ const IPHONES = [
             db.push({ id: 'f_ip_sub', type: 'focus', title: 'Pendências', startMin: 22 * 60, duration: 60, date: '2026-11-16', microblocks: [], completed: false, theme: 'focus', tagId: null, linkedNoteIds: [], expanded: false,
                 cards: [{ id: 'cd_ip1', title: 'Copo de água', done: false, microblocks: [], goalId: agua.id }, { id: 'cd_ip2', title: 'Ligar pro banco', done: true, microblocks: [] }] });
             saveDb(); closeAllSheets(); renderTimeline(); renderBacklog(); renderRoutinesList();
-            if (typeof undoBarHide === 'function') undoBarHide();
         });
         await m.waitForTimeout(400);
+        // o aviso "Meta criada!" e a barrinha do Desfazer do preparo não entram nas fotos
+        await m.evaluate(() => { if (typeof undoBarHide === 'function') undoBarHide(); const t = document.getElementById('toast'); if (t) t.classList.add('opacity-0'); });
+        await m.waitForTimeout(300);
         // a barra de status e o risco de início de mentira (só pra foto; o dedo passa por eles)
         await m.evaluate((ip) => {
             const top = document.createElement('div');

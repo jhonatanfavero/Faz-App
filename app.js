@@ -570,7 +570,7 @@ function normalizeText(str) {
 }
 
 // V40.2.24: Helper centralizado de match de busca em cards.
-//   Busca em 3 campos (Opção B aprovada por Jules + Jhonatan):
+//   Busca em 3 campos (Opção B aprovada por Jules + Jhonatan; V40.35.0: + cartões da sublista e o checklist deles):
 //   1. Título do cartão (b.title)
 //   2. Microblocos (b.microblocks[].title)
 //   3. Nome da tag (tagsDb.find(t => t.id === b.tagId).name)
@@ -582,28 +582,28 @@ function normalizeText(str) {
 //   Argumento `normalizedQuery` recebe a string já passada por normalizeText()
 //   pra não chamar normalizeText 4 vezes por bloco. Performance.
 function cardMatchesSearch(block, normalizedQuery) {
-    if (!normalizedQuery) return false;
-
-    // 1. Título do cartão
-    if (normalizeText(block.title).includes(normalizedQuery)) return true;
-
+    if (!normalizedQuery || !block) return false;
+    // V40.35.0: cada palavra digitada tem que aparecer em algum lugar (nome, checklist, cartões da sublista e o
+    // checklist deles, tag): "geo qualite" acha "GEO ADAO" da tag QUALITÊ. As mesmas regras da busca do PC.
+    // Uma palavra só (ou o mesmo trecho seguido) acha tudo o que já achava antes.
+    const words = normalizedQuery.split(/\s+/).filter(Boolean);
+    if (!words.length) return false;
+    const parts = [block.title]; // 1. Título do cartão
     // 2. Microblocos (checklist interna)
-    if (block.microblocks && block.microblocks.length > 0) {
-        if (block.microblocks.some(mb => normalizeText(mb.title).includes(normalizedQuery))) {
-            return true;
-        }
-    }
-
-    // 2b. V40.24.0: cartões da sublista
-    if (isSublist(block) && block.cards.some(c => c && normalizeText(c.title).includes(normalizedQuery))) return true;
-
+    if (Array.isArray(block.microblocks)) block.microblocks.forEach(mb => { if (mb) parts.push(mb.title); });
+    // 2b. V40.24.0: cartões da sublista (V40.35.0: e o checklist de cada cartão)
+    if (isSublist(block)) block.cards.forEach(c => {
+        if (!c) return;
+        parts.push(c.title);
+        if (Array.isArray(c.microblocks)) c.microblocks.forEach(mb => { if (mb) parts.push(mb.title); });
+    });
     // 3. Nome da tag (se tiver tag vinculada)
     if (block.tagId) {
         const tag = tagsDb.find(t => t.id === block.tagId);
-        if (tag && normalizeText(tag.name).includes(normalizedQuery)) return true;
+        if (tag) parts.push(tag.name);
     }
-
-    return false;
+    const hay = normalizeText(parts.filter(Boolean).join('\n'));
+    return words.every(w => hay.includes(w));
 }
 
 // V40.2.5: Abre a barra de busca
@@ -756,6 +756,11 @@ function runRealTimeEngine() {
 }
 
 setInterval(runRealTimeEngine, 60000);
+// V40.35.0: a fonte do app (Inter) pode terminar de carregar DEPOIS da 1ª conta do nome do dia (o encurtar da V40.32.2
+// mede com a fonte reserva, mais estreita). Quando ela chega, mede de novo: senão "Sex, 20 nov" ficava cortado no
+// iPhone 13 mini. Também ao girar a tela / mudar o tamanho da janela.
+try { if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { try { runRealTimeEngine(); } catch (e) {} }); } catch (e) {}
+window.addEventListener('resize', () => { clearTimeout(window.__fazHdT); window.__fazHdT = setTimeout(() => { try { runRealTimeEngine(); } catch (e) {} }, 150); });
 
 // --- MICROBLOCOS FUNCTIONS ---
 window.toggleBlockCompletion = function(id, e) {
@@ -3475,7 +3480,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.34.0',
+            version: 'v40.35.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

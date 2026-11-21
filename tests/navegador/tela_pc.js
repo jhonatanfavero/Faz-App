@@ -10,6 +10,7 @@
 // V40.29.0: Relatórios na barra da Agenda; Semana sempre de segunda a domingo (com zoom, o dia aberto fica à vista).
 // V40.33.0: mudar a lista de lugar arrastando pelo título (e pelo menu dos 3 pontinhos).
 // V40.34.0: campo "Meta" no cartão (vai pra nuvem, selo no cartão) e o gráfico ao abrir a meta.
+// V40.35.0: busca na agenda (cabe na barra de 1024 a 1440 px; teclado e mouse de verdade).
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -868,6 +869,46 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(gch.aberta && gch.vis && (gch.barras === 7 || gch.barras === 8 || gch.barras === 6) && gch.cabe && !gch.vaza, 'abrir a meta: o gráfico aparece em cima (' + gch.barras + ' barras), sem vazar, e a janela cabe na tela');
   await foto(p, 'pc-meta-grafico.png');
   await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+
+  {
+  console.log('\nX) Busca na agenda (V40.35.0):');
+  await p.keyboard.press('Escape'); await p.locator('#tab-agenda').click(); await p.waitForTimeout(300);
+  await p.evaluate(() => { const b = document.querySelector('.ag-view[data-view="week"]'); if (b) b.click(); document.getElementById('ag-today').click(); }); await p.waitForTimeout(250);
+  await p.evaluate((uid) => {
+    const s = window.__nuvem;
+    s.insert('blocos', uid, { id: 'f_bx1', date: '2026-11-21', start_min: 480, duration: 5, title: 'CONSULTA PROTOCOLOS', type: 'focus', theme: 'focus', microblocks: [], completed: false,
+      cards: [{ id: 'cd_1', title: 'ASSUNTA', done: false, microblocks: [] }, { id: 'cd_2', title: 'LUCAS ESPERANÇA', done: false, microblocks: [{ title: 'ligar no cartório', done: false }] }, { id: 'cd_3', title: 'DESM LUCAS', done: true, microblocks: [] }, { id: 'cd_4', title: 'DALTON', done: false, microblocks: [] }] });
+    s.insert('blocos', uid, { id: 'f_bx2', date: '2026-11-21', start_min: 490, duration: 30, title: 'GEO ADÃO', type: 'focus', theme: 'focus', microblocks: [{ title: 'Conferir matrícula do Lucas', done: false }, { title: 'Memorial', done: true }], completed: false });
+    s.insert('blocos', uid, { id: 'f_bx3', date: '2026-11-10', start_min: 600, duration: 60, title: 'Reunião com Lucas', type: 'past', theme: 'focus', microblocks: [], completed: true });
+  }, UID);
+  await p.waitForTimeout(500);
+  const linha = async () => p.evaluate(() => {
+    const bar = document.getElementById('ag-prev').parentNode, br = bar.getBoundingClientRect(), s = document.getElementById('ag-search-wrap').getBoundingClientRect();
+    const v = document.querySelector('.ag-view[data-view="week"]').parentNode.getBoundingClientRect(), r = document.getElementById('ag-rep').getBoundingClientRect(), pv = document.getElementById('ag-prev').getBoundingClientRect();
+    return { alt: Math.round(br.height), uma: [s, v, r].every((x) => Math.abs(x.top + x.height / 2 - (pv.top + pv.height / 2)) < 3), dentro: v.right <= br.right + 1 && s.width >= 150, larg: Math.round(s.width) };
+  });
+  const larg = [1440, 1280, 1100, 1024], res = [];
+  for (const lw of larg) { await p.setViewportSize({ width: lw, height: 820 }); await p.waitForTimeout(200); res.push(await linha()); if (lw === 1024) await foto(p, 'pc-busca-barra-1024.png'); }
+  await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(250);
+  ok(res.every((x) => x.uma && x.dentro && x.alt === res[0].alt), 'o campo de busca cabe na mesma linha da barra de 1024 a 1440 px (' + res.map((x, i) => larg[i] + ': ' + x.larg + ' px').join(', ') + ')');
+  await p.locator('#ag-search').click(); await p.keyboard.type('lucas', { delay: 25 }); await p.waitForTimeout(250);
+  const pn = await p.evaluate(() => { const b = document.getElementById('ag-sres'), r = b.getBoundingClientRect(); return { vis: !b.classList.contains('hidden'), n: b.querySelectorAll('.ag-sres-row').length, cabe: r.right <= innerWidth && r.bottom <= innerHeight && r.left >= 0, marks: b.querySelectorAll('mark').length, cima: document.elementFromPoint(r.left + 40, r.top + 60).closest('#ag-sres') !== null }; });
+  ok(pn.vis && pn.n === 3 && pn.marks === 4 && pn.cabe && pn.cima, 'digitou "lucas": painel com 3 blocos (nome, cartões da sublista e checklist), as 4 vezes marcadas, por cima da agenda e dentro da tela' + (pn.vis && pn.n === 3 && pn.marks === 4 && pn.cabe && pn.cima ? '' : ' ' + JSON.stringify(pn)));
+  await foto(p, 'pc-busca.png');
+  await p.keyboard.press('ArrowDown'); await p.keyboard.press('Enter'); await p.waitForTimeout(300);
+  ok(await p.evaluate(() => !document.getElementById('modal-task').classList.contains('hidden') && document.getElementById('f-title').value === 'GEO ADÃO'), 'seta pra baixo + Enter (teclado de verdade): abre o 2º (GEO ADÃO)');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+  ok(await p.evaluate(() => document.getElementById('modal-task').classList.contains('hidden') && !document.getElementById('ag-sres').classList.contains('hidden')), 'Esc fecha o bloco e a busca continua aberta');
+  await p.locator('#ag-sres .ag-sres-row').nth(2).click(); await p.waitForTimeout(300);
+  ok(await p.evaluate(() => !document.getElementById('modal-task').classList.contains('hidden') && document.getElementById('f-title').value === 'Reunião com Lucas' && /9 a 15 de nov/.test(document.getElementById('ag-label').textContent)), 'clique (mouse de verdade) num de outra semana: abre o bloco e a Agenda vai pra semana dele');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+  await p.locator('#ag-sres .ag-sres-day[data-sday="2026-11-21"]').click(); await p.waitForTimeout(300);
+  ok(await p.evaluate(() => document.getElementById('ag-sres').classList.contains('hidden') && document.querySelector('.ag-view[data-view="day"]').classList.contains('on') && /21 de novembro/.test(document.getElementById('ag-label').textContent)), '"Ver o dia": abre o sábado 21 na visão Dia');
+  await foto(p, 'pc-busca-dia.png');
+  await p.locator('#ag-search').click(); await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+  ok(await p.evaluate(() => document.getElementById('ag-search').value === '' && document.getElementById('ag-sres').classList.contains('hidden')), 'Esc no campo limpa a busca');
+  await p.evaluate(() => { const b = document.querySelector('.ag-view[data-view="week"]'); if (b) b.click(); }); await p.waitForTimeout(150);
+  }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));
   await fim();

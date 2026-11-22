@@ -11,6 +11,7 @@
 // V40.33.0: mudar a lista de lugar arrastando pelo título (e pelo menu dos 3 pontinhos).
 // V40.34.0: campo "Meta" no cartão (vai pra nuvem, selo no cartão) e o gráfico ao abrir a meta.
 // V40.35.0: busca na agenda (cabe na barra de 1024 a 1440 px; teclado e mouse de verdade).
+// V40.36.0: Repetir bloco (pelos 3 pontinhos) e os 3 pontinhos na visão Dia (não arrastam o bloco).
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -695,7 +696,7 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   const mais = await centro(`#ag-cols [data-block="${sub.id}"] [data-more]`);
   await p.mouse.move(mais.x, mais.y); await p.waitForTimeout(150); await p.mouse.click(mais.x, mais.y); await p.waitForTimeout(250);
   const itens = await p.evaluate(() => [...document.querySelectorAll('div.fixed.z-40[role="menu"] button')].map((b) => b.textContent.trim()));
-  ok(itens.join('|') === 'Duplicar|Arquivar|Apagar', 'os 3 pontinhos da sublista: ' + itens.join(', '));
+  ok(itens.join('|') === 'Duplicar|Repetir…|Arquivar|Apagar', 'os 3 pontinhos da sublista: ' + itens.join(', ') + ' (V40.36.0: + Repetir)');
   await foto(p, 'pc-menu-duplicar.png');
   await p.locator('div.fixed.z-40[role="menu"] [data-act="dup"]').click(); await p.waitForTimeout(500);
   const n1 = await p.evaluate(([uid, day]) => window.__nuvem.alive('blocos', uid).filter((b) => b.date === day).length, [UID, sub.date]);
@@ -908,6 +909,51 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await p.locator('#ag-search').click(); await p.keyboard.press('Escape'); await p.waitForTimeout(150);
   ok(await p.evaluate(() => document.getElementById('ag-search').value === '' && document.getElementById('ag-sres').classList.contains('hidden')), 'Esc no campo limpa a busca');
   await p.evaluate(() => { const b = document.querySelector('.ag-view[data-view="week"]'); if (b) b.click(); }); await p.waitForTimeout(150);
+  }
+
+  {
+  console.log('\nY) Repetir bloco e os 3 pontinhos na visão Dia (V40.36.0):');
+  await p.keyboard.press('Escape'); await p.locator('#tab-agenda').click(); await p.waitForTimeout(300);
+  await p.evaluate(() => { document.querySelector('.ag-view[data-view="week"]').click(); document.getElementById('ag-today').click(); }); await p.waitForTimeout(250);
+  const alvo = await p.evaluate(() => { const c = document.querySelector('#ag-cols .ag-list[data-day="2026-11-17"] [data-block]'); c.scrollIntoView({ block: 'center' }); const b = window.__nuvem.get('blocos', document.body.dataset.uid || '', c.dataset.block); return c.dataset.block; });
+  const titulo = await p.evaluate((id) => document.querySelector('#ag-cols [data-block="' + id + '"]').querySelector('.font-semibold, .ag-title, p, span').textContent, alvo);
+  await p.locator('#ag-cols [data-block="' + alvo + '"]').hover(); await p.waitForTimeout(150);
+  const vis = await p.evaluate((id) => getComputedStyle(document.querySelector('#ag-cols [data-block="' + id + '"] [data-more]')).opacity, alvo);
+  await p.locator('#ag-cols [data-block="' + alvo + '"] [data-more]').click(); await p.waitForTimeout(200);
+  const itens = await p.evaluate(() => [...document.querySelectorAll('body > div[role="menu"] button')].map((b) => b.textContent.trim()).join('|'));
+  ok(vis === '1' && itens === 'Duplicar|Repetir…|Arquivar|Apagar', 'Semana: passando o mouse aparecem os 3 pontinhos; o menu tem "Repetir…" (' + itens + ')');
+  await p.locator('body > div[role="menu"] [data-act="rpt"]').click(); await p.waitForTimeout(250);
+  const jan = await p.evaluate(() => { const box = document.querySelector('#modal-rpt > div').getBoundingClientRect(); return { aberta: !document.getElementById('modal-rpt').classList.contains('hidden'), cabe: box.top >= 0 && box.bottom <= innerHeight, dias: document.querySelectorAll('#rpt-days li').length, ok: document.getElementById('rpt-ok').textContent }; });
+  ok(jan.aberta && jan.cabe && jan.dias === 5 && /^Criar \d+ cópias?$/.test(jan.ok), 'a janela "Repetir bloco" abre inteira na tela, com os 5 dias (' + jan.ok + ')');
+  await foto(p, 'pc-repetir.png');
+  await p.locator('#rpt-every [data-rpt="week"]').click(); await p.waitForTimeout(100);
+  await p.locator('#rpt-n').click({ clickCount: 3 }); await p.keyboard.type('3'); await p.waitForTimeout(150);
+  const sem = await p.evaluate(() => [document.querySelectorAll('#rpt-days li').length, document.getElementById('rpt-ok').textContent]);
+  ok(sem[0] === 3, 'Toda semana + digitar 3 (teclado de verdade): 3 semanas na lista (' + sem[1] + ')');
+  const n0 = await p.evaluate((uid) => [...window.__nuvem.tables.blocos.values()].filter((r) => r.user_id === uid && !r.deleted).length, UID);
+  await p.locator('#rpt-ok').click(); await p.waitForTimeout(500);
+  const n1 = await p.evaluate((uid) => [...window.__nuvem.tables.blocos.values()].filter((r) => r.user_id === uid && !r.deleted).length, UID);
+  const criadas = Number((sem[1].match(/\d+/) || [0])[0]);
+  ok(n1 - n0 === criadas && criadas >= 1 && await p.evaluate(() => document.getElementById('modal-rpt').classList.contains('hidden')), 'Criar: ' + (n1 - n0) + ' blocos novos na nuvem e a janela fecha');
+  // visão Dia
+  await p.evaluate(() => document.querySelector('.ag-day-btn[data-day="2026-11-17"]').click()); await p.waitForTimeout(300);
+  const dia = await p.evaluate(() => { const c = document.querySelector('#ag-timeline [data-block]'); c.scrollIntoView({ block: 'center' }); return c.dataset.block; });
+  await p.waitForTimeout(150);
+  await p.locator('#ag-timeline [data-block="' + dia + '"]').hover(); await p.waitForTimeout(150);
+  const dots = await p.evaluate((id) => { const b = document.querySelector('#ag-timeline [data-block="' + id + '"] [data-more]'), r = b.getBoundingClientRect(), c = b.closest('[data-block]').getBoundingClientRect(); return { op: getComputedStyle(b).opacity, dentro: r.right <= c.right + 1 && r.top >= c.top - 1 && r.bottom <= c.bottom + 1, st: (window.__nuvem.get('blocos', Object.keys(window.__nuvem.tables.blocos.keys ? {} : {})[0], id) || {}).start_min }; }, dia);
+  const st0 = await p.evaluate(([uid, id]) => window.__nuvem.get('blocos', uid, id).start_min, [UID, dia]);
+  const bx = await p.locator('#ag-timeline [data-block="' + dia + '"] [data-more]').boundingBox();
+  await p.mouse.move(bx.x + bx.width / 2, bx.y + bx.height / 2); await p.mouse.down(); await p.mouse.move(bx.x + bx.width / 2, bx.y + 70, { steps: 5 }); await p.mouse.up(); await p.waitForTimeout(300);
+  const st1 = await p.evaluate(([uid, id]) => window.__nuvem.get('blocos', uid, id).start_min, [UID, dia]);
+  ok(dots.op === '1' && dots.dentro && st1 === st0, 'Dia: passando o mouse aparecem os 3 pontinhos dentro do bloco; segurar e puxar por eles não arrasta o bloco');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(100);
+  await p.locator('#ag-timeline [data-block="' + dia + '"]').hover(); await p.waitForTimeout(100);
+  await p.locator('#ag-timeline [data-block="' + dia + '"] [data-more]').click(); await p.waitForTimeout(200);
+  const itensDia = await p.evaluate(() => [...document.querySelectorAll('body > div[role="menu"] button')].map((b) => b.textContent.trim()).join('|'));
+  ok(itensDia === 'Duplicar|Repetir…|Arquivar|Apagar', 'Dia: clicar nos 3 pontinhos abre o mesmo menu');
+  await foto(p, 'pc-dia-3-pontinhos.png');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(100);
+  await p.evaluate(() => document.querySelector('.ag-view[data-view="week"]').click()); await p.waitForTimeout(150);
   }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));

@@ -908,6 +908,39 @@
     </div>
 </div>
 
+<!-- V40.36.0: Repetir bloco — o "Repetir Tarefa" do celular: todo dia, toda semana ou todo mês, quantas vezes. Cópias no
+     mesmo horário; o dia em que o horário já está ocupado fica de fora (o PC nunca põe um bloco em cima de outro). -->
+<div id="modal-rpt" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="rpt-title">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[85vh]">
+        <div class="px-5 pt-5 pb-3 min-w-0">
+            <h3 id="rpt-title" class="text-base font-bold text-zinc-900">Repetir bloco</h3>
+            <p id="rpt-sub" class="mt-0.5 text-[12.5px] text-zinc-500 truncate"></p>
+        </div>
+        <div class="px-5 pb-3 flex flex-col gap-3 min-h-0">
+            <div id="rpt-every" class="flex gap-1 bg-zinc-100 p-1 rounded-xl" role="radiogroup" aria-label="Repetir">
+                <button type="button" data-rpt="day" role="radio" class="flex-1 py-1.5 rounded-lg text-xs font-bold">Todo dia</button>
+                <button type="button" data-rpt="week" role="radio" class="flex-1 py-1.5 rounded-lg text-xs font-bold">Toda semana</button>
+                <button type="button" data-rpt="month" role="radio" class="flex-1 py-1.5 rounded-lg text-xs font-bold">Todo mês</button>
+            </div>
+            <div class="flex items-center gap-3">
+                <label for="rpt-n" class="text-[13px] font-semibold text-zinc-700">Quantas vezes</label>
+                <div class="ml-auto inline-flex items-center rounded-lg border border-zinc-200 bg-white overflow-hidden">
+                    <button type="button" id="rpt-minus" class="w-9 h-9 flex items-center justify-center text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:hover:bg-transparent" aria-label="Uma vez a menos"><i class="ph-bold ph-minus"></i></button>
+                    <input id="rpt-n" type="text" inputmode="numeric" maxlength="2" autocomplete="off" class="w-11 h-9 text-center text-[14px] font-bold text-zinc-900 outline-none border-x border-zinc-200 tabular-nums" aria-describedby="rpt-unit">
+                    <button type="button" id="rpt-plus" class="w-9 h-9 flex items-center justify-center text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 disabled:hover:bg-transparent" aria-label="Uma vez a mais"><i class="ph-bold ph-plus"></i></button>
+                </div>
+                <span id="rpt-unit" class="w-24 text-[12.5px] text-zinc-500"></span>
+            </div>
+            <p id="rpt-sum" class="text-[12.5px] text-zinc-600 leading-snug"></p>
+            <ul id="rpt-days" class="flex flex-col gap-1 text-[12.5px] max-h-[38vh] overflow-y-auto thin-scroll" aria-label="Dias das cópias"></ul>
+        </div>
+        <div class="px-5 py-3 border-t border-zinc-100 flex items-center justify-end gap-2">
+            <button id="rpt-cancel" type="button" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
+            <button id="rpt-ok" type="button" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">Repetir</button>
+        </div>
+    </div>
+</div>
+
 <!-- V40.32.0: Configurações — cor do app e horário do dia. Vão na conta: valem aqui e no celular. -->
 <div id="modal-cfg" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="cfg-title">
     <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[85vh]">
@@ -938,7 +971,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.35.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.36.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1552,7 +1585,7 @@
             '<div class="flex items-start gap-1.5">' + doneBtnHtml(b, 'mt-0.5 -ml-0.5') + '<div class="min-w-0 flex-1">' +
             '<div class="flex items-center"><p class="ag-tm min-w-0 flex-1 text-[11px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + '<span class="font-medium text-zinc-400"> · ' + fmtDur(b.duration) + '</span></p>' +
             // V40.15.0: 3 pontinhos (Arquivar / Apagar) sem abrir o cartão; com tarefa na mão os blocos não são mexidos
-            (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100" data-more="' + esc(b.id) + '" title="Duplicar, arquivar ou apagar" aria-label="Mais opções deste bloco" aria-haspopup="menu"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
+            (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100" data-more="' + esc(b.id) + '" title="Duplicar, repetir, arquivar ou apagar" aria-label="Mais opções deste bloco" aria-haspopup="menu"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
             '<p class="text-[13px] font-semibold leading-snug break-words ' + (b.completed ? 'line-through text-zinc-400' : 'text-zinc-800') + '">' + goalBadge(b.goal_id) + (esc(b.title) || 'Sem nome') + '</p>' +
             ((tag || mb.n || b.completed || nn) ? '<div class="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-zinc-500">' +
                 (b.completed ? '<span class="inline-flex items-center gap-1 text-emerald-600 font-medium"><i class="ph-fill ph-check-circle"></i>Concluído</span>' : '') +
@@ -1836,6 +1869,13 @@
 
     // V40.14.0: miolo do bloco na régua do Dia. Fica separado pra redesenhar só o bloco enquanto ele é arrastado ou
     // esticado ("note" é o aviso que aparece no meio do gesto: horário ocupado, limite). A alça de baixo muda a duração.
+    // V40.36.0: os 3 pontinhos também na visão Dia (Duplicar, Repetir, Arquivar, Apagar), como na Semana
+    function dayMoreHtml(b, sub) {
+        if (S.placing) return '';
+        return '<button type="button" class="ag-more ag-day-more shrink-0 self-center h-6 max-h-full w-6 -mr-1 rounded-md flex items-center justify-center ' +
+            (sub ? 'text-amber-800/70 hover:text-amber-950 hover:bg-amber-100' : 'text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100') +
+            '" data-more="' + esc(b.id) + '" title="Duplicar, repetir, arquivar ou apagar" aria-label="Mais opções deste bloco" aria-haspopup="menu"><i class="ph-bold ph-dots-three text-base"></i></button>';
+    }
     function dayInnerHtml(b, note) {
         if (isSub(b)) return subDayInnerHtml(b, note); // V40.24.0
         var tag = tagOf(b.tag_id), compact = b.duration < 20, nn = linkedNotes(b).length; // V40.22.0: notas vinculadas
@@ -1845,11 +1885,11 @@
             (compact
                 ? '<span class="text-[10.5px] leading-none font-semibold text-zinc-500 tabular-nums shrink-0">' + clock(b.start_min) + '</span>' +
                   '<span class="text-[11.5px] leading-none font-semibold truncate ' + titleCls + '">' + goalBadge(b.goal_id) + (esc(b.title) || 'Sem nome') + '</span>' +
-                  '<span class="ml-auto text-[10.5px] leading-none text-zinc-400 shrink-0">' + fmtDur(b.duration) + warn + '</span>'
+                  '<span class="ml-auto text-[10.5px] leading-none text-zinc-400 shrink-0">' + fmtDur(b.duration) + warn + '</span>' + dayMoreHtml(b)
                 : '<span class="min-w-0 flex-1 flex flex-col justify-center">' +
                   '<span class="text-[10.5px] font-semibold text-zinc-500 tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration) + (tag ? ' · ' + esc(tag.name) : '') +
                   (nn ? '<span class="ag-notes" title="' + nn + (nn === 1 ? ' nota vinculada' : ' notas vinculadas') + '"> · <i class="ph ph-note"></i>' + nn + '</span>' : '') + warn + '</span>' +
-                  '<span class="text-[13px] font-semibold truncate ' + titleCls + '">' + goalBadge(b.goal_id) + (esc(b.title) || 'Sem nome') + '</span></span>') +
+                  '<span class="text-[13px] font-semibold truncate ' + titleCls + '">' + goalBadge(b.goal_id) + (esc(b.title) || 'Sem nome') + '</span></span>' + dayMoreHtml(b)) +
             '<span class="ag-rz' + (b.duration < 10 ? ' s' : '') + '" title="Puxe pra mudar a duração" aria-hidden="true"></span>';
     }
     function renderDay(day, map, today, nm) {
@@ -1963,7 +2003,7 @@
     function dgDown(e) {
         if (e.button !== 0 || DG || S.placing || S.agView !== 'day') return;
         var card = e.target.closest('[data-block]');
-        if (!card || e.target.closest('[data-done], [data-sub-ck], [data-sub-open], [data-sub-drop]')) return; // V40.24.0
+        if (!card || e.target.closest('[data-done], [data-sub-ck], [data-sub-open], [data-sub-drop], [data-more]')) return; // V40.24.0; V40.36.0: 3 pontinhos
         var b = S.blocos[card.dataset.block];
         if (!b || b.deleted) return;
         var size = !!e.target.closest('.ag-rz'), y = e.clientY - $('ag-timeline').getBoundingClientRect().top;
@@ -2195,6 +2235,7 @@
         cb.setAttribute('aria-label', S.agCompact ? 'Mostrar vagos' : 'Compactar vagos');
         $('board-summary').textContent = S.agView === 'day' ? renderDay(S.agAnchor, map, today, nowMin()) : renderWeek(weekStart(S.agAnchor), map, today, nowMin()); // V40.29.0: segunda a domingo
         if (AGS.open) agsRender(); // V40.35.0: a busca aberta acompanha o que mudou
+        if (repeatOpen()) renderRepeat(document.activeElement === $('rpt-n')); // V40.36.0: e a lista do Repetir
     }
 
     var TABS = ['assistente', 'listas', 'agenda', 'rotinas', 'notas', 'financas', 'metas']; // V40.17.0: + Rotinas e Notas; V40.19.0: + Finanças; V40.20.0: Assistente na frente; V40.21.0: + Metas
@@ -2332,7 +2373,8 @@
         menuEl.dataset.card = kind + '|' + id;
         menuEl.setAttribute('role', 'menu');
         menuEl.className = 'fixed z-40 w-44 bg-white border border-zinc-200 rounded-xl shadow-lg p-1';
-        menuEl.innerHTML = (kind === 'blocos' ? '<button type="button" role="menuitem" data-act="dup" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-copy"></i>Duplicar</button>' : '') + // V40.28.0
+        menuEl.innerHTML = (kind === 'blocos' ? '<button type="button" role="menuitem" data-act="dup" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-copy"></i>Duplicar</button>' + // V40.28.0
+            '<button type="button" role="menuitem" data-act="rpt" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-repeat"></i>Repetir…</button>' : '') + // V40.36.0
             '<button type="button" role="menuitem" data-act="archive" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-archive"></i>Arquivar</button>' +
             '<button type="button" role="menuitem" data-act="delete" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-red-600 hover:bg-red-50"><i class="ph ph-trash"></i>Apagar</button>';
         menuEl.addEventListener('click', async function (e) {
@@ -2340,12 +2382,13 @@
             if (!b) return;
             closeColMenu();
             if (b.dataset.act === 'dup') return void duplicateBlock(id); // V40.28.0
+            if (b.dataset.act === 'rpt') return openRepeat(id); // V40.36.0
             if (b.dataset.act === 'archive') archiveRow(kind, id);
             else if (kind === 'blocos' && isSub(S[kind][id])) deleteSubFlow(S[kind][id]); // V40.24.0
             else if (await askDelete(kind === 'blocos')) patchRow(kind, id, { deleted: true }, kind === 'blocos' ? 'Bloco apagado' : 'Tarefa apagada');
         });
         document.body.appendChild(menuEl);
-        var h = menuEl.offsetHeight || (kind === 'blocos' ? 124 : 84), top = r.bottom + 6;
+        var h = menuEl.offsetHeight || (kind === 'blocos' ? 160 : 84), top = r.bottom + 6;
         if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - 6 - h); // cartão no fim da tela: o menu abre pra cima
         menuEl.style.top = Math.round(top) + 'px';
         menuEl.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 184, r.right - 176))) + 'px';
@@ -2569,7 +2612,7 @@
             '<div class="flex items-start gap-1.5">' + doneBtnHtml(b, 'mt-0.5 -ml-0.5') + '<div class="min-w-0 flex-1">' +
             '<div class="flex items-center"><p class="ag-tm min-w-0 flex-1 text-[11px] font-semibold ag-sub-time tabular-nums truncate">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) +
             '<span class="font-medium"> · ' + fmtDur(b.duration) + '</span></p>' +
-            (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-amber-800/70 hover:text-amber-950 hover:bg-amber-100" data-more="' + esc(b.id) + '" title="Duplicar, arquivar ou apagar" aria-label="Duplicar, arquivar ou apagar"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
+            (S.placing ? '' : '<button type="button" class="ag-more shrink-0 -my-1 -mr-1.5 w-6 h-6 rounded-md flex items-center justify-center text-amber-800/70 hover:text-amber-950 hover:bg-amber-100" data-more="' + esc(b.id) + '" title="Duplicar, repetir, arquivar ou apagar" aria-label="Duplicar, repetir, arquivar ou apagar"><i class="ph-bold ph-dots-three text-base"></i></button>') + '</div>' +
             '<p class="text-[13px] font-semibold leading-snug break-words ag-sub-title' + (b.completed ? ' line-through' : '') + '"><i class="ph-bold ph-list-checks"></i> ' + (esc(b.title) || 'Sublista') +
             ' <span class="ag-sub-badge" title="Cartões feitos">' + (subCount(b).total ? subCount(b).done + '/' + subCount(b).total : '0') + '</span>' +
             (nn ? '<span class="ag-notes text-[11px] font-medium text-amber-800/80" title="' + nn + (nn === 1 ? ' nota vinculada' : ' notas vinculadas') + '"> · <i class="ph ph-note"></i>' + nn + '</span>' : '') + '</p>' +
@@ -2582,7 +2625,7 @@
         var title = '<span class="text-[13px] font-semibold ag-sub-title' + (b.completed ? ' line-through' : '') + '"><i class="ph-bold ph-list-checks"></i> ' + (esc(b.title) || 'Sublista') + '</span>';
         var head = '<div class="flex items-center gap-2 min-w-0">' + doneBtnHtml(b, '') + '<span class="min-w-0 flex-1 truncate">' +
             '<span class="text-[10.5px] font-semibold ag-sub-time tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration) + ' · ' + subCountTxt(b) + (tag ? ' · ' + esc(tag.name) : '') + warn + '</span>' +
-            (compact ? ' ' + title : '') + '</span></div>' + (compact ? '' : '<div class="truncate">' + title + '</div>');
+            (compact ? ' ' + title : '') + '</span>' + dayMoreHtml(b, true) + '</div>' + (compact ? '' : '<div class="truncate">' + title + '</div>');
         var rows = compact ? 0 : Math.max(0, Math.floor((h - 50) / 27));
         var body = subCanDrop() ? (compact ? '' : subDropHtml(b)) : (rows ? '<div class="ag-sub-cards">' + subRowsHtml(b, rows) + '</div>' : '');
         return head + body + '<span class="ag-rz' + (b.duration < 10 ? ' s' : '') + '" title="Puxe pra mudar a duração" aria-hidden="true"></span>';
@@ -2691,13 +2734,9 @@
     }
     // V40.28.0: "Duplicar" nos 3 pontinhos do bloco: a cópia entra logo depois dele (ou no primeiro espaço livre do
     // dia), com a checklist e os cartões da sublista desmarcados e sem as notas vinculadas, como o "Copiar" do app.
-    async function duplicateBlock(id) {
-        var b = S.blocos[id];
-        if (!b || b.deleted) return;
-        var day = String(b.date).slice(0, 10), dur = Number(b.duration) > 0 ? Number(b.duration) : 15;
-        var slot = freeSlot(day, b.start_min + dur, dur);
-        if (slot === null) return toast('Esse dia não tem um espaço livre de ' + fmtDur(dur) + ' pra cópia.');
-        var n = Date.now();
+    // A cópia de um bloco num dia e horário (Duplicar e, desde a V40.36.0, Repetir): checklist e cartões da sublista
+    // desmarcados (ids novos), sem notas vinculadas, não concluída; tag que ainda existe, cor e meta vão junto.
+    function blockCopy(b, day, slot, dur, n) {
         var row = {
             user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: slot, duration: dur, title: b.title || '',
             type: blockType(day, slot, dur), theme: b.theme || 'focus', tag_id: tagOf(b.tag_id) ? b.tag_id : null,
@@ -2711,7 +2750,95 @@
             o.microblocks = normMbs(c.microblocks).map(function (m) { return { title: m.title, done: false }; });
             return o;
         });
+        return row;
+    }
+    async function duplicateBlock(id) {
+        var b = S.blocos[id];
+        if (!b || b.deleted) return;
+        var day = String(b.date).slice(0, 10), dur = Number(b.duration) > 0 ? Number(b.duration) : 15;
+        var slot = freeSlot(day, b.start_min + dur, dur);
+        if (slot === null) return toast('Esse dia não tem um espaço livre de ' + fmtDur(dur) + ' pra cópia.');
+        var row = blockCopy(b, day, slot, dur, Date.now());
         await insertRow('blocos', row, (isSub(b) ? 'Sublista duplicada: ' : 'Bloco duplicado: ') + clock(slot) + '–' + clock(slot + dur));
+    }
+
+    // ---------- V40.36.0: REPETIR BLOCO ----------
+    // O "Repetir Tarefa" do celular (Diariamente / Semanalmente / Mensalmente, quantas vezes; começa em 5, 4 e 2): cópias
+    // no mesmo horário nos próximos dias, semanas ou meses (blockCopy). Diferente do celular, o PC nunca põe um bloco em
+    // cima de outro: o dia em que o horário já está ocupado fica de fora, e a lista mostra isso antes de confirmar. Todo
+    // mês no dia 31 (ou 29, 30): nos meses mais curtos vai pro último dia. Tudo num passo só do Desfazer.
+    var RPT = { id: null, every: 'day', n: 5 };
+    var RPT_DEF = { day: 5, week: 4, month: 2 }, RPT_MAX = { day: 60, week: 52, month: 24 };
+    function addMonthsClamp(day, k) {
+        var d = parseYmd(day), y = d.getFullYear(), m = d.getMonth() + k;
+        return ymd(new Date(y, m, Math.min(d.getDate(), new Date(y, m + 1, 0).getDate()), 12));
+    }
+    function rptDates(b, every, n) {
+        var day = String(b.date).slice(0, 10), out = [];
+        for (var i = 1; i <= n; i++) out.push(every === 'day' ? addDays(day, i) : every === 'week' ? addDays(day, 7 * i) : addMonthsClamp(day, i));
+        return out;
+    }
+    function rptBusy(map, day, st, dur) { return (map[day] || []).some(function (x) { return st < x.start_min + x.duration && x.start_min < st + dur; }); }
+    function rptDayTxt(day) { var d = parseYmd(day); return WD3[d.getDay()] + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + (d.getFullYear() !== new Date().getFullYear() ? '/' + d.getFullYear() : ''); }
+    function openRepeat(id) {
+        var b = S.blocos[id];
+        if (!b || b.deleted || b.archived) return;
+        RPT.id = id; RPT.every = 'day'; RPT.n = RPT_DEF.day;
+        $('rpt-title').textContent = isSub(b) ? 'Repetir sublista' : 'Repetir bloco';
+        $('rpt-sub').textContent = (b.title || 'Sem nome') + ' · ' + rptDayTxt(String(b.date).slice(0, 10)) + ' · ' + clock(b.start_min) + '–' + clock(b.start_min + b.duration);
+        var m = $('modal-rpt');
+        m.classList.remove('hidden'); m.classList.add('flex');
+        renderRepeat();
+        $('rpt-ok').focus();
+    }
+    function closeRepeat() { var m = $('modal-rpt'); m.classList.add('hidden'); m.classList.remove('flex'); RPT.id = null; }
+    function repeatOpen() { return !$('modal-rpt').classList.contains('hidden'); }
+    function renderRepeat(typing) {
+        var b = S.blocos[RPT.id];
+        if (!b || b.deleted || b.archived) { closeRepeat(); return toast('Esse bloco não está mais na agenda.'); }
+        $('rpt-every').querySelectorAll('[data-rpt]').forEach(function (btn) {
+            var on = btn.dataset.rpt === RPT.every;
+            btn.classList.toggle('bg-white', on); btn.classList.toggle('shadow-sm', on); btn.classList.toggle('text-zinc-900', on); btn.classList.toggle('text-zinc-500', !on);
+            btn.setAttribute('aria-checked', on ? 'true' : 'false');
+        });
+        if (!typing) $('rpt-n').value = RPT.n;
+        $('rpt-minus').disabled = RPT.n <= 1;
+        $('rpt-plus').disabled = RPT.n >= RPT_MAX[RPT.every];
+        $('rpt-unit').textContent = RPT.every === 'day' ? (RPT.n === 1 ? 'dia seguinte' : 'dias seguidos') : RPT.every === 'week' ? (RPT.n === 1 ? 'semana' : 'semanas') : (RPT.n === 1 ? 'mês' : 'meses');
+        var map = blocksByDay(), dur = Number(b.duration) > 0 ? Number(b.duration) : 15, dates = rptDates(b, RPT.every, RPT.n), free = [], busy = 0;
+        $('rpt-days').innerHTML = dates.map(function (d) {
+            var off = rptBusy(map, d, b.start_min, dur);
+            if (off) busy++; else free.push(d);
+            return '<li class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg ' + (off ? 'bg-zinc-50 text-zinc-400' : 'bg-emerald-50/60 text-zinc-700') + '" data-rpt-day="' + d + '"' + (off ? ' data-busy="1"' : '') + '>' +
+                '<i class="ph-bold ' + (off ? 'ph-prohibit' : 'ph-check text-emerald-600') + '"></i><span class="font-semibold tabular-nums' + (off ? ' line-through' : '') + '">' + rptDayTxt(d) + '</span>' +
+                '<span class="ml-auto text-[11.5px]">' + (off ? 'horário ocupado: fica de fora' : clock(b.start_min) + '–' + clock(b.start_min + dur)) + '</span></li>';
+        }).join('');
+        $('rpt-sum').textContent = free.length
+            ? 'Às ' + clock(b.start_min) + ', de ' + rptDayTxt(free[0]) + ' a ' + rptDayTxt(free[free.length - 1]) + '. ' +
+              (isSub(b) ? 'Os cartões vão junto, desmarcados.' : normMbs(b.microblocks).length ? 'O checklist vai junto, desmarcado.' : 'Cada cópia começa não concluída.')
+            : 'O horário está ocupado em todos esses dias.';
+        var ok = $('rpt-ok');
+        ok.disabled = !free.length;
+        ok.textContent = free.length ? 'Criar ' + free.length + (free.length === 1 ? ' cópia' : ' cópias') : 'Nada pra criar';
+        return { free: free, busy: busy };
+    }
+    function repeatSet(n) { RPT.n = Math.max(1, Math.min(RPT_MAX[RPT.every], Math.round(n) || 1)); renderRepeat(); }
+    async function confirmRepeat() {
+        var b = S.blocos[RPT.id];
+        if (!b || b.deleted || b.archived) { closeRepeat(); return toast('Esse bloco não está mais na agenda.'); }
+        var g = S.gesture, map = blocksByDay(), dur = Number(b.duration) > 0 ? Number(b.duration) : 15, st = b.start_min;
+        var dates = rptDates(b, RPT.every, RPT.n), days = dates.filter(function (d) { return !rptBusy(map, d, st, dur); });
+        if (!days.length) return;
+        var n = Date.now(), rows = days.map(function (d, k) { var r = blockCopy(b, d, st, dur, n + k * 1000); S.blocos[r.id] = r; return r; }); // já na memória: o newId não repete
+        closeRepeat();
+        render(); renderAgenda(); renderSide();
+        var res = await S.sb.from('blocos').upsert(rows, { onConflict: 'user_id,id' });
+        if (res.error) { rows.forEach(function (r) { delete S.blocos[r.id]; }); render(); renderAgenda(); renderSide(); return fail(res.error); }
+        var skip = dates.length - days.length; // (cabe no aviso do Desfazer, que corta em 70 letras)
+        var msg = 'Repetido ' + (rows.length === 1 ? '1 vez, em ' + rptDayTxt(days[0]) : rows.length + ' vezes, até ' + rptDayTxt(days[days.length - 1])) +
+            (skip ? ' · ' + skip + (skip === 1 ? ' dia ficou' : ' dias ficaram') + ' de fora' : '');
+        var e = undoRec(g, rows.map(function (r) { return undoIns('blocos', r, null); }), msg);
+        if (!e || S.undoPillFor !== e) toast(msg); // várias cópias: o aviso do Desfazer já mostra a mensagem (não repete)
     }
     // Cartão volta pra Lista: primeiro a tarefa entra na lista (a de origem, se ainda existir), depois sai da sublista
     async function subCardToList(bid, cid, quiet) {
@@ -4832,7 +4959,7 @@
     // ---------- eventos ----------
     // Alguma janela, menu ou calendário aberto? (setas do teclado e Desfazer não agem por baixo dela)
     function anyLayerOpen() {
-        return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'modal-goal', 'modal-rep', 'modal-cfg', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
+        return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'modal-goal', 'modal-rep', 'modal-rpt', 'modal-cfg', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
     }
     function bindEvents() {
         var wrap = $('columns');
@@ -5131,6 +5258,7 @@
             if (S.mtEdit) return closeGoal(); // V40.21.0
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
             if (!$('modal-rep').classList.contains('hidden')) return closeReports(); // V40.29.0
+            if (repeatOpen()) return closeRepeat(); // V40.36.0
             if (!$('modal-cfg').classList.contains('hidden')) return closeCfg(); // V40.32.0
             if (S.rtEdit) return closeRoutine(); // V40.17.0
             if (menuEl) return closeColMenu();
@@ -5616,6 +5744,27 @@
         $('ag-rep').addEventListener('click', openReports);
         $('rep-close').addEventListener('click', closeReports);
         $('modal-rep').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeReports(); });
+        // V40.36.0: Repetir bloco
+        $('modal-rpt').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeRepeat(); });
+        $('rpt-cancel').addEventListener('click', closeRepeat);
+        $('rpt-ok').addEventListener('click', function () { confirmRepeat(); });
+        $('rpt-every').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-rpt]');
+            if (!b || b.dataset.rpt === RPT.every) return;
+            RPT.every = b.dataset.rpt; RPT.n = RPT_DEF[RPT.every]; renderRepeat();
+        });
+        $('rpt-minus').addEventListener('click', function () { repeatSet(RPT.n - 1); });
+        $('rpt-plus').addEventListener('click', function () { repeatSet(RPT.n + 1); });
+        $('rpt-n').addEventListener('input', function () {
+            var v = parseInt(this.value.replace(/\D/g, ''), 10);
+            if (this.value !== this.value.replace(/\D/g, '')) this.value = this.value.replace(/\D/g, '');
+            if (v >= 1) { RPT.n = Math.min(RPT_MAX[RPT.every], v); renderRepeat(true); }
+        });
+        $('rpt-n').addEventListener('blur', function () { this.value = RPT.n; });
+        $('rpt-n').addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); return repeatSet(RPT.n + (e.key === 'ArrowUp' ? 1 : -1)); }
+            if (e.key === 'Enter') { e.preventDefault(); this.value = RPT.n; if (!$('rpt-ok').disabled) confirmRepeat(); }
+        });
         // V40.32.0: Configurações
         $('btn-cfg').addEventListener('click', openCfg);
         $('cfg-close').addEventListener('click', closeCfg);

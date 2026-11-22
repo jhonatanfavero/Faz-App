@@ -854,7 +854,8 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
     ok(B('f_t_3').archived === true && B('f_t_3').date === '2026-11-19' && B('f_t_3').start_min === 1260 && updates('blocos').length === 1 && updates('blocos')[0].fields.join() === 'archived', 'soltar no campo arquiva o bloco sem mexer em dia nem horário');
     ok(zone.classList.contains('hidden') && d.querySelectorAll('#ag-cols .ag-drop').length === 0 && !wk('f_t_3'), 'campo e tracejados somem; o bloco sai da agenda');
     click(d.querySelector('#ag-cols .ag-day-btn[data-day="2026-11-17"]')); await sleep(40);
-    ok(d.querySelectorAll('#ag-timeline [data-block]').length > 0 && d.querySelectorAll('#ag-timeline [data-more]').length === 0, 'na régua do Dia os blocos seguem sem os 3 pontinhos (lá o bloco é arrastado e esticado)');
+    // V40.36.0: a régua do Dia ganhou os 3 pontinhos (Duplicar, Repetir, Arquivar, Apagar); arrastar e esticar continuam (test_repetir_pc.js)
+    ok(d.querySelectorAll('#ag-timeline [data-block]').length > 0 && d.querySelectorAll('#ag-timeline [data-more]').length === d.querySelectorAll('#ag-timeline [data-block]').length, 'na régua do Dia cada bloco tem os 3 pontinhos (V40.36.0)');
     click(d.querySelector('.ag-view[data-view="week"]')); click($('tab-listas')); await sleep(40);
     click(cardEl(k1).querySelector('[data-hand]'));
     ok(d.querySelectorAll('#ag-cols [data-block]').length > 0 && d.querySelectorAll('#ag-cols [data-more]').length === 0, 'com tarefa na mão, os blocos da Semana não mostram os 3 pontinhos');

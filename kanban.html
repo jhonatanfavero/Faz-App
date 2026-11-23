@@ -971,7 +971,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.36.1</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.37.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -2214,7 +2214,7 @@
         pb.classList.toggle('flex', !!pl);
         if (pl) {
             $('ag-place-title').textContent = pl.title || 'Sem nome';
-            $('ag-place-meta').textContent = ' · ' + fmtDur(pl.dur);
+            $('ag-place-meta').textContent = ' · ' + fmtDur(pl.dur) + (pl.cards ? ' · sublista com ' + pl.cards.length + (pl.cards.length === 1 ? ' meta' : ' metas') : ''); // V40.37.0
             $('ag-place-hint').textContent = S.agView === 'day' ? 'Clique no horário onde quer colocar.' : 'Clique num espaço tracejado pra colocar. Pra escolher o horário exato, clique no nome do dia.';
         }
         $('ag-tip').textContent = pl ? '' : S.agView === 'day' ? 'Arraste um bloco pra mudar o horário. Puxe a borda de baixo pra mudar a duração.'
@@ -2586,7 +2586,7 @@
     function subCount(b) { var a = subCards(b), d = a.filter(function (c) { return c.done; }).length; return { done: d, total: a.length, open: a.length - d }; }
     function subCountTxt(b) { var c = subCount(b); return !c.total ? 'vazia' : c.done ? c.done + '/' + c.total + ' feitos' : (c.total === 1 ? '1 cartão' : c.total + ' cartões'); }
     function subNewId() { return 'cd_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8); }
-    function subCanDrop() { return !!S.placing && S.placing.theme !== 'rest'; } // Descanso na mão não entra numa sublista
+    function subCanDrop() { return !!S.placing && S.placing.theme !== 'rest' && !S.placing.cards; } // Descanso na mão não entra numa sublista; V40.37.0: nem sublista (a de metas)
     function subSave(b, cards, msg) {
         var fields = { cards: cards };
         if (cards.length) { var all = cards.every(function (c) { return c.done; }); if (all !== !!b.completed) fields.completed = all; }
@@ -2674,7 +2674,7 @@
     async function dropIntoSub(bid) {
         var src = S.placing, b = S.blocos[bid];
         if (!src || !b || b.deleted || !isSub(b)) return;
-        if (!subCanDrop()) return toast('Descanso não entra numa sublista: clique num espaço livre.');
+        if (!subCanDrop()) return toast((src.cards ? 'Sublista não entra numa sublista' : 'Descanso não entra numa sublista') + ': clique num espaço livre.'); // V40.37.0
         if (!placingAlive(src)) { S.placing = null; renderAgenda(); return toast(src.kind === 'rotinas' ? 'Essa rotina foi apagada em outro aparelho.' : 'Essa tarefa foi apagada em outro aparelho.'); }
         if (subCards(b).length >= SUB_MAX) return toast('Uma sublista cabe até ' + SUB_MAX + ' cartões.');
         S.placing = null;
@@ -3243,9 +3243,17 @@
     // Cria o bloco a partir da tarefa e só depois tira a tarefa da lista (se o bloco não entrar, nada muda).
     // V40.17.0: a origem também pode ser uma rotina (src.kind === 'rotinas'): a rotina continua existindo,
     // e o bloco leva o tipo dela (Foco ou Descanso), como o "carimbar" do app.
-    function placingAlive(src) { var k = src.kind === 'rotinas' ? 'rotinas' : 'tarefas', r = S[k][src.id]; return !!r && !r.deleted; }
+    function placingAlive(src) { if (src.kind === 'metas') return true; var k = src.kind === 'rotinas' ? 'rotinas' : 'tarefas', r = S[k][src.id]; return !!r && !r.deleted; } // V40.37.0: a sublista de metas não sai de lugar nenhum
     async function createBlockFromTask(src, day, slot, asked) {
         var isRt = src.kind === 'rotinas';
+        if (src.kind === 'metas') { // V40.37.0: sublista de metas, um cartão por meta (ligado a ela)
+            var sub = {
+                user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: slot, duration: src.dur, title: src.title, type: blockType(day, slot, src.dur), theme: 'focus',
+                tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, deleted: false, goal_id: null,
+                cards: src.cards.map(function (c) { var o = { id: subNewId(), title: c.title, done: false, microblocks: [] }; if (goalKeep(c.goalId)) o.goalId = c.goalId; return o; })
+            };
+            return insertRow('blocos', sub, 'Sublista de metas: ' + dayLabel(day) + ' às ' + clock(slot) + (asked != null && slot !== asked ? ' (às ' + clock(asked) + ' já tinha bloco)' : ''));
+        }
         if (!placingAlive(src)) { toast(isRt ? 'Essa rotina foi apagada em outro aparelho.' : 'Essa tarefa foi apagada em outro aparelho.'); return false; }
         var n = Date.now();
         var block = {
@@ -3280,6 +3288,17 @@
         closeTask();
         await createBlockFromTask(src, day, slot, st);
     }
+    // V40.37.0 — SUBLISTA DE METAS: o "Pôr na agenda" da categoria (ícone de calendário no título dela). Uma sublista com o
+    // nome da categoria e um cartão por meta (ligado a ela: marcar conta), na mão como uma tarefa: clica num espaço livre
+    // (30 min; depois dá pra esticar). Ideia dele (22/11): "um copo de água não leva 5 minutos". O mesmo do celular.
+    function mtToAgenda(listId) {
+        var M = window.FazMetas, lists = mtLists(), l = lists.filter(function (x) { return x.id === listId; })[0];
+        if (!M || !l) return;
+        var goals = mtGoals().filter(function (g) { return M.listOf(g, lists) === l.id; }).slice(0, SUB_MAX);
+        if (!goals.length) return toast('Essa categoria ainda não tem metas.');
+        startPlacing({ kind: 'metas', id: l.id, title: String(l.name || '').trim().slice(0, 60) || 'Metas', dur: 30, tag: null, color: null, mbs: [], theme: 'focus',
+            cards: goals.map(function (g) { return { title: String(g.title || 'Meta').slice(0, 200), goalId: g.id }; }) });
+    }
     // V40.12.0 — tarefa "na mão" (como o Agendar do app): vai pra Agenda e clica onde quer colocar.
     function startPlacing(src) {
         if (!src) return;
@@ -3294,7 +3313,7 @@
     }
     function cancelPlacing() {
         if (!S.placing) return;
-        var wasRt = S.placing.kind === 'rotinas';
+        var wasRt = S.placing.kind === 'rotinas' || S.placing.kind === 'metas'; // V40.37.0: a sublista de metas também não volta pra lista nenhuma
         S.placing = null;
         $('ag-place').classList.add('hidden'); // (a Agenda pode não estar na tela: renderAgenda não roda nesse caso)
         $('ag-place').classList.remove('flex');
@@ -4084,6 +4103,7 @@
             '<h2 class="min-w-0 truncate text-[12px] font-bold uppercase tracking-wider text-zinc-500" title="' + esc(l.name) + '">' + (esc(l.name) || 'Sem nome') + '</h2>' +
             '<span class="text-[11px] font-semibold text-zinc-600 bg-white border border-zinc-200 rounded-full px-2 py-0.5" title="Metas nesta categoria">' + goals.length + '</span>' +
             '<button class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800" data-mt-add="' + esc(l.id) + '" title="Nova meta nesta categoria" aria-label="Nova meta em ' + esc(l.name) + '"><i class="ph ph-plus"></i></button>' +
+            (goals.length ? '<button class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800" data-mt-agenda="' + esc(l.id) + '" title="Pôr na agenda: uma sublista com estas metas" aria-label="Pôr na agenda as metas de ' + esc(l.name) + '"><i class="ph ph-calendar-plus"></i></button>' : '') + // V40.37.0
             '<button class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800" data-mt-rename="' + esc(l.id) + '" title="Renomear categoria" aria-label="Renomear a categoria ' + esc(l.name) + '"><i class="ph ph-pencil-simple"></i></button>' +
             '<button class="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-red-50 hover:text-red-600" data-mt-dellist="' + esc(l.id) + '" title="Apagar categoria" aria-label="Apagar a categoria ' + esc(l.name) + '"><i class="ph ph-trash"></i></button>' +
             '</header>' +
@@ -5716,6 +5736,7 @@
             if ((b = e.target.closest('[data-mt-plus]'))) return mtBump(b.dataset.mtPlus, 1);
             if ((b = e.target.closest('[data-mt-minus]'))) return mtBump(b.dataset.mtMinus, -1);
             if ((b = e.target.closest('[data-mt-add]'))) return openGoal(null, b.dataset.mtAdd);
+            if ((b = e.target.closest('[data-mt-agenda]'))) return void mtToAgenda(b.dataset.mtAgenda); // V40.37.0
             if ((b = e.target.closest('[data-mt-rename]'))) return void renameGoalList(b.dataset.mtRename);
             if ((b = e.target.closest('[data-mt-dellist]'))) return void deleteGoalList(b.dataset.mtDellist);
             if ((b = e.target.closest('[data-goal]'))) openGoal(b.dataset.goal);

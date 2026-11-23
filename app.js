@@ -3590,7 +3590,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.36.1',
+            version: 'v40.37.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -5724,7 +5724,40 @@ window.openGoalListMenu = function(id) {
     if (!l) return;
     goalListMenuId = l.id;
     document.getElementById('goal-list-menu-title').textContent = l.name || 'Categoria';
+    // V40.37.0: "Pôr na agenda" diz o que vai na sublista (ou que ainda não tem meta)
+    const goals = goalListGoals(l.id), btn = document.getElementById('goal-list-agenda-btn');
+    btn.disabled = !goals.length;
+    document.getElementById('goal-list-agenda-sub').textContent = goals.length
+        ? 'Uma sublista com ' + (goals.length === 1 ? '1 cartão' : goals.length + ' cartões') + ': ' + goals.slice(0, 3).map(g => g.title || 'Meta').join(', ') + (goals.length > 3 ? '…' : '')
+        : 'Crie uma meta aqui primeiro';
     showModal('goal-list-menu-modal');
+};
+// V40.37.0 — SUBLISTA DE METAS. Ideia dele (22/11): pôr as metas de uma categoria juntas num horário só ("um copo de
+// água não leva 5 minutos"). "Pôr na agenda" no menu da categoria: uma sublista com o nome da categoria e um cartão por
+// meta (nome da meta, ligado a ela: marcar o cartão conta 1 vez, ou o passo, como todo cartão ligado). Vai pra mão como
+// o Copiar (30 min, dá pra mudar na faixa) e entra no Tempo Livre que for tocado. Com o Repetir, vai pros outros dias.
+// O mesmo do PC (mtToAgenda).
+function goalListGoals(listId) {
+    const M = window.FazMetas;
+    return M ? goalsDb.filter(g => M.listOf(g, goalListsDb) === listId).slice(0, SUB_MAX) : [];
+}
+window.goalListToAgenda = function() {
+    const l = goalListsDb.find(x => x.id === goalListMenuId), goals = l ? goalListGoals(l.id) : [];
+    if (!l) return hideModal('goal-list-menu-modal');
+    if (!goals.length) return showToast('Essa categoria ainda não tem metas.');
+    hideModal('goal-list-menu-modal');
+    closeAllSheets();
+    if (searchQuery) closeSearchBar();
+    const title = String(l.name || '').trim().slice(0, 60) || 'Metas';
+    pendingIntent = { title: title, duration: 30, theme: 'focus', tagId: null,
+        cards: goals.map(g => ({ id: subNewId(), title: String(g.title || 'Meta').slice(0, 200), done: false, microblocks: [], goalId: g.id })) };
+    selectedDur = 30;
+    document.getElementById('floating-title').innerText = title;
+    syncDurButtons(selectedDur);
+    document.getElementById('floating-task').classList.remove('hidden');
+    document.getElementById('floating-task').classList.add('flex');
+    renderTimeline();
+    showToast('Toque num Tempo Livre pra colocar a sublista 👇');
 };
 window.openCreateGoalList = function(fromForm) {
     goalListNameMode = 'create';

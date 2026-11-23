@@ -862,13 +862,80 @@
         return { apply: null, push: { faz_theme: lTheme, faz_hours: lHours, faz_prefs_at: t }, at: t };
     }
 
+    // V40.41.0 — PERÍODOS (Manhã, Tarde...) nos 2 sentidos (celular e PC). Também vão na conta, como a cor do app:
+    // faz_periods (a lista: { id, name, start 'HH:MM', end 'HH:MM' }) e faz_periods_at (quando mudou, em ms), com a
+    // hora deles (mudar a cor num aparelho não desfaz o período criado no outro). Ganha a mudança MAIS NOVA, menos na
+    // primeira vez deste aparelho (sem hora) com a conta já tendo períodos (criados no PC): aí junta os dois, pra os
+    // períodos que a pessoa fez aqui não sumirem (se aqui só tem os padrão, vale a conta).
+    //   local = { list, at }   meta = user_metadata da conta   now = Date.now()
+    // Volta { apply: lista | null (vem da conta pro aparelho), push: dados pra conta | null, at: hora pra guardar | 0 }.
+    var PERIODS_MAX = 30;
+    var DEFAULT_PERIODS = [
+        { id: 'p1', name: 'Manhã', start: '08:00', end: '12:00' }, { id: 'p2', name: 'Meio-dia', start: '12:00', end: '13:00' },
+        { id: 'p3', name: 'Tarde', start: '13:00', end: '18:00' }, { id: 'p4', name: 'Noite', start: '18:00', end: '22:00' }
+    ];
+    function periodClock(v) {
+        var m = /^(\d{1,2}):(\d{2})$/.exec(String(v == null ? '' : v).trim());
+        if (!m || +m[1] > 23 || +m[2] > 59) return null;
+        return (m[1].length === 1 ? '0' : '') + m[1] + ':' + m[2];
+    }
+    // Só o que é período de verdade: id e nome (texto), início e fim "HH:MM"; sem id repetido; no máximo 30. null = não é lista.
+    function cleanPeriods(list) {
+        if (!Array.isArray(list)) return null;
+        var out = [], seen = {};
+        list.forEach(function (p) {
+            if (!p || typeof p !== 'object' || Array.isArray(p) || out.length >= PERIODS_MAX) return;
+            var id = typeof p.id === 'string' || typeof p.id === 'number' ? String(p.id).replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 64) : ''; // vai num onclick no celular: só letra, número, _ . -
+            var name = typeof p.name === 'string' ? p.name.trim().slice(0, 60) : '';
+            var st = periodClock(p.start), en = periodClock(p.end);
+            if (!id || has(seen, id) || !name || st === null || en === null) return;
+            seen[id] = 1;
+            out.push({ id: id, name: name, start: st, end: en });
+        });
+        return out;
+    }
+    function periodsPlan(local, meta, now) {
+        meta = meta || {};
+        var lt = num(local && local.at, 0) || 0, rt = num(meta.faz_periods_at, 0) || 0;
+        var l = cleanPeriods(local && local.list), r = cleanPeriods(meta.faz_periods);
+        if (!l) return { apply: null, push: null, at: 0 }; // o aparelho ainda não tem o que mandar
+        if (r && same(l, r)) { // iguais: só acerta as horas
+            if (!rt) { var t0 = lt || now; return { apply: null, push: { faz_periods: l, faz_periods_at: t0 }, at: t0 }; }
+            return { apply: null, push: null, at: rt !== lt ? rt : 0 };
+        }
+        if (!r || !rt) { // a conta ainda não tem períodos (ou tem sem a hora): vão os daqui
+            var t1 = lt > rt ? lt : Math.max(now, rt + 1);
+            return { apply: null, push: { faz_periods: l, faz_periods_at: t1 }, at: t1 };
+        }
+        if (!lt) { // primeira vez deste aparelho e a conta já tem períodos: os da conta + os daqui que não estão lá
+            if (same(l, DEFAULT_PERIODS)) return { apply: r, push: null, at: rt }; // aqui só tem os padrão: vale a conta
+            // "Não está lá" = nome e horário (versões antigas do app tinham outros padrão com os mesmos ids p1..p4)
+            var key = function (p) { return p.name + '|' + p.start + '|' + p.end; }, keys = {}, ids = {}, extra = [];
+            r.forEach(function (p) { keys[key(p)] = 1; ids[p.id] = 1; });
+            l.forEach(function (p) {
+                if (has(keys, key(p))) return;
+                var id = p.id, n = 1;
+                while (has(ids, id)) id = p.id.slice(0, 56) + '_' + (++n); // id repetido com outro conteúdo: ganha um id novo
+                keys[key(p)] = 1; ids[id] = 1;
+                extra.push({ id: id, name: p.name, start: p.start, end: p.end });
+            });
+            if (!extra.length) return { apply: r, push: null, at: rt };
+            var both = r.concat(extra).slice(0, PERIODS_MAX), t2 = Math.max(now, rt + 1);
+            return { apply: both, push: { faz_periods: both, faz_periods_at: t2 }, at: t2 };
+        }
+        if (rt > lt) return { apply: r, push: null, at: rt }; // mudou depois na conta (no PC): vem pra cá
+        var t = lt > rt ? lt : Math.max(now, rt + 1); // mudou aqui por último: vai pra conta, sempre mais nova
+        return { apply: null, push: { faz_periods: l, faz_periods_at: t }, at: t };
+    }
+
     return {
         DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS, MONTH: MONTH, DEFAULT_GOAL_LISTS: DEFAULT_GOAL_LISTS,
         cleanOverrides: cleanOverrides, cleanMonths: cleanMonths, safeCards: safeCards, MAX_CARDS: MAX_CARDS, // V40.24.0
         stable: stable, same: same, validDate: validDate, assignPositions: assignPositions, fixTies: fixTies,
         buildLocal: buildLocal, indexRows: indexRows, cleanRow: cleanRow, merge3: merge3, mergeKind: mergeKind,
         plan: plan, materialize: materialize, materializeArchived: materializeArchived, baseFrom: baseFrom, aliveCount: aliveCount, MAP: MAP,
-        prefsPlan: prefsPlan, prefTheme: prefTheme, prefHours: prefHours // V40.32.0
+        prefsPlan: prefsPlan, prefTheme: prefTheme, prefHours: prefHours, // V40.32.0
+        periodsPlan: periodsPlan, cleanPeriods: cleanPeriods, DEFAULT_PERIODS: DEFAULT_PERIODS, PERIODS_MAX: PERIODS_MAX // V40.41.0
     };
 });
 
@@ -878,6 +945,7 @@
  * ======================================================================== */
 (function () {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    if (window.FAZ_SYNC_CORE_ONLY) return; // V40.41.0: a tela do PC carrega só as regras (pro backup), nunca a sincronização do celular
     'use strict';
 
     var CORE = window.FazSyncCore;
@@ -1265,18 +1333,26 @@
                 }
             }
             if (appBusy()) return; // arrastando ou com formulário aberto: fica pra próxima rodada
-            var p = CORE.prefsPlan(window.fazPrefs(), meta, Date.now());
+            var p = CORE.prefsPlan(window.fazPrefs(), meta, Date.now()), msg = '';
             if (p.apply && typeof window.fazApplyPrefs === 'function') {
                 var did = window.fazApplyPrefs(p.apply);
-                if (did.theme && did.hours) toast('Cor e horário do dia mudaram no outro aparelho');
-                else if (did.theme) toast('Cor do app mudou no outro aparelho 🎨');
-                else if (did.hours) toast('Horário do dia mudou no outro aparelho: ' + did.hours);
+                if (did.theme && did.hours) msg = 'Cor e horário do dia mudaram no outro aparelho';
+                else if (did.theme) msg = 'Cor do app mudou no outro aparelho 🎨';
+                else if (did.hours) msg = 'Horário do dia mudou no outro aparelho: ' + did.hours;
             }
             if (p.at && typeof window.fazSetPrefsAt === 'function') window.fazSetPrefsAt(p.at);
-            if (p.push) {
-                var res = await sb.auth.updateUser({ data: p.push });
+            // V40.41.0: os períodos (Manhã, Tarde...), com a hora deles (CORE.periodsPlan)
+            var q = typeof window.fazPeriods === 'function' ? CORE.periodsPlan(window.fazPeriods(), meta, Date.now()) : { apply: null, push: null, at: 0 };
+            if (q.apply && typeof window.fazApplyPeriods === 'function' && window.fazApplyPeriods(q.apply)) {
+                msg = msg ? 'Cor, horário ou períodos mudaram no outro aparelho' : 'Períodos mudaram no outro aparelho';
+            }
+            if (q.at && typeof window.fazSetPeriodsAt === 'function') window.fazSetPeriodsAt(q.at);
+            if (msg) toast(msg);
+            var push = p.push || q.push ? Object.assign({}, p.push || {}, q.push || {}) : null; // uma gravação só na conta
+            if (push) {
+                var res = await sb.auth.updateUser({ data: push });
                 if (res && res.error) throw res.error;
-                if (session && session.user && session.user.id === uid) session.user.user_metadata = Object.assign({}, meta, p.push);
+                if (session && session.user && session.user.id === uid) session.user.user_metadata = Object.assign({}, meta, push);
             }
         } catch (e) { console.warn('[FazSync] cor/horário', e); }
     }

@@ -39,7 +39,8 @@
 // V10.44 - v40.38.0 (Voltar pra lista: o bloco (e o cartão da sublista) volta pra lista de onde veio; se ela não existe mais, ou o bloco nasceu na agenda, vai pra primeira lista (a da esquerda). Antes ia sempre pra Geral. O mesmo no PC; a lista de origem vai pra nuvem.)
 // V10.45 - v40.39.0 (Busca nas Listas, no celular e no PC: filtra as próprias listas pelo nome, checklist e tag (sem acento, cada palavra em qualquer lugar); "1 de 8" no nome da lista; no celular as bolinhas viram o número de achados de cada lista, no PC a barra diz em quais listas achou.)
 // V10.46 - v40.40.0 (PC, visão Dia: o cartão sai da sublista arrastando (vira bloco onde o tracejado mostra, com o horário, ou muda de sublista) e o bloco entra numa sublista arrastando por cima dela. Esc desiste; um passo só do Desfazer. Era o que a Semana do PC e o celular já faziam.)
-const CACHE_NAME = 'timeblock-v40-40-0';
+// V10.47 - v40.41.0 (Períodos no PC, igual ao celular e nos 2 sentidos: vão na conta, como a cor do app; em Configurações do PC dá pra criar e apagar, e no Novo bloco clicar num período preenche o horário e a duração. Salvar backup no PC: o mesmo arquivo do celular, que dá pra restaurar lá.)
+const CACHE_NAME = 'timeblock-v40-41-0';
 const ASSETS = [
   './',
   './index.html',

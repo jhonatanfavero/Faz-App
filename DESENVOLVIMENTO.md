@@ -78,7 +78,11 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     decide quem ganha e o sync lê a conta de novo com `getUser()` (a sessão guardada pode estar velha).
     Mudou a cor ou o horário no celular? Chame `fazPrefsTouch()` (só quando o valor mudou de fato). No PC,
     grave pelo `savePrefs()`. A hora é sempre maior que a última vista (`Math.max(agora, última + 1)`):
-    relógio adiantado em outro aparelho não faz uma mudança nova perder.
+    relógio adiantado em outro aparelho não faz uma mudança nova perder. **Períodos** (V40.41.0) vão do mesmo
+    jeito, com a hora deles: `faz_periods` e `faz_periods_at` na conta, `tb__periods_at` no celular
+    (`CORE.periodsPlan`; o `savePeriods()` marca sozinho). Na primeira vez de um aparelho com a conta já tendo
+    períodos, junta (pelo nome e horário) em vez de trocar. No PC, leia a conta (`perFresh`) antes de gravar a
+    lista e grave pelo `savePeriodsPc()`.
 14. **Meta ligada conta sozinha, sem gravar nada (V40.34.0).** Bloco, tarefa, rotina e cartão de sublista
     podem ter `goalId` (`goal_id` na nuvem; a sublista em si não tem meta, só os cartões dela). Bloco concluído
     ou cartão marcado com meta entra na conta pelos "dias de mentira" do `FazMetas.autoDays()`/`withAuto()`:
@@ -99,6 +103,10 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     ela ainda existe; senão (apagada, ou o bloco nasceu na agenda) a primeira lista, a da esquerda. Desarquivar
     segue a mesma regra. Caminho novo que transforma tarefa em bloco ou cartão (ou copia um bloco) leva a lista
     junto, como a meta (regra 14).
+17. **A tela do PC carrega o `sync.js` só pelas regras (V40.41.0).** O `window.FAZ_SYNC_CORE_ONLY = true` vem
+    antes do `<script src="sync.js">` no `kanban.html`: sem ele, a sincronização do celular rodaria no PC (com o
+    localStorage vazio). O backup do PC usa `FazSyncCore.indexRows`/`materialize`, as mesmas regras com que o
+    celular monta os dados da nuvem: campo novo no `MAP` já sai certo no backup do PC.
 
 ## Publicar uma versão
 

@@ -783,6 +783,11 @@
                     <select id="f-dur" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
                 </label>
             </div>
+            <!-- V40.41.0: períodos (Manhã, Tarde... os mesmos do celular): no bloco novo, clicar preenche o horário e a duração -->
+            <div id="f-per-wrap" class="hidden mt-3">
+                <span class="text-xs font-semibold text-zinc-500">Período</span>
+                <div id="f-pers" class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label="Período"></div>
+            </div>
             <!-- V40.24.0: bloco novo pode ser uma sublista (um horário com vários cartões dentro, como no celular) -->
             <label id="f-sub-wrap" class="hidden mt-3 items-center gap-2 px-2.5 py-1.5 rounded-lg border border-dashed border-amber-400 bg-amber-50 text-[12.5px] font-semibold text-amber-900 cursor-pointer select-none">
                 <input id="f-sub" type="checkbox" class="w-4 h-4 accent-amber-500"><i class="ph-bold ph-list-checks"></i>Sublista: vários cartões no mesmo horário
@@ -989,6 +994,43 @@
                 </label>
             </div>
             <p id="cfg-h-msg" class="mt-2 text-[12px] text-zinc-500" aria-live="polite"></p>
+            <!-- V40.41.0: períodos (os mesmos do celular, nos 2 sentidos). No Novo bloco, clicar num preenche o horário. -->
+            <p class="mt-5 text-xs font-semibold text-zinc-500">Períodos <span class="font-normal text-zinc-400">· no Novo bloco, preenchem o horário</span></p>
+            <div id="cfg-pers" class="mt-2 flex flex-col gap-1.5"></div>
+            <div class="mt-2 p-3 rounded-xl border border-zinc-200 bg-zinc-50">
+                <input id="cfg-per-name" type="text" maxlength="60" autocomplete="off" placeholder="Nome do período (ex.: Madrugada)" class="w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none">
+                <div class="mt-2 flex items-end gap-3">
+                    <div class="min-w-0 flex-1">
+                        <span class="text-[11.5px] text-zinc-500">Início</span>
+                        <input id="cfg-per-st" type="hidden">
+                        <div class="mt-1 flex items-center gap-1" data-time-for="cfg-per-st">
+                            <select class="time-h min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Hora do início"></select>
+                            <span class="text-zinc-400 font-semibold">:</span>
+                            <select class="time-m min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Minuto do início"></select>
+                        </div>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <span class="text-[11.5px] text-zinc-500">Fim</span>
+                        <input id="cfg-per-en" type="hidden">
+                        <div class="mt-1 flex items-center gap-1" data-time-for="cfg-per-en">
+                            <select class="time-h min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Hora do fim"></select>
+                            <span class="text-zinc-400 font-semibold">:</span>
+                            <select class="time-m min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Minuto do fim"></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2.5 flex items-center gap-3">
+                    <p id="cfg-per-msg" class="min-w-0 flex-1 text-[12px] text-zinc-500" aria-live="polite"></p>
+                    <button id="cfg-per-add" type="button" class="shrink-0 inline-flex items-center gap-1.5 bg-focus text-white text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-90"><i class="ph-bold ph-plus"></i>Adicionar</button>
+                </div>
+            </div>
+            <!-- V40.41.0: backup (só salvar: restaurar continua no celular, escolha dele) -->
+            <p class="mt-5 text-xs font-semibold text-zinc-500">Backup</p>
+            <div class="mt-2 flex items-start gap-3">
+                <p class="min-w-0 flex-1 text-[12px] text-zinc-500 leading-snug">Baixa um arquivo com tudo desta conta. É o mesmo do celular: dá pra restaurar lá, em Configurações → Backup e Restauração.</p>
+                <button id="cfg-backup" type="button" class="shrink-0 inline-flex items-center gap-1.5 bg-white border border-zinc-300 text-zinc-800 text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:bg-zinc-50 disabled:opacity-60"><i class="ph-bold ph-download-simple"></i>Salvar backup</button>
+            </div>
+            <p id="cfg-backup-msg" class="mt-1.5 text-[12px] text-zinc-500 break-words" aria-live="polite"></p>
         </div>
     </div>
 </div>
@@ -996,7 +1038,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.40.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.41.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1011,6 +1053,9 @@
 <script src="faz-config.js"></script>
 <script src="metas.js"></script>
 <script src="assistente.js"></script>
+<!-- V40.41.0: só as regras do sync.js (o backup sai igual ao do celular); a sincronização do celular não roda aqui -->
+<script>window.FAZ_SYNC_CORE_ONLY = true;</script>
+<script src="sync.js"></script>
 <script src="libs/supabase-js/supabase.js"></script>
 <script>
 (function () {
@@ -1043,7 +1088,8 @@
         tab: 'listas', agView: 'week', agAnchor: null, agScrolled: null, hours: [7, 24], recovery: false,
         channel: null, live: 'connecting', lastLoad: 0, loading: false,
         dragId: null, colDrag: null, pendingRender: false, composer: null, editing: null, placing: null, agH0: 7,
-        theme: '#4f46e5', prefsAt: 0, prefsSeen: false, prefsCheckedAt: 0 // V40.32.0: cor do app e quando a cor/horário mudaram por último
+        theme: '#4f46e5', prefsAt: 0, prefsSeen: false, prefsCheckedAt: 0, // V40.32.0: cor do app e quando a cor/horário mudaram por último
+        periods: null, periodsAt: 0, periodsSeen: false // V40.41.0: períodos (Manhã, Tarde...) e quando mudaram por último
     };
 
     // ---------- utilitários ----------
@@ -2807,6 +2853,8 @@
         $('f-card-back').classList.add('hidden'); $('f-card-back').classList.remove('inline-flex');
         $('f-sub').checked = false;
         $('f-sub-wrap').classList.toggle('hidden', !(isB && isNew));
+        S.editing.per = null; // V40.41.0: períodos no bloco novo
+        perChips();
         $('f-sub-wrap').classList.toggle('inline-flex', isB && isNew);
         $('f-mbs-wrap').classList.toggle('hidden', sub);
         fillGoalSelect('f-goal-wrap', 'f-goal', S.editing.goal); // V40.34.0
@@ -3253,17 +3301,20 @@
         var start = st == null ? suggestStart(day, dur) : Math.max(0, Math.min(Math.round(st), 1440 - dur));
         openCard('blocos', null, { title: '', date: day, start_min: start, duration: dur, tag_id: null, microblocks: [], color: null, type: 'focus' });
         S.editing.timeTouched = st != null; // horário clicado na régua não é trocado sozinho ao mudar o dia
+        refreshPrefs(false); // V40.41.0: os períodos podem ter mudado no celular (os botões se refazem quando chegam)
     }
     async function createBlock() {
         var ed = S.editing;
         if (!ed || !ed.isNew) return;
         var asSub = $('f-sub').checked; // V40.24.0
-        var title = $('f-title').value.trim() || (asSub ? 'Sublista' : titleOrGoal(ed.goal)); // V40.36.1: vazio com meta = nome da meta
+        var per = perOn(); // V40.41.0: período escolhido (o horário e a duração ainda são os dele)
+        var title = $('f-title').value.trim() || (per ? per.name : asSub ? 'Sublista' : titleOrGoal(ed.goal)); // V40.36.1: vazio com meta = nome da meta; V40.41.0: com período = nome dele
         if (!title) { $('f-title').focus(); return toast('Dê um nome pro bloco.'); }
         var dur = parseInt($('f-dur').value, 10), day = $('f-date').value, st = parseClock($('f-start').value);
         if (!Number.isFinite(dur) || dur <= 0) dur = 30;
         if (!isYmd(day) || st === null) return toast('Confira o dia e o horário.');
-        var slot = freeSlot(day, st, dur);
+        if (per && hits(dayOthers(day, null), st, dur)) return toast('Conflito! O período se sobrepõe a outro bloco.', 4000); // como no celular: não empurra pra outro horário
+        var slot = per ? st : freeSlot(day, st, dur);
         if (slot === null) return toast('Esse dia não tem um espaço livre de ' + fmtDur(dur) + '.');
         var row = {
             user_id: S.uid, id: newId('f_', 'blocos'), date: day, start_min: slot, duration: dur, title: title,
@@ -4268,7 +4319,7 @@
     function goalKeep(id) { return goalOf(id) ? String(id) : null; }
     // V40.36.1: com uma meta escolhida, o nome pode ficar vazio: vale o da meta (o campo mostra ele clarinho)
     function titleOrGoal(goalId) { var t = $('f-title').value.trim(), g = goalOf(goalKeep(goalId)); return t || (g ? String(g.title || '').trim() : ''); }
-    function goalPlaceholder() { var ed = S.editing, g = ed && goalOf(goalKeep(ed.goal)); if (ed) $('f-title').placeholder = g && g.title ? String(g.title) : (ed.ph || ''); }
+    function goalPlaceholder() { var ed = S.editing, g = ed && goalOf(goalKeep(ed.goal)), p = ed && perOn(); if (ed) $('f-title').placeholder = p ? p.name : g && g.title ? String(g.title) : (ed.ph || ''); } // V40.41.0: período escolhido = nome dele
     function goalBadge(id) {
         var g = goalOf(id);
         return g ? '<span class="goal-badge" title="Meta: ' + esc(g.title || 'Sem nome') + '" aria-label="Meta: ' + esc(g.title || 'Sem nome') + '">' + esc(g.emoji || '🎯') + '</span>' : '';
@@ -5024,6 +5075,9 @@
         m.classList.remove('hidden');
         m.classList.add('flex');
         renderCfg(true);
+        renderCfgPeriods(); // V40.41.0
+        cfgPerReset();
+        $('cfg-backup-msg').textContent = '';
         $('cfg-close').focus();
         refreshPrefs(true); // traz o que mudou no celular desde a última olhada
     }
@@ -5071,7 +5125,241 @@
             var u = r && r.data && r.data.user;
             if (!u || u.id !== uid || S.uid !== uid) return;
             if (applyTheme(u, true)) scheduleRender();
+            applyPeriods(u, true); // V40.41.0
         }).catch(function () {});
+    }
+
+    // ---------- V40.41.0: Períodos (Manhã, Tarde...) — os mesmos do celular, nos 2 sentidos ----------
+    // Vão na conta, como a cor do app: faz_periods (a lista { id, name, start 'HH:MM', end 'HH:MM' }) e faz_periods_at
+    // (quando mudou). Ganha a mudança mais nova, aqui ou no celular (o celular confere ao sincronizar: CORE.periodsPlan).
+    // Conta sem períodos ainda (o celular não mandou, ou é uma conta só do PC): os 4 padrão do celular.
+    // No Novo bloco, clicar num período preenche o horário e a duração (e o nome, se ficar vazio); se o período bate
+    // em outro bloco, não cria (como no celular). Em Configurações: criar e apagar.
+    var PERIODS_MAX = 30;
+    var DEFAULT_PERIODS = [
+        { id: 'p1', name: 'Manhã', start: '08:00', end: '12:00' }, { id: 'p2', name: 'Meio-dia', start: '12:00', end: '13:00' },
+        { id: 'p3', name: 'Tarde', start: '13:00', end: '18:00' }, { id: 'p4', name: 'Noite', start: '18:00', end: '22:00' }
+    ];
+    function perDefaults() { return DEFAULT_PERIODS.map(function (p) { return Object.assign({}, p); }); }
+    function perClock(v) {
+        var m = /^(\d{1,2}):(\d{2})$/.exec(String(v == null ? '' : v).trim());
+        if (!m || +m[1] > 23 || +m[2] > 59) return null;
+        return (m[1].length === 1 ? '0' : '') + m[1] + ':' + m[2];
+    }
+    function perClean(list) { // as mesmas regras do sync.js (cleanPeriods)
+        if (!Array.isArray(list)) return null;
+        var out = [], seen = {};
+        list.forEach(function (p) {
+            if (!p || typeof p !== 'object' || Array.isArray(p) || out.length >= PERIODS_MAX) return;
+            var id = typeof p.id === 'string' || typeof p.id === 'number' ? String(p.id).replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 64) : ''; // como no sync.js
+            var name = typeof p.name === 'string' ? p.name.trim().slice(0, 60) : '';
+            var st = perClock(p.start), en = perClock(p.end);
+            if (!id || Object.prototype.hasOwnProperty.call(seen, id) || !name || st === null || en === null) return;
+            seen[id] = 1;
+            out.push({ id: id, name: name, start: st, end: en });
+        });
+        return out;
+    }
+    function perList() { return S.periods || (S.periods = perDefaults()); }
+    function perSpan(p) { // { st, dur }: fim antes do começo = termina no dia seguinte (como no celular)
+        var st = parseClock(p.start), en = parseClock(p.end);
+        if (st === null || en === null) return null;
+        return { st: st, dur: en > st ? en - st : en + 1440 - st };
+    }
+    function perText(p) { return p.start + ' às ' + p.end; }
+    // Da conta (sessão, getUser, USER_UPDATED). As mesmas regras da cor (applyTheme): o que é mais velho que a última
+    // mudança feita aqui não volta a tela pra trás.
+    function applyPeriods(user, fresh) {
+        var m = (user && user.user_metadata) || {};
+        var at = Number(m.faz_periods_at) || 0;
+        if (at < S.periodsAt || (!fresh && S.periodsSeen && at <= S.periodsAt)) return false;
+        S.periodsAt = at;
+        if (fresh) S.periodsSeen = true;
+        var list = perClean(m.faz_periods), next = list || (at ? perList() : perDefaults());
+        if (JSON.stringify(next) === JSON.stringify(perList())) return false;
+        S.periods = next;
+        renderCfgPeriods();
+        perChips();
+        return true;
+    }
+    function cfgPerMsg(text, bad) {
+        var p = $('cfg-per-msg');
+        p.textContent = text;
+        p.classList.toggle('text-red-600', !!bad);
+        p.classList.toggle('font-semibold', !!bad);
+        p.classList.toggle('text-zinc-500', !bad);
+    }
+    function renderCfgPeriods() {
+        if ($('modal-cfg').classList.contains('hidden')) return;
+        var list = perList();
+        $('cfg-pers').innerHTML = list.length ? list.map(function (p) {
+            var sp = perSpan(p), next = sp && sp.st + sp.dur > 1440;
+            return '<div class="flex items-center gap-2 pl-3 pr-1 py-1 rounded-lg border border-zinc-200 bg-white">' +
+                '<i class="ph ph-clock text-zinc-400 shrink-0" aria-hidden="true"></i>' +
+                '<span class="min-w-0 truncate text-[13px] font-semibold text-zinc-800">' + esc(p.name) + '</span>' +
+                '<span class="shrink-0 text-[12px] text-zinc-500 tabular-nums">' + esc(perText(p)) + (next ? ' (dia seguinte)' : '') + '</span>' +
+                '<button type="button" class="ml-auto shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-600 hover:bg-red-50" data-per-del="' + esc(p.id) + '" title="Apagar o período ' + esc(p.name) + '" aria-label="Apagar o período ' + esc(p.name) + '"><i class="ph ph-trash"></i></button></div>';
+        }).join('') : '<p class="text-[12.5px] text-zinc-400 px-1">Nenhum período. Crie um aqui embaixo.</p>';
+    }
+    function cfgPerReset() {
+        $('cfg-per-name').value = '';
+        setTimeVal('cfg-per-st', '');
+        setTimeVal('cfg-per-en', '');
+        cfgPerMsg('Fim antes do início = termina no dia seguinte.', false);
+    }
+    // Aplica na hora e grava na conta. Sem internet: volta como estava e avisa.
+    async function savePeriodsPc(list, msg) {
+        if (!S.uid) return false;
+        var prev = { list: perList(), at: S.periodsAt };
+        var at = Math.max(Date.now(), S.periodsAt + 1); // sempre mais nova que a última que este PC viu (relógios diferentes)
+        S.periods = list;
+        S.periodsAt = at;
+        S.periodsSeen = true;
+        renderCfgPeriods();
+        perChips();
+        try {
+            var res = await S.sb.auth.updateUser({ data: { faz_periods: list, faz_periods_at: at } });
+            if (res && res.error) throw res.error;
+            if (S.periodsAt === at) toast(msg + '. No celular muda na próxima sincronização.', 3600);
+            return true;
+        } catch (e) {
+            if (S.periodsAt === at) { S.periods = prev.list; S.periodsAt = prev.at; renderCfgPeriods(); perChips(); } // nada mais novo por cima: volta
+            fail(e);
+            return false;
+        }
+    }
+    // Antes de mudar a lista: a mais nova da conta (o celular pode ter mudado agora há pouco; senão a mudança de lá se perde)
+    async function perFresh() {
+        try {
+            var uid = S.uid, r = await S.sb.auth.getUser(), u = r && r.data && r.data.user;
+            if (u && u.id === uid && S.uid === uid) applyPeriods(u, true);
+        } catch (e) {}
+    }
+    async function cfgPerAdd() {
+        if (S.perBusy) return;
+        var name = $('cfg-per-name').value.trim().slice(0, 60), st = perClock($('cfg-per-st').value), en = perClock($('cfg-per-en').value);
+        if (!name) { $('cfg-per-name').focus(); return cfgPerMsg('Dê um nome pro período.', true); }
+        if (st === null || en === null) return cfgPerMsg('Escolha o início e o fim.', true);
+        if (st === en) return cfgPerMsg('O início e o fim não podem ser iguais.', true);
+        S.perBusy = true;
+        $('cfg-per-add').disabled = true;
+        try {
+            await perFresh();
+            var list = perList();
+            if (list.length >= PERIODS_MAX) return cfgPerMsg('Até ' + PERIODS_MAX + ' períodos.', true);
+            var id = 'p_' + Date.now();
+            while (list.some(function (x) { return x.id === id; })) id += '_';
+            var p = { id: id, name: name, start: st, end: en };
+            cfgPerReset();
+            if (!(await savePeriodsPc(list.concat([p]), 'Período ' + name + ' criado (' + perText(p) + ')'))) { $('cfg-per-name').value = name; setTimeVal('cfg-per-st', st); setTimeVal('cfg-per-en', en); }
+        } finally { S.perBusy = false; $('cfg-per-add').disabled = false; }
+    }
+    async function cfgPerDel(id) {
+        if (S.perBusy) return;
+        var p = perList().filter(function (x) { return x.id === id; })[0];
+        if (!p) return;
+        var ok = await dialog({ title: 'Apagar o período?', text: '"' + p.name + '" (' + perText(p) + ') some daqui e do celular. Os blocos que já foram criados com ele continuam na agenda.', okLabel: 'Apagar', danger: true });
+        if (!ok || S.perBusy) return;
+        S.perBusy = true;
+        try {
+            await perFresh();
+            var cur = perList();
+            if (!cur.some(function (x) { return x.id === id; })) return toast('Esse período já tinha sido apagado no celular.'); // já tinha sumido
+            await savePeriodsPc(cur.filter(function (x) { return x.id !== id; }), 'Período ' + p.name + ' apagado');
+        } finally { S.perBusy = false; }
+    }
+    // Bloco novo: os períodos viram botões; o que bate com o horário e a duração escolhidos fica marcado.
+    function perOn() { // o período escolhido, se o horário e a duração ainda são os dele
+        var ed = S.editing;
+        if (!ed || !ed.isNew || ed.kind !== 'blocos' || !ed.per) return null;
+        var p = perList().filter(function (x) { return x.id === ed.per; })[0], sp = p && perSpan(p);
+        if (!sp || parseClock($('f-start').value) !== sp.st || parseInt($('f-dur').value, 10) !== sp.dur) return null;
+        return p;
+    }
+    function perChips() {
+        var ed = S.editing, show = !!(ed && ed.isNew && ed.kind === 'blocos') && perList().length > 0;
+        $('f-per-wrap').classList.toggle('hidden', !show);
+        if (!show) { $('f-pers').innerHTML = ''; return; }
+        var on = perOn();
+        $('f-pers').innerHTML = perList().map(function (p) {
+            var is = !!on && on.id === p.id;
+            return '<button type="button" data-per="' + esc(p.id) + '" aria-pressed="' + (is ? 'true' : 'false') + '" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50' + (is ? ' chip-on' : '') + '" title="' + esc(p.name + ': ' + perText(p)) + '">' +
+                '<i class="ph ph-clock text-zinc-400" aria-hidden="true"></i>' + esc(p.name) + ' <span class="text-zinc-400 tabular-nums">' + esc(p.start) + '–' + esc(p.end) + '</span></button>';
+        }).join('');
+        goalPlaceholder();
+    }
+    // ---------- V40.41.0: Salvar backup (escolha dele: "Só salvar"; restaurar continua no celular) ----------
+    // O mesmo arquivo do celular (Configurações → Backup e Restauração → Salvar backup): { signature, app, version,
+    // exportedAt, summary, data: { tb_...: texto } }. As linhas da nuvem viram os itens do app pelas mesmas regras da
+    // sincronização (FazSyncCore.indexRows/materialize, do sync.js), lidas de novo na hora pra sair tudo.
+    var BACKUP_SIGNATURE = 'faz-timeblock-backup';
+    function backupStamp(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()); }
+    function backupData(CORE, rows) { // rows = { tipo: linhas da nuvem } → { dados no formato do celular, resumo }
+        var idx = {};
+        KINDS.forEach(function (k) { idx[k] = CORE.indexRows(k, rows[k] || []); });
+        var L = function (k) { return CORE.materialize(k, idx[k], [], null); }, now = Date.now(), arch = [];
+        [['tarefa', 'tarefas'], ['bloco', 'blocos']].forEach(function (x) { // os arquivados ficam à parte, como no celular
+            CORE.materializeArchived(x[1], idx[x[1]], []).forEach(function (it) {
+                if (x[0] === 'bloco') it.expanded = false;
+                arch.push({ kind: x[0], archivedAt: now - arch.length, item: it });
+            });
+        });
+        var d = {
+            tb_backlog_db: L('tarefas'), tb_backlog_columns: L('listas'), tb_tags_db: L('tags'), tb_master_db: L('blocos'),
+            tb_routines_db: L('rotinas'), tb_notes_db: L('notas'), tb_financial_db: L('financas'), tb_archive_db: arch,
+            tb_goal_lists: L('metas_listas'), tb_goals_db: L('metas'), tb_goal_days: L('metas_dias'), tb_periods_db: perList()
+        };
+        var out = {};
+        Object.keys(d).forEach(function (k) { out[k] = JSON.stringify(d[k]); });
+        out.tb_theme_color = S.theme;
+        out.tb_start_hour = String(S.hours[0]);
+        out.tb_end_hour = String(S.hours[1]);
+        return { data: out, summary: { tarefas: d.tb_backlog_db.length, blocos: d.tb_master_db.length, rotinas: d.tb_routines_db.length, notas: d.tb_notes_db.length, despesas: d.tb_financial_db.length, tags: d.tb_tags_db.length, metas: d.tb_goals_db.length } };
+    }
+    async function saveBackup() {
+        var CORE = window.FazSyncCore, msg = $('cfg-backup-msg');
+        if (!S.uid || S.bkBusy) return;
+        if (!CORE || typeof CORE.indexRows !== 'function' || typeof CORE.materialize !== 'function') { msg.textContent = 'Não deu pra montar o backup. Atualize a página (Ctrl+Shift+R) e tente de novo.'; return; }
+        S.bkBusy = true;
+        $('cfg-backup').disabled = true;
+        msg.textContent = 'Juntando tudo da nuvem…';
+        try {
+            var got = await Promise.all(KINDS.map(fetchKind)), rows = {};
+            KINDS.forEach(function (k, i) { rows[k] = got[i]; });
+            var b = backupData(CORE, rows), t = new Date(), s = b.summary;
+            var payload = JSON.stringify({ signature: BACKUP_SIGNATURE, app: 'Faz / TimeBlock', version: $('pc-version').textContent.trim(), exportedAt: t.toISOString(), summary: s, data: b.data }, null, 2);
+            var name = 'faz-backup-' + backupStamp(t) + '.json';
+            var url = URL.createObjectURL(new Blob([payload], { type: 'application/json' })), a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 1000);
+            var n = function (v, one, many) { return v + ' ' + (v === 1 ? one : many); };
+            msg.textContent = 'Salvo: ' + name + ' · ' + [n(s.tarefas, 'tarefa', 'tarefas'), n(s.blocos, 'bloco', 'blocos'), n(s.rotinas, 'rotina', 'rotinas'), n(s.notas, 'nota', 'notas'), n(s.despesas, 'despesa', 'despesas'), n(s.metas, 'meta', 'metas')].join(', ') + '.';
+            if (msg.scrollIntoView) msg.scrollIntoView({ block: 'nearest' }); // o aviso fica no fim da janela
+            toast('Backup salvo: ' + name, 3600);
+        } catch (e) {
+            msg.textContent = '';
+            fail(e);
+        } finally {
+            S.bkBusy = false;
+            $('cfg-backup').disabled = false;
+        }
+    }
+    function setDurVal(d) { // a duração do período pode não estar na lista (ex.: 5h): entra nela
+        var durs = DURATIONS.indexOf(d) >= 0 ? DURATIONS : DURATIONS.concat([d]).sort(function (a, b) { return a - b; });
+        $('f-dur').innerHTML = durs.map(function (m) { return '<option value="' + m + '">' + fmtDur(m) + '</option>'; }).join('');
+        $('f-dur').value = String(d);
+    }
+    function perPick(id) {
+        var ed = S.editing, p = perList().filter(function (x) { return x.id === id; })[0], sp = p && perSpan(p);
+        if (!ed || !ed.isNew || !sp) return;
+        ed.per = p.id;
+        ed.timeTouched = true; // trocar o dia não muda o horário do período
+        setTimeVal('f-start', clock(sp.st));
+        setDurVal(sp.dur);
+        perChips();
     }
     function unarchive(kind, id) {
         var r = S[kind][id];
@@ -5410,6 +5698,16 @@
         // V40.13.0: bloco novo → trocar o dia sugere de novo o horário, até a pessoa escolher um
         $('f-date').addEventListener('change', function () { var ed = S.editing; if (ed && ed.isNew && !ed.timeTouched && isYmd(this.value)) setTimeVal('f-start', clock(suggestStart(this.value, parseInt($('f-dur').value, 10) || 30))); });
         $('f-start').addEventListener('change', function () { if (S.editing && S.editing.isNew) S.editing.timeTouched = true; });
+        // V40.41.0: períodos no bloco novo (clicar preenche; mexer no horário ou na duração desmarca) e em Configurações
+        $('f-pers').addEventListener('click', function (e) { // 2º clique de um clique duplo na agenda (que abriu esta janela) não escolhe período
+            var b = e.target.closest('[data-per]');
+            if (b && e.detail < 2) perPick(b.dataset.per);
+        });
+        ['f-start', 'f-dur'].forEach(function (id) { $(id).addEventListener('change', function () { if (S.editing && S.editing.isNew && S.editing.kind === 'blocos') perChips(); }); });
+        $('cfg-per-add').addEventListener('click', cfgPerAdd);
+        $('cfg-backup').addEventListener('click', saveBackup); // V40.41.0
+        $('cfg-per-name').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); cfgPerAdd(); } });
+        $('cfg-pers').addEventListener('click', function (e) { var b = e.target.closest('[data-per-del]'); if (b) cfgPerDel(b.dataset.perDel); });
         $('ag-new').addEventListener('click', function () { var ws = weekStart(S.agAnchor || todayStr()), t = todayStr(); openNewBlock(S.agView === 'day' ? S.agAnchor : (t >= ws && t <= addDays(ws, 6) ? t : ws)); }); // V40.29.0: semana de segunda a domingo
         $('f-schedule').addEventListener('click', function () { if ($('f-sched').classList.contains('hidden')) openSched(); else document.querySelector('[data-date-for="f-sched-date"]').focus(); });
         $('f-hand').addEventListener('click', function () { startPlacing(formAsSource()); });
@@ -6222,8 +6520,9 @@
     var currentUid;
     function onSession(session, event) {
         var uid = session ? session.user.id : null;
-        if (uid !== currentUid) { S.prefsAt = 0; S.prefsSeen = false; S.prefsCheckedAt = 0; } // V40.32.0: outra conta
+        if (uid !== currentUid) { S.prefsAt = 0; S.prefsSeen = false; S.prefsCheckedAt = 0; S.periods = perDefaults(); S.periodsAt = 0; S.periodsSeen = false; } // V40.32.0: outra conta (V40.41.0: e os períodos)
         if (session && applyTheme(session.user, event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') && uid === currentUid) scheduleRender(); // V40.32.0: o horário do dia mudou
+        if (session) applyPeriods(session.user, event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED'); // V40.41.0
         if (S.recovery && session) { show('view-recovery'); $('recovery-pass').focus(); return; }
         if (uid === currentUid) return;
         currentUid = uid;

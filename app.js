@@ -310,7 +310,7 @@ if (!routinesDb) {
 function saveRoutinesDb() { localStorage.setItem('tb_routines_db', JSON.stringify(routinesDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('rotinas'); } // V40.17.0: rotinas vão pra nuvem
 
 let periodsDb = fazLoadList('tb_periods_db', null);
-if (!periodsDb || periodsDb.length === 0) {
+if (!periodsDb) { // V40.41.0: só quando não tem nada guardado (apagou todos de propósito = continua sem nenhum; antes os padrão voltavam)
     periodsDb = [
         { id: 'p1', name: 'Manhã', start: '08:00', end: '12:00' },
         { id: 'p2', name: 'Meio-dia', start: '12:00', end: '13:00' },
@@ -362,7 +362,7 @@ if (!db || db.length === 0) {
 // V40.25.0: cada save avisa o Desfazer (undoTouch, lá no fim do arquivo), que guarda o que mudou.
 function saveDb() { localStorage.setItem('tb_master_db', JSON.stringify(db)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('blocos'); } // V40.8.0: agenda vai pra nuvem (só ida)
 function saveBacklog() { localStorage.setItem('tb_backlog_db', JSON.stringify(backlogDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('tarefas'); } // V40.7.0: + aviso ao sync
-function savePeriods() { localStorage.setItem('tb_periods_db', JSON.stringify(periodsDb)); undoTouch('periodos'); }
+function savePeriods() { localStorage.setItem('tb_periods_db', JSON.stringify(periodsDb)); undoTouch('periodos'); fazPeriodsTouch(); } // V40.41.0: vão pro PC (na conta)
 function saveTags() { localStorage.setItem('tb_tags_db', JSON.stringify(tagsDb)); if (window.fazSyncNotify) window.fazSyncNotify(); undoTouch('tags'); } // V40.7.0: + aviso ao sync
 
 // --- FUNÇÕES DE TAGS ---
@@ -3602,7 +3602,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.40.0',
+            version: 'v40.41.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -3748,7 +3748,7 @@ function applyFazImport(parsed) {
 
     // 2) Limpa chaves de dados atuais (tb_ mas não tb__) e grava as do backup.
     try {
-        const prefsBefore = fazPrefsKeys();
+        const prefsBefore = fazPrefsKeys(), periodsBefore = fazPeriodsRaw();
         const toRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
             const k = localStorage.key(i);
@@ -3757,6 +3757,7 @@ function applyFazImport(parsed) {
         toRemove.forEach(k => localStorage.removeItem(k));
         for (const k in incoming) { localStorage.setItem(k, incoming[k]); }
         fazPrefsStampIfChanged(prefsBefore); // V40.32.0: a cor e o horário do backup valem também no PC
+        fazPeriodsStampIfChanged(periodsBefore); // V40.41.0: e os períodos
     } catch (e) {
         showToast('Erro ao gravar 😕 Revertendo...');
         try {
@@ -3783,7 +3784,7 @@ window.undoFazImport = function() {
     if (!confirm('Desfazer a última restauração e voltar ao estado de ' + quando + '?')) return;
 
     try {
-        const prefsBefore = fazPrefsKeys();
+        const prefsBefore = fazPrefsKeys(), periodsBefore = fazPeriodsRaw();
         const toRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
             const k = localStorage.key(i);
@@ -3792,6 +3793,7 @@ window.undoFazImport = function() {
         toRemove.forEach(k => localStorage.removeItem(k));
         for (const k in rb.data) { localStorage.setItem(k, rb.data[k]); }
         fazPrefsStampIfChanged(prefsBefore); // V40.32.0
+        fazPeriodsStampIfChanged(periodsBefore); // V40.41.0
         localStorage.removeItem(FAZ_ROLLBACK_KEY);
         showToast('Estado anterior restaurado! Recarregando... ✅');
         setTimeout(() => location.reload(), 900);
@@ -3844,6 +3846,7 @@ window.commitPeriodBlock = (periodId) => {
 
 function renderPeriodSelect() {
     const container = document.getElementById('period-select-container');
+    if (!periodsDb.length) { container.innerHTML = '<p class="text-sm text-zinc-400 text-center mt-8 px-4">Nenhum período. Crie em Configurações → Períodos de Tempo.</p>'; return; } // V40.41.0
     container.innerHTML = periodsDb.map(p => `
         <button onclick="commitPeriodBlock('${p.id}')" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-app-focus hover:text-white transition text-left group">
             <span class="font-bold text-zinc-800 group-hover:text-white">${escapeHtml(p.name)}</span>
@@ -3854,6 +3857,7 @@ function renderPeriodSelect() {
 
 function renderConfigPeriods() {
     const container = document.getElementById('config-periods-list');
+    if (!periodsDb.length) { container.innerHTML = '<p class="text-[13px] text-zinc-400 text-center py-2">Nenhum período. Crie um aqui em cima.</p>'; return; } // V40.41.0
     container.innerHTML = periodsDb.map(p => `
         <div class="flex items-center justify-between bg-white border border-zinc-200 p-3 rounded-xl shadow-sm">
             <div class="flex flex-col">
@@ -3876,8 +3880,9 @@ window.addConfigPeriod = () => {
         showToast("Preencha o nome e os horários!");
         return;
     }
-    
-    periodsDb.push({ id: 'p_' + Date.now(), name, start, end });
+    if (periodsDb.length >= 30) { showToast('Até 30 períodos.'); return; } // V40.41.0: o mesmo limite da nuvem (vão na conta)
+
+    periodsDb.push({ id: 'p_' + Date.now(), name: name.slice(0, 60), start, end });
     savePeriods();
     
     document.getElementById('config-period-name').value = '';
@@ -6842,6 +6847,46 @@ window.fazApplyPrefs = function (p) {
         did.hours = fazHoursLabel(START_HOUR, END_HOUR);
     }
     return did;
+};
+
+// ===== V40.41.0: os períodos (Manhã, Tarde...) também vão pro PC =====
+// Vão na conta, como a cor do app (o sync.js cuida: CORE.periodsPlan), com a hora deles: tb__periods_at (deste
+// aparelho, fora do backup) guarda quando a lista mudou por último aqui (ou quando chegou a mudança mais nova da conta).
+function fazPeriodsTouch() {
+    try {
+        const cur = Number(localStorage.getItem('tb__periods_at')) || 0;
+        localStorage.setItem('tb__periods_at', String(Math.max(Date.now(), cur + 1)));
+    } catch (e) {}
+    if (window.fazSyncNotify) window.fazSyncNotify();
+}
+// Restaurar backup (ou desfazer a restauração) que troca os períodos: isso vira a mudança mais nova.
+function fazPeriodsRaw() { try { return localStorage.getItem('tb_periods_db'); } catch (e) { return null; } }
+function fazPeriodsStampIfChanged(before) {
+    if (fazPeriodsRaw() === before) return;
+    try {
+        const cur = Number(localStorage.getItem('tb__periods_at')) || 0;
+        localStorage.setItem('tb__periods_at', String(Math.max(Date.now(), cur + 1)));
+    } catch (e) {}
+}
+window.fazPeriods = function () {
+    let at = 0;
+    try { at = Number(localStorage.getItem('tb__periods_at')) || 0; } catch (e) {}
+    return { list: periodsDb, at: at };
+};
+window.fazSetPeriodsAt = function (t) { try { localStorage.setItem('tb__periods_at', String(t)); } catch (e) {} };
+// O que veio da conta (sync.js), já conferido. Não vira passo do Desfazer. Volta true se a lista mudou.
+window.fazApplyPeriods = function (list) {
+    if (!Array.isArray(list)) return false;
+    const next = list.map((p) => ({ id: String(p.id), name: String(p.name), start: String(p.start), end: String(p.end) }));
+    if (JSON.stringify(next) === JSON.stringify(periodsDb)) return false;
+    undoQuiet(() => {
+        periodsDb = next;
+        try { localStorage.setItem('tb_periods_db', JSON.stringify(periodsDb)); } catch (e) {}
+        undoTouch('periodos');
+    });
+    try { if (!document.getElementById('config-periods-view').classList.contains('hidden')) renderConfigPeriods(); } catch (e) {}
+    try { if (!document.getElementById('period-select-sheet').classList.contains('translate-y-full')) renderPeriodSelect(); } catch (e) {}
+    return true;
 };
 
 // =====================================================

@@ -13,8 +13,10 @@
 // V40.35.0: busca na agenda (cabe na barra de 1024 a 1440 px; teclado e mouse de verdade).
 // V40.36.0: Repetir bloco (pelos 3 pontinhos) e os 3 pontinhos na visão Dia (não arrastam o bloco).
 // V40.40.0: visão Dia — o cartão sai da sublista arrastando (vira bloco ou muda de sublista) e o bloco entra nela.
+// V40.41.0: Períodos em Configurações e no Novo bloco; Salvar backup (o download de verdade).
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
+const fs = require('fs');
 const { abrirPc } = require('./apoio');
 const PXM = 3.2; // pixels por minuto da régua (igual ao kanban.html)
 const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
@@ -615,7 +617,8 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await p.waitForTimeout(150);
   const y10 = await p.evaluate(() => { const t = document.getElementById('ag-timeline'), r = t.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + (10 * 60 - 7 * 60) * 3.2 + 2 }; });
   await p.mouse.dblclick(y10.x, y10.y); await p.waitForTimeout(600);
-  ok(hr && await aberto() && await p.evaluate(() => document.getElementById('f-start').value) === '10:00' && await p.evaluate(() => document.getElementById('f-date').value) === '2026-11-19', 'Dia: clique duplo nas 10:00 abre o "Novo bloco" às 10:00 e ele fica aberto');
+  const dq = await p.evaluate(() => ({ ab: !document.getElementById('modal-task').classList.contains('hidden'), st: document.getElementById('f-start').value, dia: document.getElementById('f-date').value }));
+  ok(hr && dq.ab && dq.st === '10:00' && dq.dia === '2026-11-19', 'Dia: clique duplo nas 10:00 abre o "Novo bloco" às 10:00 e ele fica aberto' + (dq.ab && dq.st === '10:00' ? '' : ' (aberto: ' + dq.ab + ', início ' + dq.st + ', dia ' + dq.dia + ')'));
   await foto(p, 'pc-dois-cliques-dia.png');
   await p.keyboard.press('Escape'); await p.waitForTimeout(200);
   await p.evaluate(() => { const b = document.querySelector('.ag-view[data-view="week"]'); if (b) b.click(); }); await p.waitForTimeout(200);
@@ -1000,6 +1003,48 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await solta();
   ok(await p.evaluate((uid) => window.__nuvem.get('blocos', uid, 'f_dzb').deleted === true && window.__nuvem.get('blocos', uid, 'f_dz2').cards.some((c) => c.title === 'Bloco solto'), UID), 'soltou: o bloco virou cartão da sublista');
   await p.evaluate(() => document.querySelector('.ag-view[data-view="week"]').click()); await p.waitForTimeout(150);
+  }
+
+  {
+  console.log('\nAA) Períodos (V40.41.0): em Configurações e no Novo bloco:');
+  await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(150);
+  await p.locator('#btn-cfg').click(); await p.waitForTimeout(250);
+  const perRows = () => p.evaluate(() => [...document.querySelectorAll('#cfg-pers > div')].map((d) => [...d.querySelectorAll('span')].map((x) => x.textContent.trim()).join(' ')));
+  ok(JSON.stringify(await perRows()) === JSON.stringify(['Manhã 08:00 às 12:00', 'Meio-dia 12:00 às 13:00', 'Tarde 13:00 às 18:00', 'Noite 18:00 às 22:00']), 'conta sem períodos ainda: os 4 padrão do celular');
+  await p.locator('#cfg-per-name').click(); await p.keyboard.type('Madrugada');
+  await p.selectOption('[data-time-for="cfg-per-st"] .time-h', '0'); await p.selectOption('[data-time-for="cfg-per-en"] .time-h', '6');
+  await p.selectOption('[data-time-for="cfg-per-en"] .time-m', '30');
+  await p.locator('#cfg-per-add').click(); await p.waitForTimeout(400);
+  const mp = await p.evaluate(() => window.__nuvem.users.get('pessoa@teste.com').meta);
+  ok((mp.faz_periods || []).map((x) => x.name).join(',') === 'Manhã,Meio-dia,Tarde,Noite,Madrugada' && mp.faz_periods[4].end === '06:30', 'mouse e teclado de verdade: "Madrugada" 00:00 às 06:30 vai pra conta, junto com os 4');
+  const caixa = await p.evaluate(() => {
+    const m = document.querySelector('#modal-cfg > div').getBoundingClientRect(), add = document.getElementById('cfg-per-add').getBoundingClientRect(), sc = document.querySelector('#modal-cfg .overflow-y-auto');
+    sc.scrollTop = sc.scrollHeight;
+    const add2 = document.getElementById('cfg-per-add').getBoundingClientRect();
+    return { dentro: m.top >= 0 && m.bottom <= innerHeight, w: Math.round(m.width), h: Math.round(m.height), botao: add2.right <= m.right - 8 && add2.bottom <= m.bottom && add.width > 60 };
+  });
+  ok(caixa.dentro && caixa.botao, `a janela (${caixa.w}×${caixa.h}) cabe na tela e rola até o "Adicionar"`);
+  await p.waitForTimeout(150);
+  await foto(p, 'pc-periodos-config.png');
+  // V40.41.0: Salvar backup (o download de verdade do navegador)
+  const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 15000 }), p.locator('#cfg-backup').click()]);
+  const bk = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+  const bkMsg = await p.evaluate(() => document.getElementById('cfg-backup-msg').textContent);
+  ok(/^faz-backup-\d{4}-\d{2}-\d{2}-\d{4}\.json$/.test(dl.suggestedFilename()) && bk.signature === 'faz-timeblock-backup' && JSON.parse(bk.data.tb_backlog_db).length === bk.summary.tarefas && bk.summary.tarefas > 0 && JSON.parse(bk.data.tb_periods_db).length === 5,
+    'Salvar backup: o navegador baixa "' + dl.suggestedFilename() + '" (' + bk.summary.tarefas + ' tarefas, ' + bk.summary.blocos + ' blocos, os 5 períodos)');
+  ok(bkMsg.startsWith('Salvo: ' + dl.suggestedFilename()), 'aviso na janela: "' + bkMsg + '"');
+  await foto(p, 'pc-backup.png');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+  await p.locator('#tab-agenda').click(); await p.waitForTimeout(200);
+  await p.locator('#ag-new').click(); await p.waitForTimeout(250);
+  const ch = await p.evaluate(() => [...document.querySelectorAll('#f-pers [data-per]')].map((b) => { const r = b.getBoundingClientRect(); return { t: b.textContent.replace(/\s+/g, ' ').trim(), w: r.width, vis: r.width > 0 && r.height > 0 }; }));
+  ok(ch.length === 5 && ch.every((c) => c.vis) && ch[4].t === 'Madrugada 00:00–06:30', 'Novo bloco: os 5 períodos aparecem (' + ch.map((c) => c.t.split(' ')[0]).join(', ') + ')');
+  await p.locator('#f-pers [data-per="p3"]').click(); await p.waitForTimeout(150);
+  const f = await p.evaluate(() => ({ h: document.querySelector('[data-time-for="f-start"] .time-h').value, m: document.querySelector('[data-time-for="f-start"] .time-m').value, d: document.getElementById('f-dur').selectedOptions[0].text, ph: document.getElementById('f-title').placeholder, on: document.querySelector('#f-pers [data-per="p3"]').getAttribute('aria-pressed') }));
+  ok(f.h === '13' && f.m === '0' && f.d === '5h' && f.ph === 'Tarde' && f.on === 'true', 'clicou em "Tarde": Início 13:00, Duração 5h, nome "Tarde" e o botão marcado');
+  await foto(p, 'pc-periodos-novo-bloco.png');
+  await p.locator('#f-cancel').click(); await p.waitForTimeout(150);
+  await p.locator('#tab-listas').click(); await p.waitForTimeout(150);
   }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));

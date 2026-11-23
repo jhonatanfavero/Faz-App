@@ -3,7 +3,7 @@ const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)
 
 const COLUMNS = {
   tarefas: ['user_id', 'id', 'column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived', 'goal_id', 'deleted', 'updated_at'], // V40.34.0: + goal_id
-  blocos: ['user_id', 'id', 'date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'cards', 'goal_id', 'deleted', 'updated_at'], // V40.24.0: + cards (sublista); V40.34.0: + goal_id
+  blocos: ['user_id', 'id', 'date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'cards', 'goal_id', 'column_id', 'deleted', 'updated_at'], // V40.24.0: + cards (sublista); V40.34.0: + goal_id; V40.38.0: + column_id
   listas: ['user_id', 'id', 'name', 'is_default', 'position', 'created_ms', 'deleted', 'updated_at'],
   tags: ['user_id', 'id', 'name', 'color', 'position', 'deleted', 'updated_at'],
   // V40.17.0
@@ -17,7 +17,7 @@ const COLUMNS = {
 };
 const DEFAULTS = {
   tarefas: { column_id: 'col_geral', title: '', duration: 30, tag_id: null, microblocks: [], position: 0, color: null, archived: false, goal_id: null, deleted: false },
-  blocos: { title: '', type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, cards: null, goal_id: null, deleted: false },
+  blocos: { title: '', type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, cards: null, goal_id: null, column_id: null, deleted: false },
   listas: { name: '', is_default: false, position: 0, created_ms: null, deleted: false },
   tags: { name: '', color: '#a1a1aa', position: 0, deleted: false },
   rotinas: { title: '', emoji: '', duration: 60, theme: 'focus', tag_id: null, microblocks: [], created_ms: null, goal_id: null, deleted: false },
@@ -38,6 +38,7 @@ function check(table, r) { // mesmas CHECKs da migration
   if ('count_from' in r && r.count_from !== null && !/^\d{4}-\d{2}-\d{2}$/.test(String(r.count_from))) return bad('count_from'); // V40.34.0
   if (table === 'blocos') {
     if ('date' in r && !/^\d{4}-\d{2}-\d{2}$/.test(String(r.date))) return bad('date');
+    if ('column_id' in r && r.column_id !== null && (typeof r.column_id !== 'string' || r.column_id.length < 1 || r.column_id.length > 64)) return bad('column_id'); // V40.38.0 (migration faz_v40_38_0_bloco_lista)
     for (const k of ['start_min', 'duration']) if (k in r && (!Number.isInteger(r[k]) || r[k] < 0 || r[k] > 1440)) return bad(k);
     for (const k of ['microblocks', 'linked_note_ids']) if (k in r && !Array.isArray(r[k])) return bad(k);
     if ('cards' in r && r.cards !== null && (!Array.isArray(r.cards) || r.cards.length > 200)) return bad('cards'); // V40.24.0

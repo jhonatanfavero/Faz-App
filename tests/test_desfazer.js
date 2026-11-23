@@ -105,7 +105,7 @@ const UID = '11111111-1111-1111-1111-111111111111';
   fresh();
   const K2 = day16[2].id, nBl = ev('backlogDb.length');
   w.openDeleteModal(K2); w.moveToBacklog(); await tick();
-  ok(!blk(K2) && ev('backlogDb.length') === nBl + 1 && steps().join() === 'Bloco voltou pra lista', 'Mover pra Lista: "Bloco voltou pra lista"');
+  ok(!blk(K2) && ev('backlogDb.length') === nBl + 1 && steps().join() === 'Voltou pra lista ' + ev('backlogColumnsDb[0].name') && barTxt() === steps().join(), 'Mover pra Lista: "' + barTxt() + '" (V40.38.0: diz pra qual lista; o bloco nasceu na agenda, então a primeira)');
   w.fazUndo(); await tick();
   ok(!!blk(K2) && ev('backlogDb.length') === nBl, 'Desfazer: o bloco volta pra agenda e a tarefa criada sai da Lista');
   w.openDeleteModal(K2); w.confirmKillTask(); await tick();

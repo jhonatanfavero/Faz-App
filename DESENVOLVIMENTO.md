@@ -39,7 +39,9 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
    sem reenviar tudo para a nuvem. `tests/test_atualizacao.js` é o modelo. Campo novo nos blocos (a agenda é
    lida de forma incremental): quem vem de antes precisa reler a agenda inteira uma vez, senão o que o PC gravou
    nesse campo enquanto o celular estava na versão antiga nunca chega, e mexer no bloco apaga por cima. Veja o
-   `goalIds` no `fetchAll` do `sync.js` (V40.34.0).
+   `goalIds` (V40.34.0) e o `colIds` (V40.38.0) no `fetchAll` do `sync.js`. E o campo novo entra em três lugares
+   de cada lado: no `FIELDS` e no `SELECT` do `sync.js` e no `SELECT` do `kanban.html` (fora do `SELECT`, a
+   leitura chega sem ele e o celular apaga o campo no próprio aparelho).
 8. **`npm test` verde antes de publicar.** Mexeu em arrasto, rolagem, `sw.js` ou `libs/`? Rode também
    os testes de navegador. Tela, janelinha ou botão novo no celular: rode o `tests/navegador/iphone.js`
    (V40.32.2: iPhone simulado, com a barra de status e o risco de início por cima do app).
@@ -89,6 +91,12 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     `#fab-btn`, o `#floating-task` e a `#undo-bar` no `style.css`); dentro das telas cheias (`[id$="-sheet"]`)
     quem cuida é o `padding-bottom` delas: não some a barra de novo. O `tests/navegador/iphone.js` confere os
     dois (iPhone e Android).
+16. **Voltar pra lista: a de onde veio, senão a primeira (V40.38.0).** O bloco e o cartão da sublista guardam a
+    lista de onde a tarefa saiu (`columnId`; `column_id` no bloco da nuvem; o cartão leva dentro de `cards`). Tudo
+    que devolve pra Lista passa por `backToListColumn()` no celular e `backToListId()` no PC: a lista de origem se
+    ela ainda existe; senão (apagada, ou o bloco nasceu na agenda) a primeira lista, a da esquerda. Desarquivar
+    segue a mesma regra. Caminho novo que transforma tarefa em bloco ou cartão (ou copia um bloco) leva a lista
+    junto, como a meta (regra 14).
 
 ## Publicar uma versão
 

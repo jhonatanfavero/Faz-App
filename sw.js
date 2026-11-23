@@ -36,7 +36,8 @@
 // V10.41 - v40.36.0 (PC: Repetir bloco, o "Repetir Tarefa" do celular: nos 3 pontinhos, "Repetir…" abre a janela com Todo dia / Toda semana / Todo mês e quantas vezes (5, 4 e 2 pra começar); cópias no mesmo horário, com checklist e cartões desmarcados; o dia em que o horário já está ocupado fica de fora (a lista mostra antes). Os 3 pontinhos (Duplicar, Repetir, Arquivar, Apagar) agora também na visão Dia.)
 // V10.42 - v40.36.1 (Celular: o "Repetir Tarefa" igual ao do PC: o dia em que o horário já está ocupado fica de fora (a janelinha mostra antes, com −/+ e o resumo), "Mensalmente" no dia 31 vai pro último dia do mês, a cópia segue o horário (sem o atraso do original), no máximo 60/52/24 e um passo só do Desfazer. Copiar leva a cor. Cartão de 26 a 36 min sem a fatia do checklist (nome em 2 linhas). Botões do pé acima da barra de navegação do Android. "+ Meta em …" em toda categoria. Meta escolhida sem nome = nome da meta (celular e PC). Ocultar vagos com 2 ou 3 dias.)
 // V10.43 - v40.37.0 (Sublista de metas: no menu de cada categoria das Metas (no PC, o calendário no título dela), "Pôr na agenda" põe na mão uma sublista com o nome da categoria e um cartão por meta, ligado a ela (marcar conta na meta); toca/clica num horário livre e ela entra. Com o Repetir vai pros outros dias.)
-const CACHE_NAME = 'timeblock-v40-37-0';
+// V10.44 - v40.38.0 (Voltar pra lista: o bloco (e o cartão da sublista) volta pra lista de onde veio; se ela não existe mais, ou o bloco nasceu na agenda, vai pra primeira lista (a da esquerda). Antes ia sempre pra Geral. O mesmo no PC; a lista de origem vai pra nuvem.)
+const CACHE_NAME = 'timeblock-v40-38-0';
 const ASSETS = [
   './',
   './index.html',

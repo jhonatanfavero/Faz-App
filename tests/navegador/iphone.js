@@ -25,6 +25,12 @@ const IPHONES = [
 
     async function abrirIphone(ip) {
         const ctx = await celular(browser, { viewport: { width: ip.w, height: ip.h } });
+        // V40.38.0: relógio parado na segunda 16/11/2026 às 10:20 (como a tela do PC): a Agenda abre no mesmo lugar em
+        // qualquer dia e hora em que o teste roda (com o relógio de verdade, os blocos rolavam pra trás da barra de status).
+        await ctx.addInitScript(() => {
+            const RD = Date, base = new RD(2026, 10, 16, 10, 20, 0).getTime(), t0 = RD.now(), agora = () => base + (RD.now() - t0);
+            window.Date = class extends RD { constructor(...a) { if (a.length) super(...a); else super(agora()); } static now() { return agora(); } };
+        });
         await ctx.route('**/style.css', async (route) => {
             const r = await route.fetch();
             let css = await r.text();
@@ -150,7 +156,7 @@ const IPHONES = [
     // telas: [nome, como abrir, raiz (o que está por cima), opções]
     const ID = (s) => JSON.stringify(s);
     const TELAS = [
-        ['Agenda', 'closeAllSheets(); activeDateObj = new Date(2026, 10, 16); renderTimeline();', null],
+        ['Agenda', "closeAllSheets(); activeDateObj = new Date(2026, 10, 16); renderTimeline(); document.getElementById('timeline-scroll').scrollTop = 0;", null], // V40.38.0: do começo do dia (os blocos rolados ficam por baixo do cabeçalho, de propósito)
         ['Agenda (cabeçalho recolhido)', 'toggleHeader();', null, { depois: 'toggleHeader();' }],
         ['Agenda com busca', 'openSearchBar();', null, { depois: 'closeSearchBar();' }],
         ['Bloco aberto', `(() => { const b = db.find((x) => x.date === '2026-11-16' && !Array.isArray(x.cards)); toggleExpandBlock(b.id, { stopPropagation() {} }); setTimeout(() => { const el = document.querySelector('[data-block-id="' + b.id + '"]'); if (el) el.scrollIntoView({ block: 'center' }); }, 50); })();`, null, { depois: 'db.forEach((b) => { b.expanded = false; }); renderTimeline();' }],

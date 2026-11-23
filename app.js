@@ -1752,6 +1752,12 @@ function subCount(b) {
 function subNewId() { return 'cd_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8); }
 // Todos os cartões marcados = sublista concluída (desmarcar um reabre). Sublista vazia fica como está.
 function subSyncDone(b) { const c = subCount(b); if (c.total) b.completed = c.done === c.total; }
+// V40.38.0: pra qual lista volta um bloco ou cartão ("Voltar pra lista", "Devolver os não feitos", apagar a sublista
+// devolvendo): a lista de onde ele veio; se ela não existe mais (ou o bloco nasceu na agenda), a primeira lista (a da
+// esquerda). Pedido dele (23/11); antes o bloco ia sempre pra Geral. O mesmo do PC (backToListId).
+function backToListColumn(columnId) {
+    return (columnId && backlogColumnsDb.find(c => c.id === columnId)) || backlogColumnsDb[0] || { id: 'col_geral', name: 'Geral' };
+}
 // Cópia (duplicar, repetir): ids novos e tudo desmarcado, como a checklist dos blocos.
 function subCloneCards(cards) {
     return (Array.isArray(cards) ? cards : []).filter(c => c && typeof c === 'object' && !Array.isArray(c)).map(c => {
@@ -1779,7 +1785,7 @@ function subCardFrom(p) {
 }
 // O cartão volta pra Lista (pra lista de onde veio, se ela ainda existir). Devolve o nome da lista.
 function subCardToList(b, card) {
-    const col = (card.columnId && backlogColumnsDb.find(c => c.id === card.columnId)) || backlogColumnsDb.find(c => c.id === 'col_geral') || backlogColumnsDb[0];
+    const col = backToListColumn(card.columnId); // V40.38.0: a de origem; senão a primeira (antes: Geral)
     backlogDb.push({
         id: 'bl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
         title: card.title || 'Sem nome',
@@ -1788,11 +1794,11 @@ function subCardToList(b, card) {
         microblocks: (card.microblocks || []).map(m => ({ title: m.title, done: false })),
         ...(fazCardColor(card.color) ? { color: fazCardColor(card.color) } : {}),
         ...(goalKeep(card.goalId) ? { goalId: card.goalId } : {}), // V40.34.0
-        columnId: col ? col.id : 'col_geral'
+        columnId: col.id
     });
     b.cards = b.cards.filter(c => c.id !== card.id);
     subSyncDone(b);
-    return col ? col.name : 'Geral';
+    return col.name || 'Sem nome';
 }
 function subCardRowHtml(b, card) {
     const tagColor = card.tagId ? getTagColor(card.tagId) : null;
@@ -2050,9 +2056,11 @@ window.subCardToListFromModal = function() {
     if (!f) { closeSubCard(); return showToast('Esse cartão não está mais na sublista.'); }
     const name = subCardToList(f.b, f.card);
     saveDb(); saveBacklog();
+    const a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName)) a.blur(); // campo com foco numa janelinha fechada esconderia a barrinha
     closeSubCard();
     renderTimeline(); renderBacklog();
-    showToast(`Voltou pra lista ${name}`);
+    undoNameStep('Voltou pra lista ' + name); // V40.38.0: na barrinha do Desfazer (aviso vermelho fica pra problema)
 };
 window.deleteSubCardFromModal = function() {
     const ed = subCardEdit;
@@ -2134,6 +2142,7 @@ function subCardOut(bid, cid, ds, st) {
         theme: 'focus',
         tagId: f.card.tagId && tagsDb.some(t => t.id === f.card.tagId) ? f.card.tagId : null,
         ...(goalKeep(f.card.goalId) ? { goalId: f.card.goalId } : {}), // V40.34.0
+        ...(f.card.columnId ? { columnId: String(f.card.columnId) } : {}), // V40.38.0: o cartão lembra de qual lista veio; o bloco também
         linkedNoteIds: []
     });
     f.b.cards = f.b.cards.filter(c => c.id !== cid);
@@ -2180,6 +2189,7 @@ function blockIntoSublist(id, subId, sure) {
     const col = fazCardColor(b.color);
     if (col) card.color = col;
     if (goalKeep(b.goalId)) card.goalId = b.goalId; // V40.34.0
+    if (b.columnId) card.columnId = String(b.columnId); // V40.38.0
     s.cards.push(card);
     subSyncDone(s);
     db = db.filter(x => x.id !== id);
@@ -2628,7 +2638,8 @@ function performEncaixeMatematico(gapStart, gapDuration, exact, date) { // V40.2
         tagId: pendingIntent.tagId || null,
         linkedNoteIds: [], // V40.2: notas vinculadas começam vazias (clone não copia notas)
         ...(Array.isArray(pendingIntent.cards) ? { cards: subCloneCards(pendingIntent.cards) } : {}), // V40.24.0: sublista
-        ...(!Array.isArray(pendingIntent.cards) && goalKeep(pendingIntent.goalId) ? { goalId: pendingIntent.goalId } : {}) // V40.34.0: meta ligada
+        ...(!Array.isArray(pendingIntent.cards) && goalKeep(pendingIntent.goalId) ? { goalId: pendingIntent.goalId } : {}), // V40.34.0: meta ligada
+        ...(!Array.isArray(pendingIntent.cards) && pendingIntent.columnId ? { columnId: String(pendingIntent.columnId) } : {}) // V40.38.0: a lista de onde veio ("Voltar pra lista" volta pra ela)
     });
     saveDb();
     
@@ -2673,6 +2684,7 @@ window.cloneManual = function() {
         theme: taskToClone.theme || 'focus',
         tagId: taskToClone.tagId || null, // V40.1.4: preserva tag
         ...(fazCardColor(taskToClone.color) ? { color: taskToClone.color } : {}), // V40.36.1: a cor do cartão vai junto (como no Duplicar do PC)
+        ...(taskToClone.columnId ? { columnId: taskToClone.columnId } : {}), // V40.38.0: e a lista de onde ele veio
         ...(goalKeep(taskToClone.goalId) ? { goalId: taskToClone.goalId } : {}), // V40.34.0
         microblocks: taskToClone.microblocks || [], // V40.1.4: copia microblocks
         ...(isSublist(taskToClone) ? { cards: subCloneCards(taskToClone.cards) } : {}) // V40.24.0: sublista leva os cartões (desmarcados)
@@ -3590,7 +3602,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.37.0',
+            version: 'v40.38.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -6518,6 +6530,7 @@ window.moveToBacklog = function() {
         // AGORA: clone profundo dos microblocks, com done resetado pra false 
         //        (faz sentido: ao reagendar, recomeça do zero, igual ao duplicate).
         const clonedMbs = (b.microblocks || []).map(mb => ({ title: mb.title, done: false }));
+        const col = backToListColumn(b.columnId); // V40.38.0: a lista de onde veio; senão a primeira (antes: sempre Geral)
         backlogDb.push({ 
             id: 'bl_' + Date.now(), 
             title: b.title, 
@@ -6525,14 +6538,15 @@ window.moveToBacklog = function() {
             tagId: b.tagId || null,
             microblocks: clonedMbs,
             ...(fazCardColor(b.color) ? { color: fazCardColor(b.color) } : {}), // V40.9.0
-            ...(goalKeep(b.goalId) ? { goalId: b.goalId } : {}) // V40.34.0
+            ...(goalKeep(b.goalId) ? { goalId: b.goalId } : {}), // V40.34.0
+            columnId: col.id
         });
         saveBacklog();
         db = db.filter(x => x.id !== deletingTaskId);
         saveDb();
         renderTimeline();
         renderBacklog();
-        showToast("Movido para a lista!");
+        undoNameStep('Voltou pra lista ' + (col.name || 'Sem nome')); // V40.38.0: a barrinha do Desfazer diz pra qual lista foi (antes: aviso vermelho "Movido para a lista!")
     }
     closeAllSheets();
     cancelDelete();
@@ -6924,7 +6938,7 @@ window.fazUnarchive = function(id) {
         db.push(a.item);
         saveDb();
     } else {
-        if (a.item.columnId && !backlogColumnsDb.some(c => c.id === a.item.columnId)) delete a.item.columnId; // lista apagada → lista padrão
+        if (!backlogColumnsDb.some(c => c.id === getItemColumn(a.item))) a.item.columnId = backToListColumn(null).id; // lista apagada → a primeira lista (V40.38.0; antes: a padrão)
         backlogDb.push(a.item);
         saveBacklog();
     }

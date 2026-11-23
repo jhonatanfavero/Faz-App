@@ -63,7 +63,7 @@
         tarefas: ['column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived', 'goal_id'], // V40.34.0: + goal_id (meta ligada)
         listas: ['name', 'is_default', 'position', 'created_ms'],
         tags: ['name', 'color', 'position'],
-        blocos: ['date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'cards', 'goal_id'],
+        blocos: ['date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'cards', 'goal_id', 'column_id'],
         rotinas: ['title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms', 'goal_id'],
         notas: ['title', 'content', 'created_ms', 'updated_ms'],
         financas: ['title', 'amount', 'start_month', 'duration_months', 'is_recurring', 'due_day', 'tag_id', 'paid_months', 'amount_overrides', 'created_ms'],
@@ -261,7 +261,8 @@
                     color: hex6(b.color),
                     archived: !!b.__archived,
                     cards: Array.isArray(b.cards) ? safeCards(b.cards) : null, // V40.24.0: sublista
-                    goal_id: goalRef(b.goalId) // V40.34.0: meta ligada
+                    goal_id: goalRef(b.goalId), // V40.34.0: meta ligada
+                    column_id: goalRef(b.columnId) // V40.38.0: a lista de onde o bloco veio (o mesmo formato de id)
                 };
             },
             item: function (r, prev) {
@@ -280,6 +281,7 @@
                 if (r.color) b.color = r.color; else delete b.color;
                 if (Array.isArray(r.cards)) b.cards = clone(r.cards); else delete b.cards; // V40.24.0: sublista
                 if (goalRef(r.goal_id)) b.goalId = goalRef(r.goal_id); else delete b.goalId; // V40.34.0
+                if (goalRef(r.column_id)) b.columnId = goalRef(r.column_id); else delete b.columnId; // V40.38.0
                 delete b.__archived;
                 return b;
             }
@@ -887,7 +889,7 @@
         tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,goal_id,deleted', // V40.34.0: + goal_id
         listas: 'id,name,is_default,position,created_ms,deleted',
         tags: 'id,name,color,position,deleted',
-        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,goal_id,deleted,updated_at', // V40.24.0: + cards (sublista); V40.34.0: + goal_id
+        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,goal_id,column_id,deleted,updated_at', // V40.24.0: + cards (sublista); V40.34.0: + goal_id; V40.38.0: + column_id
         rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,goal_id,deleted',
         notas: 'id,title,content,created_ms,updated_ms,deleted',
         financas: 'id,title,amount,start_month,duration_months,is_recurring,due_day,tag_id,paid_months,amount_overrides,created_ms,deleted',
@@ -1043,7 +1045,7 @@
             // V40.34.0: quem vem de antes guardou os blocos sem o goal_id (a versão antiga nem lia). Lê a agenda
             // inteira uma vez só: senão a meta que o PC ligou enquanto o celular estava na versão antiga não chega,
             // e mexer naquele bloco aqui mandaria goal_id vazio por cima dela.
-            var incremental = !!(st && st.base && st.base[k] && cursor) && !(k === 'blocos' && !st.goalIds);
+            var incremental = !!(st && st.base && st.base[k] && cursor) && !(k === 'blocos' && !(st.goalIds && st.colIds)); // V40.38.0: + colIds (campo novo nos blocos: relê a agenda uma vez)
             var rows = await fetchRows(k, uid, incremental ? cursor - 30000 : 0);
             rows.forEach(function (r) { var t = Date.parse(r.updated_at); if (t > cursor) cursor = t; });
             if (incremental) {
@@ -1225,7 +1227,7 @@
             if (KINDS.some(function (k) { return p.changed[k]; })) applyLocal(p);
 
             await pushAll(uid, p.push);
-            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), cursorBlocos: fetched.cursors.blocos, cursorMetasDias: fetched.cursors.metas_dias, arch: 1, goalIds: 1, lastSyncAt: Date.now() }); // goalIds: V40.34.0
+            writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), cursorBlocos: fetched.cursors.blocos, cursorMetasDias: fetched.cursors.metas_dias, arch: 1, goalIds: 1, colIds: 1, lastSyncAt: Date.now() }); // goalIds: V40.34.0; colIds: V40.38.0
             lastError = null;
             if (manual || firstSync) toast('Sincronizado ✅');
             else if (novosTipos) toast('☁️ Rotinas, notas e finanças agora também vão pro computador');

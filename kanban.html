@@ -971,7 +971,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.37.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.38.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1000,7 +1000,7 @@
         tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,goal_id,deleted', // V40.34.0: + goal_id (meta ligada)
         listas: 'id,name,is_default,position,created_ms,deleted',
         tags: 'id,name,color,position,deleted',
-        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,goal_id,deleted', // V40.22.0: + linked_note_ids (notas vinculadas); V40.24.0: + cards (sublista); V40.34.0: + goal_id
+        blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,goal_id,column_id,deleted', // V40.22.0: + linked_note_ids (notas vinculadas); V40.24.0: + cards (sublista); V40.34.0: + goal_id; V40.38.0: + column_id (a lista de onde veio)
         // V40.17.0: rotinas, notas e finanças (as mesmas do celular)
         rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,goal_id,deleted',
         notas: 'id,title,content,created_ms,updated_ms,deleted',
@@ -1044,6 +1044,14 @@
         return Object.keys(S[kind]).map(function (k) { return S[kind][k]; }).filter(function (r) { return !r.deleted && !r.archived; }).sort(byPos);
     }
     function aliveListIds() { var s = {}; alive('listas').forEach(function (c) { s[c.id] = true; }); return s; }
+    // V40.38.0: pra qual lista volta um bloco (ou cartão de sublista): a de onde ele veio; se ela não existe mais (ou o bloco
+    // nasceu na agenda), a primeira lista (a da esquerda). Pedido dele (23/11). O mesmo do celular (backToListColumn).
+    function backToListId(colId) {
+        if (colId && aliveListIds()[colId]) return String(colId);
+        var first = alive('listas')[0];
+        return first ? first.id : DEFAULT_COL;
+    }
+    function listRef(v) { return v != null && v !== '' && /^[\w.\-]{1,64}$/.test(String(v)) ? String(v) : null; } // id de lista guardado no bloco (V40.38.0)
     function colOf(t, ids) { ids = ids || aliveListIds(); return ids[t.column_id] ? t.column_id : DEFAULT_COL; } // órfã → lista padrão (igual ao app)
     function tasksInCol(colId) { var ids = aliveListIds(); return alive('tarefas').filter(function (t) { return colOf(t, ids) === colId; }); }
     function maxPos(kind) { return Object.keys(S[kind]).reduce(function (m, k) { return Math.max(m, Number(S[kind][k].position) || 0); }, 0); }
@@ -2701,7 +2709,8 @@
             type: blockType(day, st, dur), theme: 'focus', tag_id: tagOf(f.c.tagId) ? f.c.tagId : null,
             microblocks: normMbs(f.c.microblocks).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: m.done }; }),
             completed: !!f.c.done, was_delayed: false, linked_note_ids: [], color: hex6(f.c.color), archived: false, deleted: false,
-            goal_id: goalKeep(f.c.goalId) // V40.34.0
+            goal_id: goalKeep(f.c.goalId), // V40.34.0
+            column_id: listRef(f.c.columnId) // V40.38.0: o cartão lembra de qual lista veio; o bloco também
         };
         if (!(await insertRow('blocos', block))) return;
         var cur = S.blocos[bid];
@@ -2730,6 +2739,7 @@
         if (tagOf(b.tag_id)) card.tagId = b.tag_id;
         if (hex6(b.color)) card.color = hex6(b.color);
         if (goalKeep(b.goal_id)) card.goalId = String(b.goal_id); // V40.34.0
+        if (listRef(b.column_id)) card.columnId = listRef(b.column_id); // V40.38.0
         var cur = S.blocos[subId];
         if (!cur || cur.deleted || !(await subSave(cur, subCards(cur).concat([card])))) return;
         await patchRow('blocos', id, { deleted: true }, 'Entrou na sublista ' + (cur.title || ''));
@@ -2744,7 +2754,8 @@
             type: blockType(day, slot, dur), theme: b.theme || 'focus', tag_id: tagOf(b.tag_id) ? b.tag_id : null,
             microblocks: normMbs(b.microblocks).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: false }; }),
             completed: false, was_delayed: false, linked_note_ids: [], color: hex6(b.color), archived: false, deleted: false,
-            goal_id: isSub(b) ? null : goalKeep(b.goal_id) // V40.34.0
+            goal_id: isSub(b) ? null : goalKeep(b.goal_id), // V40.34.0
+            column_id: isSub(b) ? null : listRef(b.column_id) // V40.38.0
         };
         if (isSub(b)) row.cards = subCards(b).map(function (c) {
             var o = JSON.parse(JSON.stringify(c));
@@ -2846,7 +2857,7 @@
     async function subCardToList(bid, cid, quiet) {
         var f = subFind(bid, cid);
         if (!f) { toast('Esse cartão não está mais na sublista.'); return false; }
-        var ids = aliveListIds(), listId = f.c.columnId && ids[f.c.columnId] ? f.c.columnId : (ids[DEFAULT_COL] ? DEFAULT_COL : ((alive('listas')[0] || {}).id || DEFAULT_COL));
+        var listId = backToListId(f.c.columnId); // V40.38.0: a de origem; senão a primeira (antes: Geral)
         var task = {
             user_id: S.uid, id: newId('bl_', 'tarefas'), column_id: listId, title: f.c.title || 'Sem nome', duration: Number(f.c.duration) > 0 ? Number(f.c.duration) : 30,
             tag_id: tagOf(f.c.tagId) ? f.c.tagId : null, microblocks: normMbs(f.c.microblocks).map(function (m) { return { title: m.title, done: false }; }),
@@ -3261,7 +3272,8 @@
             type: blockType(day, slot, src.dur), theme: src.theme === 'rest' ? 'rest' : 'focus', tag_id: src.tag || null,
             microblocks: normMbs(src.mbs).map(function (m, i) { return { id: 'mb_' + (n + i), title: m.title, done: false }; }),
             completed: false, was_delayed: false, linked_note_ids: [], color: src.color || null, archived: false, deleted: false,
-            goal_id: goalKeep(src.goal) // V40.34.0
+            goal_id: goalKeep(src.goal), // V40.34.0
+            column_id: isRt ? null : listRef(src.col) // V40.38.0: a lista de onde a tarefa veio ("Voltar pra lista" volta pra ela)
         };
         if (!(await insertRow('blocos', block))) return false;
         var where = dayLabel(day) + ' às ' + clock(slot) + (asked != null && slot !== asked ? ' (às ' + clock(asked) + ' já tinha bloco)' : '');
@@ -3276,7 +3288,8 @@
         if (!t || t.deleted) { closeTask(); toast('Essa tarefa foi apagada em outro aparelho.'); return null; }
         var title = titleOrGoal(ed.goal); // V40.36.1
         if (!title) { $('f-title').focus(); toast('Dê um nome pra tarefa.'); return null; }
-        return { id: ed.id, title: title, dur: schedDur(), tag: ed.tag || null, color: ed.color || null, mbs: normMbs(ed.mbs), goal: goalKeep(ed.goal) }; // V40.34.0: + meta
+        var col = aliveListIds()[$('f-col').value] ? $('f-col').value : (t.column_id || null); // V40.38.0: a lista escolhida no cartão (mesmo sem salvar)
+        return { id: ed.id, title: title, dur: schedDur(), tag: ed.tag || null, color: ed.color || null, mbs: normMbs(ed.mbs), goal: goalKeep(ed.goal), col: col }; // V40.34.0: + meta; V40.38.0: + lista
     }
     async function scheduleTask() {
         var src = formAsSource();
@@ -3309,7 +3322,7 @@
     function startPlacingFromTask(id) {
         var t = S.tarefas[id];
         if (!t || t.deleted) return;
-        startPlacing({ id: id, title: t.title || '', dur: Number(t.duration) > 0 ? Number(t.duration) : 30, tag: tagOf(t.tag_id) ? t.tag_id : null, color: hex6(t.color), mbs: normMbs(t.microblocks), goal: goalKeep(t.goal_id) });
+        startPlacing({ id: id, title: t.title || '', dur: Number(t.duration) > 0 ? Number(t.duration) : 30, tag: tagOf(t.tag_id) ? t.tag_id : null, color: hex6(t.color), mbs: normMbs(t.microblocks), goal: goalKeep(t.goal_id), col: t.column_id || null }); // V40.38.0: + a lista de onde veio
     }
     function cancelPlacing() {
         if (!S.placing) return;
@@ -4632,7 +4645,7 @@
         var title = $('f-title').value.trim();
         if (!title) { $('f-title').focus(); return toast('Dê um nome pro bloco.'); }
         var dur = parseInt($('f-dur').value, 10);
-        var listId = aliveListIds()[DEFAULT_COL] ? DEFAULT_COL : ((alive('listas')[0] || {}).id || DEFAULT_COL);
+        var listId = backToListId(b.column_id); // V40.38.0: a lista de onde veio (senão a primeira; antes ia sempre pra Geral)
         var task = {
             user_id: S.uid, id: newId('bl_', 'tarefas'), column_id: listId, title: title, duration: Number.isFinite(dur) ? dur : (Number(b.duration) || 30),
             tag_id: ed.tag || null, microblocks: normMbs(ed.mbs).map(function (m) { return { title: m.title, done: false }; }),
@@ -4826,7 +4839,7 @@
             return patchRow('blocos', id, { archived: false, start_min: slot }, 'Bloco desarquivado');
         }
         var f = { archived: false, position: maxPos('tarefas') + STEP };
-        if (!aliveListIds()[r.column_id]) f.column_id = DEFAULT_COL; // a lista foi apagada → lista padrão
+        if (!aliveListIds()[r.column_id]) f.column_id = backToListId(null); // a lista foi apagada → a primeira lista (V40.38.0; antes: a padrão)
         patchRow('tarefas', id, f, 'Tarefa desarquivada');
     }
     async function deleteArchived(kind, id) {

@@ -126,7 +126,8 @@ const UID = '11111111-1111-1111-1111-111111111111';
   w.subCardToListFromModal();
   const back = JSON.parse(ev("JSON.stringify(backlogDb[backlogDb.length - 1])"));
   ok(back.title === 'Tarefa 1 (revisada)' && back.columnId === 'col_1700000008000' && back.duration === 15 && back.tagId === TAG2 && back.color === '#3b82f6' && back.microblocks.length === 5 && back.microblocks.every((m) => m.done === false) && /^bl_\d+_[a-z0-9]+$/.test(back.id), 'voltou pra lista de onde veio (GAMA), com tempo, etiqueta, cor e checklist');
-  ok(get(S1).cards.length === 1 && lastToast() === 'Voltou pra lista GAMA' && modal.classList.contains('hidden'), 'saiu da sublista e avisou: "' + lastToast() + '"');
+  await sleep(20);
+  ok(get(S1).cards.length === 1 && $('undo-bar-msg').textContent === 'Voltou pra lista GAMA' && !$('undo-bar').classList.contains('hidden') && modal.classList.contains('hidden'), 'saiu da sublista e avisou na barrinha do Desfazer: "' + $('undo-bar-msg').textContent + '"'); // V40.38.0: antes, aviso vermelho
   // apagar: 2 toques
   const c0 = get(S1).cards[0];
   w.openSublistCard(S1, c0.id, {});

@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 37 suítes (cerca de 5 minutos)
+npm test        # confere o CSS pronto e roda as 38 suítes (cerca de 5 minutos)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -49,6 +49,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_repetir_pc.js` | `kanban.html` de verdade | V40.36.0: Repetir bloco no PC. Os 3 pontinhos com "Repetir…" na Semana e na visão Dia (no Dia, segurar os 3 pontinhos não arrasta); a janela (Todo dia / Toda semana / Todo mês, começando em 5, 4 e 2 como no celular; −/+, digitar, máximos 60/52/24; o dia com o horário ocupado fica de fora; o resumo); o que é criado (horário, tag, cor, meta, checklist e cartões desmarcados, sem notas, o tipo pelo horário); todo mês no dia 31; sublista; passado; nada livre; um passo só do Desfazer; Esc, Cancelar, fundo, Enter; bloco que chega da nuvem e bloco apagado com a janela aberta. V40.36.1: com uma meta escolhida o bloco novo pode ficar sem nome (vale o da meta) |
 | `test_v40361.js` | app de verdade | V40.36.1 no celular: o "Repetir Tarefa" igual ao do PC (janelinha com −/+, máximos, resumo e o dia ocupado ficando de fora; cópias com o tipo pelo horário, sem atraso, sem notas, checklist e cartões desmarcados; dia 31; tudo ocupado; bloco que sumiu; um passo do Desfazer "Repetido 4 vezes · 1 dia de fora"); Copiar com a cor; cartão recolhido sem a fatia do checklist (nome em 2 linhas, contador no horário); "+ Meta em …" em toda categoria; nome pela meta (+, tarefa, cartão da sublista); ocultar vagos com 2 dias; nuvem e o foco numa janelinha fechada |
 | `test_sublista_metas.js` | app de verdade e `kanban.html` de verdade | V40.37.0: sublista de metas. Celular: o "Pôr na agenda" no menu da categoria (o que vai; apagado sem meta), a sublista na mão (nome da categoria, 30 min, um cartão por meta, ligado a ela), entrar no Tempo Livre, um passo do Desfazer, marcar conta na meta, o Repetir leva as metas, não entra em outra sublista. PC: o calendário no título da categoria, a barra na mão, cancelar, colocar num espaço livre e o que vai pra nuvem |
+| `test_volta_lista.js` | app de verdade e `kanban.html` de verdade | V40.38.0: voltar pra lista de onde veio. Celular: o bloco agendado lembra a lista (column_id); "Mover pra Lista" volta pra ela, com o aviso "Voltou pra lista …"; lista apagada ou bloco que nasceu na agenda → a primeira lista (mesmo com as listas em outra ordem); Repetir, Copiar e cartão ↔ bloco da sublista levam a lista. Nuvem: column_id sobe e desce; vindo da versão antiga, relê a agenda uma vez (colIds) sem subir nada. PC: bloco do celular, a mão, o Agendar do cartão (vale a lista escolhida), Duplicar, a lista apagada e o cartão da sublista |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)

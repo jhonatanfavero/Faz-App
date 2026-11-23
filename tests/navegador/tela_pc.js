@@ -12,6 +12,7 @@
 // V40.34.0: campo "Meta" no cartão (vai pra nuvem, selo no cartão) e o gráfico ao abrir a meta.
 // V40.35.0: busca na agenda (cabe na barra de 1024 a 1440 px; teclado e mouse de verdade).
 // V40.36.0: Repetir bloco (pelos 3 pontinhos) e os 3 pontinhos na visão Dia (não arrastam o bloco).
+// V40.40.0: visão Dia — o cartão sai da sublista arrastando (vira bloco ou muda de sublista) e o bloco entra nela.
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const { abrirPc } = require('./apoio');
@@ -953,6 +954,51 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(itensDia === 'Duplicar|Repetir…|Arquivar|Apagar', 'Dia: clicar nos 3 pontinhos abre o mesmo menu');
   await foto(p, 'pc-dia-3-pontinhos.png');
   await p.keyboard.press('Escape'); await p.waitForTimeout(100);
+  await p.evaluate(() => document.querySelector('.ag-view[data-view="week"]').click()); await p.waitForTimeout(150);
+  }
+
+  {
+  console.log('\nZ) Visão Dia: o cartão sai da sublista arrastando e o bloco entra nela (V40.40.0):');
+  const DZ = '2026-12-09'; // quarta, sem nada nos dados de teste
+  await p.evaluate(([uid, dz]) => {
+    const n = window.__nuvem, base = { type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, deleted: false, date: dz };
+    n.insert('blocos', uid, Object.assign({}, base, { id: 'f_dz1', start_min: 540, duration: 60, title: 'Pendências', cards: [{ id: 'cd_z1', title: 'Ligar pro cartório', done: false, microblocks: [], duration: 30 }, { id: 'cd_z2', title: 'Pagar boleto', done: false, microblocks: [] }] }));
+    n.insert('blocos', uid, Object.assign({}, base, { id: 'f_dzb', start_min: 660, duration: 15, title: 'Bloco solto' }));
+    n.insert('blocos', uid, Object.assign({}, base, { id: 'f_dz2', start_min: 690, duration: 60, title: 'Tarde', cards: [{ id: 'cd_z9', title: 'Revisar orçamento', done: false, microblocks: [] }] }));
+  }, [UID, DZ]);
+  await p.evaluate(() => { document.querySelector('.ag-view[data-view="week"]').click(); document.getElementById('ag-today').click(); for (let i = 0; i < 3; i++) document.getElementById('ag-next').click(); }); await p.waitForTimeout(300);
+  await p.evaluate((dz) => document.querySelector('#ag-cols .ag-day-btn[data-day="' + dz + '"]').click(), DZ); await p.waitForTimeout(300);
+  await p.evaluate(() => { document.getElementById('ag-day').scrollTop = (9 * 60 - 7 * 60) * 3.2 - 40; }); await p.waitForTimeout(150);
+  await p.evaluate(() => { const x = document.getElementById('undo-pill-x'); if (!document.getElementById('undo-pill').classList.contains('hidden')) x.click(); }); // a foto sem o aviso da seção anterior
+  const yOf = (min) => p.evaluate((m) => document.getElementById('ag-timeline').getBoundingClientRect().top + (m - 420) * 3.2 + 2, min);
+  const rowBox = (cid) => p.evaluate((cid) => { const r = document.querySelector('#ag-timeline [data-sub-open][data-card="' + cid + '"]').getBoundingClientRect(); return { x: r.x + Math.min(40, r.width / 2), y: r.y + r.height / 2 }; }, cid);
+  const cards = (id) => p.evaluate(([uid, id]) => window.__nuvem.get('blocos', uid, id).cards.map((c) => c.id), [UID, id]);
+  // cartão → horário livre
+  let rb = await rowBox('cd_z1'), y1 = await yOf(630);
+  await p.mouse.move(rb.x, rb.y); await p.mouse.down();
+  await p.mouse.move(rb.x + 10, rb.y + 20, { steps: 4 }); await p.mouse.move(rb.x + 10, y1, { steps: 8 });
+  const meio = await p.evaluate(() => { const l = document.querySelector('#ag-timeline .ag-land'), g = document.querySelector('.ag-sub-ghost'); return { land: l && l.textContent, bad: l && l.classList.contains('bad'), ghost: !!g && getComputedStyle(g).position === 'fixed' }; });
+  ok(meio.land === '10:30–11:00' && !meio.bad && meio.ghost, 'mouse de verdade: a cópia anda com o mouse e o tracejado mostra "' + meio.land + '"');
+  await foto(p, 'pc-dia-cartao-saindo.png');
+  await solta();
+  const z1 = await p.evaluate(([uid, dz]) => window.__nuvem.alive('blocos', uid).filter((b) => b.date === dz && b.title === 'Ligar pro cartório').map((b) => [b.start_min, b.duration]), [UID, DZ]);
+  ok(z1.length === 1 && z1[0][0] === 630 && z1[0][1] === 30 && !(await cards('f_dz1')).includes('cd_z1') && !(await cartaoAberto()), 'soltou: virou bloco às 10:30 (30 min), saiu da sublista e nada abriu');
+  // cartão → outra sublista
+  rb = await rowBox('cd_z2'); const y2 = await yOf(720);
+  await p.mouse.move(rb.x, rb.y); await p.mouse.down();
+  await p.mouse.move(rb.x + 10, rb.y + 20, { steps: 4 }); await p.mouse.move(rb.x + 10, y2, { steps: 8 });
+  ok(await p.evaluate(() => document.querySelector('#ag-timeline [data-block="f_dz2"]').classList.contains('ag-sub-over')), 'em cima da outra sublista: ela acende');
+  await solta();
+  ok((await cards('f_dz2')).includes('cd_z2') && !(await cards('f_dz1')).includes('cd_z2'), 'soltou: o cartão mudou de sublista');
+  // bloco → sublista
+  const bb = await caixa('f_dzb'), y3 = await yOf(715);
+  await p.mouse.move(bb.x + 300, bb.y + 6); await p.mouse.down();
+  await p.mouse.move(bb.x + 300, bb.y + 20, { steps: 4 }); await p.mouse.move(bb.x + 300, y3, { steps: 8 });
+  const sobre = await p.evaluate(() => ({ over: document.querySelector('#ag-timeline [data-block="f_dz2"]').classList.contains('ag-sub-over'), meio: document.querySelector('#ag-timeline [data-block="f_dzb"]').classList.contains('ag-into-sub') }));
+  ok(sobre.over && sobre.meio, 'bloco em cima da sublista: ela acende e ele fica meio transparente');
+  await foto(p, 'pc-dia-bloco-entrando.png');
+  await solta();
+  ok(await p.evaluate((uid) => window.__nuvem.get('blocos', uid, 'f_dzb').deleted === true && window.__nuvem.get('blocos', uid, 'f_dz2').cards.some((c) => c.title === 'Bloco solto'), UID), 'soltou: o bloco virou cartão da sublista');
   await p.evaluate(() => document.querySelector('.ag-view[data-view="week"]').click()); await p.waitForTimeout(150);
   }
 

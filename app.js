@@ -3602,7 +3602,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.39.0',
+            version: 'v40.40.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

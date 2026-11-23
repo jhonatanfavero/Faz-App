@@ -143,6 +143,12 @@
     .ag-sub-card[draggable="true"] { cursor: grab; } /* V40.28.0: na Semana o cartão sai da sublista arrastando */
     .ag-sub-card.dragging { opacity: .35; }
     .ag-sub.ag-sub-over { outline: 2px dashed var(--focus); outline-offset: 2px; } /* V40.28.0: soltar aqui = entrar na sublista */
+    /* V40.40.0: visão Dia — o cartão sai da sublista arrastando (a cópia anda com o mouse; o tracejado mostra onde vira bloco) */
+    #ag-timeline:not(.placing) .ag-sub-card { cursor: grab; }
+    .ag-sub-ghost { position: fixed; z-index: 70; pointer-events: none; opacity: .96; box-shadow: 0 10px 24px rgba(0,0,0,.22); }
+    .ag-land { position: absolute; left: 56px; right: 0; z-index: 5; pointer-events: none; display: flex; align-items: flex-end; justify-content: flex-end; padding: 2px 8px; border: 2px dashed var(--focus); border-radius: 6px; background: rgba(0,0,0,.03); font-size: 11px; font-weight: 700; color: var(--focus); }
+    .ag-land.bad { border-color: #dc2626; color: #dc2626; background: rgba(220,38,38,.05); }
+    .ag-into-sub { opacity: .55; } /* bloco arrastado em cima de uma sublista: vai entrar nela */
     .ag-sub-card.dark .ag-sub-t { color: #fff; }
     .ag-sub-mb { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 10.5px; font-weight: 600; color: #a16207; }
     .ag-sub-card.dark .ag-sub-mb { color: rgba(255,255,255,.8); }
@@ -990,7 +996,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.39.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.40.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -2097,7 +2103,9 @@
         return null;
     }
     function dgDown(e) {
-        if (e.button !== 0 || DG || S.placing || S.agView !== 'day') return;
+        if (e.button !== 0 || DG || CG || S.placing || S.agView !== 'day') return;
+        var row = e.target.closest('.ag-sub-card'); // V40.40.0: cartão de dentro de uma sublista: sai arrastando
+        if (row && !e.target.closest('[data-sub-ck]')) return void cgDown(e, row);
         var card = e.target.closest('[data-block]');
         if (!card || e.target.closest('[data-done], [data-sub-ck], [data-sub-open], [data-sub-drop], [data-more]')) return; // V40.24.0; V40.36.0: 3 pontinhos
         var b = S.blocos[card.dataset.block];
@@ -2140,8 +2148,19 @@
         var at = agMin(y - g.grab), note = ''; // minuto do dia onde está a borda arrastada (V40.22.0: vale também com os vagos compactados)
         if (g.mode === 'move') {
             g.start = Math.max(h0, Math.min(Math.round(at / 5) * 5, h1 - g.dur0)); // de 5 em 5 min, sem sair da régua
-            g.clash = hits(g.others, g.start, g.dur0);
-            if (g.clash) note = 'horário ocupado';
+            // V40.40.0: com o mouse em cima de uma sublista, o bloco entra nela (vira cartão), como na Semana e no celular
+            var pm = agMin(y), sub = null;
+            g.others.forEach(function (o) { if (isSub(o) && agVisible(o) && pm >= o.start_min && pm < o.start_min + o.duration) sub = o; });
+            if ((sub && sub.id) !== g.sub) {
+                var was = g.sub && dgCard(g.sub);
+                if (was) was.classList.remove('ag-sub-over');
+                g.sub = sub ? sub.id : null;
+                var now = g.sub && dgCard(g.sub);
+                if (now) now.classList.add('ag-sub-over');
+            }
+            g.clash = !g.sub && hits(g.others, g.start, g.dur0);
+            if (g.sub) note = isSub(b) ? 'sublista não entra em outra' : b.theme === 'rest' ? 'descanso não entra' : 'entra na sublista';
+            else if (g.clash) note = 'horário ocupado';
         } else {
             var want = Math.round((at - g.st0) / 5) * 5; // duração de 5 em 5 min
             g.dur = Math.max(5, Math.min(want, g.max));
@@ -2152,6 +2171,7 @@
         g.el.style.height = (g.mode === 'move' ? Math.max(g.dur0 * PXM - 2, 14) : Math.max(agY(g.st0 + g.dur) - agY(g.st0) - 2, 14)) + 'px'; // movendo, o bloco não muda de tamanho
         g.el.classList.toggle('ag-clash', !!g.clash);
         g.el.classList.toggle('ag-limit', !!g.over);
+        g.el.classList.toggle('ag-into-sub', !!g.sub); // V40.40.0
         var key = g.start + '|' + g.dur + '|' + note;
         if (key !== g.key) { g.key = key; g.el.innerHTML = dayInnerHtml(Object.assign({}, b, { start_min: g.start, duration: g.dur }), note); }
     }
@@ -2200,6 +2220,7 @@
         var b = S.blocos[g.id], saved = false;
         if (commit && b && !b.deleted && !b.archived && String(b.date).slice(0, 10) === g.day) {
             if (b.start_min !== g.st0 || b.duration !== g.dur0) toast('Esse bloco mudou em outro aparelho. Tente de novo.');
+            else if (g.mode === 'move' && g.sub) { renderAgenda(); blockIntoSub(g.id, g.sub); return; } // V40.40.0: vira cartão da sublista (o desenho volta já; a gravação redesenha)
             else if (g.mode === 'move') saved = moveBlock(g.id, g.day, g.start, 'Bloco movido: ' + clock(g.start) + '–' + clock(g.start + g.dur0));
             else if (g.dur !== g.dur0) {
                 if (g.dur > g.dur0 && hits(dayOthers(g.day, g.id), g.st0 + g.dur0, g.dur - g.dur0)) toast('Conflito! A duração voltou ao que era.');
@@ -2213,6 +2234,139 @@
     }
     function dgUp() { dgStop(true, 'up'); }
     function dgAbort() { dgStop(false, 'desistiu'); }
+
+    // ---------- V40.40.0: visão Dia — o cartão sai da sublista arrastando (o mesmo da Semana e do celular) ----------
+    // Segurar um cartão de dentro de uma sublista e arrastar: a cópia dele anda com o mouse e, na régua, um tracejado mostra
+    // onde ele vira bloco (no horário do mouse, de 5 em 5 min, encostando no próximo bloco se precisar; "Não cabe aqui" em
+    // cima de um bloco ou num vago pequeno). Em cima de outra sublista, ela acende e o cartão muda de sublista. Esc desiste.
+    // As regras do celular (V40.30.0: subDragTarget/subFreeAround); a gravação é a da Semana (subCardOut, subCardMove).
+    var CG = null;
+    function cgDown(e, row) {
+        var ck = row.querySelector('[data-sub-ck]');
+        if (!ck) return;
+        CG = { bid: ck.dataset.subCk, cid: ck.dataset.card, row: row, day: S.agAnchor, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, on: false, t: null };
+        document.addEventListener('mousemove', cgMove);
+        document.addEventListener('mouseup', cgUp);
+    }
+    function cgBegin() { // passou de 4px: agora é arraste (antes disso continua sendo um clique, que abre ou marca o cartão)
+        var g = CG, f = subFind(g.bid, g.cid);
+        if (!f || !g.row.isConnected || S.agView !== 'day' || S.agAnchor !== g.day) { cgStop(false); return false; }
+        g.on = true;
+        g.dur = subCardDur(f.c);
+        var r = g.row.getBoundingClientRect(), gh = g.row.cloneNode(true);
+        gh.querySelectorAll('*').forEach(function (el) { [].slice.call(el.attributes).forEach(function (a) { if (/^data-/.test(a.name)) el.removeAttribute(a.name); }); });
+        gh.classList.add('ag-sub-ghost');
+        gh.style.width = r.width + 'px';
+        g.offX = g.x0 - r.left; g.offY = g.y0 - r.top;
+        document.body.appendChild(gh);
+        g.ghost = gh;
+        g.land = document.createElement('div');
+        g.land.className = 'ag-land';
+        g.land.style.display = 'none';
+        $('ag-timeline').appendChild(g.land);
+        g.row.classList.add('dragging');
+        S.agCard = { bid: g.bid, cid: g.cid }; // segura o redesenho da agenda até soltar
+        document.body.classList.add('ag-grabbing');
+        $('ag-day').addEventListener('scroll', cgTarget);
+        window.addEventListener('blur', cgAbort);
+        return true;
+    }
+    function cgFreeAround(day, min, lo, hi) { // o vago do dia em volta de "min" ({ a, b }); null em cima de um bloco
+        var a = lo, b = hi, list = blocksByDay()[day] || [];
+        for (var i = 0; i < list.length; i++) {
+            var s = list[i].start_min, z = s + list[i].duration;
+            if (min >= s && min < z) return null;
+            if (z <= min && z > a) a = z;
+            if (s > min && s < b) b = s;
+        }
+        return { a: a, b: b };
+    }
+    function cgTarget() { // o que acontece se soltar agora; mostra na tela
+        var g = CG;
+        if (!g || !g.on) return;
+        var tl = $('ag-timeline'), tr = tl.getBoundingClientRect(), t = null;
+        if (g.x >= tr.left && g.x <= tr.right && g.y >= tr.top && g.y <= tr.bottom) {
+            var lo = S.agH0 * 60, hi = S.agH1 * 60, pm = agMin(g.y - tr.top), over = null;
+            (blocksByDay()[g.day] || []).forEach(function (o) { if (isSub(o) && agVisible(o) && pm >= o.start_min && pm < o.start_min + o.duration) over = o; });
+            if (over) t = over.id === g.bid ? { kind: 'self' } : { kind: 'sub', id: over.id };
+            else {
+                var min = Math.max(lo, Math.min(hi - 5, Math.round(pm / 5) * 5));
+                var gap = cgFreeAround(g.day, min, lo, hi);
+                t = gap && gap.b - gap.a >= g.dur
+                    ? { kind: 'free', ok: true, st: Math.max(gap.a, Math.min(min, gap.b - g.dur)) }
+                    : { kind: 'free', ok: false, st: min };
+            }
+        }
+        g.t = t;
+        tl.querySelectorAll('.ag-sub-over').forEach(function (el) { if (!t || t.kind !== 'sub' || el.dataset.block !== t.id) el.classList.remove('ag-sub-over'); });
+        var se = t && t.kind === 'sub' && dgCard(t.id);
+        if (se) se.classList.add('ag-sub-over');
+        var L = g.land;
+        if (t && t.kind === 'free') {
+            var y0 = agY(t.st), y1 = agY(Math.min(t.st + g.dur, S.agH1 * 60));
+            L.style.display = '';
+            L.style.top = (y0 + 1) + 'px';
+            L.style.height = Math.max(20, y1 - y0 - 2) + 'px';
+            L.classList.toggle('bad', !t.ok);
+            L.textContent = t.ok ? clock(t.st) + '–' + clock(t.st + g.dur) : 'Não cabe aqui';
+        } else L.style.display = 'none';
+    }
+    function cgEdge() { // perto da borda de cima ou de baixo, a régua rola sozinha (como no arraste do bloco)
+        var g = CG, sc = $('ag-day'), r = sc.getBoundingClientRect(), zone = 48, v = 0;
+        if (r.height > 0) {
+            if (g.y < r.top + zone && g.y < g.y0 - 8) v = -Math.min(24, Math.ceil((r.top + zone - g.y) / 4));
+            else if (g.y > r.bottom - zone && g.y > g.y0 + 8) v = Math.min(24, Math.ceil((g.y - (r.bottom - zone)) / 4));
+        }
+        g.v = v;
+        if (v && !g.timer) g.timer = setInterval(function () { if (CG && CG.v) { sc.scrollTop += CG.v; cgTarget(); } }, 16);
+        if (!v && g.timer) { clearInterval(g.timer); g.timer = null; }
+    }
+    function cgMove(e) {
+        var g = CG;
+        if (!g) return;
+        if (e.buttons === 0) return cgStop(false, 'solto'); // o botão foi solto fora da janela: desiste
+        g.x = e.clientX; g.y = e.clientY;
+        if (!g.on && (Math.abs(g.x - g.x0) < 4 && Math.abs(g.y - g.y0) < 4 || !cgBegin())) return;
+        e.preventDefault();
+        g.ghost.style.left = (g.x - g.offX) + 'px';
+        g.ghost.style.top = (g.y - g.offY) + 'px';
+        cgTarget();
+        cgEdge();
+    }
+    function cgStop(commit, why) {
+        var g = CG;
+        if (!g) return;
+        CG = null;
+        document.removeEventListener('mousemove', cgMove);
+        document.removeEventListener('mouseup', cgUp);
+        if (!g.on) return; // não chegou a arrastar: o clique normal abre (ou marca) o cartão
+        clearInterval(g.timer);
+        $('ag-day').removeEventListener('scroll', cgTarget);
+        window.removeEventListener('blur', cgAbort);
+        document.body.classList.remove('ag-grabbing');
+        if (g.ghost) g.ghost.remove();
+        if (g.land) g.land.remove();
+        g.row.classList.remove('dragging');
+        $('ag-timeline').querySelectorAll('.ag-sub-over').forEach(function (el) { el.classList.remove('ag-sub-over'); });
+        S.agCard = null;
+        if (why !== 'solto') { // o clique que o navegador dispara logo depois de soltar não abre o cartão (igual ao arraste do bloco)
+            S.agNoClick = true;
+            var off = function () { S.agNoClick = false; document.removeEventListener('mousedown', off, true); };
+            if (why === 'up') setTimeout(off, 50);
+            else {
+                document.addEventListener('mouseup', function up() { document.removeEventListener('mouseup', up); setTimeout(off, 50); });
+                document.addEventListener('mousedown', off, true);
+            }
+        }
+        renderAgenda(); // volta o desenho ao que está gravado (o que gravar redesenha de novo)
+        var t = commit ? g.t : null;
+        if (!t || t.kind === 'self') return;
+        if (t.kind === 'sub') return void subCardMove(g.bid, g.cid, t.id);
+        if (!t.ok) return toast('Não cabe aqui: o cartão ficou na sublista.');
+        subCardOut(g.bid, g.cid, g.day, t.st);
+    }
+    function cgUp() { cgStop(true, 'up'); }
+    function cgAbort() { cgStop(false, 'desistiu'); }
 
     // ---------- V40.28.0: Semana — duração puxando a borda de baixo do bloco (como no Dia e no celular) ----------
     // Pedido do Jhonatan: "poder diminuir o horário pelo web na agenda também". A Semana não tem régua: vale a escala
@@ -2313,7 +2467,7 @@
             $('ag-place-meta').textContent = ' · ' + fmtDur(pl.dur) + (pl.cards ? ' · sublista com ' + pl.cards.length + (pl.cards.length === 1 ? ' meta' : ' metas') : ''); // V40.37.0
             $('ag-place-hint').textContent = S.agView === 'day' ? 'Clique no horário onde quer colocar.' : 'Clique num espaço tracejado pra colocar. Pra escolher o horário exato, clique no nome do dia.';
         }
-        $('ag-tip').textContent = pl ? '' : S.agView === 'day' ? 'Arraste um bloco pra mudar o horário. Puxe a borda de baixo pra mudar a duração.'
+        $('ag-tip').textContent = pl ? '' : S.agView === 'day' ? 'Arraste um bloco pra mudar o horário (ou pra dentro de uma sublista). Puxe a borda de baixo pra mudar a duração. Cartão da sublista sai arrastando.'
             : 'Arraste um bloco pra outro dia ou pra um espaço livre. Puxe a borda de baixo pra mudar a duração.';
         document.querySelectorAll('.ag-view').forEach(function (b) { b.classList.toggle('on', b.dataset.view === S.agView); });
         applyZoom(); // V40.18.0: na visão Dia não tem zoom (a régua das horas depende do tamanho real)
@@ -5382,6 +5536,7 @@
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             if (DG) return dgStop(false, 'esc'); // V40.14.0: Esc no meio do arraste devolve o bloco pro lugar
+            if (CG) return cgStop(false, 'esc'); // V40.40.0: idem, com o cartão de uma sublista
             if (WZ) return wzStop(false, 'esc'); // V40.28.0: idem, puxando a duração na Semana
             if (!$('dialog').classList.contains('hidden')) return;
             if (!$('cal-pop').classList.contains('hidden')) return closeCal();
@@ -5532,7 +5687,11 @@
             else if (S.tab === 'financas') { e.preventDefault(); fnMove(dir); }
         });
         // V40.25.0: cada clique, tecla ou arraste é um "gesto"; o que ele gravar vira um passo só do Desfazer
-        ['pointerdown', 'mousedown', 'keydown', 'click', 'dragstart', 'drop'].forEach(function (t) { document.addEventListener(t, function () { S.gesture++; }, true); });
+        ['pointerdown', 'mousedown', 'keydown', 'click', 'dragstart', 'drop'].forEach(function (t) {
+            // V40.40.0: o clique que o navegador solta depois de um arraste no Dia (S.agNoClick) não é gesto novo: as duas
+            // gravações de tirar um cartão da sublista (ou pôr um bloco nela) continuam num passo só do Desfazer
+            document.addEventListener(t, function (e) { if (e.type === 'click' && S.agNoClick) return; S.gesture++; }, true);
+        });
         // Ctrl+Z desfaz, Ctrl+Y (ou Ctrl+Shift+Z) refaz. No Mac, Cmd. Dentro de um campo de texto vale o desfazer do próprio texto.
         document.addEventListener('keydown', function (e) {
             if (!(e.ctrlKey || e.metaKey) || e.altKey || e.defaultPrevented) return;

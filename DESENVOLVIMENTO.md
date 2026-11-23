@@ -51,7 +51,9 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
    usuário pedir, vai dentro de `undoQuiet(...)`; campo que é só de tela num item salvo (como o
    `expanded` do bloco) entra no `skip` da chave em `undoKeys()`. No PC, grave por `insertRow` /
    `patchRow`; gravação em lote direto no Supabase precisa de `undoRec(g, undoBulk(...))` depois do
-   sucesso, com o gesto (`var g = S.gesture`) guardado antes do primeiro `await`.
+   sucesso, com o gesto (`var g = S.gesture`) guardado antes do primeiro `await`. Arrasto no PC que grava
+   duas coisas (cartão sai da sublista, bloco entra nela): o clique que o navegador solta depois de soltar o
+   botão não é gesto novo enquanto `S.agNoClick` estiver ligado (V40.40.0), senão viram dois passos.
 10. **Tela ou janelinha nova tem o botão do voltar (V40.27.0).** O voltar do Android (e o Esc no
     computador) toca no botão de voltar/fechar da tela de cima: em cada janelinha (`id` terminado em
     `-modal`), o Cancelar/fechar leva `data-voltar`; em cada tela (`id` terminado em `-sheet`), o X leva

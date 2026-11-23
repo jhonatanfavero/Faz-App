@@ -38,7 +38,8 @@
 // V10.43 - v40.37.0 (Sublista de metas: no menu de cada categoria das Metas (no PC, o calendário no título dela), "Pôr na agenda" põe na mão uma sublista com o nome da categoria e um cartão por meta, ligado a ela (marcar conta na meta); toca/clica num horário livre e ela entra. Com o Repetir vai pros outros dias.)
 // V10.44 - v40.38.0 (Voltar pra lista: o bloco (e o cartão da sublista) volta pra lista de onde veio; se ela não existe mais, ou o bloco nasceu na agenda, vai pra primeira lista (a da esquerda). Antes ia sempre pra Geral. O mesmo no PC; a lista de origem vai pra nuvem.)
 // V10.45 - v40.39.0 (Busca nas Listas, no celular e no PC: filtra as próprias listas pelo nome, checklist e tag (sem acento, cada palavra em qualquer lugar); "1 de 8" no nome da lista; no celular as bolinhas viram o número de achados de cada lista, no PC a barra diz em quais listas achou.)
-const CACHE_NAME = 'timeblock-v40-39-0';
+// V10.46 - v40.40.0 (PC, visão Dia: o cartão sai da sublista arrastando (vira bloco onde o tracejado mostra, com o horário, ou muda de sublista) e o bloco entra numa sublista arrastando por cima dela. Esc desiste; um passo só do Desfazer. Era o que a Semana do PC e o celular já faziam.)
+const CACHE_NAME = 'timeblock-v40-40-0';
 const ASSETS = [
   './',
   './index.html',

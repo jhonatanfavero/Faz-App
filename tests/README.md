@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 39 suítes (cerca de 5 minutos)
+npm test        # confere o CSS pronto e roda as 40 suítes (cerca de 5 minutos)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -51,6 +51,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_sublista_metas.js` | app de verdade e `kanban.html` de verdade | V40.37.0: sublista de metas. Celular: o "Pôr na agenda" no menu da categoria (o que vai; apagado sem meta), a sublista na mão (nome da categoria, 30 min, um cartão por meta, ligado a ela), entrar no Tempo Livre, um passo do Desfazer, marcar conta na meta, o Repetir leva as metas, não entra em outra sublista. PC: o calendário no título da categoria, a barra na mão, cancelar, colocar num espaço livre e o que vai pra nuvem |
 | `test_volta_lista.js` | app de verdade e `kanban.html` de verdade | V40.38.0: voltar pra lista de onde veio. Celular: o bloco agendado lembra a lista (column_id); "Mover pra Lista" volta pra ela, com o aviso "Voltou pra lista …"; lista apagada ou bloco que nasceu na agenda → a primeira lista (mesmo com as listas em outra ordem); Repetir, Copiar e cartão ↔ bloco da sublista levam a lista. Nuvem: column_id sobe e desce; vindo da versão antiga, relê a agenda uma vez (colIds) sem subir nada. PC: bloco do celular, a mão, o Agendar do cartão (vale a lista escolhida), Duplicar, a lista apagada e o cartão da sublista |
 | `test_busca_listas.js` | app de verdade e `kanban.html` de verdade | V40.39.0: busca nas Listas, filtrando as próprias listas (nome, checklist e tag, sem acento, cada palavra em qualquer lugar). Celular: a lupa, o filtro, "1 de 8" no nome, as bolinhas com o número de achados, ir sozinho pra lista que tem achado, as marcas (nome, checklist primeiro, tag), nada achado, o que é criado/editado durante a busca fica, o X e o voltar. PC: a barra só nas Listas, "1 de 8", lista sem achado apagada, "N cartões em M listas" com as listas, marcas, checklist, tarefa adicionada fica, arrastar com a busca, Esc, ×, "/" e trocar de aba |
+| `test_dia_sublista_pc.js` | `kanban.html` de verdade | V40.40.0: PC, visão Dia, sublista arrastando (o que a Semana do PC e o celular já faziam). O cartão arrastado: a cópia anda com o mouse, o tracejado mostra onde vira bloco ("10:30–11:00"), nada grava antes de soltar e a nuvem não redesenha no meio; soltar cria o bloco inteiro (tempo, tag, cor, checklist, lista de origem) e tira o cartão; o clique que sobra não abre nada; um passo do Desfazer e o Refazer; encostar no próximo bloco; "Não cabe aqui"; outra sublista (muda o cartão inteiro); a própria sublista (nada); Esc; clique e círculo iguais. O bloco em cima da sublista entra nela (um passo do Desfazer); Descanso e sublista não entram |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)

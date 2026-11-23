@@ -1251,11 +1251,19 @@
 
         <!-- MODAL DE QUANTIDADE (SUBSTITUI O PROMPT) -->
         <div id="clone-qtd-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
-            <h3 id="clone-qtd-title" class="text-lg font-bold text-zinc-900 mb-2 text-center">Quantas repetições?</h3>
-            <input type="number" id="clone-qtd-input" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-6 text-center text-xl" min="1">
-            <div class="flex gap-2">
+            <h3 id="clone-qtd-title" class="text-lg font-bold text-zinc-900 text-center">Quantas repetições?</h3>
+            <!-- V40.36.1: qual bloco, −/+, e o resumo (o dia com o horário ocupado fica de fora), como no Repetir do PC -->
+            <p id="clone-qtd-sub" class="text-[12px] font-medium text-zinc-500 text-center truncate mt-0.5 mb-4"></p>
+            <div class="flex items-center gap-2 mb-3">
+                <button type="button" id="clone-qtd-minus" onclick="cloneQtdStep(-1)" aria-label="Diminuir" class="w-12 h-12 shrink-0 rounded-xl bg-zinc-100 text-zinc-700 flex items-center justify-center active:scale-95 transition disabled:opacity-40 disabled:active:scale-100"><i class="ph-bold ph-minus text-lg"></i></button>
+                <input type="number" id="clone-qtd-input" inputmode="numeric" min="1" max="60" oninput="cloneQtdInput()" onkeydown="cloneQtdKey(event)" aria-label="Quantas vezes" class="flex-1 min-w-0 bg-zinc-50 border border-zinc-200 rounded-xl px-2 py-2.5 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors text-center text-xl">
+                <button type="button" id="clone-qtd-plus" onclick="cloneQtdStep(1)" aria-label="Aumentar" class="w-12 h-12 shrink-0 rounded-xl bg-zinc-100 text-zinc-700 flex items-center justify-center active:scale-95 transition disabled:opacity-40 disabled:active:scale-100"><i class="ph-bold ph-plus text-lg"></i></button>
+            </div>
+            <p id="clone-qtd-sum" class="text-[12px] leading-snug text-zinc-600 text-center"></p>
+            <p id="clone-qtd-busy" class="hidden text-[12px] leading-snug font-semibold text-amber-700 text-center mt-1.5"></p>
+            <div class="flex gap-2 mt-5">
                 <button data-voltar onclick="cancelCloneQtd()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
-                <button onclick="confirmCloneQtd()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:opacity-90 shadow-md transition">Confirmar</button>
+                <button id="clone-qtd-ok" onclick="confirmCloneQtd()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:opacity-90 shadow-md transition disabled:opacity-40 disabled:shadow-none">Confirmar</button>
             </div>
         </div>
 
@@ -1545,7 +1553,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.36.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.36.1</div>
 
     </div>
 

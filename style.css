@@ -33,9 +33,11 @@ body { touch-action: pan-y; background-color: #e2e8f0; overscroll-behavior-x: no
    PC) continua 1.5rem, o p-6 de sempre. --faz-safe-top existe pro teste de navegador simular o iPhone. */
 :root { --faz-safe-top: env(safe-area-inset-top, 0px); --faz-safe-bottom: env(safe-area-inset-bottom, 0px); }
 [id$="-sheet"] { padding-top: max(1.5rem, calc(var(--faz-safe-top) + 0.75rem)) !important; }
-/* V40.32.2: o campo do Assistente fica no pé da tela: no iPhone ele encostava no risco de início (a barrinha de baixo).
-   Sobe o que faltar; sem área segura embaixo (Android, PC) fica igual. */
-#assistant-form { margin-bottom: max(0px, calc(var(--faz-safe-bottom) - 0.75rem)); }
+/* V40.36.1: e a de baixo, em todo aparelho: no Android (Chrome 135+) a tela vai até embaixo, atrás da barra de navegação,
+   e os botões do pé das telas ("Nova Tarefa", "Salvar na Lista", "Nova meta"...) ficavam meio escondidos. Sem barra
+   embaixo continua 1.5rem. Isso substitui os ajustes só do pé de cada tela (o .ios-safe-bottom e a margem do campo do
+   Assistente, V40.32.2), que somariam a barra duas vezes. */
+[id$="-sheet"] { padding-bottom: max(1.5rem, calc(var(--faz-safe-bottom) + 0.5rem)) !important; }
 
 /* Retraído INTACTO: padding-bottom 4px conforme fix5. */
 header.header-collapsed {
@@ -241,6 +243,17 @@ body { overflow-x: hidden; max-width: 100vw; }
 }
 
 /* ========================================================================
+   V40.36.1 — Botões do rodapé acima da barra de baixo, em TODO aparelho (era só no iPhone, V40.8.0; o pé das telas
+   cheias ficou na regra do [id$="-sheet"], lá em cima).
+   Desde o Chrome 135 (Android), com o viewport-fit=cover do index.html, a tela do app vai até embaixo, ATRÁS da
+   barra de navegação, e o env(safe-area-inset-bottom) diz quanto ela ocupa: o "54 itens" e o "+" ficavam pela metade
+   atrás da barra (foto dele de 22/11, depois de puxar a tela pra atualizar). Sem barra por cima, env() = 0 e fica
+   como sempre foi (2rem, 1.5rem). A barrinha do Desfazer sobe junto (fica 68 px acima do pé dos botões).
+   ======================================================================== */
+#fab-btn, #list-btn { bottom: max(2rem, calc(env(safe-area-inset-bottom) + 0.75rem)) !important; }
+#floating-task { bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 0.5rem)) !important; }
+
+/* ========================================================================
    V40.8.0 — Ajustes SÓ de iOS (iPhone/iPad). O @supports abaixo só é verdadeiro
    no Safari do iOS: Android e desktop não entram aqui.
    ======================================================================== */
@@ -257,10 +270,7 @@ body { overflow-x: hidden; max-width: 100vw; }
     }
     /* sem o retângulo cinza do iOS a cada toque (os botões já têm o próprio feedback) */
     .app-frame-locked { -webkit-tap-highlight-color: rgba(0, 0, 0, 0); }
-    /* botões do rodapé acima da barra de início do iPhone */
-    #fab-btn, #list-btn { bottom: max(2rem, calc(env(safe-area-inset-bottom) + 0.75rem)) !important; }
-    #floating-task { bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 0.5rem)) !important; }
-    .ios-safe-bottom { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)) !important; }
+    /* (os botões do rodapé acima da barra de início saíram daqui na V40.36.1: valem pra todo aparelho, logo abaixo) */
     /* V40.32.1: campo de hora (type="time") do iOS tem largura mínima e visual próprios: vazava do cartão em
        Config → Períodos. Sem a aparência do sistema ele obedece a largura; a altura mínima segura o campo vazio
        (sem valor o iOS não desenha texto nenhum) e o valor segue o alinhamento do campo. */
@@ -473,6 +483,7 @@ body { overflow-x: hidden; max-width: 100vw; }
    (faixa #floating-task aberta), sobe acima dela. "#undo-bar.hidden" vence o display:flex daqui. */
 #undo-bar {
     position: absolute; left: 50%; bottom: 100px; z-index: 55;
+    bottom: calc(max(2rem, calc(env(safe-area-inset-bottom) + 0.75rem)) + 68px); /* V40.36.1: 100 px sem barra embaixo; com ela, sobe junto com os botões */
     display: flex; align-items: center; gap: 6px;
     width: max-content; max-width: calc(100% - 24px);
     padding: 5px 5px 5px 14px; border-radius: 9999px;
@@ -487,7 +498,7 @@ body { overflow-x: hidden; max-width: 100vw; }
 #undo-bar .undo-bar-btn { flex: none; height: 34px; padding: 0 13px; border-radius: 9999px; background: rgba(255, 255, 255, 0.16); color: #fff; font-size: 13px; font-weight: 800; }
 #undo-bar .undo-bar-btn:active { transform: scale(0.95); }
 #undo-bar .undo-bar-btn.hidden { display: none; }
-#floating-task:not(.hidden) ~ #undo-bar { bottom: 160px; } /* a faixa tem ~120 px (a dica quebra em 2 linhas); o app ainda confere a altura de verdade */
+#floating-task:not(.hidden) ~ #undo-bar { bottom: 160px; bottom: calc(max(1.5rem, calc(env(safe-area-inset-bottom) + 0.5rem)) + 136px); } /* a faixa tem ~120 px (a dica quebra em 2 linhas); o app ainda confere a altura de verdade. V40.36.1: sobe com a barra de baixo */
 @keyframes undoIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* V40.26.0 — AGENDA AFASTADA: 2 ou 3 dias lado a lado. Cada dia é uma coluna (.tl-col) com blocos compactos
@@ -517,6 +528,13 @@ body { overflow-x: hidden; max-width: 100vw; }
 .tl-mini-gap { position: absolute; left: 1px; right: 1px; z-index: 5; cursor: pointer; }
 .tl-mini-gap.drop { display: flex; align-items: center; justify-content: center; border: 2px dashed var(--theme-color, #4f46e5); border-radius: 8px; background: rgba(0, 0, 0, 0.03); color: var(--theme-color, #4f46e5); font-size: 18px; z-index: 30; }
 .tl-mini-gap.short { cursor: default; }
+/* V40.36.1: vagos ocultos com 2 ou 3 dias: a faixa do horário que encolheu passa por cima das colunas (o toque vai pra
+   coluna de baixo) */
+.tl-multi-band { position: absolute; left: 2px; right: 2px; z-index: 6; pointer-events: none; display: flex; align-items: center; justify-content: center;
+    border: 1px dashed rgba(0, 0, 0, 0.12); border-radius: 10px; background-color: rgba(0, 0, 0, 0.02);
+    background-image: repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.035) 0 1px, transparent 1px 9px); }
+.tl-multi-band span { display: inline-flex; align-items: center; gap: 4px; max-width: calc(100% - 8px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    padding: 1px 8px; border-radius: 9999px; background: rgba(255, 255, 255, 0.85); font-size: 10px; font-weight: 700; color: #71717a; }
 .tl-now-mini { position: absolute; left: 0; right: 0; height: 2px; background: #00d2ff; box-shadow: 0 0 8px rgba(0, 210, 255, 0.7); z-index: 20; pointer-events: none; }
 #tl-dayhead { gap: 0; }
 .tl-dh { min-width: 0; margin: 0 2px; padding: 4px 0; border-radius: 8px; font-size: 12px; font-weight: 800; color: #3f3f46; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

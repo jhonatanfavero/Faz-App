@@ -3,7 +3,8 @@
 // bloco); a janela (padrões 5/4/2 como no celular, −/+, digitar, máximo, a lista dos dias com o horário ocupado ficando
 // de fora, o resumo); o que é criado (igual ao Duplicar: checklist e cartões desmarcados, sem notas, a meta junto, o tipo
 // pelo horário); o dia ocupado não é tocado; todo mês no dia 31; um passo só do Desfazer; Esc/Cancelar/fundo/Enter; o que
-// chega da nuvem com a janela aberta; bloco apagado em outro aparelho.
+// chega da nuvem com a janela aberta; bloco apagado em outro aparelho. V40.36.1: com uma meta escolhida, o bloco novo
+// pode ficar sem nome (vale o da meta).
 // Uso: TZ='America/Sao_Paulo' node test_repetir_pc.js <repo> <dados-ficticios.json>
 const fs = require('fs');
 const path = require('path');
@@ -199,6 +200,27 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   await openRpt('f_r4', '2026-11-10');
   server.patch('blocos', UID, 'f_r4', { deleted: true });
   ok(await waitFor(() => !open() && /Esse bloco não está mais na agenda/.test(T($('toast')))), 'o bloco apagado em outro aparelho: a janela fecha e avisa');
+
+  console.log('\nG) V40.36.1: com uma meta escolhida, o nome pode ficar vazio (vale o da meta):');
+  click($('ag-new')); await sleep(40);
+  ok(!$('modal-task').classList.contains('hidden') && $('f-title').placeholder === 'Nome do compromisso' && !$('f-goal-wrap').classList.contains('hidden'), 'Novo bloco: campo do nome normal e o campo Meta à vista');
+  $('f-goal').value = 'meta_ler'; $('f-goal').dispatchEvent(new w.Event('change', { bubbles: true })); await sleep(10);
+  ok($('f-title').placeholder === 'Ler', 'escolheu a meta "Ler": o nome dela aparece clarinho no campo');
+  $('f-goal').value = ''; $('f-goal').dispatchEvent(new w.Event('change', { bubbles: true })); await sleep(10);
+  ok($('f-title').placeholder === 'Nome do compromisso', 'tirou a meta: volta o texto de sempre');
+  $('f-goal').value = 'meta_ler'; $('f-goal').dispatchEvent(new w.Event('change', { bubbles: true })); await sleep(10);
+  const antesG = rows().filter((r) => r.title === 'Ler' && !r.deleted).length;
+  $('f-title').value = '';
+  click($('f-save'));
+  ok(await waitFor(() => rows().filter((r) => r.title === 'Ler' && r.goal_id === 'meta_ler' && !r.deleted).length === antesG + 1), 'salvou sem nome: o bloco novo se chama "Ler" e fica ligado à meta');
+  await sleep(40);
+  if (!$('modal-task').classList.contains('hidden')) press(d.body, 'Escape');
+  await sleep(20);
+  click($('ag-new')); await sleep(40);
+  $('f-title').value = '';
+  click($('f-save')); await sleep(40);
+  ok(!$('modal-task').classList.contains('hidden') && /Dê um nome pro bloco/.test(T($('toast'))), 'sem nome e sem meta continua pedindo o nome');
+  press(d.body, 'Escape'); await sleep(20);
 
   ok(errors.length === 0, 'nenhum erro de página' + (errors.length ? ': ' + errors[0].slice(0, 300) : ''));
   try { w.close(); } catch (e) {}

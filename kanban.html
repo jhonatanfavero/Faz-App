@@ -971,7 +971,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.36.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.36.1</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -2514,6 +2514,7 @@
         S.editing.goal = S.editing.goal0 = goalKeep(r.goal_id); // V40.34.0
         $('f-title').value = r.title || '';
         $('f-title').placeholder = isNew ? 'Nome do compromisso' : (isB ? 'Nome do bloco' : 'Nome da tarefa');
+        S.editing.ph = $('f-title').placeholder; // V40.36.1
         $('f-col-wrap').classList.toggle('hidden', isB);
         ['f-date-wrap', 'f-start-wrap'].forEach(function (w) { $(w).classList.toggle('hidden', !isB); $(w).classList.toggle('block', isB); });
         $('f-grid').classList.toggle('grid-cols-3', isB);
@@ -2558,6 +2559,7 @@
         $('f-sub-wrap').classList.toggle('inline-flex', isB && isNew);
         $('f-mbs-wrap').classList.toggle('hidden', sub);
         fillGoalSelect('f-goal-wrap', 'f-goal', S.editing.goal); // V40.34.0
+        goalPlaceholder(); // V40.36.1
         if (sub) $('f-goal-wrap').classList.add('hidden');
         if (sub) {
             $('f-title').placeholder = 'Nome da sublista';
@@ -2930,6 +2932,7 @@
         S.editing.goal = S.editing.goal0 = goalKeep(f.c.goalId); // V40.34.0
         $('f-title').value = f.c.title || '';
         $('f-title').placeholder = 'Nome do cartão';
+        S.editing.ph = 'Nome do cartão'; // V40.36.1
         $('f-grid').classList.add('hidden');
         ['f-done', 'f-archive', 'f-schedule', 'f-hand', 'f-sched', 'f-notes-wrap', 'f-cards-wrap', 'f-sub-wrap'].forEach(function (id) { $(id).classList.add('hidden'); $(id).classList.remove('inline-flex', 'flex'); });
         $('f-mbs-wrap').classList.remove('hidden');
@@ -2942,6 +2945,7 @@
         back.classList.remove('hidden'); back.classList.add('inline-flex');
         $('f-mb-new').value = '';
         fillGoalSelect('f-goal-wrap', 'f-goal', S.editing.goal); // V40.34.0
+        goalPlaceholder(); // V40.36.1
         renderTagChips(); renderMbs(); renderColors(); renderDone();
         var m = $('modal-task');
         m.classList.remove('hidden'); m.classList.add('flex');
@@ -2956,7 +2960,7 @@
     async function saveSubCard() {
         var ed = S.editing, f = ed && subFind(ed.block, ed.id);
         if (!f) { closeTask(); return toast('Esse cartão não está mais na sublista.'); }
-        var title = $('f-title').value.trim();
+        var title = titleOrGoal(ed.goal); // V40.36.1: vazio com meta = nome da meta
         if (!title) { $('f-title').focus(); return toast('Dê um nome pro cartão.'); }
         var c = Object.assign({}, f.c, { title: title.slice(0, 200), microblocks: normMbs(ed.mbs) });
         if (ed.tag && tagOf(ed.tag)) c.tagId = ed.tag; else delete c.tagId;
@@ -3000,7 +3004,7 @@
         var ed = S.editing;
         if (!ed || !ed.isNew) return;
         var asSub = $('f-sub').checked; // V40.24.0
-        var title = $('f-title').value.trim() || (asSub ? 'Sublista' : '');
+        var title = $('f-title').value.trim() || (asSub ? 'Sublista' : titleOrGoal(ed.goal)); // V40.36.1: vazio com meta = nome da meta
         if (!title) { $('f-title').focus(); return toast('Dê um nome pro bloco.'); }
         var dur = parseInt($('f-dur').value, 10), day = $('f-date').value, st = parseClock($('f-start').value);
         if (!Number.isFinite(dur) || dur <= 0) dur = 30;
@@ -3165,7 +3169,7 @@
         if (ed.isNew) return createBlock();
         var isB = ed.kind === 'blocos', t = S[ed.kind][ed.id];
         if (!t || t.deleted) { closeTask(); return toast(isB ? 'Esse bloco foi apagado em outro aparelho.' : 'Essa tarefa foi apagada em outro aparelho.'); }
-        var title = $('f-title').value.trim();
+        var title = titleOrGoal(ed.goal); // V40.36.1: vazio com meta = nome da meta
         if (!title) { $('f-title').focus(); return toast(isB ? 'Dê um nome pro bloco.' : 'Dê um nome pra tarefa.'); }
         var fields = {}, note = '';
         if (title !== (ed.orig.title || '')) fields.title = title;
@@ -3262,7 +3266,7 @@
         if (!ed || ed.kind !== 'tarefas') return null;
         var t = S.tarefas[ed.id];
         if (!t || t.deleted) { closeTask(); toast('Essa tarefa foi apagada em outro aparelho.'); return null; }
-        var title = $('f-title').value.trim();
+        var title = titleOrGoal(ed.goal); // V40.36.1
         if (!title) { $('f-title').focus(); toast('Dê um nome pra tarefa.'); return null; }
         return { id: ed.id, title: title, dur: schedDur(), tag: ed.tag || null, color: ed.color || null, mbs: normMbs(ed.mbs), goal: goalKeep(ed.goal) }; // V40.34.0: + meta
     }
@@ -3987,6 +3991,9 @@
     // a rotina só levam a meta pro bloco que virarem. Meta apagada vale como "sem meta" (o selo some, não conta).
     function goalOf(id) { var r = id ? S.metas[id] : null; return r && !r.deleted ? r : null; }
     function goalKeep(id) { return goalOf(id) ? String(id) : null; }
+    // V40.36.1: com uma meta escolhida, o nome pode ficar vazio: vale o da meta (o campo mostra ele clarinho)
+    function titleOrGoal(goalId) { var t = $('f-title').value.trim(), g = goalOf(goalKeep(goalId)); return t || (g ? String(g.title || '').trim() : ''); }
+    function goalPlaceholder() { var ed = S.editing, g = ed && goalOf(goalKeep(ed.goal)); if (ed) $('f-title').placeholder = g && g.title ? String(g.title) : (ed.ph || ''); }
     function goalBadge(id) {
         var g = goalOf(id);
         return g ? '<span class="goal-badge" title="Meta: ' + esc(g.title || 'Sem nome') + '" aria-label="Meta: ' + esc(g.title || 'Sem nome') + '">' + esc(g.emoji || '🎯') + '</span>' : '';
@@ -5041,7 +5048,7 @@
         $('f-title').addEventListener('input', function () { autoGrow(this); });
         $('f-title').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveTask(); } });
         $('f-save').addEventListener('click', saveTask);
-        $('f-goal').addEventListener('change', function () { if (S.editing) S.editing.goal = this.value || null; }); // V40.34.0
+        $('f-goal').addEventListener('change', function () { if (S.editing) { S.editing.goal = this.value || null; goalPlaceholder(); } }); // V40.34.0; V40.36.1: nome da meta clarinho
         $('f-cancel').addEventListener('click', closeTaskUi);
         $('f-delete').addEventListener('click', deleteTask);
         $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeTaskUi(); }); // V40.25.1: o 2º clique de um clique duplo não fecha

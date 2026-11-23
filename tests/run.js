@@ -40,6 +40,7 @@ const SUITES = [
     ['Metas etapa 2: bloco, tarefa, rotina e cartão ligados a uma meta; gráfico (celular, nuvem e PC)', 'test_metas_etapa2.js', [ROOT, DADOS]],
     ['Busca na agenda: PC (nome, checklist, sublista e tag; abrir, teclado, nuvem) e as mesmas regras no celular', 'test_busca_agenda.js', [ROOT, DADOS]],
     ['PC: Repetir bloco (todo dia, semana ou mês) e os 3 pontinhos na visão Dia', 'test_repetir_pc.js', [ROOT, DADOS]],
+    ['Celular: Repetir igual ao PC, cartão curto sem fatia, Metas, nome pela meta, vagos com 2 dias (V40.36.1)', 'test_v40361.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

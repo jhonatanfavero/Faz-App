@@ -971,7 +971,8 @@
             // V40.8.0: digitando em algum campo do app (ex.: item de checklist)? Não redesenha por baixo.
             var a = document.activeElement;
             // V40.34.0: campo de uma tela já fechada (translate-y-full) não conta: ninguém está digitando nele.
-            if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !(a.closest && (a.closest('#config-sheet') || a.closest('.translate-y-full')))) return true;
+            // V40.36.1: nem campo de janelinha (ou parte da tela) escondida com .hidden.
+            if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !(a.closest && (a.closest('#config-sheet') || a.closest('.translate-y-full') || a.closest('.hidden')))) return true;
         } catch (e) {}
         return false;
     }

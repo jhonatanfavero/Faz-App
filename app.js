@@ -450,7 +450,12 @@ window.selectTag = function(id) {
     selectedTagId = selectedTagId === id ? null : id;
     renderTagSelector();
 }
-window.selectNewGoal = function(id) { selectedGoalId = goalKeep(id || null); goalPickFill('goal-pick-new-wrap', 'goal-pick-new', selectedGoalId, 'selectNewGoal'); }; // V40.34.0
+window.selectNewGoal = function(id) { selectedGoalId = goalKeep(id || null); goalPickFill('goal-pick-new-wrap', 'goal-pick-new', selectedGoalId, 'selectNewGoal'); goalNamePlaceholder('task-input', selectedGoalId, 'Nome da tarefa'); }; // V40.34.0
+// V40.36.1: escolheu uma meta: o campo do nome mostra o nome dela (clarinho). Deixar vazio = fica com o nome da meta.
+function goalNamePlaceholder(inputId, goalId, normal) {
+    const el = document.getElementById(inputId), g = goalById(goalKeep(goalId));
+    if (el) el.placeholder = g && g.title ? String(g.title) : normal;
+}
 function renderTagSelector() {
     const container = document.getElementById('tag-selector-container');
     if(!container) return;
@@ -884,8 +889,7 @@ window.toggleTlCompact = function() {
     tlCompact = !tlCompact;
     try { localStorage.setItem('tb__vagos_compactos', tlCompact ? '1' : '0'); } catch (e) {}
     updateTlCompactBtn();
-    renderTimeline();
-    if (tlCompact && tlMulti()) showToast('Ocultar vagos vale quando a agenda mostra 1 dia'); // V40.26.0
+    renderTimeline(); // V40.36.1: vale também com 2 ou 3 dias (some o horário livre em TODOS os dias da tela)
 };
 // Tocar 2 vezes numa faixa ou no Tempo Livre (sem tarefa na mão) abre o + já mirando ali: o que for criado entra direto lá (V40.25.1: eram 1 toque, só na faixa).
 let sheetSlot = null; // { date, start, dur }
@@ -1100,6 +1104,17 @@ function tlRenderMulti() {
         }
         container.appendChild(col);
     });
+    // V40.36.1: vagos ocultos com vários dias: uma faixa por cima das colunas mostra o horário que encolheu (o toque
+    // passa pra coluna de baixo: 2 toques criam ali, e a tarefa na mão cai no dia tocado)
+    (tlSegs || []).forEach(sg => {
+        if (!sg.gap) return;
+        const band = document.createElement('div');
+        band.className = 'tl-multi-band';
+        band.style.top = `${tlY(sg.a) + 1}px`;
+        band.style.height = `${Math.max(sg.px - 2, 4)}px`;
+        band.innerHTML = `<span><i class="ph ph-arrows-out-line-vertical"></i>${formatClock(sg.a)}–${formatClock(sg.b)} · livre ${formatDur(sg.b - sg.a)}</span>`;
+        container.appendChild(band);
+    });
     const pct = Math.round((occupied / (TOTAL_MINS * n)) * 100) || 0;
     document.getElementById('progress-bar').style.width = `${pct}%`;
     document.getElementById('progress-text').innerText = `Planejado (${pct}%)`;
@@ -1259,10 +1274,12 @@ function renderTimeline() {
         }
     }
 
-    // V40.24.0: vagos ocultos (só na agenda normal de 1 dia; nos filtros é lista)
-    if (tlCompact && !multi && !showOnlyDelayed && !showOnlyCompleted) {
-        const lo = START_HOUR * 60, hi = END_HOUR * 60;
-        tlSegs = tlBuildSegs(db.filter(b => b.date === getActiveDateStr() && b.startMin < hi && b.startMin + b.duration > lo).sort((a, b) => a.startMin - b.startMin), lo, hi);
+    // V40.24.0: vagos ocultos (na agenda normal; nos filtros é lista). V40.36.1: com 2 ou 3 dias lado a lado a régua é
+    // uma só, então some o horário que está livre em TODOS os dias da tela (pedido dele de 22/11: antes só avisava
+    // "Ocultar vagos vale quando a agenda mostra 1 dia"). O tlBuildSegs recebe os blocos dos dias juntos, por início.
+    if (tlCompact && !showOnlyDelayed && !showOnlyCompleted) {
+        const lo = START_HOUR * 60, hi = END_HOUR * 60, days = multi ? tlMultiDays() : [getActiveDateStr()];
+        tlSegs = tlBuildSegs(db.filter(b => days.includes(b.date) && b.startMin < hi && b.startMin + b.duration > lo).sort((a, b) => a.startMin - b.startMin), lo, hi);
     }
     renderGrid(); 
     // V40.24.0: a régua pode ter mudado (vagos ocultos ou blocos novos): a linha do agora acompanha já
@@ -1529,6 +1546,14 @@ function drawBlock(block) {
         const isMicro = !block.expanded && block.duration <= 25;
         // V40.8.0: blocos de 5 e 10 min (13px e 28px de altura). Só na timeline, não no modo lista.
         const isNano = isMicro && block.duration <= 10 && !document.querySelector('.filter-list-mode');
+        // V40.36.1: o cartão recolhido só mostra a área do checklist quando cabe pelo menos uma linha inteira. Medido no
+        // Chrome: horário + nome ocupam 35 px e os respiros 41 px (76 px); a caixa "+ Adicionar Check" pede 33 px e um
+        // item do checklist, 17 px. Com menos aparecia só uma fatia da caixa e o cartão parecia cortado (foto dele de
+        // 22/11, bloco de 30 min). Sem a área, o nome usa até 2 linhas e o horário conta o checklist ("☑ 1/3").
+        // No modo lista (filtros) o cartão cresce com o conteúdo: lá nada muda.
+        const mbs = block.microblocks || [], listMode = !!document.querySelector('.filter-list-mode');
+        const checksOff = !block.expanded && (isMicro || (!listMode && heightPx - 76 < (mbs.length ? 17 : 33)));
+        const title2 = checksOff && !isMicro && !listMode;
         if (block.expanded) {
             // V40.2.21: pb-12 (era pb-6) pra dar espaço pra action bar (Editar/Duplicar/Apagar)
             // que agora ocupa o rodapé via absolute. A barra usa bottom-1, height ~32px.
@@ -1576,7 +1601,7 @@ function drawBlock(block) {
             : 'bg-black/5 hover:bg-black/10 focus:bg-white focus:border-zinc-300 text-zinc-900 placeholder-zinc-500 border-transparent shadow-sm';
 
         microblocksSection = `
-            <div class="flex-1 overflow-y-auto no-scrollbar mt-2 mb-2 ml-10 z-20 relative pointer-events-auto ${!block.expanded && block.duration <= 25 ? 'hidden' : ''}">
+            <div class="flex-1 overflow-y-auto no-scrollbar mt-2 mb-2 ml-10 z-20 relative pointer-events-auto ${checksOff ? 'hidden' : ''}">
                 ${microHtml}
                 <div class="mt-1">
                     <input type="text" id="micro-input-${block.id}" placeholder="+ Adicionar Check" class="microblock-input w-full rounded-md px-2 py-1.5 text-[10px] font-medium outline-none transition-colors border ${mbInputClasses}" onkeypress="if(event.key==='Enter') addMicroblock('${block.id}', this, event)">
@@ -1660,10 +1685,10 @@ function drawBlock(block) {
             <div class="flex justify-between items-start z-30 relative ml-10">
                 <div class="flex flex-1 min-w-0 pr-2">
                     <div class="flex flex-col flex-1 min-w-0 pointer-events-auto">
-                        <span ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition max-w-full" title="${isSearching ? '' : 'Alterar Horário'}">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}</span>
-                        <div class="title-wrapper flex items-center ${isMicro ? 'mt-0' : 'mt-0.5'} min-w-0 pointer-events-none">
-                            ${pastIconHtml}
-                            <h3 class="block-title ${isMicro ? 'text-[13px] mt-0' : 'text-[14px]'} font-bold leading-tight truncate ${titleClass}">${goalBadge(block.goalId)}${escapeHtml(block.title)}</h3>
+                        <span ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} class="time-label ${isMicro ? 'hidden' : 'block'} text-[10px] font-bold tracking-widest ${timeColor} uppercase opacity-90 truncate ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition max-w-full" title="${isSearching ? '' : 'Alterar Horário'}">${formatClock(block.startMin)} - ${formatClock(block.startMin + block.duration)} &bull; ${formatDur(block.duration)}${title2 && mbs.length ? ` &bull; <i class="ph-bold ph-check-square"></i> ${mbs.filter(m => m && m.done).length}/${mbs.length}` : ''}</span>
+                        <div class="title-wrapper flex ${title2 || block.expanded ? 'items-start' : 'items-center'} ${isMicro ? 'mt-0' : 'mt-0.5'} min-w-0 pointer-events-none">
+                            ${title2 || block.expanded ? pastIconHtml.replace('class="pointer-events-auto', 'class="mt-[2px] pointer-events-auto') : pastIconHtml}
+                            <h3 class="block-title ${isMicro ? 'text-[13px] mt-0' : 'text-[14px]'} font-bold leading-tight ${block.expanded ? 'min-w-0 break-words' : title2 ? 'min-w-0 line-clamp-2 break-words' : 'truncate'} ${titleClass}">${goalBadge(block.goalId)}${escapeHtml(block.title)}</h3>
                             <span class="micro-time ${isMicro ? 'block' : 'hidden'} text-[11px] font-bold ${timeColor} ml-1 shrink-0 ${isSearching ? '' : 'cursor-pointer hover:opacity-70 hover:underline'} transition pointer-events-auto" ${isSearching ? '' : `onclick="openTimePicker('${block.id}', ${block.startMin}, event)"`} title="${isSearching ? '' : 'Alterar Horário'}">&bull; <span class="micro-time-val">${formatDur(block.duration)}</span></span>
                         </div>
                     </div>
@@ -1967,6 +1992,7 @@ function renderSubCardForm() {
     });
     document.getElementById('sub-card-tags').innerHTML = html;
     goalPickFill('sub-card-goal-wrap', 'sub-card-goals', ed.goalId, 'selectSubCardGoal'); // V40.34.0
+    goalNamePlaceholder('sub-card-title', ed.goalId, ''); // V40.36.1
     fazRenderColorPicker('sub-card-colors', ed.color, 'fazPickSubCardColor');
     renderSubCardMbs();
     const del = document.getElementById('sub-card-del');
@@ -1984,7 +2010,7 @@ function renderSubCardMbs() {
         </div>`).join('') : '<p class="text-[11px] text-zinc-400 px-1">Sem checklist.</p>';
 }
 window.selectSubCardTag = function(id) { if (!subCardEdit) return; subCardEdit.tagId = subCardEdit.tagId === id ? null : id; renderSubCardForm(); };
-window.selectSubCardGoal = function(id) { if (!subCardEdit) return; subCardEdit.goalId = goalKeep(id || null); goalPickFill('sub-card-goal-wrap', 'sub-card-goals', subCardEdit.goalId, 'selectSubCardGoal'); }; // V40.34.0
+window.selectSubCardGoal = function(id) { if (!subCardEdit) return; subCardEdit.goalId = goalKeep(id || null); goalPickFill('sub-card-goal-wrap', 'sub-card-goals', subCardEdit.goalId, 'selectSubCardGoal'); goalNamePlaceholder('sub-card-title', subCardEdit.goalId, ''); }; // V40.34.0; V40.36.1: nome da meta clarinho
 window.fazPickSubCardColor = function(c) { if (!subCardEdit) return; subCardEdit.color = fazCardColor(c); fazRenderColorPicker('sub-card-colors', subCardEdit.color, 'fazPickSubCardColor'); };
 window.toggleSubCardMb = function(i) { const m = subCardEdit && subCardEdit.mbs[i]; if (m) { m.done = !m.done; renderSubCardMbs(); } };
 window.removeSubCardMb = function(i) { if (!subCardEdit) return; subCardEdit.mbs.splice(i, 1); renderSubCardMbs(); };
@@ -2002,7 +2028,8 @@ window.saveSubCard = function() {
     if (!ed) return;
     const f = subFindCard(ed.bid, ed.cid);
     if (!f) { closeSubCard(); return showToast('Esse cartão não está mais na sublista.'); }
-    const title = document.getElementById('sub-card-title').value.trim();
+    const sg = goalById(goalKeep(ed.goalId));
+    const title = document.getElementById('sub-card-title').value.trim() || (sg ? String(sg.title || '').trim() : ''); // V40.36.1: vazio com meta = nome da meta
     if (!title) { document.getElementById('sub-card-title').focus({ preventScroll: true }); return showToast('Dê um nome pro cartão.'); }
     const pending = document.getElementById('sub-card-mb-new').value.trim(); // escreveu um item e não deu Enter: vale também
     if (pending) ed.mbs.push({ title: pending.slice(0, 200), done: false });
@@ -2620,9 +2647,10 @@ function addDaysToDateStr(dateStr, days) {
     return d.toLocaleDateString('en-CA');
 }
 function addMonthToDateStr(dateStr, monthsToAdd) {
-    let d = new Date(dateStr + 'T00:00:00');
-    d.setMonth(d.getMonth() + monthsToAdd);
-    return d.toLocaleDateString('en-CA');
+    // V40.36.1: dia 29 a 31 num mês menor vai pro último dia do mês e volta no seguinte (31/01 → 28/02 → 31/03),
+    // como no PC. Antes o setMonth escorregava pro mês seguinte (31/01 + 1 mês = 03/03).
+    const d = new Date(dateStr + 'T12:00:00'), y = d.getFullYear(), m = d.getMonth() + monthsToAdd;
+    return new Date(y, m, Math.min(d.getDate(), new Date(y, m + 1, 0).getDate()), 12).toLocaleDateString('en-CA');
 }
 
 window.duplicateTask = function(id, e) {
@@ -2644,6 +2672,7 @@ window.cloneManual = function() {
         duration: taskToClone.duration, 
         theme: taskToClone.theme || 'focus',
         tagId: taskToClone.tagId || null, // V40.1.4: preserva tag
+        ...(fazCardColor(taskToClone.color) ? { color: taskToClone.color } : {}), // V40.36.1: a cor do cartão vai junto (como no Duplicar do PC)
         ...(goalKeep(taskToClone.goalId) ? { goalId: taskToClone.goalId } : {}), // V40.34.0
         microblocks: taskToClone.microblocks || [], // V40.1.4: copia microblocks
         ...(isSublist(taskToClone) ? { cards: subCloneCards(taskToClone.cards) } : {}) // V40.24.0: sublista leva os cartões (desmarcados)
@@ -2660,42 +2689,121 @@ window.cloneManual = function() {
     showToast("Pronto para colar! Navegue até o dia e toque num espaço livre.");
 }
 
+// V40.36.1 — REPETIR (Diariamente / Semanalmente / Mensalmente), igual ao Repetir do PC (V40.36.0):
+// - o dia em que o horário já está ocupado fica de fora (antes a cópia ficava por cima do outro bloco), e a janelinha
+//   mostra isso antes de confirmar;
+// - "Mensalmente" no dia 31 vai pro último dia do mês (addMonthToDateStr);
+// - a cópia segue o horário: o que já passou nasce "passado" e o que vem pela frente, "focus" (antes copiava o tipo e o
+//   atraso do original: repetir um bloco que já tinha passado criava cópias futuras "passadas"); não concluída, sem
+//   atraso e sem notas; checklist e cartões da sublista desmarcados, com ids novos; tag e meta só se ainda existem;
+// - no máximo 60 dias, 52 semanas ou 24 meses (começa em 5, 4 e 2, como sempre);
+// - um passo só do Desfazer, com o texto "Repetido 4 vezes · 1 dia de fora" (no lugar do aviso vermelho "Clonado com
+//   sucesso!": aviso vermelho fica pra problema).
+const CLONE_MAX = { daily: 60, weekly: 52, monthly: 24 };
+const CLONE_DEF = { daily: 5, weekly: 4, monthly: 2 };
+function cloneSource() { return taskToClone ? db.find((x) => x && x.id === taskToClone.id) || null : null; } // o bloco de agora (a sincronização troca os objetos)
+function cloneDayTxt(ds) { // "Qua 18/11" (com o ano quando não é este)
+    const d = new Date(ds + 'T12:00:00'), p = (n) => String(n).padStart(2, '0');
+    return TL_WD[d.getDay()] + ' ' + p(d.getDate()) + '/' + p(d.getMonth() + 1) + (d.getFullYear() !== new Date().getFullYear() ? '/' + d.getFullYear() : '');
+}
+function cloneDur(b) { return Number(b.duration) > 0 ? Number(b.duration) : 15; }
+function cloneBusy(ds, st, dur) { return db.some((x) => x && x.date === ds && st < x.startMin + (Number(x.duration) || 0) && x.startMin < st + dur); }
+function clonePlan(b, type, n) { // os dias das cópias: livres (vão ser criadas) e ocupados (ficam de fora)
+    const st = b.startMin, dur = cloneDur(b), free = [], busy = [];
+    for (let i = 1; i <= n; i++) {
+        const ds = type === 'daily' ? addDaysToDateStr(b.date, i) : type === 'weekly' ? addDaysToDateStr(b.date, i * 7) : addMonthToDateStr(b.date, i);
+        (cloneBusy(ds, st, dur) ? busy : free).push(ds);
+    }
+    return { free, busy };
+}
+function clonePastAt(ds, st, dur) { const t = getTodayStr(), now = new Date(); return ds < t || (ds === t && st + dur <= now.getHours() * 60 + now.getMinutes()); }
+function cloneCopy(b, ds, k) {
+    const base = Date.now() + '_' + k;
+    const nb = {
+        ...b, id: 'f_' + base + '_' + Math.random().toString(36).slice(2, 6), date: ds,
+        type: clonePastAt(ds, b.startMin, cloneDur(b)) ? 'past' : 'focus',
+        microblocks: (b.microblocks || []).map((mb, i) => ({ ...mb, id: 'mb_' + base + '_' + i, done: false })),
+        completed: false, expanded: false, linkedNoteIds: []
+    };
+    delete nb.wasDelayed;
+    if (isSublist(b)) { nb.cards = subCloneCards(b.cards); delete nb.goalId; } // a sublista não tem meta (os cartões têm)
+    else if (!goalKeep(b.goalId)) delete nb.goalId;
+    if (nb.tagId && !(tagsDb || []).some((t) => t && t.id === nb.tagId)) nb.tagId = null;
+    return nb;
+}
+function cloneQtdN() { const v = parseInt(document.getElementById('clone-qtd-input').value, 10); return isNaN(v) ? 0 : v; }
+function cloneQtdBlur() { const i = document.getElementById('clone-qtd-input'); if (i && document.activeElement === i) i.blur(); } // campo com foco numa janelinha fechada seguraria o sync
+function cloneQtdRender() {
+    const b = cloneSource(), max = CLONE_MAX[pendingCloneType] || 60, n = cloneQtdN();
+    const sum = document.getElementById('clone-qtd-sum'), busyEl = document.getElementById('clone-qtd-busy'), ok = document.getElementById('clone-qtd-ok');
+    document.getElementById('clone-qtd-minus').disabled = n <= 1;
+    document.getElementById('clone-qtd-plus').disabled = n >= max;
+    busyEl.classList.add('hidden');
+    if (!b) { sum.textContent = 'Esse bloco não está mais na agenda.'; ok.disabled = true; ok.textContent = 'Nada pra criar'; return null; }
+    if (n < 1) { sum.textContent = 'Escolha de 1 a ' + max + '.'; ok.disabled = true; ok.textContent = 'Criar'; return null; }
+    const p = clonePlan(b, pendingCloneType, n), f = p.free;
+    sum.textContent = f.length
+        ? 'Às ' + formatClock(b.startMin) + ', ' + (f.length === 1 ? 'em ' + cloneDayTxt(f[0]) : 'de ' + cloneDayTxt(f[0]) + ' a ' + cloneDayTxt(f[f.length - 1])) + '. ' +
+          (isSublist(b) ? 'Os cartões vão junto, desmarcados.' : (b.microblocks || []).length ? 'O checklist vai junto, desmarcado.' : 'Cada cópia começa não concluída.')
+        : 'O horário está ocupado em todos esses dias.';
+    if (f.length && p.busy.length) {
+        const list = p.busy.slice(0, 3).map(cloneDayTxt).join(', ') + (p.busy.length > 3 ? ' e mais ' + (p.busy.length - 3) : '');
+        busyEl.textContent = p.busy.length === 1 ? list + ' fica de fora: o horário já está ocupado.' : p.busy.length + ' dias ficam de fora (horário ocupado): ' + list + '.';
+        busyEl.classList.remove('hidden');
+    }
+    ok.disabled = !f.length;
+    ok.textContent = f.length ? 'Criar ' + f.length + (f.length === 1 ? ' cópia' : ' cópias') : 'Nada pra criar';
+    return p;
+}
+
 window.promptCloneQtd = function(type) {
     if(!taskToClone) return;
     pendingCloneType = type;
-    const modal = document.getElementById('clone-qtd-modal');
-    const title = document.getElementById('clone-qtd-title');
+    const modal = document.getElementById('clone-qtd-modal'), b = cloneSource();
+    document.getElementById('clone-qtd-title').textContent = type === 'daily' ? 'Quantos dias seguidos?' : type === 'weekly' ? 'Por quantas semanas?' : 'Por quantos meses?';
+    document.getElementById('clone-qtd-sub').textContent = b ? (b.title || 'Sem nome') + ' · ' + cloneDayTxt(b.date) + ' · ' + formatClock(b.startMin) + '–' + formatClock(b.startMin + cloneDur(b)) : '';
     const input = document.getElementById('clone-qtd-input');
-
-    if(type === 'daily') { title.innerText = 'Quantos dias seguidos?'; input.value = '5'; }
-    else if(type === 'weekly') { title.innerText = 'Por quantas semanas?'; input.value = '4'; }
-    else if(type === 'monthly') { title.innerText = 'Por quantos meses?'; input.value = '2'; }
-
-    document.getElementById('clone-sheet').classList.add('translate-y-full'); 
+    input.max = String(CLONE_MAX[type] || 60);
+    input.value = String(CLONE_DEF[type] || 1);
+    document.getElementById('clone-sheet').classList.add('translate-y-full');
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+    cloneQtdRender();
+}
+window.cloneQtdInput = function() { // só números, até o máximo
+    const inp = document.getElementById('clone-qtd-input'), max = CLONE_MAX[pendingCloneType] || 60;
+    const n = parseInt(String(inp.value).replace(/\D/g, ''), 10);
+    if (!isNaN(n) && String(Math.min(n, max)) !== inp.value) inp.value = String(Math.min(n, max));
+    cloneQtdRender();
+}
+window.cloneQtdStep = function(d) {
+    const max = CLONE_MAX[pendingCloneType] || 60;
+    document.getElementById('clone-qtd-input').value = String(Math.max(1, Math.min(max, cloneQtdN() + d)));
+    cloneQtdRender();
+}
+window.cloneQtdKey = function(e) { // Enter (o "Ir" do teclado) confirma
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (!document.getElementById('clone-qtd-ok').disabled) confirmCloneQtd();
 }
 
 window.confirmCloneQtd = function() {
-    const inputVal = document.getElementById('clone-qtd-input').value;
-    const num = parseInt(inputVal);
-    if(isNaN(num) || num <= 0) return showToast("Número inválido.");
-
-    for(let i=1; i<=num; i++) {
-        let nextDate;
-        if(pendingCloneType === 'daily') nextDate = addDaysToDateStr(taskToClone.date, i);
-        else if(pendingCloneType === 'weekly') nextDate = addDaysToDateStr(taskToClone.date, i * 7);
-        else if(pendingCloneType === 'monthly') nextDate = addMonthToDateStr(taskToClone.date, i);
-
-        db.push({...taskToClone, id: 'f_' + Date.now() + '_' + Math.random(), date: nextDate, microblocks: (taskToClone.microblocks || []).map(mb => ({...mb, id: 'mb_' + Date.now() + Math.random(), done: false})), completed: false, expanded: false, linkedNoteIds: [], ...(isSublist(taskToClone) ? { cards: subCloneCards(taskToClone.cards) } : {})}); // V40.24.0: sublista
-    }
+    const b = cloneSource();
+    if (!b) { cloneQtdBlur(); closeAllSheets(); return showToast('Esse bloco não está mais na agenda.'); }
+    const n = Math.min(cloneQtdN(), CLONE_MAX[pendingCloneType] || 60);
+    if (n < 1) return showToast("Número inválido.");
+    const p = clonePlan(b, pendingCloneType, n);
+    if (!p.free.length) return showToast('O horário está ocupado em todos esses dias.');
+    p.free.forEach((ds, k) => db.push(cloneCopy(b, ds, k)));
     saveDb();
+    undoNameStep('Repetido ' + (p.free.length === 1 ? '1 vez' : p.free.length + ' vezes') + (p.busy.length ? ' · ' + p.busy.length + (p.busy.length === 1 ? ' dia' : ' dias') + ' de fora' : ''));
+    cloneQtdBlur();
     closeAllSheets();
     renderTimeline(); // V40.2.8: re-render pra atualizar lista de busca se estiver ativa
-    showToast(`Clonado com sucesso!`);
 }
 
 window.cancelCloneQtd = function() {
+    cloneQtdBlur();
     closeAllSheets();
 }
 
@@ -3038,6 +3146,7 @@ window.openSheet = () => {
     renderTagSelector();
     selectedGoalId = null; // V40.34.0
     goalPickFill('goal-pick-new-wrap', 'goal-pick-new', null, 'selectNewGoal');
+    goalNamePlaceholder('task-input', null, 'Nome da tarefa'); // V40.36.1
 
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     sheet.classList.remove('translate-y-full');
@@ -3263,7 +3372,8 @@ window.closeAllSheets = () => {
 window.closeSheet = window.closeAllSheets;
 
 window.commitIntent = () => {
-    const title = input.value.trim();
+    const g = goalById(goalKeep(selectedGoalId));
+    const title = input.value.trim() || (g ? String(g.title || '').trim() : ''); // V40.36.1: com meta escolhida, o nome pode ficar vazio (vale o da meta)
     if (!title) return;
     const slot = tlTakeSlot(); // V40.24.0: veio de uma faixa de vago oculto
     
@@ -3480,7 +3590,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.36.0',
+            version: 'v40.36.1',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -5356,8 +5466,9 @@ window.renderGoals = function() {
             `<div class="flex items-center gap-2 px-1 pt-3 pb-2"><h3 class="min-w-0 truncate text-[11px] font-bold uppercase tracking-wider text-zinc-500">${name}</h3>` +
             `<span class="text-[11px] font-bold text-zinc-400">${goals.length}</span>` +
             `<button type="button" onclick="openGoalListMenu('${id}')" aria-label="Opções da categoria ${name}" class="goal-section-menu ml-auto w-8 h-8 -mr-1 flex items-center justify-center text-zinc-400 hover:text-zinc-700 rounded-lg active:scale-90 transition"><i class="ph-bold ph-dots-three text-base"></i></button></div>` +
-            (goals.length ? goals.map(g => goalCardHtml(g, st[g.id], M)).join('')
-                : `<button type="button" onclick="openGoalForm(null, '${id}')" class="goal-section-add w-full mb-2.5 py-3 rounded-2xl border-2 border-dashed border-zinc-200 text-zinc-400 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] transition"><i class="ph ph-plus"></i> Meta em ${name}</button>`) +
+            goals.map(g => goalCardHtml(g, st[g.id], M)).join('') +
+            // V40.36.1: o atalho fica em toda categoria, não só na vazia (sem ele parecia que só cabia uma meta por categoria)
+            `<button type="button" onclick="openGoalForm(null, '${id}')" class="goal-section-add w-full mb-2.5 ${goals.length ? 'py-2.5' : 'py-3'} rounded-2xl border-2 border-dashed border-zinc-200 text-zinc-400 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] transition"><i class="ph ph-plus"></i> Meta em ${name}</button>` +
             `</section>`;
     });
     html += `<button type="button" onclick="openCreateGoalList()" class="goal-new-cat mt-1 mb-2 mx-auto flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-zinc-500 hover:bg-zinc-100 active:scale-95 transition"><i class="ph ph-folder-plus text-sm"></i> Nova categoria</button>`;
@@ -7116,6 +7227,7 @@ function updateBacklogFormVisuals() {
         tagContainer.innerHTML = html;
     }
     goalPickFill('bl-form-goal-wrap', 'bl-form-goal-container', currentBlGoalId, 'selectBacklogFormGoal'); // V40.34.0
+    goalNamePlaceholder('backlog-input', currentBlGoalId, 'Nome da tarefa'); // V40.36.1
 }
 
 function syncBlMicroblocksFromDOM() {
@@ -7211,7 +7323,8 @@ function scrollNewCheckIntoView(inputEl) {
 }
 
 window.saveBacklogForm = function() {
-    const title = document.getElementById('backlog-input').value.trim();
+    const bg = goalById(goalKeep(currentBlGoalId));
+    const title = document.getElementById('backlog-input').value.trim() || (bg ? String(bg.title || '').trim() : ''); // V40.36.1: vazio com meta = nome da meta
     if (!title) return showToast('A tarefa precisa de um nome.');
 
     syncBlMicroblocksFromDOM();
@@ -8568,6 +8681,9 @@ function undoTouch(key) {
     }
     if (ch.length || reord) undoAdd(key, ch, reord ? old.ids : null, reord ? now.ids : null);
 }
+// V40.36.1: dá um texto próprio ao passo que está sendo juntado agora (chamar logo depois do save*()). Sem passo
+// aberto (desfazer desligado, ou nada mudou) não faz nada: o texto não sobra pra outro passo.
+function undoNameStep(label) { if (undoGroup && label) undoGroup.label = label; }
 function undoAdd(key, ch, ob, oa) {
     if (!undoGroup) { undoGroup = { keys: {}, at: Date.now() }; setTimeout(undoClose, 0); } // tudo do mesmo toque = um passo
     const G = undoGroup.keys[key] || (undoGroup.keys[key] = { ch: new Map(), ob: null, oa: null });
@@ -8597,7 +8713,7 @@ function undoClose() {
     });
     const ks = Object.keys(keys);
     if (!ks.length) return;
-    const step = { keys, at: g.at, label: undoLabel(keys) };
+    const step = { keys, at: g.at, label: g.label || undoLabel(keys) }; // V40.36.1: g.label = texto próprio (undoNameStep)
     step.quiet = ks.every((k) => k === 'metas_dias'); // o "+" das metas já tem o "−" do lado: não precisa da barrinha
     step.heavy = !!keys.arquivo || ks.some((k) => keys[k].ch.some((c) => !c.a)); // apagou ou arquivou: a barrinha fica mais tempo
     undoStack.push(step);

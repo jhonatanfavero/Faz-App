@@ -83,6 +83,12 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     tinham blocos ganham uma marca com o alvo antigo (`FazMetas.targetMarks`), senão a estrela antiga mudaria.
     Recomeçar grava `countFrom` (`count_from`): bloco de antes não conta mais. Tarefa e rotina passam a meta
     para o bloco que viram (agendar, na mão, rotina na agenda, voltar pra lista, duplicar, repetir).
+15. **O pé da tela tem barra por cima em todo celular (V40.36.1).** No iPhone é o risco de início; no Android
+    (Chrome 135+, com o `viewport-fit=cover` do `index.html`) a tela do app vai até embaixo, ATRÁS da barra de
+    navegação. Elemento fixo no pé usa `env(safe-area-inset-bottom)` sempre, fora do bloco só de iOS (como o
+    `#fab-btn`, o `#floating-task` e a `#undo-bar` no `style.css`); dentro das telas cheias (`[id$="-sheet"]`)
+    quem cuida é o `padding-bottom` delas: não some a barra de novo. O `tests/navegador/iphone.js` confere os
+    dois (iPhone e Android).
 
 ## Publicar uma versão
 

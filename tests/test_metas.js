@@ -125,7 +125,7 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   const g1 = ev('goalsDb[0]');
   ok(ev('goalsDb.length') === 1 && /^meta_\d+$/.test(g1.id) && g1.listId === 'gl_pessoal' && g1.target === 8 && g1.step === 1 && g1.period === 'dia' && g1.unit === 'vezes' && lastToast() === 'Meta criada! 🎯', 'Salvar: meta criada (id meta_..., lista Pessoal, 8 vezes por dia)');
   ok(!$('goals-list-view').classList.contains('hidden') && /Beber água/.test($('goals-container').textContent) && /0 de 8 hoje/.test($('goals-container').textContent) && d.querySelector('#goals-container .goal-plus').textContent === '+1', 'volta pra lista: cartão "💧 Beber água · 0 de 8 hoje" com o botão +1');
-  ok(secs()[0] === 'Pessoal1' && secOf('gl_pessoal').querySelector('[data-goal="' + g1.id + '"]') && !secOf('gl_pessoal').querySelector('.goal-section-add') && !/Crie sua primeira meta/.test($('goals-container').textContent), 'a meta aparece embaixo do título Pessoal (que conta 1)');
+  ok(secs()[0] === 'Pessoal1' && secOf('gl_pessoal').querySelector('[data-goal="' + g1.id + '"]') && secOf('gl_pessoal').lastElementChild.classList.contains('goal-section-add') && !/Crie sua primeira meta/.test($('goals-container').textContent), 'a meta aparece embaixo do título Pessoal (que conta 1); o "+ Meta em Pessoal" continua, depois dela (V40.36.1)');
 
   for (let i = 0; i < 7; i++) w.goalBump(g1.id, 1);
   ok(/7 de 8 hoje/.test($('goals-container').textContent) && [...d.querySelectorAll('#goals-container button')].some((b) => b.getAttribute('aria-label') === 'Desfazer o último +') && !toasts().some((t) => /Meta cumprida/.test(t)), '+1 sete vezes: "7 de 8 hoje", aparece o − e nada de estrela ainda');

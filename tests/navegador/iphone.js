@@ -6,12 +6,16 @@
 //   - nada tocável coberto por outra coisa (o dedo acertaria outra coisa);
 //   - nenhum campo vazando do cartão e nada passando da largura da tela.
 // Duas telas de iPhone: 13 (390×844, 47 px em cima) e 13 mini (375×812, 50 px). Fotos com a barra de mentira.
+// V40.36.1: e um Android (Samsung, barra de 3 botões): desde o Chrome 135, com viewport-fit=cover, a tela do app vai
+// até embaixo, ATRÁS da barra de navegação (opaca), e o env(safe-area-inset-bottom) diz quanto ela ocupa. Sem o bloco
+// só de iOS. Foto dele de 22/11: os botões "54 itens" e "+" ficavam pela metade atrás da barra.
 // Uso: CHROME=/usr/bin/google-chrome FOTOS=<pasta> TZ='America/Sao_Paulo' node tests/navegador/iphone.js
 const { abrir, celular } = require('./apoio');
 
 const IPHONES = [
     { nome: 'iPhone 13', w: 390, h: 844, top: 47, bot: 34 },
-    { nome: 'iPhone 13 mini', w: 375, h: 812, top: 50, bot: 34 }
+    { nome: 'iPhone 13 mini', w: 375, h: 812, top: 50, bot: 34 },
+    { nome: 'Android (barra de 3 botões)', w: 393, h: 808, top: 0, bot: 49, android: true, foto: 'android-' }
 ];
 
 (async () => {
@@ -26,8 +30,8 @@ const IPHONES = [
             let css = await r.text();
             css = css.replace(/env\(\s*safe-area-inset-top[^)]*\)/g, ip.top + 'px')
                 .replace(/env\(\s*safe-area-inset-bottom[^)]*\)/g, ip.bot + 'px')
-                .replace(/env\(\s*safe-area-inset-(left|right)[^)]*\)/g, '0px')
-                .replace(/@supports\s*\(-webkit-touch-callout:\s*none\)/g, '@supports (display: block)');
+                .replace(/env\(\s*safe-area-inset-(left|right)[^)]*\)/g, '0px');
+            if (!ip.android) css = css.replace(/@supports\s*\(-webkit-touch-callout:\s*none\)/g, '@supports (display: block)'); // só no iPhone
             await route.fulfill({ response: r, body: css, headers: Object.assign({}, r.headers(), { 'content-type': 'text/css; charset=utf-8' }) });
         });
         const m = await ctx.newPage();
@@ -60,6 +64,11 @@ const IPHONES = [
             const bot = document.createElement('div');
             bot.id = '__ios_home';
             bot.style.cssText = `position:fixed;left:50%;bottom:8px;width:134px;height:5px;margin-left:-67px;border-radius:3px;background:#111;z-index:2147483647;pointer-events:none`;
+            if (ip.android) { // V40.36.1: a barra de navegação do Android é opaca e cobre o pé da tela
+                bot.style.cssText = `position:fixed;left:0;right:0;bottom:0;height:${ip.bot}px;z-index:2147483647;pointer-events:none;background:#ef4444;color:#fff;font:600 22px sans-serif;display:flex;align-items:center;justify-content:space-around`;
+                bot.innerHTML = '<span>|||</span><span>○</span><span>‹</span>';
+                top.style.display = 'none';
+            }
             document.body.append(top, bot);
         }, ip);
         return { ctx, m };
@@ -108,7 +117,7 @@ const IPHONES = [
                         const ps = getComputedStyle(p);
                         if (/(auto|scroll)/.test(ps.overflowY) && p.scrollHeight > p.clientHeight + 2 && p.scrollTop < p.scrollHeight - p.clientHeight - 2) { rola = true; break; }
                     }
-                    if (!rola) out.push({ tipo: 'em cima do risco de início', quem, rect });
+                    if (!rola) out.push({ tipo: ip.android ? 'atrás da barra de navegação' : 'em cima do risco de início', quem, rect });
                 }
                 if (!scrollX && (r0.right > W + 1 || r0.left < -1)) out.push({ tipo: 'passa da largura da tela', quem, rect });
                 if (/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) && el.parentElement) {
@@ -177,12 +186,13 @@ const IPHONES = [
         ['Janelinha: cartão da sublista', "closeAllSheets(); openSublistCard('f_ip_sub', 'cd_ip1', { stopPropagation() {} });", '#sub-card-modal', { depois: 'closeSubCard();' }], // V40.34.0: + linha Meta
         ['Janelinha: apagar bloco', `closeAllSheets(); openDeleteModal(db.find((x) => x.date === '2026-11-16').id);`, '#delete-task-modal', { depois: 'cancelDelete();' }],
         ['Janelinha: horário', `closeAllSheets(); openTimePicker(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} });`, '#time-picker-modal', { depois: 'cancelTimePicker();' }],
+        ['Janelinha: repetir', `closeAllSheets(); duplicateTask(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} }); promptCloneQtd('daily');`, '#clone-qtd-modal', { depois: 'cancelCloneQtd();' }], // V40.36.1: −/+ e o resumo
         ['Tarefa na mão', `closeAllSheets(); scheduleBacklogItem(backlogDb[0].id);`, '#floating-task', { depois: 'cancelPendingTask();' }],
         ['Barrinha do Desfazer', `closeAllSheets(); (() => { const b = db.find((x) => x.date === '2026-11-16'); toggleBlockCompletion(b.id, { stopPropagation() {} }); })();`, '#undo-bar', { espera: 400, depois: '(() => { const b = db.find((x) => x.date === "2026-11-16"); toggleBlockCompletion(b.id, { stopPropagation() {} }); undoBarHide && undoBarHide(); })();' }]
     ];
 
     for (const ip of IPHONES) {
-        console.log(`\n${ip.nome} (${ip.w}×${ip.h}, barra de status ${ip.top} px, risco de início ${ip.bot} px):`);
+        console.log(`\n${ip.nome} (${ip.w}×${ip.h}, ` + (ip.android ? `barra de navegação ${ip.bot} px):` : `barra de status ${ip.top} px, risco de início ${ip.bot} px):`));
         const { ctx, m } = await abrirIphone(ip);
         for (const [nome, abre, raiz, opts] of TELAS) {
             try { if (abre) await m.evaluate(abre); } catch (e) { ok(false, `${nome}: não abriu (${String(e.message || e).slice(0, 120)})`); continue; }
@@ -190,7 +200,7 @@ const IPHONES = [
             const probs = await conferir(m, ip, raiz, opts);
             const lista = probs.map((p) => `${p.tipo}: ${p.quem} [${p.rect}]`);
             ok(!probs.length, `${nome}` + (probs.length ? ':\n        - ' + lista.slice(0, 8).join('\n        - ') + (lista.length > 8 ? `\n        (+${lista.length - 8})` : '') : ''));
-            if (ip.w === 390) await foto(m, 'iphone-' + nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png');
+            if (ip.w === 390 || ip.android) await foto(m, (ip.foto || 'iphone-') + nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png');
             if (opts && opts.depois) { try { await m.evaluate(opts.depois); } catch (e) {} await m.waitForTimeout(150); }
         }
         await ctx.close();

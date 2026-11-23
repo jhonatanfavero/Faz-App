@@ -271,7 +271,7 @@ const UID = '11111111-1111-1111-1111-111111111111';
   ok(!bar() && steps().length === 2, 'mudança feita com um campo em foco: guarda o passo, mas não cobre o campo');
   $('search-input').blur();
   const css = fs.readFileSync(path.join(REPO, 'style.css'), 'utf8');
-  ok(/#undo-bar\.hidden \{ display: none; \}/.test(css) && /#undo-bar \{[^}]*z-index: 55;/.test(css) && /#floating-task:not\(\.hidden\) ~ #undo-bar \{ bottom: 160px; \}/.test(css), 'CSS: some de verdade quando escondida, fica acima das telas (55) e sobe com a tarefa na mão');
+  ok(/#undo-bar\.hidden \{ display: none; \}/.test(css) && /#undo-bar \{[^}]*z-index: 55;/.test(css) && /#floating-task:not\(\.hidden\) ~ #undo-bar \{ bottom: 160px; bottom: calc\(max\(1\.5rem, calc\(env\(safe-area-inset-bottom\) \+ 0\.5rem\)\) \+ 136px\); \}/.test(css) && /#undo-bar \{[^}]*bottom: calc\(max\(2rem, calc\(env\(safe-area-inset-bottom\) \+ 0\.75rem\)\) \+ 68px\);/.test(css), 'CSS: some de verdade quando escondida, fica acima das telas (55) e sobe com a tarefa na mão (e com a barra de baixo do celular, V40.36.1)');
   const sibs = [...$('undo-bar').parentElement.children];
   ok(sibs.indexOf($('floating-task')) >= 0 && sibs.indexOf($('floating-task')) < sibs.indexOf($('undo-bar')), 'a barrinha vem depois da faixa da tarefa na mão (o CSS "~" depende disso)');
   w.toggleBlockCompletion(K1, { stopPropagation() {} }); await tick();

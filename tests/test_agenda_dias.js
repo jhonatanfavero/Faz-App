@@ -146,8 +146,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(cols().length === 0, 'busca: lista de sempre');
   ev("searchQuery = ''; renderTimeline();");
   $('tl-compact-btn').click();
-  ok(cols().length === 3 && !d.querySelector('#blocks-container .tl-gap') && ev('tlSegs') === null, 'ocultar vagos ligado: com vários dias a régua continua inteira (vale só em 1 dia)');
-  ok(toasts()[toasts().length - 1] === 'Ocultar vagos vale quando a agenda mostra 1 dia', 'e avisa: "' + toasts()[toasts().length - 1] + '"');
+  // V40.36.1: com vários dias some o horário livre em TODOS os dias da tela (antes: régua inteira e o aviso "vale só em 1 dia")
+  ok(cols().length === 3 && ev('tlSegs') !== null && d.querySelectorAll('#blocks-container .tl-multi-band').length === ev('tlSegs.filter((s) => s.gap).length'), 'ocultar vagos ligado com 3 dias: a régua encolhe onde os 3 estão livres, com uma faixa por vago');
+  ok(!toasts().includes('Ocultar vagos vale quando a agenda mostra 1 dia'), 'e não avisa mais "vale só em 1 dia"');
   ev('setTlDays(1)');
   ok(!!d.querySelector('#blocks-container .tl-gap'), 'em 1 dia os vagos ficam ocultos de novo');
   $('tl-compact-btn').click();

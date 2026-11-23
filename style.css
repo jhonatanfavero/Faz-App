@@ -564,3 +564,12 @@ body { overflow-x: hidden; max-width: 100vw; }
     #header-filters-row { gap: 6px !important; }
     #header-filters-row > button.shrink-0 { padding: 6px !important; }
 }
+
+/* V40.39.0: busca nas Listas do celular */
+.bl-search:focus-within { border-color: var(--theme-color, #4f46e5); color: var(--theme-color, #4f46e5); }
+mark.bl-hl { background: #fde68a; color: inherit; border-radius: 3px; padding: 0 1px; }
+.card-dark mark.bl-hl { color: #18181b !important; }
+.bl-dot-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9999px; font-size: 10px; font-weight: 800; line-height: 18px; text-align: center; flex: none; background: #e4e4e7; color: #3f3f46; }
+.bl-dot-n.on { background: var(--theme-color, #4f46e5); color: #fff; }
+.bl-dot-0 { width: 6px; height: 6px; border-radius: 9999px; flex: none; background: #e4e4e7; }
+.bl-dot-0.on { background: var(--theme-color, #4f46e5); opacity: .45; }

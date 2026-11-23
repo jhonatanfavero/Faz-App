@@ -197,6 +197,15 @@
     .ag-sres-hit.done > span { text-decoration: line-through; color: #a1a1aa; }
     .ag-found { animation: agFound 2.6s ease-out; }
     @keyframes agFound { 0%, 55% { box-shadow: 0 0 0 3px var(--focus); } 100% { box-shadow: 0 0 0 3px transparent; } }
+    /* V40.39.0: busca nas Listas (filtra as próprias listas) */
+    .painted mark.ag-hl { color: #18181b !important; }
+    .ls-hits { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+    .ls-none { padding: 10px 4px 14px; text-align: center; font-size: 12px; color: #a1a1aa; }
+    .col.ls-miss > header h2, .col.ls-miss > header p { opacity: .55; }
+    .ls-go { display: inline-flex; align-items: center; gap: 5px; height: 24px; max-width: 240px; padding: 0 9px; border-radius: 9999px; background: #fff; border: 1px solid #e4e4e7; font-size: 11.5px; font-weight: 600; color: #3f3f46; }
+    .ls-go:hover { border-color: #a1a1aa; color: #18181b; }
+    .ls-go > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ls-go b { flex: none; color: var(--focus); }
     /* V40.34.0: ligado a uma meta: o emoji dela antes do nome */
     .goal-badge { display: inline-block; margin-right: 4px; font-size: .95em; line-height: 1; font-style: normal; text-decoration: none; }
     #toast { transition: opacity .2s, transform .2s; }
@@ -310,6 +319,16 @@
             <button id="btn-logout" class="shrink-0 text-xs font-semibold text-zinc-600 hover:text-zinc-900 px-2.5 py-2 rounded-lg hover:bg-zinc-100">Sair</button>
         </div>
     </header>
+    <!-- V40.39.0: busca nas Listas. Filtra as próprias listas (nome, checklist e tag, sem acento; as mesmas regras da busca
+         da agenda) e diz em quais listas achou (clicar leva até ela). Atalho: / -->
+    <div id="ls-bar" class="hidden shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-4 sm:px-5 pt-3">
+        <label class="ag-search inline-flex items-center gap-1.5 h-9 w-56 xl:w-72 pl-2.5 pr-1 rounded-lg bg-white border border-zinc-200 text-zinc-400" title="Buscar nas listas: nome, checklist e tag (atalho: /)">
+            <i class="ph ph-magnifying-glass text-[15px]"></i>
+            <input id="ls-search" type="text" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="80" placeholder="Buscar nas listas" aria-label="Buscar nas listas" aria-describedby="ls-info" class="min-w-0 flex-1 bg-transparent outline-none text-[13px] font-medium text-zinc-800 placeholder-zinc-400">
+            <button id="ls-search-x" type="button" class="hidden shrink-0 w-6 h-6 rounded-md items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100" aria-label="Limpar a busca" title="Limpar a busca (Esc)"><i class="ph-bold ph-x text-[12px]"></i></button>
+        </label>
+        <div id="ls-info" class="min-w-0 flex-1 flex flex-wrap items-center gap-1.5 text-[12px] text-zinc-500" aria-live="polite"></div>
+    </div>
     <!-- V40.15.0: campo de arquivar. Fica por cima do cabeçalho só enquanto um cartão (ou bloco da Semana) é arrastado. -->
     <div id="drop-archive" class="hidden fixed top-1 left-1/2 -translate-x-1/2 z-30 h-12 w-[min(520px,60vw)] items-center justify-center gap-2.5 rounded-xl border-2 border-dashed text-[13.5px] font-semibold" aria-hidden="true">
         <i class="ph ph-archive text-xl"></i><span>Solte aqui pra arquivar</span>
@@ -971,7 +990,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.38.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.39.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1178,6 +1197,7 @@
 
     async function insertRow(kind, row, okMsg) {
         var g = S.gesture, was = S[kind][row.id] ? undoClone(S[kind][row.id]) : null; // V40.25.0: pro Desfazer
+        lsKeep(kind, row.id); // V40.39.0
         S[kind][row.id] = row;
         render(); renderAgenda(); renderSide(); renderTags();
         var res = await S.sb.from(kind).upsert(row, { onConflict: 'user_id,id' });
@@ -1192,6 +1212,7 @@
         var row = S[kind][id];
         if (!row) return false;
         var g = S.gesture, was = undoClone(row); // V40.25.0: pro Desfazer (cópia funda: listas e cartões dentro)
+        lsKeep(kind, id); // V40.39.0
         var prev = Object.assign({}, row);
         Object.assign(row, fields);
         render(); renderAgenda(); renderArchive(); renderSide(); renderTags();
@@ -1433,15 +1454,65 @@
     function scheduleRender() { clearTimeout(renderT); renderT = setTimeout(function () { render(); renderAgenda(); renderArchive(); renderReports(); renderSide(); renderTags(); if (S.editing && S.editing.kind === 'blocos') { renderDone(); renderNoteLinks(); renderSubCards(); } }, 60); }
     function renderSide() { renderRotinas(); renderNotas(); renderFinancas(); renderMetas(); renderAssistente(); } // V40.17.0 (+ Finanças na V40.19.0, Metas na V40.21.0): cada uma só desenha se a aba dela estiver aberta
 
+    // ===================== V40.39.0: BUSCA NAS LISTAS =====================
+    // Pedido dele (23/11, com foto do quadro): "precisamos pesquisar também na aba listas". Escolheu "Filtrar as listas":
+    // cada lista mostra só os cartões que batem e o resto some até limpar. Procura no nome, no checklist e no nome da tag,
+    // sem ligar pra acento nem maiúscula, cada palavra em qualquer lugar: as mesmas regras da busca da agenda (agsWords,
+    // subNorm) e do celular (cardMatchesSearch). O que for criado ou mexido aqui durante a busca continua na tela
+    // (LS.keep), senão a tarefa recém-adicionada sumiria na hora; a palavra nova zera isso. Arrastar continua valendo:
+    // o moveTo traduz o lugar entre os cartões que aparecem pro lugar entre todos.
+    var LS = { q: '', words: null, keep: {}, t: null };
+    function lsSetQuery(q) {
+        var w = agsWords(q);
+        LS.q = String(q || '');
+        LS.words = w.length ? w : null;
+        LS.keep = {};
+    }
+    function lsMatch(t, words) {
+        var parts = [String(t.title || '')], tag = tagOf(t.tag_id);
+        (Array.isArray(t.microblocks) ? t.microblocks : []).forEach(function (m) { if (m && m.title) parts.push(String(m.title)); });
+        if (tag && tag.name) parts.push(String(tag.name));
+        var hay = subNorm(parts.join('\n'));
+        return words.every(function (w) { return hay.indexOf(w) >= 0; });
+    }
+    function lsShown(t) { return !LS.words || !!LS.keep[t.id] || lsMatch(t, LS.words); }
+    function lsKeep(kind, id) { if (kind === 'tarefas' && LS.words && id) LS.keep[id] = 1; } // insertRow/patchRow: o que foi mexido aqui fica
+    function lsBar(show) {
+        var bar = $('ls-bar'), on = !!show && S.tab === 'listas';
+        bar.classList.toggle('hidden', !on);
+        bar.classList.toggle('flex', on);
+    }
+    function lsInfo(hit, n) { // embaixo/do lado do campo: quantos achou e em quais listas (clicar leva até a lista)
+        var box = $('ls-info');
+        if (!LS.words) { box.innerHTML = ''; return; }
+        if (!n) { box.innerHTML = '<span>Nenhum cartão com “' + esc(LS.q.trim()) + '”.</span><span class="text-zinc-400">Os arquivados não entram na busca.</span>'; return; }
+        box.innerHTML = '<span class="font-semibold text-zinc-700">' + n + (n === 1 ? ' cartão em ' : ' cartões em ') + hit.length + (hit.length === 1 ? ' lista' : ' listas') + '</span>' +
+            hit.map(function (x) { return '<button type="button" class="ls-go" data-ls-go="' + esc(x.c.id) + '" title="Ir pra lista ' + esc(x.c.name) + '"><span>' + (esc(x.c.name) || 'Sem nome') + '</span><b>' + x.n + '</b></button>'; }).join('');
+    }
+    function lsApply(q) { clearTimeout(LS.t); lsSetQuery(q); render(); }
+    function lsClear() {
+        $('ls-search').value = '';
+        $('ls-search-x').classList.add('hidden');
+        $('ls-search-x').classList.remove('inline-flex');
+        lsApply('');
+    }
+    function lsReveal(colId) { // leva o quadro até a lista (encostada na esquerda) e pisca ela
+        var sec = $('columns').querySelector('section.col[data-col="' + CSS.escape(colId) + '"]'), board = $('board');
+        if (!sec) return;
+        var left = Math.max(0, sec.offsetLeft - 16);
+        if (board.scrollTo) board.scrollTo({ left: left, behavior: 'smooth' }); else board.scrollLeft = left;
+        sec.classList.remove('ag-found'); void sec.offsetWidth; sec.classList.add('ag-found');
+    }
+
     function cardHtml(t) {
-        var tag = tagOf(t.tag_id);
+        var tag = tagOf(t.tag_id), W = LS.words; // V40.39.0: com a busca, as palavras achadas ficam marcadas
         var mbs = Array.isArray(t.microblocks) ? t.microblocks : [];
         var done = mbs.filter(function (m) { return m && m.done; }).length;
         var all = mbs.length > 0 && done === mbs.length, paint = paintOf(t.color);
         return '<article class="card ' + paint.cls + 'bg-white border border-zinc-200 border-l-4 rounded-xl px-3 py-2.5 cursor-pointer hover:border-zinc-300 hover:shadow-sm transition-shadow" ' +
             'style="' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" draggable="true" tabindex="0" data-id="' + esc(t.id) + '">' +
             '<div class="flex items-start gap-1">' +
-            '<p class="min-w-0 flex-1 text-[13.5px] font-semibold text-zinc-800 leading-snug break-words">' + goalBadge(t.goal_id) + (esc(t.title) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
+            '<p class="min-w-0 flex-1 text-[13.5px] font-semibold text-zinc-800 leading-snug break-words">' + goalBadge(t.goal_id) + ((W ? agsHl(t.title, W) : esc(t.title)) || '<span class="text-zinc-400">Sem nome</span>') + '</p>' +
             // V40.15.0: os botões do cartão ficam colados (sem espaço entre eles) pra não roubar largura do nome
             '<div class="shrink-0 flex -mr-1.5 -mt-1">' +
             '<button type="button" class="card-sched w-6 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-sched="' + esc(t.id) + '" title="Agendar" aria-label="Agendar esta tarefa"><i class="ph ph-calendar-plus text-base"></i></button>' +
@@ -1449,24 +1520,34 @@
             '<button type="button" class="card-sched w-6 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 focus:opacity-100" data-more="' + esc(t.id) + '" title="Arquivar ou apagar" aria-label="Mais opções desta tarefa" aria-haspopup="menu"><i class="ph-bold ph-dots-three text-base"></i></button>' +
             '</div></div>' +
             '<div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">' +
-            (tag ? '<span class="inline-flex items-center gap-1.5 font-medium text-zinc-600"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + esc(tag.name) + '</span>' : '') +
+            (tag ? '<span class="inline-flex items-center gap-1.5 font-medium text-zinc-600"><span class="w-2 h-2 rounded-full" style="background:' + esc(safeColor(tag.color)) + '"></span>' + (W ? agsHl(tag.name, W) : esc(tag.name)) + '</span>' : '') +
             '<span class="inline-flex items-center gap-1"><i class="ph ph-clock"></i>' + fmtDur(t.duration) + '</span>' +
             (mbs.length ? '<span class="inline-flex items-center gap-1' + (all ? ' text-emerald-600 font-medium' : '') + '"><i class="ph ' + (all ? 'ph-check-circle' : 'ph-check-square') + '"></i>' + done + '/' + mbs.length + '</span>' : '') +
-            '</div></article>';
+            '</div>' + lsHitsHtml(mbs, W) + '</article>';
+    }
+    // V40.39.0: com a busca, os itens do checklist onde achou (até 2), marcados
+    function lsHitsHtml(mbs, W) {
+        if (!W) return '';
+        var hits = mbs.filter(function (m) { return m && m.title && agsHit(m.title, W); });
+        if (!hits.length) return '';
+        return '<div class="ls-hits">' + hits.slice(0, 2).map(function (m) {
+            return '<span class="ag-sres-hit' + (m.done ? ' done' : '') + '"><i class="ph ' + (m.done ? 'ph-check-square' : 'ph-square') + '"></i><span class="min-w-0 truncate">' + agsHl(m.title, W) + '</span></span>';
+        }).join('') + (hits.length > 2 ? '<span class="ag-sres-hit text-zinc-400">+' + (hits.length - 2) + ' no checklist</span>' : '') + '</div>';
     }
 
-    function colHtml(c, tasks) {
+    function colHtml(c, tasks, shown) {
         var mins = tasks.reduce(function (a, t) { return a + (Number(t.duration) || 0); }, 0);
-        return '<section class="col w-[296px] shrink-0 max-h-full flex flex-col bg-zinc-50 border border-zinc-200 rounded-2xl" data-col="' + esc(c.id) + '">' +
+        var W = LS.words, miss = !!W && !shown.length; // V40.39.0: com a busca, só os cartões que batem ("2 de 12")
+        return '<section class="col' + (miss ? ' ls-miss' : '') + ' w-[296px] shrink-0 max-h-full flex flex-col bg-zinc-50 border border-zinc-200 rounded-2xl" data-col="' + esc(c.id) + '">' +
             '<header class="px-3.5 pt-3 pb-2 flex items-start gap-2" draggable="true" data-col-drag="' + esc(c.id) + '">' + // V40.33.0: arrastar pelo título muda a lista de lugar
             '<div class="min-w-0 flex-1">' +
             '<h2 class="text-[13px] font-bold text-zinc-800 truncate" title="' + esc(c.name) + '">' + (esc(c.name) || 'Sem nome') + '</h2>' +
             '<p class="mt-0.5 text-[11px] font-medium text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i>' + (tasks.length ? fmtDur(mins) + ' planejados' : 'Vazia') + '</p>' +
             '</div>' +
-            '<span class="mt-0.5 text-[11px] font-semibold text-zinc-600 bg-white border border-zinc-200 rounded-full px-2 py-0.5" title="Tarefas nesta lista">' + tasks.length + '</span>' +
+            '<span class="mt-0.5 shrink-0 text-[11px] font-semibold text-zinc-600 bg-white border border-zinc-200 rounded-full px-2 py-0.5" title="' + (W ? 'Cartões desta lista que batem com a busca' : 'Tarefas nesta lista') + '">' + (W ? shown.length + ' de ' + tasks.length : tasks.length) + '</span>' +
             '<button class="col-menu-btn w-7 h-7 -mr-1 rounded-lg flex items-center justify-center text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800" data-col="' + esc(c.id) + '" aria-label="Opções da lista ' + esc(c.name) + '"><i class="ph-bold ph-dots-three text-base"></i></button>' +
             '</header>' +
-            '<div class="col-list thin-scroll flex-1 min-h-[52px] overflow-y-auto px-2.5 pb-1 flex flex-col gap-2" data-col="' + esc(c.id) + '">' + tasks.map(cardHtml).join('') + '</div>' +
+            '<div class="col-list thin-scroll flex-1 min-h-[52px] overflow-y-auto px-2.5 pb-1 flex flex-col gap-2" data-col="' + esc(c.id) + '">' + (miss ? '<p class="ls-none">Nada aqui com essa busca</p>' : shown.map(cardHtml).join('')) + '</div>' +
             '<footer class="p-2.5 pt-1.5" data-composer="' + esc(c.id) + '">' +
             '<button class="add-btn w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-[13px] font-medium text-zinc-500 hover:bg-zinc-200/60 hover:text-zinc-800" data-col="' + esc(c.id) + '"><i class="ph ph-plus"></i>Adicionar tarefa</button>' +
             '</footer></section>';
@@ -1487,6 +1568,7 @@
         tasks.forEach(function (t) { var c = colOf(t, ids); (byCol[c] = byCol[c] || []).push(t); });
 
         if (S.tab === 'listas') $('board-summary').textContent = tasks.length + (tasks.length === 1 ? ' tarefa em ' : ' tarefas em ') + cols.length + (cols.length === 1 ? ' lista' : ' listas');
+        lsBar(cols.length > 0); // V40.39.0
         if (!cols.length) {
             wrap.innerHTML = '';
             $('empty-email').textContent = S.email;
@@ -1494,9 +1576,15 @@
             return;
         }
         $('board-empty').classList.add('hidden');
-        wrap.innerHTML = cols.map(function (c) { return colHtml(c, byCol[c.id] || []); }).join('') +
+        var lsHit = [], lsN = 0; // V40.39.0: com a busca, cada lista só com os cartões que batem
+        wrap.innerHTML = cols.map(function (c) {
+            var all = byCol[c.id] || [], shown = LS.words ? all.filter(lsShown) : all;
+            if (LS.words) { lsN += shown.length; if (shown.length) lsHit.push({ c: c, n: shown.length }); }
+            return colHtml(c, all, shown);
+        }).join('') +
             '<button id="btn-new-list" class="w-[296px] shrink-0 flex items-center gap-2 px-4 py-3 rounded-2xl border-2 border-dashed border-zinc-300 text-[13px] font-semibold text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 hover:bg-white/60"><i class="ph ph-plus"></i>Nova lista</button>';
 
+        lsInfo(lsHit, lsN);
         board.scrollLeft = scrollLeft;
         wrap.querySelectorAll('.col-list').forEach(function (el) { if (colScroll[el.dataset.col] != null) el.scrollTop = colScroll[el.dataset.col]; });
         if (S.composer) openComposer(S.composer.col, S.composer.text, composerFocused);
@@ -2254,6 +2342,7 @@
         if (S.tab !== 'agenda' && AGS.open) agsClose(false); // V40.35.0
         try { localStorage.setItem('faz_pc_tab', S.tab); } catch (e) {}
         $('board').classList.toggle('hidden', S.tab !== 'listas');
+        lsBar(S.tab === 'listas'); // V40.39.0 (o render das Listas esconde de novo se não tiver lista)
         ['assistente', 'agenda', 'rotinas', 'notas', 'financas', 'metas'].forEach(function (t) {
             $(t).classList.toggle('hidden', S.tab !== t);
             $(t).classList.toggle('flex', S.tab === t);
@@ -4892,6 +4981,10 @@
         if (!t || t.deleted) return;
         var cur = colOf(t);
         var sibs = tasksInCol(colId).filter(function (x) { return x.id !== id; });
+        if (LS.words) { // V40.39.0: com a busca, o índice é entre os cartões que aparecem: entra logo antes do mesmo vizinho
+            var vis = sibs.filter(lsShown);
+            index = vis[index] ? sibs.indexOf(vis[index]) : (vis.length ? sibs.indexOf(vis[vis.length - 1]) + 1 : sibs.length);
+        }
         var prev = sibs[index - 1] || null, next = sibs[index] || null;
         if (cur === colId) {
             var list = tasksInCol(colId), ci = list.indexOf(t);
@@ -5376,6 +5469,29 @@
             if (!AGS.open || anyLayerOpen() || e.target.closest('#ag-search-wrap')) return;
             agsClose(false);
         }, true);
+        // V40.39.0: busca nas Listas
+        $('ls-search').addEventListener('input', function () {
+            var v = this.value;
+            $('ls-search-x').classList.toggle('hidden', !v);
+            $('ls-search-x').classList.toggle('inline-flex', !!v);
+            clearTimeout(LS.t);
+            LS.t = setTimeout(function () { lsApply(v); }, 120);
+        });
+        $('ls-search').addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); if (this.value) lsClear(); else this.blur(); return; }
+            if (e.key === 'Enter') { e.preventDefault(); lsApply(this.value); }
+        });
+        $('ls-search-x').addEventListener('click', function () { lsClear(); $('ls-search').focus(); });
+        $('ls-info').addEventListener('click', function (e) { var b = e.target.closest('[data-ls-go]'); if (b) lsReveal(b.dataset.lsGo); });
+        document.addEventListener('keydown', function (e) { // "/" leva pra busca das Listas (fora de campo e sem janela aberta)
+            if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+            if (!S.uid || S.tab !== 'listas' || $('ls-bar').classList.contains('hidden')) return;
+            var t = e.target, tg = t && t.tagName;
+            if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT' || (t && t.isContentEditable) || anyLayerOpen() || S.dragId || S.colDrag) return;
+            e.preventDefault();
+            $('ls-search').focus();
+            $('ls-search').select();
+        });
         $('ag-hide-done').addEventListener('click', function () {
             S.agHideDone = !S.agHideDone;
             try { localStorage.setItem('faz_pc_ag_hidedone', S.agHideDone ? '1' : '0'); } catch (e) {}

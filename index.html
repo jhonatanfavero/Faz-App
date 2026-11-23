@@ -326,6 +326,8 @@
                             <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider shrink-0" id="backlog-count">0</span>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
+                            <!-- V40.39.0: busca nas listas (nome, checklist e tag): cada lista mostra só os cartões que batem -->
+                            <button onclick="openBacklogSearch()" id="backlog-search-btn" aria-label="Buscar nas listas" title="Buscar nas listas" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 active:scale-95 transition"><i class="ph ph-magnifying-glass text-lg"></i></button>
                             <!-- V40.16.0: a lupa abre o menu de zoom (1, 1½, 2 ou 3 listas por tela); a pinça faz o mesmo, um nível por gesto -->
                             <div class="relative">
                                 <button onclick="toggleBacklogZoomMenu()" id="backlog-zoom-btn" aria-label="Zoom das listas" aria-haspopup="true" aria-expanded="false" title="Zoom das listas (uma por tela)" class="relative w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 active:scale-95 transition"><i class="ph ph-magnifying-glass-minus text-lg"></i></button>
@@ -349,6 +351,17 @@
                         </div>
                     </div>
                     
+                    <!-- V40.39.0: busca nas listas. Filtra as próprias listas (nome, checklist e tag, sem acento: as mesmas regras da
+                         busca da agenda); as bolinhas viram o número de achados de cada lista. O X (e o voltar) limpa e fecha. -->
+                    <div id="bl-search-row" class="hidden shrink-0 px-4 pt-2.5">
+                        <div class="bl-search flex items-center gap-2 h-10 bg-white border border-zinc-200 rounded-xl pl-3 pr-1 text-zinc-400 transition-colors">
+                            <i class="ph ph-magnifying-glass text-base shrink-0"></i>
+                            <input id="bl-search-input" type="text" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="80" placeholder="Buscar nas listas" aria-label="Buscar nas listas" oninput="backlogSearchInput()" onkeydown="backlogSearchKey(event)" class="flex-1 min-w-0 bg-transparent outline-none text-sm font-medium text-zinc-800 placeholder-zinc-400">
+                            <span id="bl-search-info" class="shrink-0 text-[11px] font-semibold text-zinc-500 whitespace-nowrap" aria-live="polite"></span>
+                            <button data-voltar onclick="closeBacklogSearch()" aria-label="Fechar a busca" title="Fechar a busca" class="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 active:scale-90 transition"><i class="ph-bold ph-x text-sm"></i></button>
+                        </div>
+                    </div>
+
                     <!-- V40.5.0: Indicadores de coluna (dots) + nome -->
                     <!-- V40.5.1-fix1: py-1 (era py-2) pra reduzir gap -->
                     <div id="backlog-column-dots" class="flex items-center justify-center gap-1.5 shrink-0 py-1 px-4 overflow-x-auto no-scrollbar">
@@ -1558,7 +1571,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.38.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.39.0</div>
 
     </div>
 

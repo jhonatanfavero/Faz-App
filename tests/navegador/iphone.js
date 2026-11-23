@@ -165,6 +165,7 @@ const IPHONES = [
         ['Lista: Listas', "switchListTab('backlog');", '#list-sheet'],
         ['Lista: Listas (fim)', '', '#list-sheet', { fim: true }],
         ['Lista: nova tarefa', 'openBacklogForm();', '#list-sheet', { fim: true }],
+        ['Lista: busca', "closeAllSheets(); openListSheet(); switchListTab('backlog'); openBacklogSearch(); document.getElementById('bl-search-input').value = 'tarefa 1'; backlogSearchApply();", '#list-sheet', { espera: 500, depois: 'closeBacklogSearch(); closeAllSheets();' }], // V40.39.0: o campo, os números no lugar das bolinhas
         ['Lista: Rotinas', "closeAllSheets(); openListSheet(); switchListTab('routines');", '#list-sheet', { fim: true }],
         ['Lista: nova rotina', 'openRoutineForm();', '#list-sheet', { fim: true }],
         ['Lista: Notas', "closeAllSheets(); openListSheet(); switchListTab('notes');", '#list-sheet', { fim: true }],

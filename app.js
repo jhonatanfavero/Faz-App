@@ -3602,7 +3602,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.38.0',
+            version: 'v40.39.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -3952,20 +3952,120 @@ window.scheduleBacklogItem = (id) => {
     renderTimeline();
 };
 
+// =====================================================
+// V40.39.0 — BUSCA NAS LISTAS
+// Pedido dele (23/11): "precisamos pesquisar também na aba listas". Escolheu "Filtrar as listas": cada lista mostra só
+// os cartões que batem e o resto some até limpar. Procura no nome, no checklist e no nome da tag, sem ligar pra acento
+// nem maiúscula, cada palavra em qualquer lugar: o mesmo cardMatchesSearch da busca da agenda (e as regras do PC). As
+// bolinhas viram o número de achados de cada lista; se a lista na tela não tem nada e outra tem, vai pra ela. O que for
+// criado ou editado durante a busca continua na tela (blSearchKeep), senão sumiria ao salvar; a palavra nova zera isso.
+// (var, não let: renderBacklog pode rodar antes destas linhas)
+// =====================================================
+var blSearchQ = '';            // a busca já normalizada (sem acento, minúscula); '' = sem busca
+var blSearchKeep = new Set();  // ids criados/editados durante esta busca
+var blSearchT = null;
+var blSearchJump = false;      // no próximo desenho: lista na tela sem achado e outra com → vai pra ela
+function blSearchWords() { return blSearchQ ? blSearchQ.split(' ').filter(Boolean) : []; }
+function blSearchShown(item) { return !blSearchQ || blSearchKeep.has(item.id) || cardMatchesSearch(item, blSearchQ); }
+function blSearchHit(s, words) { const n = normalizeText(s); return words.some(w => n.includes(w)); }
+// Texto com as palavras achadas marcadas: compara letra a letra sem acento, mas marca o texto original (o agsHl do PC).
+function blSearchHl(s, words) {
+    s = String(s == null ? '' : s);
+    let flat = '';
+    const at = [];
+    for (let i = 0; i < s.length; i++) { const n = normalizeText(s[i]); for (let k = 0; k < n.length; k++) { flat += n[k]; at.push(i); } }
+    const marks = [];
+    words.forEach(w => { for (let p = flat.indexOf(w); p >= 0 && w; p = flat.indexOf(w, p + 1)) marks.push([at[p], at[p + w.length - 1] + 1]); });
+    if (!marks.length) return escapeHtml(s);
+    marks.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    let html = '', cur = 0, m0 = marks[0][0], m1 = marks[0][1];
+    const flush = () => { html += escapeHtml(s.slice(cur, m0)) + '<mark class="bl-hl">' + escapeHtml(s.slice(m0, m1)) + '</mark>'; cur = m1; };
+    for (let i = 1; i < marks.length; i++) {
+        if (marks[i][0] <= m1) { m1 = Math.max(m1, marks[i][1]); continue; }
+        flush(); m0 = marks[i][0]; m1 = marks[i][1];
+    }
+    flush();
+    return html + escapeHtml(s.slice(cur));
+}
+window.openBacklogSearch = function() {
+    const row = document.getElementById('bl-search-row'), inp = document.getElementById('bl-search-input');
+    if (!row || !inp) return;
+    row.classList.remove('hidden');
+    setTimeout(() => { // foco atrasado: só se a busca e a tela ainda estiverem abertas
+        const sheet = document.getElementById('list-sheet');
+        if (!row.classList.contains('hidden') && sheet && !sheet.classList.contains('translate-y-full')) inp.focus();
+    }, 60);
+};
+window.closeBacklogSearch = function() {
+    const row = document.getElementById('bl-search-row'), inp = document.getElementById('bl-search-input');
+    clearTimeout(blSearchT);
+    if (inp) { inp.value = ''; if (document.activeElement === inp) inp.blur(); }
+    if (row) row.classList.add('hidden');
+    const had = !!blSearchQ;
+    blSearchQ = '';
+    blSearchKeep = new Set();
+    if (had) renderBacklog(); else backlogSearchInfo(0, 0);
+};
+window.backlogSearchInput = function() { clearTimeout(blSearchT); blSearchT = setTimeout(backlogSearchApply, 150); };
+window.backlogSearchKey = function(e) { // o "Ir"/"Buscar" do teclado: aplica na hora e baixa o teclado
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    backlogSearchApply();
+    if (e.target && e.target.blur) e.target.blur();
+};
+function backlogSearchApply() {
+    clearTimeout(blSearchT);
+    const inp = document.getElementById('bl-search-input');
+    const q = normalizeText(String(inp ? inp.value : '').trim()).split(/\s+/).filter(Boolean).join(' ');
+    if (q === blSearchQ) return;
+    blSearchQ = q;
+    blSearchKeep = new Set();
+    blSearchJump = !!q;
+    renderBacklog();
+}
+function backlogSearchInfo(n, lists) {
+    const el = document.getElementById('bl-search-info');
+    if (!el) return;
+    el.textContent = !blSearchQ ? '' : !n ? 'Nada' : n + ' em ' + lists + (lists === 1 ? ' lista' : ' listas');
+}
+// As bolinhas embaixo do nome da lista. Com a busca, cada uma vira o número de achados daquela lista (sem achado: bolinha apagada).
+function backlogDotsHtml(hits) {
+    return backlogColumnsDb.map(col => {
+        const isActive = col.id === activeColumnId, name = escapeHtml(col.name);
+        if (blSearchQ) {
+            const n = (hits && hits[col.id]) || 0;
+            return n
+                ? `<button onclick="scrollToColumn('${col.id}')" class="bl-dot-n${isActive ? ' on' : ''} transition active:scale-90" aria-label="Ir para ${name}: ${n} com essa busca">${n}</button>`
+                : `<button onclick="scrollToColumn('${col.id}')" class="bl-dot-0${isActive ? ' on' : ''} transition active:scale-90" aria-label="Ir para ${name}: nada com essa busca"></button>`;
+        }
+        const dotClass = isActive ? 'bg-app-focus' : 'bg-zinc-300';
+        return `<button onclick="scrollToColumn('${col.id}')" class="w-2 h-2 rounded-full ${dotClass} shrink-0 transition active:scale-90" aria-label="Ir para ${name}"></button>`;
+    }).join('');
+}
+function backlogSearchHits() { // { id da lista: quantos cartões aparecem }
+    const hits = {};
+    backlogDb.forEach(it => { if (blSearchShown(it)) { const c = getItemColumn(it); hits[c] = (hits[c] || 0) + 1; } });
+    return hits;
+}
+
 // V40.5.0: helper extraído — gera HTML do card de uma tarefa (sem mudar nada por dentro).
 function renderBacklogCard(item) {
     const tagColor = item.tagId ? getTagColor(item.tagId) : null;
     const mbs = item.microblocks || [];
     const isExpanded = expandedBacklogIds.has(item.id);
+    // V40.39.0: com a busca, os itens do checklist onde achou vêm primeiro, e as palavras achadas ficam marcadas
+    const W = blSearchWords();
+    const mbsView = W.length ? mbs.filter(m => blSearchHit(m.title, W)).concat(mbs.filter(m => !blSearchHit(m.title, W))) : mbs;
+    const txt = (v) => W.length ? blSearchHl(v, W) : escapeHtml(v);
     // V40.5.0-fix3: preview reduzido de 3 → 2 checks pra cards menores
     const PREVIEW_COUNT = 2;
-    const visibleMbs = isExpanded ? mbs : mbs.slice(0, PREVIEW_COUNT);
+    const visibleMbs = isExpanded ? mbsView : mbsView.slice(0, PREVIEW_COUNT);
     const extraCount = mbs.length - PREVIEW_COUNT;
     
     let mbHtml = visibleMbs.map(mb => `
         <div class="flex items-center gap-1.5 mt-1">
             <i class="ph-bold ph-check text-[10px] text-zinc-300 shrink-0"></i>
-            <span class="text-[11px] text-zinc-500 truncate">${escapeHtml(mb.title)}</span>
+            <span class="text-[11px] text-zinc-500 truncate">${txt(mb.title)}</span>
         </div>
     `).join('');
     
@@ -3981,6 +4081,9 @@ function renderBacklogCard(item) {
     const cardBorderStyle = tagColor 
         ? `border-left-color: ${tagColor}; border-left-width: 4px;` 
         : '';
+    // V40.39.0: achou pelo nome da tag (o cartão só mostra a cor dela): o nome aparece, marcado
+    const tagObj = W.length && item.tagId ? tagsDb.find(t => t.id === item.tagId) : null;
+    const tagHit = tagObj && tagObj.name && blSearchHit(tagObj.name, W) ? ` · ${blSearchHl(tagObj.name, W)}` : '';
     
     // V40.5.0-fix3: divisor + seção de checks SÓ se tem mbHtml (item com checklist)
     const hasChecks = mbs.length > 0;
@@ -4005,8 +4108,8 @@ function renderBacklogCard(item) {
     <div onclick="openBacklogForm('${item.id}')" data-bl-card="${item.id}" class="${cardPaintClass}bg-white border border-zinc-200 rounded-xl p-3.5 shadow-sm relative mb-2 cursor-pointer hover:shadow active:scale-[0.99] transition" style="${cardPaintStyle}${cardBorderStyle}">
         <div class="flex justify-between items-start mb-2">
             <div class="min-w-0 flex-1 pr-2">
-                <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${goalBadge(item.goalId)}${escapeHtml(item.title)}</h4>
-                <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(item.duration)}${mbs.length > 0 ? ` · ${mbs.length} ${mbs.length === 1 ? 'item' : 'itens'}` : ''}</p>
+                <h4 class="font-bold text-sm text-zinc-800 leading-tight truncate">${goalBadge(item.goalId)}${txt(item.title)}</h4>
+                <p class="text-[11px] text-zinc-400 font-bold mt-0.5"><i class="ph-bold ph-clock mr-1"></i>${formatDur(item.duration)}${mbs.length > 0 ? ` · ${mbs.length} ${mbs.length === 1 ? 'item' : 'itens'}` : ''}${tagHit}</p>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
                 <button onclick="event.stopPropagation(); scheduleBacklogItem('${item.id}')" class="w-8 h-8 flex items-center justify-center bg-app-focus-soft text-app-focus rounded-lg hover:bg-app-focus-soft-strong active:scale-95 transition" title="Agendar">
@@ -4063,10 +4166,21 @@ function renderBacklog() {
     wrapper.classList.toggle('zoom-15', backlogZoomLevel() === 1.5); // V40.16.0: nível do afastado (o 2 não tem classe)
     wrapper.classList.toggle('zoom-3', backlogZoomLevel() === 3);
     backlogZoomUi();
+    // V40.39.0: com a busca, cada lista só com os cartões que batem
+    const searchHits = blSearchQ ? backlogSearchHits() : {};
+    const searchN = backlogColumnsDb.reduce((a, c) => a + (searchHits[c.id] || 0), 0);
     wrapper.innerHTML = backlogColumnsDb.map((col, idx) => {
-        const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
+        const allItems = backlogDb.filter(item => getItemColumn(item) === col.id);
+        const colItems = blSearchQ ? allItems.filter(blSearchShown) : allItems;
         let cardsHtml;
-        if (colItems.length === 0) {
+        if (blSearchQ && !colItems.length) {
+            cardsHtml = `
+                <div class="flex flex-col items-center justify-center text-center opacity-60 py-10 px-6">
+                    <i class="ph ph-magnifying-glass text-3xl mb-2 text-zinc-400"></i>
+                    <p class="text-sm font-medium text-zinc-500">${searchN ? 'Nada nesta lista com essa busca' : 'Nenhum cartão com essa busca'}</p>
+                    <p class="text-[11px] text-zinc-400 mt-1">${searchN ? 'Os números embaixo do nome mostram onde achou' : 'Os arquivados não entram na busca'}</p>
+                </div>`;
+        } else if (colItems.length === 0) {
             cardsHtml = `
                 <div class="flex flex-col items-center justify-center text-center opacity-50 py-12 px-6">
                     <i class="ph ph-inbox text-4xl mb-2 text-zinc-400"></i>
@@ -4080,20 +4194,15 @@ function renderBacklog() {
         // Sem beiradinha — descoberta do swipe fica nos DOTS embaixo do header.
         return `
             <div class="snap-center snap-always shrink-0 w-full h-full overflow-y-auto no-scrollbar px-4 pb-4${col.id === activeColumnId ? ' zoom-active' : ''}" data-column-id="${col.id}">
-                <div class="zoom-col-head" onclick="setActiveColumnFromZoom('${col.id}')"><span class="truncate">${escapeHtml(col.name)}</span><span class="zoom-col-count">${colItems.length}</span></div>
+                <div class="zoom-col-head" onclick="setActiveColumnFromZoom('${col.id}')"><span class="truncate">${escapeHtml(col.name)}</span><span class="zoom-col-count">${blSearchQ ? colItems.length + '/' + allItems.length : colItems.length}</span></div>
                 ${cardsHtml}
             </div>`;
     }).join('');
     Array.from(wrapper.children).forEach(el => { if (keepTop[el.dataset.columnId]) el.scrollTop = keepTop[el.dataset.columnId]; });
     
-    // Dots de navegação
-    if (dotsContainer) {
-        dotsContainer.innerHTML = backlogColumnsDb.map((col, idx) => {
-            const isActive = col.id === activeColumnId;
-            const dotClass = isActive ? 'bg-app-focus' : 'bg-zinc-300';
-            return `<button onclick="scrollToColumn('${col.id}')" class="w-2 h-2 rounded-full ${dotClass} shrink-0 transition active:scale-90" aria-label="Ir para ${escapeHtml(col.name)}"></button>`;
-        }).join('');
-    }
+    // Dots de navegação (V40.39.0: com a busca, o número de achados de cada lista)
+    if (dotsContainer) dotsContainer.innerHTML = backlogDotsHtml(searchHits);
+    backlogSearchInfo(searchN, backlogColumnsDb.filter(c => searchHits[c.id]).length);
     
     // Após render, garante que o scroll está na coluna ativa (sem animação)
     requestAnimationFrame(() => {
@@ -4118,6 +4227,14 @@ function renderBacklog() {
             if (cols[activeIdx]) {
                 // V40.5.0-fix: centraliza (compatível com snap-center + w-[88%])
                 wrapper.scrollLeft = cols[activeIdx].offsetLeft + (cols[activeIdx].offsetWidth / 2) - (wrapper.clientWidth / 2);
+            }
+        }
+        // V40.39.0: a busca acabou de mudar e a lista na tela não tem nada: vai pra primeira que tem
+        if (blSearchJump) {
+            blSearchJump = false;
+            if (blSearchQ && !searchHits[activeColumnId]) {
+                const to = backlogColumnsDb.find(c => searchHits[c.id]);
+                if (to) scrollToColumn(to.id);
             }
         }
         // Liga listener de scroll (idempotente)
@@ -4164,16 +4281,17 @@ function updateActiveColumnHeader() {
     if (!col) return;
     const titleEl = document.getElementById('backlog-column-title');
     const countEl = document.getElementById('backlog-count');
-    if (titleEl) titleEl.innerText = col.name;
+    if (titleEl) titleEl.textContent = col.name; // V40.39.0: textContent (o innerText não existe no jsdom dos testes)
     if (countEl) {
         const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
-        countEl.innerText = colItems.length;
+        countEl.textContent = blSearchQ ? colItems.filter(blSearchShown).length + ' de ' + colItems.length : colItems.length; // V40.39.0: com a busca, "1 de 8"
     }
 }
 
 function updateColumnDots() {
     const dotsContainer = document.getElementById('backlog-column-dots');
     if (!dotsContainer) return;
+    if (blSearchQ) { dotsContainer.innerHTML = backlogDotsHtml(backlogSearchHits()); return; } // V40.39.0: os números
     Array.from(dotsContainer.children).forEach((dot, idx) => {
         const col = backlogColumnsDb[idx];
         if (!col) return;
@@ -7379,6 +7497,7 @@ window.saveBacklogForm = function() {
 
     if (currentBlId) {
         const item = backlogDb.find(x => x.id === currentBlId);
+        if (item && blSearchQ) blSearchKeep.add(item.id); // V40.39.0: editado durante a busca continua na tela
         if (item) {
             item.title = title;
             item.duration = currentBlDur;
@@ -7389,8 +7508,10 @@ window.saveBacklogForm = function() {
         }
         showToast('Tarefa atualizada!');
     } else {
+        const newId = 'bl_' + Date.now();
+        if (blSearchQ) blSearchKeep.add(newId); // V40.39.0: criado durante a busca aparece mesmo sem bater com ela
         backlogDb.push({
-            id: 'bl_' + Date.now(),
+            id: newId,
             title: title,
             duration: currentBlDur,
             tagId: currentBlTagId,

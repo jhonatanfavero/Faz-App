@@ -65,7 +65,7 @@ function fakeGeometry(w) {
   ok(formOpen(), 'tocar num cartão continua abrindo ele');
   w.closeBacklogForm();
   heads[1].click();
-  ok(w.eval('activeColumnId') === cols[1] && $('backlog-column-title').innerText === names[1] && colEl(cols[1]).classList.contains('zoom-active') && !colEl(cols[0]).classList.contains('zoom-active'), 'tocar no título de uma lista deixa ela ativa');
+  ok(w.eval('activeColumnId') === cols[1] && $('backlog-column-title').textContent === names[1] && colEl(cols[1]).classList.contains('zoom-active') && !colEl(cols[0]).classList.contains('zoom-active'), 'tocar no título de uma lista deixa ela ativa');
   w.openBacklogForm(); $('backlog-input').value = 'Tarefa criada afastado'; w.saveBacklogForm(); await sleep(60);
   const created = w.eval("backlogDb.find(x => x.title === 'Tarefa criada afastado')");
   ok(created && created.columnId === cols[1] && W().classList.contains('lists-zoom'), '"+ Nova Tarefa" entra na lista ativa e a tela continua afastada');

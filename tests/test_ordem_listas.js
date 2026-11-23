@@ -77,7 +77,7 @@ function fakePhone(w) {
   $('column-menu-right').click(); await sleep(30);
   let o1 = order();
   ok(o1.join() === [C0[1], C0[0], C0[2], C0[3], C0[4]].join() && saved().join() === o1.join(), 'Direita: a lista troca de lugar com a vizinha (e fica gravada)');
-  ok(w.eval('activeColumnId') === C0[0] && $('backlog-column-title').innerText === name(C0[0]), 'a lista ativa continua a mesma (o nome lá em cima não muda)');
+  ok(w.eval('activeColumnId') === C0[0] && $('backlog-column-title').textContent === name(C0[0]), 'a lista ativa continua a mesma (o nome lá em cima não muda)');
   ok(!$('column-menu-modal').classList.contains('hidden') && pos() === 'Posição 2 de 5' && !dis('column-menu-left') && !dis('column-menu-right'), 'o menu fica aberto, já com "Posição 2 de 5" e as duas setas valendo');
   ok([...$('backlog-column-dots').children].map((b) => b.getAttribute('aria-label')).join() === o1.map((id) => 'Ir para ' + name(id)).join() && $('backlog-column-dots').children[1].className.includes('bg-app-focus'), 'as bolinhas seguem a ordem nova (a acesa é a 2ª)');
   await sleep(30);
@@ -176,7 +176,7 @@ function fakePhone(w) {
   const o3 = order(), exp3 = C0.filter((c) => c !== C0[1]); exp3.splice(tgt ? exp3.indexOf(tgt) : exp3.length, 0, C0[1]);
   ok(o3.join() === exp3.join() && o3.indexOf(C0[1]) > 1, `soltou: a lista foi pra ${o3.indexOf(C0[1]) + 1}ª posição (onde estava o espaço)`);
   ok(!W().classList.contains('lists-zoom') && !W().classList.contains('zoom-3') && clean() && [L('tb__lista_afastada'), L('tb__lista_zoom')].join() === prefs1, 'o quadro volta pro modo normal, sem sobrar nada');
-  ok(w.eval('activeColumnId') === C0[1] && $('backlog-column-title').innerText === name(C0[1]) && $('backlog-column-dots').children[o3.indexOf(C0[1])].className.includes('bg-app-focus'), 'continua na mesma lista (nome lá em cima) e a bolinha acesa foi junto pro lugar novo');
+  ok(w.eval('activeColumnId') === C0[1] && $('backlog-column-title').textContent === name(C0[1]) && $('backlog-column-dots').children[o3.indexOf(C0[1])].className.includes('bg-app-focus'), 'continua na mesma lista (nome lá em cima) e a bolinha acesa foi junto pro lugar novo');
   w.fazUndo(); await sleep(60);
   ok(order().join() === C0.join(), 'Desfazer devolve');
   fire(hd, 'touchstart', [[90, 34]]); await sleep(520);

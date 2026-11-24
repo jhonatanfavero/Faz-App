@@ -40,7 +40,8 @@
 // V10.45 - v40.39.0 (Busca nas Listas, no celular e no PC: filtra as próprias listas pelo nome, checklist e tag (sem acento, cada palavra em qualquer lugar); "1 de 8" no nome da lista; no celular as bolinhas viram o número de achados de cada lista, no PC a barra diz em quais listas achou.)
 // V10.46 - v40.40.0 (PC, visão Dia: o cartão sai da sublista arrastando (vira bloco onde o tracejado mostra, com o horário, ou muda de sublista) e o bloco entra numa sublista arrastando por cima dela. Esc desiste; um passo só do Desfazer. Era o que a Semana do PC e o celular já faziam.)
 // V10.47 - v40.41.0 (Períodos no PC, igual ao celular e nos 2 sentidos: vão na conta, como a cor do app; em Configurações do PC dá pra criar e apagar, e no Novo bloco clicar num período preenche o horário e a duração. Salvar backup no PC: o mesmo arquivo do celular, que dá pra restaurar lá.)
-const CACHE_NAME = 'timeblock-v40-41-0';
+// V10.48 - v40.42.0 (Avisos dos compromissos, no celular e no PC: em Configurações, liga NESTE aparelho e a nuvem avisa antes de cada bloco da agenda, com o app fechado — Na hora, 5, 10, 15 ou 30 min (10 pra começar) e "Mandar um aviso de teste". Web Push: o aparelho se inscreve no serviço de push do navegador (avisos.js) e a função "alertas" do Supabase, a cada minuto, manda o aviso cifrado. Aqui: o push vira aviso na tela e o clique volta pro app (ou pra tela do PC). Precisa da conta; no iPhone, com o app instalado na tela de início. Sair da conta desliga.)
+const CACHE_NAME = 'timeblock-v40-42-0';
 const ASSETS = [
   './',
   './index.html',
@@ -50,6 +51,7 @@ const ASSETS = [
   './sync.js',
   './assistente.js',
   './metas.js',
+  './avisos.js',
   './libs/tailwind.css',
   './libs/inter/inter.css',
   './libs/inter/inter-latin-wght-normal.woff2',
@@ -82,4 +84,35 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     fetch(e.request).catch(() => caches.match(e.request))
   );
+});
+
+// V40.42.0: avisos dos compromissos (Web Push). A nuvem (função "alertas") manda { t: título, b: texto, tag, u },
+// cifrado: só este aparelho lê. Todo push vira um aviso na tela (o iPhone e o Chrome exigem). O mesmo bloco troca
+// o aviso dele (tag) em vez de empilhar. u: 'pc' abre a tela do PC; senão, o app.
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = {}; }
+  if (!d || typeof d !== 'object') d = {};
+  e.waitUntil(self.registration.showNotification(String(d.t || 'Faz').slice(0, 120), {
+    body: String(d.b || '').slice(0, 240),
+    tag: String(d.tag || 'faz').slice(0, 80),
+    renotify: true,
+    icon: './icon-192.png',
+    data: { u: d.u === 'pc' ? 'pc' : 'app' }
+  }));
+});
+
+// Tocar no aviso: volta pra janela do Faz que já está aberta (a do PC ou a do app) ou abre uma.
+self.addEventListener('notificationclick', (e) => {
+  const pc = !!(e.notification.data && e.notification.data.u === 'pc');
+  e.notification.close();
+  const escopo = self.registration.scope, alvo = new URL(pc ? 'kanban.html' : './', escopo).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((janelas) => {
+    for (const j of janelas) {
+      if (j.url.indexOf(escopo) !== 0) continue;
+      const ehPc = /\/kanban\.html$/.test(new URL(j.url).pathname);
+      if (ehPc === pc && 'focus' in j) return j.focus();
+    }
+    return self.clients.openWindow ? self.clients.openWindow(alvo) : null;
+  }));
 });

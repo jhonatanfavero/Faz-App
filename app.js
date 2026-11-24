@@ -3451,10 +3451,12 @@ window.openConfigSheet = () => {
     document.getElementById('config-backup-view').classList.add('hidden'); // V40.6.0: nova sub-view Backup
     document.getElementById('config-sync-view').classList.add('hidden'); // V40.7.0: nova sub-view Sincronizar
     document.getElementById('config-archive-view').classList.add('hidden'); // V40.9.0: nova sub-view Arquivados
+    document.getElementById('config-avisos-view').classList.add('hidden'); // V40.42.0: nova sub-view Avisos
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
     document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
-    
+    avisosMenuStatus(); // V40.42.0
+
     document.getElementById('config-sheet').classList.remove('translate-y-full');
     pushNavState(); // V40.5.0-fix7
 }
@@ -3602,7 +3604,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.41.0',
+            version: 'v40.42.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -7159,6 +7161,129 @@ window.closeConfigArchive = function() {
     document.getElementById('config-title').innerText = 'Configurações';
     document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
 };
+
+// ---------- V40.42.0: AVISOS DOS COMPROMISSOS (a tela; a lógica fica no avisos.js, igual no PC) ----------
+// Config → "Avisos dos compromissos": ligar/desligar NESTE aparelho, quanto tempo antes (na hora, 5, 10, 15 ou 30 min)
+// e "Mandar um aviso de teste". Precisa da conta (quem avisa é a nuvem, olhando a agenda da conta). No iPhone, só com
+// o app instalado na tela de início. O estado fica só neste aparelho (tb__avisos, fora do backup).
+let avisosConta = null, avisosBusy = false; // avisosConta: null = conferindo; true/false
+function avisosMenuStatus() {
+    const el = document.getElementById('avisos-menu-status');
+    if (!el) return;
+    const r = window.FazAvisos ? window.FazAvisos.resumo() : '';
+    el.textContent = r || 'Aviso antes de cada compromisso';
+    el.classList.toggle('text-app-focus', !!r);
+    el.classList.toggle('text-zinc-500', !r);
+}
+function avisosMsg(t, ruim) {
+    const p = document.getElementById('avisos-msg');
+    if (!p) return;
+    p.textContent = t || '';
+    p.classList.toggle('text-red-600', !!ruim);
+    p.classList.toggle('font-semibold', !!ruim);
+    p.classList.toggle('text-zinc-500', !ruim);
+}
+function renderAvisos() {
+    const view = document.getElementById('config-avisos-view');
+    if (!view || view.classList.contains('hidden')) return;
+    const A = window.FazAvisos, st = A ? A.estado() : { suporte: 'suporte', permissao: 'default', on: false, minutos: 10 };
+    const prontoPraLigar = !!A && st.suporte === 'ok' && avisosConta === true;
+    let titulo, texto, botao = '', acao = '', ligado = false;
+    if (!A || st.suporte === 'suporte') { titulo = 'Este navegador não mostra avisos'; texto = 'Os avisos funcionam no Chrome e no Edge (Android e computador), no Firefox, no Safari do Mac e no iPhone com o Faz instalado na tela de início.'; }
+    else if (st.suporte === 'iphone') { titulo = 'Instale o Faz na tela de início'; texto = 'No iPhone os avisos só funcionam com o app instalado: toque em Compartilhar (no iOS 26 ele fica nos ⋯ da barra de endereço) e depois em Adicionar à Tela de Início. Abra o Faz por lá e volte aqui.'; }
+    else if (st.suporte === 'ios-velho') { titulo = 'Precisa de um iOS mais novo'; texto = 'No iPhone os avisos precisam do iOS 16.4 ou mais novo. Atualize o iPhone em Ajustes → Geral → Atualização de Software.'; }
+    else if (avisosConta === null) { titulo = 'Conferindo a conta…'; texto = 'Um instante.'; }
+    else if (avisosConta === false) { titulo = 'Entre na sua conta primeiro'; texto = 'Quem avisa é a nuvem, olhando a agenda da sua conta. Entre em Sincronizar com a nuvem e depois volte aqui.'; botao = 'Entrar na conta'; acao = 'conta'; }
+    else if (st.on) { titulo = 'Avisos ligados neste aparelho'; texto = 'Avisa ' + (st.minutos ? st.minutos + ' min antes de' : 'na hora de') + ' cada compromisso da agenda, mesmo com o app fechado.'; botao = 'Desligar os avisos'; acao = 'desligar'; ligado = true; }
+    else if (st.permissao === 'denied') { titulo = 'As notificações estão bloqueadas'; texto = 'Libere as notificações do Faz nas configurações do celular (no computador, no cadeado da barra de endereço) e toque em Ligar de novo.'; botao = 'Ligar os avisos'; acao = 'ligar'; }
+    else { titulo = 'Avisos desligados neste aparelho'; texto = 'Ligue pra receber um aviso antes de cada compromisso da agenda, mesmo com o app fechado.'; botao = 'Ligar os avisos'; acao = 'ligar'; }
+    document.getElementById('avisos-titulo').textContent = titulo;
+    document.getElementById('avisos-texto').textContent = texto;
+    const ic = document.getElementById('avisos-icone');
+    ic.className = 'w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ' + (ligado ? 'bg-rose-50 text-rose-600' : 'bg-zinc-100 text-zinc-500');
+    ic.innerHTML = '<i class="ph ' + (ligado ? 'ph-bell-ringing' : 'ph-bell-slash') + ' text-xl"></i>';
+    const b = document.getElementById('avisos-ligar');
+    b.className = 'w-full rounded-xl px-3 py-3 text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 mb-3 disabled:opacity-60 ' +
+        (ligado ? 'bg-white text-zinc-700 border border-zinc-200' : 'bg-app-focus text-white shadow-md') + (botao ? '' : ' hidden');
+    b.dataset.acao = acao;
+    b.disabled = avisosBusy;
+    b.querySelector('span').textContent = botao;
+    b.querySelector('i').className = 'ph ' + (acao === 'conta' ? 'ph-sign-in' : ligado ? 'ph-bell-slash' : 'ph-bell-ringing') + ' text-lg';
+    const chips = document.getElementById('avisos-minutos');
+    chips.innerHTML = (A ? A.MINUTOS : [0, 5, 10, 15, 30]).map((m) => {
+        const on = m === st.minutos;
+        return `<button type="button" role="radio" aria-checked="${on}" data-avisos-min="${m}" ${!prontoPraLigar || avisosBusy ? 'disabled' : ''} onclick="fazAvisosMinutos(${m})" class="py-2 rounded-lg border text-[12px] font-bold transition active:scale-95 disabled:opacity-40 ${on ? 'bg-app-focus border-app-focus text-white' : 'bg-white border-zinc-200 text-zinc-700'}">${A ? A.rotulo(m) : m}</button>`;
+    }).join('');
+    const t = document.getElementById('avisos-teste');
+    t.disabled = !(prontoPraLigar && st.on) || avisosBusy;
+    avisosMenuStatus();
+}
+window.openConfigAvisos = function() {
+    document.getElementById('config-main-menu').classList.add('hidden');
+    document.getElementById('config-avisos-view').classList.remove('hidden');
+    document.getElementById('config-title').innerText = 'Avisos';
+    document.getElementById('config-back-btn').setAttribute('onclick', 'closeConfigAvisos()');
+    avisosMsg('');
+    avisosConta = null;
+    renderAvisos();
+    const A = window.FazAvisos;
+    const conferir = typeof window.fazSyncConta === 'function' ? window.fazSyncConta() : Promise.resolve(null);
+    conferir.then((c) => {
+        avisosConta = !!c;
+        renderAvisos();
+        if (c && A && A.estado().suporte === 'ok') A.revalidar().then(() => { A.preparar(); renderAvisos(); }); // deixa a inscrição na mão: no iPhone ela sai direto do toque
+    }, () => { avisosConta = false; renderAvisos(); });
+};
+window.closeConfigAvisos = function() {
+    document.getElementById('config-avisos-view').classList.add('hidden');
+    document.getElementById('config-main-menu').classList.remove('hidden');
+    document.getElementById('config-title').innerText = 'Configurações';
+    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+    avisosMenuStatus();
+};
+// Ligar / Desligar / Entrar na conta. Ligar chama o FazAvisos.ligar() direto do toque, sem esperar nada antes.
+window.fazAvisosBotao = function() {
+    const A = window.FazAvisos, acao = document.getElementById('avisos-ligar').dataset.acao;
+    if (acao === 'conta') { closeConfigAvisos(); openConfigSync(); return; }
+    if (!A || avisosBusy || (acao !== 'ligar' && acao !== 'desligar')) return;
+    const p = acao === 'ligar' ? A.ligar(A.estado().minutos) : A.desligar();
+    avisosBusy = true;
+    avisosMsg(acao === 'ligar' ? 'Ligando…' : 'Desligando…');
+    renderAvisos();
+    p.then((r) => {
+        avisosBusy = false;
+        if (r && r.ok) avisosMsg(acao === 'ligar' ? 'Pronto! Toque em "Mandar um aviso de teste" pra ver como chega.' : 'Avisos desligados neste aparelho.');
+        else avisosMsg(A.texto(r && r.erro), true);
+        renderAvisos();
+    }, () => { avisosBusy = false; avisosMsg(A.texto('rede'), true); renderAvisos(); });
+};
+window.fazAvisosMinutos = function(m) {
+    const A = window.FazAvisos;
+    if (!A || avisosBusy || m === A.estado().minutos) return;
+    avisosBusy = true;
+    avisosMsg('');
+    renderAvisos();
+    A.mudarMinutos(m).then((r) => {
+        avisosBusy = false;
+        if (r && r.ok) avisosMsg(A.estado().on ? 'Agora avisa ' + (m ? m + ' min antes.' : 'na hora.') : '');
+        else avisosMsg(A.texto(r && r.erro), true);
+        renderAvisos();
+    }, () => { avisosBusy = false; avisosMsg(A.texto('rede'), true); renderAvisos(); });
+};
+window.fazAvisosTestar = function() {
+    const A = window.FazAvisos;
+    if (!A || avisosBusy) return;
+    avisosBusy = true;
+    avisosMsg('Mandando…');
+    renderAvisos();
+    A.testar().then((r) => {
+        avisosBusy = false;
+        if (r && r.ok) avisosMsg('Enviado! O aviso chega em alguns segundos.');
+        else avisosMsg(A.texto(r && r.erro), true);
+        renderAvisos();
+    }, () => { avisosBusy = false; avisosMsg(A.texto('rede'), true); renderAvisos(); });
+};
+window.fazAvisosMudou = () => { renderAvisos(); avisosMenuStatus(); }; // o avisos.js chama quando o estado muda (ex.: tiraram a permissão)
 
 // V40.8.0: duração mínima de 5 min. Abaixo de 15 anda de 5 em 5 (15 → 10 → 5);
 // acima de 15 mantém o passo do botão e sempre para no 15.

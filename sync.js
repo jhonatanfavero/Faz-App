@@ -1483,9 +1483,19 @@
         sync('manual');
     };
 
+    // V40.42.0: a conta pros avisos dos compromissos (avisos.js): { sb, uid, token } ou null (sem conta / sem nuvem)
+    window.fazSyncConta = function () {
+        if (!configured) return Promise.resolve(null);
+        return ensureClient().then(function (c) { return c.auth.getSession(); }).then(function (r) {
+            var s = r && r.data && r.data.session;
+            return s && s.user && s.access_token ? { sb: sb, uid: s.user.id, token: s.access_token } : null;
+        }).catch(function () { return null; });
+    };
+
     window.fazSyncLogout = async function (silent) {
         if (silent !== true && !confirm('Sair da conta?\n\nSeus dados continuam neste aparelho, só param de sincronizar.')) return;
         clearTimeout(debounceT);
+        try { if (window.FazAvisos) await window.FazAvisos.esquecer(); } catch (e) {} // V40.42.0: os avisos deste aparelho eram da conta que está saindo
         try { if (sb) await sb.auth.signOut(); } catch (e) {}
         session = null;
         updateUI();

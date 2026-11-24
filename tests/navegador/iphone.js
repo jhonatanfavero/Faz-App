@@ -183,6 +183,9 @@ const IPHONES = [
         ['Config: Backup', 'openConfigSheet(); openConfigBackup();', '#config-sheet', { fim: true }],
         ['Config: Arquivados', 'openConfigSheet(); openConfigArchive();', '#config-sheet', { fim: true }],
         ['Config: Sincronizar', 'openConfigSheet(); openConfigSync();', '#config-sheet', { fim: true }],
+        ['Config: Avisos', 'openConfigSheet(); openConfigAvisos();', '#config-sheet', { fim: true, espera: 700 }], // V40.42.0: sem conta ("Entre na sua conta primeiro")
+        // V40.42.0: a cara de "ligados" (só a tela: ligar de verdade precisa do serviço de push, que o Chrome do teste não tem)
+        ['Config: Avisos (ligados)', "window.__av = { e: FazAvisos.estado, r: FazAvisos.revalidar, p: FazAvisos.preparar, c: window.fazSyncConta }; FazAvisos.estado = () => ({ suporte: 'ok', permissao: 'granted', on: true, minutos: 10 }); FazAvisos.revalidar = () => Promise.resolve({ ok: true, on: true }); FazAvisos.preparar = () => Promise.resolve(true); window.fazSyncConta = () => Promise.resolve({ sb: {}, uid: 'u', token: 't' }); openConfigSheet(); openConfigAvisos(); setTimeout(() => { document.getElementById('avisos-msg').textContent = 'Enviado! O aviso chega em alguns segundos.'; }, 200);", '#config-sheet', { fim: true, espera: 700, depois: 'FazAvisos.estado = __av.e; FazAvisos.revalidar = __av.r; FazAvisos.preparar = __av.p; window.fazSyncConta = __av.c; openConfigSheet();' }],
         ['Tags', 'closeAllSheets(); openTagsSheet();', '#tags-sheet', { fim: true }],
         ['Relatórios', 'closeAllSheets(); openReportsSheet();', '#reports-sheet', { fim: true }],
         ['Períodos (agendar)', 'closeAllSheets(); openPeriodSelectSheet();', '#period-select-sheet', { fim: true }],

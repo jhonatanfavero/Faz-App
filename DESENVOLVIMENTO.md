@@ -9,6 +9,8 @@ publica (branch `V-5.0`, em `jhonatanfavero.github.io/Faz-App`).
 |---|---|
 | `index.html`, `app.js`, `style.css` | o app do celular (PWA) |
 | `sync.js`, `faz-config.js` | sincronização opcional com o Supabase (endereço e chave pública do projeto) |
+| `avisos.js` | avisos dos compromissos no aparelho (Web Push): ligar, desligar, minutos, teste; o mesmo no celular e no PC |
+| `supabase/functions/alertas/` | a função do Supabase que manda os avisos (roda a cada minuto); `supabase/migrations/` tem a cópia do SQL aplicado |
 | `kanban.html` | tela do PC (Listas e Agenda), só funciona com login |
 | `sw.js` | service worker: guarda o app no aparelho para abrir offline |
 | `libs/` | fonte, ícones, Supabase e o CSS pronto do Tailwind (ver `libs/README.md`) |
@@ -107,6 +109,17 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     antes do `<script src="sync.js">` no `kanban.html`: sem ele, a sincronização do celular rodaria no PC (com o
     localStorage vazio). O backup do PC usa `FazSyncCore.indexRows`/`materialize`, as mesmas regras com que o
     celular monta os dados da nuvem: campo novo no `MAP` já sai certo no backup do PC.
+
+18. **Avisos dos compromissos: o banco, a função e o app falam a mesma língua (V40.42.0).** A lista dos serviços
+    de push (o `SERVICOS` do `avisos.js` e do `nucleo.js`, a regra `push_inscricoes_endpoint_check` do banco), os
+    minutos (0, 5, 10, 15, 30) e o limite de 20 aparelhos estão nos três: mudou um, mude os três (o
+    `test_avisos.js` confere). O "Ligar" chama `FazAvisos.ligar()` direto do toque, sem nenhum `await` antes:
+    no iPhone a inscrição só vale saindo do toque (a tela chama `FazAvisos.preparar()` ao abrir pra ter tudo na
+    mão). Sair da conta chama `FazAvisos.esquecer()` ANTES do `signOut` (depois o RLS não deixa apagar a
+    inscrição). A chave privada VAPID nasce dentro da função e fica só no banco (`faz_segredos`); o token do
+    agendador nasce no banco. Nenhuma das duas vai pro repositório nem passa pelo chat. Mudou a função? Publique
+    `supabase/functions/alertas` (index.ts + nucleo.js) com `verify_jwt = false`: ela confere sozinha quem chama.
+    O estado do aparelho é `tb__avisos` (fora do backup: cada aparelho liga o seu).
 
 ## Publicar uma versão
 

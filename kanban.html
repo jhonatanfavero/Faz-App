@@ -1024,6 +1024,26 @@
                     <button id="cfg-per-add" type="button" class="shrink-0 inline-flex items-center gap-1.5 bg-focus text-white text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-90"><i class="ph-bold ph-plus"></i>Adicionar</button>
                 </div>
             </div>
+            <!-- V40.42.0: avisos dos compromissos, NESTE computador (cada aparelho liga o seu; a lógica é o avisos.js, a mesma do celular) -->
+            <p class="mt-5 text-xs font-semibold text-zinc-500">Avisos dos compromissos <span class="font-normal text-zinc-400">· neste computador</span></p>
+            <div class="mt-2 p-3 rounded-xl border border-zinc-200 bg-zinc-50">
+                <div class="flex items-start gap-3">
+                    <i id="cfg-av-ic" class="ph ph-bell-slash text-xl text-zinc-400 mt-0.5 shrink-0" aria-hidden="true"></i>
+                    <div class="min-w-0 flex-1">
+                        <p id="cfg-av-tit" class="text-[13px] font-semibold text-zinc-800">Avisos</p>
+                        <p id="cfg-av-txt" class="mt-0.5 text-[12px] text-zinc-500 leading-snug"></p>
+                    </div>
+                    <button id="cfg-av-btn" type="button" class="hidden shrink-0 text-[13px] font-semibold px-3.5 py-2 rounded-lg disabled:opacity-60"></button>
+                </div>
+                <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    <span class="text-[11.5px] text-zinc-500 mr-1">Avisar</span>
+                    <div id="cfg-av-min" class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Quanto tempo antes"></div>
+                </div>
+                <div class="mt-2.5 flex items-center gap-3">
+                    <p id="cfg-av-msg" class="min-w-0 flex-1 text-[12px] text-zinc-500" aria-live="polite"></p>
+                    <button id="cfg-av-teste" type="button" disabled class="shrink-0 inline-flex items-center gap-1.5 bg-white border border-zinc-300 text-zinc-800 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg hover:bg-zinc-50 disabled:opacity-50"><i class="ph ph-paper-plane-tilt"></i>Mandar um teste</button>
+                </div>
+            </div>
             <!-- V40.41.0: backup (só salvar: restaurar continua no celular, escolha dele) -->
             <p class="mt-5 text-xs font-semibold text-zinc-500">Backup</p>
             <div class="mt-2 flex items-start gap-3">
@@ -1038,7 +1058,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.41.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.42.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1057,6 +1077,7 @@
 <script>window.FAZ_SYNC_CORE_ONLY = true;</script>
 <script src="sync.js"></script>
 <script src="libs/supabase-js/supabase.js"></script>
+<script src="avisos.js"></script>
 <script>
 (function () {
     'use strict';
@@ -5078,6 +5099,7 @@
         renderCfgPeriods(); // V40.41.0
         cfgPerReset();
         $('cfg-backup-msg').textContent = '';
+        cfgAvOpen(); // V40.42.0
         $('cfg-close').focus();
         refreshPrefs(true); // traz o que mudou no celular desde a última olhada
     }
@@ -5127,6 +5149,86 @@
             if (applyTheme(u, true)) scheduleRender();
             applyPeriods(u, true); // V40.41.0
         }).catch(function () {});
+    }
+
+    // ---------- V40.42.0: Avisos dos compromissos (neste computador) ----------
+    // A lógica é a do celular (avisos.js): Ligar inscreve este navegador no serviço de push dele e grava na conta
+    // (push_inscricoes); a nuvem avisa N minutos antes de cada bloco da agenda, com a aba fechada também (com o
+    // navegador aberto). Cada aparelho liga o seu; sair da conta desliga. O service worker (sw.js) só é registrado
+    // aqui quando liga os avisos.
+    var AV = { busy: false };
+    function avConta() {
+        if (!S.sb || !S.uid) return Promise.resolve(null);
+        var uid = S.uid;
+        return S.sb.auth.getSession().then(function (r) {
+            var s = r && r.data && r.data.session;
+            return s && s.user && s.user.id === uid && S.uid === uid && s.access_token ? { sb: S.sb, uid: uid, token: s.access_token } : null;
+        });
+    }
+    if (window.FazAvisos) { window.FazAvisos.config({ conta: avConta, aparelho: 'pc' }); window.FazAvisos.aoMudar(function () { renderCfgAvisos(); }); }
+    function cfgAvMsg(text, bad) {
+        var p = $('cfg-av-msg');
+        p.textContent = text || '';
+        p.classList.toggle('text-red-600', !!bad);
+        p.classList.toggle('font-semibold', !!bad);
+        p.classList.toggle('text-zinc-500', !bad);
+    }
+    function renderCfgAvisos() {
+        if ($('modal-cfg').classList.contains('hidden')) return;
+        var A = window.FazAvisos, st = A ? A.estado() : { suporte: 'suporte', permissao: 'default', on: false, minutos: 10 };
+        var pode = !!A && st.suporte === 'ok' && !!S.uid, tit, txt, btn = '', acao = '';
+        if (!A || st.suporte !== 'ok') { tit = 'Este navegador não mostra avisos'; txt = 'Use o Chrome, o Edge ou o Firefox (no Mac, o Safari também).'; }
+        else if (st.on) { tit = 'Ligados neste computador'; txt = 'Avisa ' + (st.minutos ? st.minutos + ' min antes de' : 'na hora de') + ' cada compromisso da agenda, mesmo com a aba fechada (com o navegador aberto).'; btn = 'Desligar'; acao = 'desligar'; }
+        else if (st.permissao === 'denied') { tit = 'As notificações estão bloqueadas'; txt = 'Libere as notificações deste site no cadeado da barra de endereço e clique em Ligar de novo.'; btn = 'Ligar'; acao = 'ligar'; }
+        else { tit = 'Desligados neste computador'; txt = 'Ligue pra receber um aviso antes de cada compromisso da agenda, mesmo com a aba fechada.'; btn = 'Ligar'; acao = 'ligar'; }
+        $('cfg-av-tit').textContent = tit;
+        $('cfg-av-txt').textContent = txt;
+        $('cfg-av-ic').className = 'ph ' + (st.on ? 'ph-bell-ringing text-rose-600' : 'ph-bell-slash text-zinc-400') + ' text-xl mt-0.5 shrink-0';
+        var b = $('cfg-av-btn');
+        b.className = 'shrink-0 text-[13px] font-semibold px-3.5 py-2 rounded-lg disabled:opacity-60 ' + (st.on ? 'bg-white border border-zinc-300 text-zinc-800 hover:bg-zinc-50' : 'bg-focus text-white hover:opacity-90') + (btn && pode ? '' : ' hidden');
+        b.textContent = btn;
+        b.dataset.acao = acao;
+        b.disabled = AV.busy;
+        $('cfg-av-min').innerHTML = (A ? A.MINUTOS : [0, 5, 10, 15, 30]).map(function (m) {
+            var on = m === st.minutos;
+            return '<button type="button" role="radio" aria-checked="' + on + '" data-av-min="' + m + '"' + (pode && !AV.busy ? '' : ' disabled') +
+                ' class="px-2.5 py-1 rounded-lg border text-[12px] font-semibold disabled:opacity-50 ' + (on ? 'bg-focus border-transparent text-white' : 'bg-white border-zinc-300 text-zinc-700 hover:bg-zinc-100') + '">' + (A ? A.rotulo(m) : m) + '</button>';
+        }).join('');
+        $('cfg-av-teste').disabled = !(pode && st.on) || AV.busy;
+    }
+    function cfgAvOpen() {
+        cfgAvMsg('');
+        renderCfgAvisos();
+        var A = window.FazAvisos;
+        if (A && A.estado().suporte === 'ok') A.revalidar().then(function () { return A.preparar({ semRegistrar: true }); }).then(function () { renderCfgAvisos(); }, function () {});
+    }
+    function cfgAvFim(p, okText) {
+        AV.busy = true;
+        renderCfgAvisos();
+        return p.then(function (r) {
+            AV.busy = false;
+            if (r && r.ok) cfgAvMsg(typeof okText === 'function' ? okText() : okText);
+            else cfgAvMsg(window.FazAvisos.texto(r && r.erro), true);
+            renderCfgAvisos();
+        }, function () { AV.busy = false; cfgAvMsg(window.FazAvisos.texto('rede'), true); renderCfgAvisos(); });
+    }
+    function cfgAvBotao() { // Ligar sai direto do clique (sem esperar nada antes): o Safari e o Firefox só pedem a permissão assim
+        var A = window.FazAvisos, acao = $('cfg-av-btn').dataset.acao;
+        if (!A || AV.busy || !S.uid) return;
+        if (acao === 'ligar') { cfgAvMsg('Ligando…'); cfgAvFim(A.ligar(A.estado().minutos), 'Pronto! Clique em "Mandar um teste" pra ver como chega.'); }
+        else if (acao === 'desligar') { cfgAvMsg('Desligando…'); cfgAvFim(A.desligar(), 'Avisos desligados neste computador.'); }
+    }
+    function cfgAvMinutos(m) {
+        var A = window.FazAvisos;
+        if (!A || AV.busy || m === A.estado().minutos) return;
+        cfgAvMsg('');
+        cfgAvFim(A.mudarMinutos(m), function () { return A.estado().on ? 'Agora avisa ' + (m ? m + ' min antes.' : 'na hora.') : ''; });
+    }
+    function cfgAvTestar() {
+        var A = window.FazAvisos;
+        if (!A || AV.busy) return;
+        cfgAvMsg('Mandando…');
+        cfgAvFim(A.testar(), 'Enviado! O aviso chega em alguns segundos.');
     }
 
     // ---------- V40.41.0: Períodos (Manhã, Tarde...) — os mesmos do celular, nos 2 sentidos ----------
@@ -5609,7 +5711,9 @@
         $('btn-refresh').addEventListener('click', function () { loadAll().then(function () { toast('Listas atualizadas'); }); });
         $('btn-logout').addEventListener('click', async function () {
             var ok = await dialog({ title: 'Sair da conta?', text: 'Neste computador você volta pra tela de entrada. Nada é apagado.', okLabel: 'Sair' });
-            if (ok) { try { await S.sb.auth.signOut(); } catch (err) {} }
+            if (!ok) return;
+            try { if (window.FazAvisos) await window.FazAvisos.esquecer(); } catch (err) {} // V40.42.0: os avisos deste computador eram desta conta
+            try { await S.sb.auth.signOut(); } catch (err) {}
         });
 
         // modal da tarefa
@@ -6389,6 +6493,10 @@
         });
         $('cfg-h0').addEventListener('change', cfgHoursChanged);
         $('cfg-h1').addEventListener('change', cfgHoursChanged);
+        // V40.42.0: avisos dos compromissos (o Ligar chama o avisos.js direto do clique)
+        $('cfg-av-btn').addEventListener('click', cfgAvBotao);
+        $('cfg-av-min').addEventListener('click', function (e) { var b = e.target.closest('[data-av-min]'); if (b) cfgAvMinutos(Number(b.dataset.avMin)); });
+        $('cfg-av-teste').addEventListener('click', cfgAvTestar);
         $('rep-tabs').addEventListener('click', function (e) { var b = e.target.closest('[data-rep]'); if (b) { REP.period = b.dataset.rep; renderReports(); } });
         $('modal-archive').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeArchive(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('ar-list').addEventListener('click', function (e) {

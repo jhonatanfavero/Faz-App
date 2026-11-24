@@ -14,6 +14,7 @@
 // V40.36.0: Repetir bloco (pelos 3 pontinhos) e os 3 pontinhos na visão Dia (não arrastam o bloco).
 // V40.40.0: visão Dia — o cartão sai da sublista arrastando (vira bloco ou muda de sublista) e o bloco entra nela.
 // V40.41.0: Períodos em Configurações e no Novo bloco; Salvar backup (o download de verdade).
+// V40.42.0: Avisos dos compromissos em Configurações (cabe na janela; não registra o service worker só de abrir).
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const fs = require('fs');
@@ -1045,6 +1046,34 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await foto(p, 'pc-periodos-novo-bloco.png');
   await p.locator('#f-cancel').click(); await p.waitForTimeout(150);
   await p.locator('#tab-listas').click(); await p.waitForTimeout(150);
+  }
+
+  {
+  console.log('\nAB) Avisos dos compromissos em Configurações (V40.42.0):');
+  await p.locator('#btn-cfg').click(); await p.waitForTimeout(400);
+  const av = () => p.evaluate(() => {
+    const m = document.querySelector('#modal-cfg > div').getBoundingClientRect(), sc = document.querySelector('#modal-cfg .overflow-y-auto');
+    document.getElementById('cfg-av-min').scrollIntoView({ block: 'center' });
+    const ch = [...document.querySelectorAll('#cfg-av-min [data-av-min]')].map((b) => { const r = b.getBoundingClientRect(); return { t: b.textContent, on: b.getAttribute('aria-checked') === 'true', dentro: r.left >= m.left && r.right <= m.right, dis: b.disabled }; });
+    const bt = document.getElementById('cfg-av-btn'), br = bt.getBoundingClientRect(), te = document.getElementById('cfg-av-teste').getBoundingClientRect();
+    return { tit: document.getElementById('cfg-av-tit').textContent, txt: document.getElementById('cfg-av-txt').textContent, btn: bt.classList.contains('hidden') ? '' : bt.textContent, btnDentro: br.right <= m.right - 8, teste: document.getElementById('cfg-av-teste').disabled, testeDentro: te.right <= m.right - 8 && te.width > 80, ch, rola: sc.scrollHeight > sc.clientHeight };
+  });
+  let a = await av();
+  ok(a.tit === 'Desligados neste computador' && a.btn === 'Ligar' && a.teste && a.ch.map((c) => c.t).join(',') === 'Na hora,5 min,10 min,15 min,30 min' && a.ch.find((c) => c.on).t === '10 min', 'Chrome de verdade: "' + a.tit + '", botão "' + a.btn + '", os 5 tempos (10 min marcado) e o teste só depois de ligar');
+  ok(a.btnDentro && a.testeDentro && a.ch.every((c) => c.dentro && !c.dis), 'tudo cabe na janela (botões e os 5 tempos clicáveis)');
+  const sw = await p.evaluate(() => navigator.serviceWorker.getRegistration('./').then((r) => !!r));
+  ok(!sw, 'abrir Configurações não registra o service worker no computador (só ao ligar)');
+  await foto(p, 'pc-avisos-desligados.png');
+  // a cara de "ligados" (ligar de verdade precisa do serviço de push, que o Chrome do teste não tem)
+  await p.evaluate(() => { window.__av = FazAvisos.estado; FazAvisos.estado = () => ({ suporte: 'ok', permissao: 'granted', on: true, minutos: 15 }); document.getElementById('btn-cfg').click(); });
+  await p.locator('#cfg-close').click(); await p.waitForTimeout(150);
+  await p.locator('#btn-cfg').click(); await p.waitForTimeout(400);
+  a = await av();
+  ok(a.tit === 'Ligados neste computador' && /15 min antes de cada compromisso/.test(a.txt) && a.btn === 'Desligar' && !a.teste && a.ch.find((c) => c.on).t === '15 min', 'ligados: "' + a.tit + '", "Avisa 15 min antes…", "Desligar" e o teste liberado');
+  await p.evaluate(() => { document.getElementById('cfg-av-msg').textContent = 'Enviado! O aviso chega em alguns segundos.'; });
+  await foto(p, 'pc-avisos-ligados.png');
+  await p.evaluate(() => { FazAvisos.estado = window.__av; });
+  await p.locator('#cfg-close').click(); await p.waitForTimeout(150);
   }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));

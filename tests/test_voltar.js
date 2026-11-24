@@ -127,7 +127,7 @@ function fakeCW(w) {
 
   // ======================================================================================================
   console.log('\nD) + → Config e as outras telas:');
-  const subs = [['openConfigHours()', 'config-hours-view', 'Janela de Horário'], ['openConfigPeriods()', 'config-periods-view', 'Períodos'], ['openConfigAppearance()', 'config-appearance-view', 'Aparência'], ['openConfigBackup()', 'config-backup-view', 'Backup'], ['openConfigSync()', 'config-sync-view', 'Sincronizar'], ['openConfigArchive()', 'config-archive-view', 'Arquivados']];
+  const subs = [['openConfigHours()', 'config-hours-view', 'Janela de Horário'], ['openConfigPeriods()', 'config-periods-view', 'Períodos'], ['openConfigAppearance()', 'config-appearance-view', 'Aparência'], ['openConfigBackup()', 'config-backup-view', 'Backup'], ['openConfigSync()', 'config-sync-view', 'Sincronizar'], ['openConfigArchive()', 'config-archive-view', 'Arquivados'], ['openConfigAvisos()', 'config-avisos-view', 'Avisos']]; // V40.42.0: + Avisos
   for (const [abrir, view, nome] of subs) {
     ev(`openSheet(); openConfigSheet(); ${abrir};`); await sleep(5);
     const antes = visivel(view) && !visivel('config-main-menu');

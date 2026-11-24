@@ -14,6 +14,8 @@ const COLUMNS = {
   metas_listas: ['user_id', 'id', 'name', 'is_default', 'position', 'created_ms', 'deleted', 'updated_at'],
   metas: ['user_id', 'id', 'list_id', 'title', 'emoji', 'period', 'unit', 'target', 'step', 'position', 'created_ms', 'count_from', 'deleted', 'updated_at'], // V40.34.0: + count_from
   metas_dias: ['user_id', 'id', 'goal_id', 'date', 'amount', 'target', 'deleted', 'updated_at'],
+  // V40.42.0: avisos dos compromissos (migration faz_v40_42_0_avisos)
+  push_inscricoes: ['user_id', 'id', 'endpoint', 'p256dh', 'auth', 'aparelho', 'fuso', 'minutos', 'criado_em', 'atualizado_em'],
 };
 const DEFAULTS = {
   tarefas: { column_id: 'col_geral', title: '', duration: 30, tag_id: null, microblocks: [], position: 0, color: null, archived: false, goal_id: null, deleted: false },
@@ -26,11 +28,25 @@ const DEFAULTS = {
   metas_listas: { name: '', is_default: false, position: 0, created_ms: null, deleted: false },
   metas: { list_id: null, title: '', emoji: '', period: 'dia', unit: 'vezes', target: 1, step: 1, position: 0, created_ms: null, count_from: null, deleted: false },
   metas_dias: { amount: 0, target: null, deleted: false },
+  push_inscricoes: { aparelho: 'celular', fuso: 'America/Sao_Paulo', minutos: 10 },
 };
+// V40.42.0: as mesmas regras da migration faz_v40_42_0_avisos (o teste confere o texto da migration)
+const PUSH_ENDPOINT = /^https:\/\/(fcm\.googleapis\.com|android\.googleapis\.com|updates\.push\.services\.mozilla\.com|web\.push\.apple\.com|[a-z0-9-]+\.notify\.windows\.com)\//;
+const sha256hex = (t) => (typeof require === 'function' ? require('crypto').createHash('sha256').update(String(t)).digest('hex') : null); // no navegador (tela_pc): não confere
 
 function check(table, r) { // mesmas CHECKs da migration
   const bad = (m) => ({ code: '23514', message: 'violates check constraint: ' + m });
   for (const k of Object.keys(r)) if (!COLUMNS[table].includes(k)) return { code: 'PGRST204', message: `Could not find the '${k}' column of '${table}'` };
+  if (table === 'push_inscricoes') { // V40.42.0
+    if (typeof r.endpoint !== 'string' || r.endpoint.length > 1000 || !PUSH_ENDPOINT.test(r.endpoint)) return bad('push_inscricoes_endpoint_check');
+    if (!/^[0-9a-f]{64}$/.test(String(r.id)) || (sha256hex(r.endpoint) !== null && r.id !== sha256hex(r.endpoint))) return bad('push_inscricoes_id_check');
+    if (typeof r.p256dh !== 'string' || r.p256dh.length < 80 || r.p256dh.length > 100 || !/^[A-Za-z0-9_=-]+$/.test(r.p256dh)) return bad('push_inscricoes_p256dh_check');
+    if (typeof r.auth !== 'string' || r.auth.length < 16 || r.auth.length > 32 || !/^[A-Za-z0-9_=-]+$/.test(r.auth)) return bad('push_inscricoes_auth_check');
+    if ('aparelho' in r && !['celular', 'pc'].includes(r.aparelho)) return bad('push_inscricoes_aparelho_check');
+    if ('fuso' in r && (typeof r.fuso !== 'string' || r.fuso.length < 1 || r.fuso.length > 64)) return bad('push_inscricoes_fuso_check');
+    if ('minutos' in r && ![0, 5, 10, 15, 30].includes(r.minutos)) return bad('push_inscricoes_minutos_check');
+    return null;
+  }
   if (typeof r.id !== 'string' || r.id.length < 1 || r.id.length > 64) return bad('id');
   if ('color' in r && table !== 'tags' && r.color !== null && !/^#[0-9a-fA-F]{6}$/.test(String(r.color))) return bad('color');
   if ('archived' in r && typeof r.archived !== 'boolean') return bad('archived');
@@ -121,7 +137,7 @@ function check(table, r) { // mesmas CHECKs da migration
 
 function makeServer() {
   const s = {
-    tables: { tarefas: new Map(), listas: new Map(), tags: new Map(), blocos: new Map(), rotinas: new Map(), notas: new Map(), financas: new Map(), metas_listas: new Map(), metas: new Map(), metas_dias: new Map() },
+    tables: { tarefas: new Map(), listas: new Map(), tags: new Map(), blocos: new Map(), rotinas: new Map(), notas: new Map(), financas: new Map(), metas_listas: new Map(), metas: new Map(), metas_dias: new Map(), push_inscricoes: new Map() },
     users: new Map(), clock: 0, log: [], channels: [], storedSession: null, createClientCalls: 0, failNext: 0, failAuth: 0,
   };
   s.emitters = [];
@@ -154,6 +170,7 @@ class Query {
   upsert(rows) { this.op = 'upsert'; this.payload = Array.isArray(rows) ? rows : [rows]; return this; }
   insert(rows) { this.op = 'insert'; this.payload = Array.isArray(rows) ? rows : [rows]; return this; }
   update(fields) { this.op = 'update'; this.payload = fields; return this; }
+  delete() { this.op = 'delete'; return this; } // V40.42.0 (push_inscricoes: os dados do app nunca são apagados de verdade, só marcados)
   then(res, rej) { return new Promise((r) => setTimeout(r, 5)).then(() => this.exec()).then(res, rej); }
   exec() {
     const sess = this.gs();
@@ -175,6 +192,7 @@ class Query {
         const err = check(this.t, r);
         if (err) return { data: null, error: err };
         if (this.op === 'insert' && tb.has(uid + '|' + r.id)) return { data: null, error: { code: '23505', message: 'duplicate key' } };
+        if (this.t === 'push_inscricoes' && !tb.has(uid + '|' + r.id) && [...tb.values()].filter((x) => x.user_id === uid).length >= 20) return { data: null, error: { code: 'P0001', message: 'faz_limite_aparelhos' } }; // V40.42.0: o gatilho do limite
         if (this.t === 'financas' && !tb.has(uid + '|' + r.id) && !r.start_month) return { data: null, error: { code: '23502', message: 'null value in column "start_month" violates not-null constraint' } };
         if (this.t === 'metas_dias' && !tb.has(uid + '|' + r.id) && (!r.goal_id || !r.date)) return { data: null, error: { code: '23502', message: 'null value in column "goal_id"/"date" violates not-null constraint' } };
       }
@@ -195,6 +213,12 @@ class Query {
         if (r.user_id === uid && this.f.every((fn) => fn(r))) { Object.assign(r, clone(this.payload), { updated_at: this.s.stamp() }); n++; this.s.emit(this.t, 'UPDATE', r); }
       }
       this.s.log.push({ op: 'update', t: this.t, n, fields: Object.keys(this.payload) });
+      return { data: null, error: null };
+    }
+    if (this.op === 'delete') { // V40.42.0
+      let n = 0;
+      for (const [k, r] of [...tb.entries()]) if (r.user_id === uid && this.f.every((fn) => fn(r))) { tb.delete(k); n++; }
+      this.s.log.push({ op: 'delete', t: this.t, n });
       return { data: null, error: null };
     }
     return { data: null, error: { message: 'op?' } };

@@ -47,6 +47,8 @@ const SUITES = [
     ['PC, visão Dia: cartão sai da sublista arrastando, muda de sublista e bloco entra', 'test_dia_sublista_pc.js', [ROOT, DADOS]],
     ['Períodos nos 2 sentidos (celular, conta e PC): Configurações e Novo bloco', 'test_periodos.js', [ROOT, DADOS]],
     ['PC: Salvar backup (o mesmo arquivo do celular, que abre igual num celular novo)', 'test_backup_pc.js', [ROOT, DADOS]],
+    ['Avisos dos compromissos: a função da nuvem (cifra, assinatura, hora de cada aparelho, uma vez só)', 'test_avisos_servidor.js', [ROOT]],
+    ['Avisos dos compromissos: ligar no celular e no PC, o service worker e as regras do banco', 'test_avisos.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

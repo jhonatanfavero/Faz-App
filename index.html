@@ -986,6 +986,20 @@
                     <i class="ph ph-caret-right text-zinc-400"></i>
                 </button>
 
+                <!-- V40.42.0: Avisos dos compromissos (Web Push: a nuvem avisa antes de cada bloco, com o app fechado) -->
+                <button onclick="openConfigAvisos()" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                            <i class="ph ph-bell-ringing text-xl"></i>
+                        </div>
+                        <div class="flex flex-col min-w-0">
+                            <span class="font-bold text-zinc-800 text-sm">Avisos dos compromissos</span>
+                            <span class="text-[11px] text-zinc-500 font-medium truncate" id="avisos-menu-status">Aviso antes de cada compromisso</span>
+                        </div>
+                    </div>
+                    <i class="ph ph-caret-right text-zinc-400 shrink-0"></i>
+                </button>
+
                 <!-- V40.6.0: Backup e Restauração (Fase 1 Export/Import) -->
                 <button onclick="openConfigBackup()" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left">
                     <div class="flex items-center gap-3">
@@ -1131,6 +1145,33 @@
                 <p class="text-[11px] text-zinc-400 text-center leading-relaxed px-4 mt-1">
                     Dica: faça backup de vez em quando e guarde no Google Drive. Se trocar de celular, é só instalar o app e restaurar.
                 </p>
+            </div>
+
+            <!-- V40.42.0: Avisos dos compromissos (tela em app.js; a lógica, igual no PC, em avisos.js) -->
+            <div class="flex-1 overflow-y-auto no-scrollbar hidden" id="config-avisos-view">
+                <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-4 mb-3 flex items-start gap-3">
+                    <div id="avisos-icone" class="w-10 h-10 rounded-lg bg-zinc-100 text-zinc-500 flex items-center justify-center shrink-0"><i class="ph ph-bell-slash text-xl"></i></div>
+                    <div class="min-w-0">
+                        <p class="font-bold text-zinc-800 text-sm" id="avisos-titulo">Avisos</p>
+                        <p class="text-[12px] text-zinc-600 leading-relaxed mt-0.5" id="avisos-texto"></p>
+                    </div>
+                </div>
+                <button id="avisos-ligar" type="button" onclick="fazAvisosBotao()" class="hidden w-full rounded-xl px-3 py-3 text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 mb-3 disabled:opacity-60 bg-app-focus text-white shadow-md">
+                    <i class="ph ph-bell-ringing text-lg"></i> <span></span>
+                </button>
+                <p class="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Avisar quanto tempo antes</p>
+                <div id="avisos-minutos" class="grid grid-cols-5 gap-1.5 mb-3" role="radiogroup" aria-label="Quanto tempo antes"></div>
+                <button id="avisos-teste" type="button" onclick="fazAvisosTestar()" disabled class="w-full bg-white border border-zinc-200 text-zinc-700 rounded-xl px-3 py-2.5 text-sm font-bold hover:bg-zinc-50 transition flex items-center justify-center gap-2 mb-2 disabled:opacity-40">
+                    <i class="ph ph-paper-plane-tilt text-base"></i> Mandar um aviso de teste
+                </button>
+                <p id="avisos-msg" class="text-[12px] text-zinc-500 text-center leading-relaxed min-h-[18px] mb-3 px-2" aria-live="polite"></p>
+                <div class="bg-white border border-zinc-200 rounded-xl p-3 mb-3">
+                    <ul class="text-[11.5px] text-zinc-600 leading-relaxed list-disc pl-4 space-y-1">
+                        <li>O aviso chega com o app fechado: quem avisa é a nuvem, olhando a agenda da sua conta.</li>
+                        <li>Cada aparelho liga o seu (este celular, o computador…).</li>
+                        <li>Bloco criado sem internet avisa depois que sincronizar. Bloco concluído não avisa.</li>
+                    </ul>
+                </div>
             </div>
 
             <!-- V40.9.0: Arquivados (tarefas e blocos fora das listas/agenda, mas guardados) -->
@@ -1571,7 +1612,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.41.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.42.0</div>
 
     </div>
 
@@ -1581,5 +1622,6 @@
     <script src="metas.js"></script>
     <script src="assistente.js"></script>
     <script src="sync.js"></script>
+    <script src="avisos.js"></script>
 </body>
 </html>

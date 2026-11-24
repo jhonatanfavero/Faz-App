@@ -43,7 +43,8 @@ const { abrir } = require('./apoio');
   console.log('\nB) Cache offline (service worker):');
   const sw = await m.evaluate(async () => { const reg = await navigator.serviceWorker.ready; const keys = await caches.keys(); const c = await caches.open(keys[0]); const reqs = await c.keys(); return { state: reg.active && reg.active.state, keys, n: reqs.length, urls: reqs.map((r) => new URL(r.url).pathname) }; });
   const swSrc = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
-  const assets = (swSrc.match(/'\.\/[^']*'/g) || []).length, cacheName = (swSrc.match(/CACHE_NAME = '([^']+)'/) || [])[1];
+  const lista = (swSrc.match(/const ASSETS = \[([\s\S]*?)\];/) || [])[1] || ''; // V40.42.0: só a lista (o sw.js tem outros './' agora: o ícone do aviso)
+  const assets = (lista.match(/'\.\/[^']*'/g) || []).length, cacheName = (swSrc.match(/CACHE_NAME = '([^']+)'/) || [])[1];
   ok(sw.state === 'activated' && sw.keys.join() === cacheName, 'service worker ativo com o cache ' + sw.keys.join());
   ok(sw.n === assets && assets >= 16, `os ${assets} arquivos da lista do sw.js entraram no cache (${sw.n})`);
   await ctx.setOffline(true);

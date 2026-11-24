@@ -928,7 +928,43 @@
         return { apply: null, push: { faz_periods: l, faz_periods_at: t }, at: t };
     }
 
+    // V40.43.0 — "SOLTAR AQUI" PELOS PERÍODOS (celular e PC). Divide um espaço livre [a, b) do dia (minutos, 0–1440)
+    // nos períodos da pessoa: [{ a, b, id, name, band }]. Fora de período: id e name '' e band '' (campo neutro).
+    // Período que passa da meia-noite (fim antes do início) vale do início até 24:00 e de 00:00 até o fim. Períodos que
+    // se cruzam: vale o mais curto (o mais específico); empate, o primeiro da lista. O mesmo período seguido vira um
+    // pedaço só. band = a cor, pela hora do dia: madrugada (antes das 6), manha (6 às 12),
+    // meiodia (12 às 13), tarde (13 às 18), noite (18 em diante) — pelo MEIO do período ("Tarde" de 12:00 às 18:00 é
+    // tarde; "Almoço" de 11:30 às 13:30 é meio-dia).
+    function periodMin(v) { var c = periodClock(v); return c === null ? null : (+c.slice(0, 2)) * 60 + (+c.slice(3)); }
+    function periodBand(min) { return min < 360 ? 'madrugada' : min < 720 ? 'manha' : min < 780 ? 'meiodia' : min < 1080 ? 'tarde' : 'noite'; }
+    function periodSlots(a, b, periods) {
+        a = Math.max(0, Math.min(1440, Math.round(Number(a) || 0)));
+        b = Math.max(a, Math.min(1440, Math.round(Number(b) || 0)));
+        var ranges = [];
+        (cleanPeriods(periods) || []).forEach(function (p, i) {
+            var s = periodMin(p.start), e = periodMin(p.end);
+            if (s === e) return;
+            var len = e > s ? e - s : 1440 - s + e, base = { p: p, len: len, i: i, band: periodBand(Math.floor(s + len / 2) % 1440) };
+            if (e > s) ranges.push(Object.assign({ a: s, b: e }, base));
+            else { ranges.push(Object.assign({ a: s, b: 1440 }, base)); if (e > 0) ranges.push(Object.assign({ a: 0, b: e }, base)); }
+        });
+        var cuts = [a, b];
+        ranges.forEach(function (r) { [r.a, r.b].forEach(function (x) { if (x > a && x < b) cuts.push(x); }); });
+        cuts.sort(function (x, y) { return x - y; });
+        var out = [];
+        for (var k = 0; k + 1 < cuts.length; k++) {
+            var s = cuts[k], e = cuts[k + 1], best = null;
+            if (e <= s) continue;
+            ranges.forEach(function (r) { if (r.a <= s && r.b >= e && (!best || r.len < best.len || (r.len === best.len && r.i < best.i))) best = r; });
+            var id = best ? best.p.id : '', last = out[out.length - 1];
+            if (last && last.id === id && last.b === s) { last.b = e; continue; }
+            out.push({ a: s, b: e, id: id, name: best ? best.p.name : '', band: best ? best.band : '' });
+        }
+        return out;
+    }
+
     return {
+        periodSlots: periodSlots, periodBand: periodBand, // V40.43.0
         DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS, MONTH: MONTH, DEFAULT_GOAL_LISTS: DEFAULT_GOAL_LISTS,
         cleanOverrides: cleanOverrides, cleanMonths: cleanMonths, safeCards: safeCards, MAX_CARDS: MAX_CARDS, // V40.24.0
         stable: stable, same: same, validDate: validDate, assignPositions: assignPositions, fixTies: fixTies,

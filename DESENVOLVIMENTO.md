@@ -121,6 +121,15 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     `supabase/functions/alertas` (index.ts + nucleo.js) com `verify_jwt = false`: ela confere sozinha quem chama.
     O estado do aparelho é `tb__avisos` (fora do backup: cada aparelho liga o seu).
 
+19. **"Soltar aqui" pelos Períodos: uma regra só, no `sync.js` (V40.43.0).** Com a tarefa na mão (e, no PC, arrastando
+    um bloco na Semana), o espaço livre se divide pelo `FazSyncCore.periodSlots(a, b, períodos)`, nos dois lados:
+    celular (`perZonesInto`/`perChipsInto` no `app.js`) e PC (`gapSlotsOf`/`cgapChips` no `kanban.html`). Mudou a
+    regra (quem ganha, a cor), mude lá e os dois acompanham. A paleta `.per-*` (madrugada, manha, meiodia, tarde,
+    noite, livre) está no `style.css` e no `<style>` do `kanban.html`: mude as duas. As partes ficam DENTRO do campo
+    de sempre (o toque fora delas faz o de antes) e, no celular, com z-index 29: abaixo do cabeçalho (z 30), senão
+    roubam o toque dos botões dele ao rolar. Sem nenhum período criado, volta o campo de sempre. No PC, os nomes
+    `perOn` (o período escolhido no Novo bloco) e `perActive` (há períodos?) são coisas diferentes.
+
 ## Publicar uma versão
 
 1. Faça a mudança e suba a versão nos cinco lugares da regra 2.

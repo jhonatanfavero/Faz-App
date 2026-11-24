@@ -15,6 +15,7 @@
 // V40.40.0: visão Dia — o cartão sai da sublista arrastando (vira bloco ou muda de sublista) e o bloco entra nela.
 // V40.41.0: Períodos em Configurações e no Novo bloco; Salvar backup (o download de verdade).
 // V40.42.0: Avisos dos compromissos em Configurações (cabe na janela; não registra o service worker só de abrir).
+// V40.43.0: "Colocar às"/"Soltar às" pelos Períodos (Semana com a tarefa na mão, arrastando, e a faixa do Dia compactado).
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const fs = require('fs');
@@ -1074,6 +1075,66 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await foto(p, 'pc-avisos-ligados.png');
   await p.evaluate(() => { FazAvisos.estado = window.__av; });
   await p.locator('#cfg-close').click(); await p.waitForTimeout(150);
+  }
+
+  {
+  console.log('\nAC) "Colocar às" e "Soltar às" pelos Períodos (V40.43.0):');
+  // a conta tem os 4 padrão + Madrugada (00:00 às 06:30, da parte AA); o dia vai das 07:00 às 24:00
+  await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(150);
+  const naMao = async () => {
+    await p.locator('#tab-listas').click(); await p.waitForTimeout(250);
+    const c = p.locator('section.col .card').first();
+    await c.hover(); await p.waitForTimeout(150);
+    await c.locator('[data-hand]').click(); await p.waitForTimeout(400);
+  };
+  await naMao();
+  await p.locator('.ag-view[data-view="week"]').click(); await p.waitForTimeout(200);
+  await p.locator('#ag-today').click(); await p.waitForTimeout(400);
+  const livre = await p.evaluate(() => { const l = [...document.querySelectorAll('#ag-cols .ag-list')].find((x) => !x.querySelector('[data-block]')); return l ? l.dataset.day : null; });
+  const bts = await p.evaluate((day) => [...document.querySelectorAll(`#ag-cols .ag-list[data-day="${day}"] .ag-gap`)].map((b) => {
+    const r = b.getBoundingClientRect(), col = b.closest('section').getBoundingClientRect(), pill = b.querySelector('.ag-per');
+    return { t: b.textContent.replace(/\s+/g, ' ').trim(), per: b.dataset.perName || '', bg: getComputedStyle(b).backgroundColor, dentro: r.left >= col.left && r.right <= col.right, linhas: pill ? pill.getClientRects().length : 0 };
+  }), livre);
+  ok(!!livre && bts.map((b) => b.t).join(' | ') === 'Colocar às 07:00 | Colocar às 08:00 Manhã | Colocar às 12:00 Meio-dia | Colocar às 13:00 Tarde | Colocar às 18:00 Noite | Colocar às 22:00',
+    'tarefa na mão, dia livre (' + livre + '): ' + bts.map((b) => b.t).join(' | '));
+  ok(new Set(bts.map((b) => b.bg)).size === 5 && bts[0].bg === bts[5].bg, 'cada parte do dia com a sua cor (as duas pontas fora de período, em cinza)');
+  ok(bts.every((b) => b.dentro) && bts.filter((b) => b.per && b.per !== 'Livre').every((b) => b.linhas === 1), 'tudo dentro da coluna, e o nome do período nunca quebra no meio ("Meio-dia" inteiro)');
+  await foto(p, 'pc-periodos-semana-mao.png');
+  await p.locator(`#ag-cols .ag-list[data-day="${livre}"] .ag-gap[data-per-name="Tarde"]`).click(); await p.waitForTimeout(700);
+  const pos = await blocos(livre);
+  ok(pos.length === 1 && pos[0].st === 780, 'clique de verdade em "Colocar às 13:00 Tarde": foi pras 13:00');
+  // arrastar esse bloco com o mouse: um "Soltar às" por período em cada dia
+  const outro = await p.evaluate((d0) => { const l = [...document.querySelectorAll('#ag-cols .ag-list')].find((x) => x.dataset.day !== d0 && !x.querySelector('[data-block]')); return l ? l.dataset.day : null; }, livre);
+  const de = await p.evaluate((id) => { const r = document.querySelector(`#ag-cols [data-block="${id}"]`).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, pos[0].id);
+  await p.mouse.move(de.x, de.y); await p.mouse.down(); await p.mouse.move(de.x + 10, de.y + 20, { steps: 4 }); await p.waitForTimeout(350);
+  const zs = await p.evaluate((day) => [...document.querySelectorAll(`#ag-cols .ag-list[data-day="${day}"] .ag-drop`)].map((z) => z.textContent.replace(/\s+/g, ' ').trim()), outro);
+  ok(zs.join(' | ') === 'Soltar às 07:00 | Soltar às 08:00 Manhã | Soltar às 12:00 Meio-dia | Soltar às 13:00 Tarde | Soltar às 18:00 Noite | Soltar às 22:00', 'arrastando o bloco, outro dia livre (' + outro + '): ' + zs.join(' | '));
+  const alvo = await p.evaluate((day) => { const r = document.querySelector(`#ag-cols .ag-list[data-day="${day}"] .ag-drop[data-per-name="Noite"]`).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, outro);
+  // o Playwright só manda o "dragover" no movimento seguinte: mais dois passinhos em cima do alvo
+  await p.mouse.move(alvo.x, alvo.y, { steps: 10 }); await p.mouse.move(alvo.x + 2, alvo.y + 1); await p.mouse.move(alvo.x + 3, alvo.y + 2); await p.waitForTimeout(150);
+  const acesa = await p.evaluate((day) => { const z = document.querySelector(`#ag-cols .ag-list[data-day="${day}"] .ag-drop[data-per-name="Noite"]`); return !!z && z.classList.contains('over') && getComputedStyle(z).backgroundColor; }, outro);
+  await foto(p, 'pc-periodos-arrastar.png');
+  await solta();
+  const mv = await nuvem(pos[0].id);
+  ok(!!acesa && acesa !== 'rgb(255, 255, 255)' && mv.date === outro && mv.st === 1080, 'em cima de "Soltar às 18:00 Noite" ela acende (' + acesa + '); soltou: foi pras 18:00 de ' + outro);
+  // visão Dia com os vagos compactados: as partes dentro da faixa
+  await naMao();
+  await p.locator(`#ag-cols .ag-day-btn[data-day="${livre}"]`).click(); await p.waitForTimeout(300);
+  const jaCompacto = await p.evaluate(() => document.getElementById('ag-compact').getAttribute('aria-pressed') === 'true');
+  if (!jaCompacto) { await p.locator('#ag-compact').click(); await p.waitForTimeout(300); }
+  const fx = await p.evaluate(() => {
+    const b = document.querySelector('#ag-timeline .ag-cgap.has-per');
+    if (!b) return null;
+    const r = b.getBoundingClientRect();
+    return { chips: [...b.querySelectorAll('.ag-pchip')].map((c) => { const q = c.getBoundingClientRect(); return { t: c.textContent.replace(/\s+/g, ' ').trim(), dentro: q.left >= r.left && q.right <= r.right - 1 && q.top >= r.top && q.bottom <= r.bottom }; }) };
+  });
+  ok(!!fx && fx.chips.map((c) => c.t).join(' | ') === 'Livre07:00 | Manhã08:00 | Meio-dia12:00 | Tarde13:00 | Noite18:00 | Livre22:00' && fx.chips.every((c) => c.dentro),
+    'visão Dia compactada, tarefa na mão: as 6 partes cabem dentro da faixa (' + (fx ? fx.chips.map((c) => c.t).join(', ') : '-') + ')');
+  await foto(p, 'pc-periodos-dia-faixa.png');
+  await p.locator('#ag-timeline .ag-pchip[data-per-name="Manhã"]').click(); await p.waitForTimeout(700);
+  const nd = await blocos(livre);
+  ok(nd.length === 1 && nd[0].st === 480, 'clique na parte "Manhã" da faixa: às 08:00');
+  if (!jaCompacto) { await p.locator('#ag-compact').click(); await p.waitForTimeout(200); }
   }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));

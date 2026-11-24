@@ -44,6 +44,23 @@
     .ag-gap { border: 1.5px dashed var(--focus); color: var(--focus); border-radius: 8px; padding: 5px 8px; font-size: 12px; font-weight: 600; text-align: left; background: #fff; }
     .ag-gap:hover, .ag-gap:focus-visible { background: color-mix(in srgb, var(--focus) 10%, white); }
     .ag-gap.first { position: sticky; top: 0; z-index: 1; box-shadow: 0 3px 8px rgba(0,0,0,.10); } /* dia cheio: o primeiro horário livre fica sempre à vista */
+    /* V40.43.0: "Colocar às"/"Soltar às" pelos Períodos: a cor da parte do dia (pela hora do meio do período; fora de
+       período, cinza). A mesma paleta do celular (style.css). */
+    .per-madrugada { --per-bg: #eef2ff; --per-bd: #818cf8; --per-tx: #4338ca; }
+    .per-manha { --per-bg: #fffbeb; --per-bd: #f59e0b; --per-tx: #b45309; }
+    .per-meiodia { --per-bg: #fff7ed; --per-bd: #fb923c; --per-tx: #c2410c; }
+    .per-tarde { --per-bg: #f0f9ff; --per-bd: #38bdf8; --per-tx: #0369a1; }
+    .per-noite { --per-bg: #f5f3ff; --per-bd: #a78bfa; --per-tx: #6d28d9; }
+    .per-livre { --per-bg: #fafafa; --per-bd: #a1a1aa; --per-tx: #52525b; }
+    .ag-gap.per { border-color: var(--per-bd); color: var(--per-tx); background: var(--per-bg); }
+    .ag-gap.per:hover, .ag-gap.per:focus-visible { background: color-mix(in srgb, var(--per-bd) 22%, white); }
+    .ag-gap .ag-per { display: inline-block; padding: 0 6px; border-radius: 9999px; background: rgba(255,255,255,.75); font-size: 10.5px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; vertical-align: 1px; }
+    .ag-drop.per.over .ag-per { background: rgba(255,255,255,.25); }
+    .ag-cgap.has-per .ag-cgap-len { display: none; } /* com as partes, o "· livre 17h" sai (não cabia tudo) */
+    .ag-cgap .ag-pchips { display: flex; gap: 4px; margin-left: auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+    .ag-cgap .ag-pchip { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border: 1.5px dashed var(--per-bd); border-radius: 9999px; background: var(--per-bg); color: var(--per-tx); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: copy; }
+    .ag-cgap .ag-pchip:hover { background: color-mix(in srgb, var(--per-bd) 22%, white); }
+    .ag-cgap .ag-pchip b { font-weight: 800; }
     #ag-timeline.placing { cursor: copy; }
     /* V40.13.0: criar bloco direto na Agenda */
     #ag-timeline:not(.placing) { cursor: cell; }
@@ -68,6 +85,7 @@
     body.ag-resizing, body.ag-resizing * { cursor: ns-resize !important; }
     /* V40.14.0: Semana — enquanto um bloco é arrastado, os espaços livres viram lugar de soltar */
     .ag-drop.over { background: var(--focus); color: #fff; border-style: solid; }
+    .ag-drop.per.over { background: var(--per-bd); color: #fff; } /* V40.43.0: a parte do dia acende na cor dela */
     /* V40.17.0: Rotinas e Notas */
     .rt-theme { color: #71717a; }
     .rt-theme.on { background: #fff; color: #18181b; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -1058,7 +1076,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.42.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.43.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1770,15 +1788,34 @@
     // Hoje começa de agora; os outros dias, do começo do dia configurado no celular.
     // V40.28.0: all = hoje também desde o começo do dia (mover um bloco que já está na agenda pode ir pra antes de
     // agora, como no Dia e no celular). A tarefa na mão continua começando de agora.
-    function gapsOf(list, day, dur, all) {
+    // V40.43.0 — "Colocar às"/"Soltar às" PELOS PERÍODOS: cada espaço livre se divide nos Períodos da pessoa (Manhã,
+    // Meio-dia, Tarde, Noite, os que ela criou), cada parte com a cor da parte do dia; um botão por parte onde a tarefa
+    // cabe, no 1º horário livre dela (antes era um só, no começo do espaço: ia tudo pros primeiros horários). Fora de
+    // período, parte cinza ("Livre"), mesmo num espaço todo fora deles. Sem nenhum período criado, um só, como antes. A
+    // regra é a do celular (FazSyncCore.periodSlots, no sync.js). Devolve [{ st, name, band }] (name '' = sem períodos).
+    function gapRangesOf(list, day, dur, all) { // os espaços livres onde cabe: { a, b } (era o gapsOf, que dava só o começo)
         var cur = S.hours[0] * 60, out = [];
         if (day === todayStr() && !all) cur = Math.max(cur, Math.ceil(nowMin() / 5) * 5);
-        list.forEach(function (b) { if (b.start_min - cur >= dur) out.push(cur); cur = Math.max(cur, b.start_min + b.duration); });
-        if (1440 - cur >= dur) out.push(cur);
+        list.forEach(function (b) { if (b.start_min - cur >= dur) out.push({ a: cur, b: b.start_min }); cur = Math.max(cur, b.start_min + b.duration); });
+        if (1440 - cur >= dur) out.push({ a: cur, b: 1440 });
         return out;
     }
-    function gapHtml(day, st, first) {
-        return '<button type="button" class="ag-gap' + (first ? ' first' : '') + '" data-gap-day="' + day + '" data-gap-start="' + st + '"><i class="ph ph-plus mr-1"></i>Colocar às ' + clock(st) + (first ? ' (primeiro livre)' : '') + '</button>';
+    function perActive() { var C = window.FazSyncCore; return !!(C && typeof C.periodSlots === 'function' && (C.cleanPeriods(perList()) || []).length); } // (o perOn é o do Novo bloco)
+    function perParts(a, b) { return perActive() ? window.FazSyncCore.periodSlots(a, b, perList()).filter(function (x) { return x.b - x.a >= 5; }) : []; }
+    function gapSlotsOf(list, day, dur, all) {
+        var out = [];
+        gapRangesOf(list, day, dur, all).forEach(function (r) {
+            var parts = perParts(r.a, r.b);
+            if (!parts.length) return void out.push({ st: r.a, name: '', band: '' });
+            parts.forEach(function (x) { if (x.a + dur <= r.b) out.push({ st: x.a, name: x.name || 'Livre', band: x.band || 'livre' }); });
+        });
+        return out;
+    }
+    // o nome do período numa etiqueta que não quebra no meio ("Meio-dia"): se não couber na linha, desce inteira
+    function perLabel(g) { return g.name && g.name !== 'Livre' ? ' <span class="ag-per">' + esc(g.name) + '</span>' : ''; }
+    function gapHtml(day, g, first) {
+        return '<button type="button" class="ag-gap' + (g.band ? ' per per-' + g.band : '') + (first ? ' first' : '') + '" data-gap-day="' + day + '" data-gap-start="' + g.st + '"' +
+            (g.name ? ' data-per-name="' + esc(g.name) + '"' : '') + '><i class="ph ph-plus mr-1"></i>Colocar às ' + clock(g.st) + perLabel(g) + (first ? ' (primeiro livre)' : '') + '</button>';
     }
     // V40.17.0: filtro da Agenda (tag e concluídos). Só esconde da tela: espaço livre e conflito contam todos os blocos.
     function agFiltering() { return !!S.agTag || !!S.agHideDone; }
@@ -1808,11 +1845,11 @@
         var list = all.filter(agVisible); // o que aparece; os espaços livres (tarefa na mão) contam todos os blocos
         if (!S.placing) return list.map(function (b) { return agCardHtml(b, day, today, nm); }).join('') +
             '<button type="button" class="ag-add shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[12.5px] font-medium text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800" data-add-day="' + day + '"><i class="ph ph-plus"></i>Adicionar bloco</button>';
-        var gaps = gapsOf(all, day, S.placing.dur), gi = 0, html = '';
+        var gaps = gapSlotsOf(all, day, S.placing.dur), gi = 0, html = ''; // V40.43.0: um por período
         // Dia cheio: o primeiro espaço livre pode estar lá embaixo, depois de vários blocos. Um atalho fixo no topo resolve.
-        if (gaps.length && list.length && gaps[0] > list[0].start_min) html += gapHtml(day, gaps[0], true);
+        if (gaps.length && list.length && gaps[0].st > list[0].start_min) html += gapHtml(day, gaps[0], true);
         list.forEach(function (b) {
-            while (gi < gaps.length && gaps[gi] <= b.start_min) html += gapHtml(day, gaps[gi++]);
+            while (gi < gaps.length && gaps[gi].st <= b.start_min) html += gapHtml(day, gaps[gi++]);
             html += agCardHtml(b, day, today, nm);
         });
         while (gi < gaps.length) html += gapHtml(day, gaps[gi++]);
@@ -2061,6 +2098,18 @@
                   '<span class="text-[13px] font-semibold truncate ' + titleCls + '">' + goalBadge(b.goal_id) + (esc(b.title) || 'Sem nome') + '</span></span>' + dayMoreHtml(b)) +
             '<span class="ag-rz' + (b.duration < 10 ? ' s' : '') + '" title="Puxe pra mudar a duração" aria-hidden="true"></span>';
     }
+    // V40.43.0: com a tarefa na mão, a faixa de um vago compactado (visão Dia) ganha uma parte por período, com a cor
+    // dela: clicar numa parte coloca no 1º horário livre dela (hoje, na parte de agora: a partir de agora). Como a
+    // faixa do celular (perChipsInto, no app.js). Clicar fora das partes faz o de sempre (o começo do vago).
+    function cgapChips(day, a, b) {
+        var dur = S.placing ? S.placing.dur : 0, nm = day === todayStr() ? nowMin() : -1, parts = perParts(a, b), html = '';
+        parts.forEach(function (x) {
+            var st = nm > x.a && nm < x.b ? Math.ceil(nm / 5) * 5 : x.a, name = esc(x.name || 'Livre');
+            if (st + dur > b) return;
+            html += '<span class="ag-pchip per per-' + (x.band || 'livre') + '" data-cgap="' + st + '" data-per-name="' + name + '" title="Colocar a tarefa às ' + clock(st) + ' (' + name + ')"><b>' + name + '</b>' + clock(st) + '</span>';
+        });
+        return html ? '<span class="ag-pchips">' + html + '</span>' : '';
+    }
     function renderDay(day, map, today, nm) {
         var list = map[day] || [], d = parseYmd(day), box = $('ag-timeline');
         var h0 = Math.min(S.hours[0], list.length ? Math.floor(list[0].start_min / 60) : 24);
@@ -2077,9 +2126,9 @@
         }
         S.agSegs.forEach(function (sg) { // V40.22.0: faixa de cada vago compactado (clicar cria um bloco ali, ou coloca a tarefa na mão)
             if (!sg.gap) return;
-            var len = sg.b - sg.a, y = agY(sg.a);
-            html += '<button type="button" class="ag-cgap" data-cgap="' + sg.a + '" style="top:' + (y + 2) + 'px;height:' + (CGAP_PX - 4) + 'px" title="' + (S.placing ? 'Colocar a tarefa às ' + clock(sg.a) : 'Clique pra criar um bloco às ' + clock(sg.a)) + '">' +
-                '<i class="ph ' + (S.placing ? 'ph-hand-pointing' : 'ph-arrows-out-line-vertical') + '"></i><span class="ag-cgap-time">' + clock(sg.a) + '–' + clock(sg.b) + '</span><span>· livre ' + fmtDur(len) + '</span></button>';
+            var len = sg.b - sg.a, y = agY(sg.a), chips = S.placing ? cgapChips(day, sg.a, sg.b) : ''; // V40.43.0: uma parte por período
+            html += '<button type="button" class="ag-cgap' + (chips ? ' has-per' : '') + '" data-cgap="' + sg.a + '" style="top:' + (y + 2) + 'px;height:' + (CGAP_PX - 4) + 'px" title="' + (S.placing ? 'Colocar a tarefa às ' + clock(sg.a) : 'Clique pra criar um bloco às ' + clock(sg.a)) + '">' +
+                '<i class="ph ' + (S.placing ? 'ph-hand-pointing' : 'ph-arrows-out-line-vertical') + '"></i><span class="ag-cgap-time">' + clock(sg.a) + '–' + clock(sg.b) + '</span><span class="ag-cgap-len">· livre ' + fmtDur(len) + '</span>' + chips + '</button>';
         });
         var shownN = 0, shownMin = 0;
         list.forEach(function (b) {
@@ -6226,27 +6275,30 @@
                 var day = list.dataset.day, others = (map[day] || []).filter(function (x) { return x.id !== b.id; });
                 // V40.28.0: hoje também os espaços de antes de agora (o bloco já está na agenda; mover pra trás vale, como no Dia),
                 // sem perder o "a partir de agora" no meio de um espaço que começou antes
-                var gaps = gapsOf(others, day, b.duration, true);
-                if (day === todayStr()) gapsOf(others, day, b.duration).forEach(function (st) { if (gaps.indexOf(st) < 0) gaps.push(st); });
-                gaps = gaps.sort(function (x, y) { return x - y; }).filter(function (st) { return day !== own || st !== b.start_min; }); // menos o lugar onde ele já está
+                // V40.43.0: um por período (gapSlotsOf), cada um com a cor da parte do dia
+                var gaps = gapSlotsOf(others, day, b.duration, true), seen = {};
+                if (day === todayStr()) gaps = gaps.concat(gapSlotsOf(others, day, b.duration));
+                gaps = gaps.filter(function (g) { if (seen[g.st] || (day === own && g.st === b.start_min)) return false; seen[g.st] = 1; return true; }) // menos o lugar onde ele já está
+                    .sort(function (x, y) { return x.st - y.st; });
                 var cards = list.querySelectorAll('[data-block]');
-                var zone = function (st, first) {
+                var zone = function (g, first) {
                     var el = document.createElement('div');
-                    el.className = 'ag-gap ag-drop shrink-0' + (first ? ' first' : '');
+                    el.className = 'ag-gap ag-drop shrink-0' + (g.band ? ' per per-' + g.band : '') + (first ? ' first' : '');
                     el.dataset.dropDay = day;
-                    el.dataset.dropStart = st;
-                    el.innerHTML = '<i class="ph ph-arrow-bend-down-right mr-1"></i>Soltar às ' + clock(st) + (first ? ' (primeiro livre)' : '');
+                    el.dataset.dropStart = g.st;
+                    if (g.name) el.dataset.perName = g.name;
+                    el.innerHTML = '<i class="ph ph-arrow-bend-down-right mr-1"></i>Soltar às ' + clock(g.st) + perLabel(g) + (first ? ' (primeiro livre)' : '');
                     return el;
                 };
-                gaps.forEach(function (st) {
+                gaps.forEach(function (g) {
                     var before = null;
-                    for (var i = 0; i < cards.length && !before; i++) { var x = S.blocos[cards[i].dataset.block]; if (x && x.start_min >= st) before = cards[i]; }
-                    list.insertBefore(zone(st, false), before || list.querySelector('.ag-add'));
+                    for (var i = 0; i < cards.length && !before; i++) { var x = S.blocos[cards[i].dataset.block]; if (x && x.start_min >= g.st) before = cards[i]; }
+                    list.insertBefore(zone(g, false), before || list.querySelector('.ag-add'));
                 });
                 // dia cheio: o primeiro espaço livre fica lá embaixo; um atalho fixo no topo deixa ele sempre à vista
                 // (hoje, o primeiro a partir de agora, como era antes da V40.28.0)
-                var lead = day === todayStr() ? gaps.filter(function (st) { return st >= Math.ceil(nowMin() / 5) * 5; }) : gaps;
-                if (lead.length && others.length && lead[0] > others[0].start_min) list.insertBefore(zone(lead[0], true), list.firstChild);
+                var lead = day === todayStr() ? gaps.filter(function (g) { return g.st >= Math.ceil(nowMin() / 5) * 5; }) : gaps;
+                if (lead.length && others.length && lead[0].st > others[0].start_min) list.insertBefore(zone(lead[0], true), list.firstChild);
             });
         }
         agCols.addEventListener('mousedown', wzDown); // V40.28.0: puxar a borda de baixo muda a duração

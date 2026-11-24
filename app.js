@@ -731,6 +731,11 @@ function runRealTimeEngine() {
             if (hd.scrollWidth <= hd.clientWidth + 1) break;
         }
     }
+    // V40.43.0: com 2 ou 3 dias no iPhone mini (375 px), "16–18 nov" também ficava cortado: aí sai o mês ("16–18")
+    if (mDays.length && hd.scrollWidth > hd.clientWidth + 1) {
+        const a = tlDateObj(mDays[0]), z = tlDateObj(mDays[mDays.length - 1]);
+        putDate(`${a.getDate()}–${z.getDate()}`);
+    }
 
     const nowLine = document.getElementById('now-line');
     const nowMini = document.querySelector('#blocks-container .tl-now-mini');
@@ -1051,6 +1056,7 @@ function tlMiniGap(ds, start, dur) {
             el.classList.add('drop', 'animate-pulse-drop');
             if (dur >= 25) el.innerHTML = '<i class="ph ph-hand-pointing"></i>';
             el.onclick = (e) => { e.stopPropagation(); performEncaixeMatematico(start, dur, false, ds); };
+            perZonesInto(el, start, start + dur, ds, true); // V40.43.0: uma parte por período, com a cor dele
         } else el.classList.add('short');
     } else {
         el.onclick = (e) => tlEmptyTap(e, { startMin: start, duration: dur }, ds);
@@ -1477,6 +1483,7 @@ function drawBlock(block) {
                 el.classList.add('border-black/20', 'animate-pulse-drop', 'cursor-pointer', 'z-30');
                 el.onclick = () => performEncaixeMatematico(block.startMin, block.duration);
                 el.innerHTML = `<span class="tl-gap-txt text-app-focus"><i class="ph ph-hand-pointing"></i>Soltar aqui · ${range}</span>`;
+                perChipsInto(el, block.startMin, block.startMin + block.duration, getActiveDateStr()); // V40.43.0: uma parte por período
             } else {
                 el.classList.add('border-red-500/20', 'opacity-60');
                 el.innerHTML = `<span class="tl-gap-txt text-red-500">${range} · muito curto</span>`;
@@ -1494,6 +1501,7 @@ function drawBlock(block) {
                 el.classList.add('border-black/20', 'animate-pulse-drop', 'cursor-pointer', 'z-30');
                 el.onclick = () => performEncaixeMatematico(block.startMin, block.duration);
                 el.innerHTML = `<i class="ph ph-hand-pointing ${block.duration < 15 ? 'text-xs' : 'text-2xl mb-1'} text-app-focus drop-shadow-md"></i> ${!isSmall ? `<span class="text-[10px] font-bold text-app-focus uppercase tracking-widest">Soltar Aqui</span>` : ''}`;
+                perZonesInto(el, block.startMin, block.startMin + block.duration, getActiveDateStr()); // V40.43.0: uma parte por período, com a cor dele
             } else {
                 el.classList.add('border-red-500/20', 'opacity-50');
                 el.innerHTML = `<span class="text-[9px] text-red-500 font-bold uppercase">Muito Curto</span>`;
@@ -2610,6 +2618,81 @@ function blkDragEnd(e) {
 }
 
 // --- 5. ENCAIXE MATEMÁTICO ---
+// ---------- V40.43.0: "SOLTAR AQUI" PELOS PERÍODOS ----------
+// Com a tarefa na mão, cada espaço livre se divide nos Períodos da pessoa (Manhã, Meio-dia, Tarde, Noite...), cada um
+// com a sua cor: tocar numa parte põe a tarefa no primeiro horário livre dela (hoje, na parte de agora: a partir de
+// agora). Fora de período, parte cinza ("Livre"), mesmo num espaço todo fora deles. Sem nenhum período criado: o campo
+// inteiro de sempre. A regra é a mesma do PC (FazSyncCore.periodSlots, no sync.js). Tocar no espaço fora das partes
+// (o vãozinho entre elas) faz o de sempre (o começo do espaço).
+function perActive() { const C = window.FazSyncCore; return !!(C && typeof C.periodSlots === 'function' && (C.cleanPeriods(periodsDb) || []).length); }
+function perSlots(a, b) {
+    return perActive() ? window.FazSyncCore.periodSlots(a, b, periodsDb).filter(s => s.b - s.a >= 5) : []; // pedacinho de menos de 5 min não vira campo
+}
+function perStart(slot, gapEnd, ds) { // onde a tarefa entra nesta parte; null = não cabe
+    let st = slot.a;
+    if (ds === getTodayStr() && currentRealMins > slot.a && currentRealMins < slot.b) st = currentRealMins;
+    st = Math.ceil(st / 5) * 5;
+    return pendingIntent && st + pendingIntent.duration <= gapEnd ? st : null;
+}
+// Põe as partes dentro do campo do espaço livre (el, já posicionado na régua). mini: os dias lado a lado.
+// O nome da parte acompanha a rolagem (fica logo abaixo do cabeçalho enquanto a parte aparece: o style.css).
+function perZonesInto(el, a, b, ds, mini) {
+    const slots = perSlots(a, b);
+    if (!slots.length) return false; // nenhum período criado: fica o campo de sempre
+    const y0 = tlY(a), today = ds === getTodayStr();
+    el.innerHTML = '';
+    el.classList.add('tl-pz-box');
+    slots.forEach(s => {
+        const st = perStart(s, b, ds), top = tlY(s.a) - y0, h = tlY(s.b) - tlY(s.a), z = document.createElement('div');
+        const nm = s.name || 'Livre', name = escapeHtml(nm), at = formatClock(st === null ? s.a : st);
+        z.className = (mini ? 'tl-pz mini' : 'tl-pz') + ' per-' + (s.band || 'livre') + (st === null ? ' nao' : '') +
+            (today && s.b <= currentRealMins ? ' past' : '') + (h < 24 ? ' tiny' : '') + (h < 14 ? ' micro' : '');
+        z.style.top = top + 'px';
+        z.style.height = Math.max(h - 2, 2) + 'px';
+        z.dataset.perStart = st === null ? '' : String(st);
+        z.dataset.perName = nm;
+        z.setAttribute('role', 'button');
+        z.setAttribute('aria-label', st === null ? `${nm}: não cabe` : `Soltar às ${at} (${nm})`);
+        z.innerHTML = mini ? `<span class="tl-pz-txt"><b>${name}</b><span>${at}</span></span>` : `<span class="tl-pz-txt"><i class="ph ph-hand-pointing"></i><b>${name}</b> <span>· ${at}${st === null ? ' · não cabe' : ''}</span></span>`;
+        z.onclick = (e) => {
+            e.stopPropagation();
+            const now = perStart(s, b, ds); // a hora de agora (a agenda pode estar aberta há uns minutos)
+            if (now === null) { showToast('Não cabe nesse período: toque em outro 👇'); return; }
+            performEncaixeMatematico(now, b - now, true, ds);
+        };
+        el.appendChild(z);
+    });
+    return true;
+}
+// A faixa de um vago oculto (36 px): as partes lado a lado, com o nome em cima e a hora embaixo.
+function perChipsInto(el, a, b, ds) {
+    const slots = perSlots(a, b).filter(s => perStart(s, b, ds) !== null);
+    if (!slots.length) return false;
+    const range = `${formatClock(a)}–${formatClock(b)}`;
+    el.innerHTML = `<span class="sr-only">Soltar aqui · ${range}</span>`; // o que o leitor de tela fala (e o texto de antes)
+    el.classList.add('tl-pz-strip');
+    const row = document.createElement('div');
+    row.className = 'tl-pchips';
+    slots.forEach(s => {
+        const st = perStart(s, b, ds), c = document.createElement('button');
+        c.type = 'button';
+        c.className = 'tl-pchip per-' + (s.band || 'livre');
+        c.dataset.perStart = String(st);
+        c.dataset.perName = s.name || 'Livre';
+        c.innerHTML = `<b>${escapeHtml(s.name || 'Livre')}</b><span>${formatClock(st)}</span>`;
+        c.title = `Soltar às ${formatClock(st)} (${s.name || 'Livre'})`;
+        c.onclick = (e) => {
+            e.stopPropagation();
+            const now = perStart(s, b, ds);
+            if (now === null) { showToast('Não cabe nesse período: toque em outro 👇'); return; }
+            performEncaixeMatematico(now, b - now, true, ds);
+        };
+        row.appendChild(c);
+    });
+    el.appendChild(row);
+    return true;
+}
+
 function performEncaixeMatematico(gapStart, gapDuration, exact, date) { // V40.25.1: exact = hora escolhida pelo toque (não puxa pra "agora")
     const ds = date || getActiveDateStr(); // V40.26.0: na agenda afastada, o dia da coluna tocada
     let start = gapStart;
@@ -3604,7 +3687,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.42.0',
+            version: 'v40.43.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

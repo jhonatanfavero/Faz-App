@@ -528,6 +528,62 @@ body { overflow-x: hidden; max-width: 100vw; }
 .tl-mini-gap { position: absolute; left: 1px; right: 1px; z-index: 5; cursor: pointer; }
 .tl-mini-gap.drop { display: flex; align-items: center; justify-content: center; border: 2px dashed var(--theme-color, #4f46e5); border-radius: 8px; background: rgba(0, 0, 0, 0.03); color: var(--theme-color, #4f46e5); font-size: 18px; z-index: 30; }
 .tl-mini-gap.short { cursor: default; }
+/* V40.43.0 — SOLTAR AQUI PELOS PERÍODOS: com a tarefa na mão, cada espaço livre se divide nos Períodos da pessoa,
+   uma cor por parte do dia (pela hora do meio do período: madrugada, manhã, meio-dia, tarde, noite; fora de período,
+   cinza "Livre"). Tocar numa parte põe no 1º horário livre dela. A mesma paleta está no kanban.html (PC). */
+.per-madrugada { --per-bg: #eef2ff; --per-bd: #818cf8; --per-tx: #4338ca; }
+.per-manha { --per-bg: #fffbeb; --per-bd: #f59e0b; --per-tx: #b45309; }
+.per-meiodia { --per-bg: #fff7ed; --per-bd: #fb923c; --per-tx: #c2410c; }
+.per-tarde { --per-bg: #f0f9ff; --per-bd: #38bdf8; --per-tx: #0369a1; }
+.per-noite { --per-bg: #f5f3ff; --per-bd: #a78bfa; --per-tx: #6d28d9; }
+.per-livre { --per-bg: #fafafa; --per-bd: #a1a1aa; --per-tx: #52525b; }
+/* o campo de sempre vira só a caixa das partes (sem borda, listras nem o piscar: quem pisca são as partes). z 29: abaixo
+   do cabeçalho (z 30, que vem antes no HTML): rolando, as partes passam POR BAIXO dele (o campo de antes, quase
+   transparente, passava por cima e roubava o toque dos botões do cabeçalho) */
+.tl-pz-box { z-index: 29 !important; overflow: visible !important; padding: 0 !important; border-width: 0 !important; background: transparent !important; animation: none !important; font-size: 11px !important; }
+.tl-pz {
+    position: absolute; left: 0; right: 0; display: flex; align-items: flex-start; justify-content: center;
+    border: 2px dashed var(--per-bd); border-radius: 14px; background: var(--per-bg); color: var(--per-tx);
+    cursor: pointer; -webkit-tap-highlight-color: transparent; animation: perPulse 1.6s ease-in-out infinite;
+}
+.tl-pz:active { filter: brightness(0.95); }
+/* o nome acompanha a rolagem sem sair da sua parte. top 0 = logo abaixo do cabeçalho: o "grudar" conta a partir do
+   padding-top da agenda (#timeline-scroll), que já é a altura do cabeçalho + 8 (Chrome e Safari descontam o padding) */
+.tl-pz-txt {
+    position: -webkit-sticky; position: sticky; top: 0;
+    display: inline-flex; align-items: center; gap: 4px; max-width: calc(100% - 12px); margin-top: 6px; padding: 3px 10px;
+    border-radius: 9999px; background: rgba(255, 255, 255, 0.92); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    font-size: 11px; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tl-pz-txt b { font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; }
+.tl-pz-txt span { flex: none; font-variant-numeric: tabular-nums; }
+.tl-pz.tiny { align-items: center; }
+.tl-pz.tiny .tl-pz-txt { position: static; margin-top: 0; padding: 0 8px; font-size: 10px; box-shadow: none; background: transparent; }
+.tl-pz.micro .tl-pz-txt { display: none; }
+.tl-pz.past { opacity: 0.5; animation: none; }
+.tl-pz.nao { cursor: not-allowed; animation: none; border-style: dotted; border-color: rgba(0, 0, 0, 0.15); background: repeating-linear-gradient(45deg, #fafafa 0 8px, #f4f4f5 8px 10px); color: #a1a1aa; }
+@keyframes perPulse { 0%, 100% { border-color: var(--per-bd); } 50% { border-color: rgba(0, 0, 0, 0.12); } }
+/* com 2 ou 3 dias lado a lado: coluna estreita, nome em cima e hora embaixo */
+.tl-pz.mini { border-width: 1.5px; border-radius: 8px; }
+.tl-pz.mini .tl-pz-txt { flex-direction: column; gap: 0; max-width: calc(100% - 4px); margin-top: 3px; padding: 2px 5px; border-radius: 6px; font-size: 9.5px; line-height: 1.15; }
+.tl-pz.mini .tl-pz-txt b { max-width: 100%; font-size: 9px; letter-spacing: 0.02em; }
+.tl-pz.mini.tiny .tl-pz-txt { display: none; }
+/* a linha do agora da coluna de hoje (z 20) ficava escondida atrás das partes, que não são transparentes: sobe pra 29
+   (vem depois delas no HTML, então passa por cima; e continua abaixo do cabeçalho, z 30). Não pega toque. */
+.tl-col .tl-now-mini { z-index: 29; }
+/* vago oculto (faixa de 36 px): as partes lado a lado, nome em cima e hora embaixo */
+.tl-pz-strip { z-index: 29 !important; padding: 0 2px !important; border-color: transparent !important; background-image: none !important; animation: none !important; }
+.tl-pchips { display: flex; align-items: stretch; gap: 4px; width: 100%; height: 100%; padding: 2px 0; overflow-x: auto; scrollbar-width: none; }
+.tl-pchips::-webkit-scrollbar { display: none; }
+.tl-pchip {
+    flex: 1 1 0; min-width: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 3px;
+    border: 1.5px dashed var(--per-bd); border-radius: 10px; background: var(--per-bg); color: var(--per-tx);
+    font-size: 10px; font-weight: 700; line-height: 1.1; -webkit-tap-highlight-color: transparent; animation: perPulse 1.6s ease-in-out infinite;
+}
+.tl-pchip:active { filter: brightness(0.95); }
+.tl-pchip b { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+.tl-pchip span { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .tl-pz, .tl-pchip { animation: none; } }
 /* V40.36.1: vagos ocultos com 2 ou 3 dias: a faixa do horário que encolheu passa por cima das colunas (o toque vai pra
    coluna de baixo) */
 .tl-multi-band { position: absolute; left: 2px; right: 2px; z-index: 6; pointer-events: none; display: flex; align-items: center; justify-content: center;

@@ -49,6 +49,7 @@ const SUITES = [
     ['PC: Salvar backup (o mesmo arquivo do celular, que abre igual num celular novo)', 'test_backup_pc.js', [ROOT, DADOS]],
     ['Avisos dos compromissos: a função da nuvem (cifra, assinatura, hora de cada aparelho, uma vez só)', 'test_avisos_servidor.js', [ROOT]],
     ['Avisos dos compromissos: ligar no celular e no PC, o service worker e as regras do banco', 'test_avisos.js', [ROOT, DADOS]],
+    ['"Soltar aqui" pelos Períodos: o espaço livre dividido por Manhã, Tarde... (celular e PC)', 'test_soltar_periodos.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

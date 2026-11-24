@@ -41,7 +41,8 @@
 // V10.46 - v40.40.0 (PC, visão Dia: o cartão sai da sublista arrastando (vira bloco onde o tracejado mostra, com o horário, ou muda de sublista) e o bloco entra numa sublista arrastando por cima dela. Esc desiste; um passo só do Desfazer. Era o que a Semana do PC e o celular já faziam.)
 // V10.47 - v40.41.0 (Períodos no PC, igual ao celular e nos 2 sentidos: vão na conta, como a cor do app; em Configurações do PC dá pra criar e apagar, e no Novo bloco clicar num período preenche o horário e a duração. Salvar backup no PC: o mesmo arquivo do celular, que dá pra restaurar lá.)
 // V10.48 - v40.42.0 (Avisos dos compromissos, no celular e no PC: em Configurações, liga NESTE aparelho e a nuvem avisa antes de cada bloco da agenda, com o app fechado — Na hora, 5, 10, 15 ou 30 min (10 pra começar) e "Mandar um aviso de teste". Web Push: o aparelho se inscreve no serviço de push do navegador (avisos.js) e a função "alertas" do Supabase, a cada minuto, manda o aviso cifrado. Aqui: o push vira aviso na tela e o clique volta pro app (ou pra tela do PC). Precisa da conta; no iPhone, com o app instalado na tela de início. Sair da conta desliga.)
-const CACHE_NAME = 'timeblock-v40-42-0';
+// V10.49 - v40.43.0 ("Soltar aqui" pelos Períodos, no celular e no PC: com a tarefa na mão (ou arrastando um bloco na Semana do PC), cada espaço livre da agenda se divide nos Períodos da pessoa — Manhã, Meio-dia, Tarde, Noite, os que ela criou —, cada parte com a cor da parte do dia (fora de período, cinza "Livre"); tocar/clicar numa parte põe no 1º horário livre DELA (antes ia tudo pro começo do espaço). Hoje, a parte de agora começa agora. Também na faixa dos vagos ocultos, com 2 ou 3 dias e na faixa do Dia compactado do PC. Sem nenhum período, o campo de sempre.)
+const CACHE_NAME = 'timeblock-v40-43-0';
 const ASSETS = [
   './',
   './index.html',

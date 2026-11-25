@@ -412,7 +412,10 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(escopo.aberto && escopo.dentro && escopo.foco === 'this', 'valor novo numa recorrente: a pergunta "Em quais meses?" abre por cima, inteira, com "Só neste mês" escolhido');
   await foto(p, 'pc-financas-escopo.png');
   await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.waitForTimeout(150);
-  ok(await p.evaluate(() => document.getElementById('modal-fin').classList.contains('hidden') && document.getElementById('fn-scope').classList.contains('hidden')), 'Esc, Esc: fecha a pergunta e depois a despesa, sem gravar');
+  // V40.46.0: o valor foi mudado, então o 2º Esc pergunta "Descartar?" antes de fechar a despesa
+  ok(await p.evaluate(() => document.getElementById('fn-scope').classList.contains('hidden') && !document.getElementById('modal-fin').classList.contains('hidden') && !document.getElementById('dialog').classList.contains('hidden') && document.getElementById('dlg-title').textContent === 'Descartar o que você escreveu?'), 'Esc, Esc: fecha a pergunta dos meses e, com o valor mudado, pergunta "Descartar?"');
+  await p.locator('#dlg-ok').click(); await p.waitForTimeout(150);
+  ok(await p.evaluate(() => document.getElementById('modal-fin').classList.contains('hidden') && document.getElementById('dialog').classList.contains('hidden')), '"Descartar": fecha a despesa, sem gravar');
 
   console.log('\nL) Aba Assistente (V40.20.0):');
   await p.locator('#tab-assistente').click(); await p.waitForTimeout(300);

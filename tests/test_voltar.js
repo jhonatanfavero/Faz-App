@@ -109,7 +109,10 @@ function fakeCW(w) {
   ev("document.getElementById('note-content-input').value = 'rascunho'");
   const notaAntes = visivel('notes-form');
   await voltar();
-  ok(notaAntes && !visivel('notes-form') && aberta('list-sheet') && J('notesDb.length') === 3, 'Notas: com a nota sendo escrita, voltar sai do formulário (igual ao X dele; nada é gravado)');
+  // V40.46.0: com a nota sendo escrita, o voltar pergunta antes ("Descartar?"); descartando, sai do formulário
+  ok(notaAntes && visivel('discard-modal') && visivel('notes-form'), 'Notas: com a nota sendo escrita, o voltar pergunta "Descartar?" (o formulário fica)');
+  ev('fgDiscard()'); await sleep(5);
+  ok(!visivel('discard-modal') && !visivel('notes-form') && aberta('list-sheet') && J('notesDb.length') === 3, 'Notas: "Descartar" sai do formulário (igual ao X dele; nada é gravado)');
   await voltar();
   ok(inicial(), 'Notas: voltar de novo fecha a tela');
   // formulário aberto numa aba que ficou pra trás: o voltar não mexe nele, fecha a tela
@@ -197,11 +200,18 @@ function fakeCW(w) {
   ok(!visivel('backlog-delete-modal') && aberta('list-sheet') && !fosca() && z60() === z0, 'tocar no fundo escuro fora do "Apagar tarefa?": fecha só a janelinha (e não esconde botão de bloco nem de cartão)');
   ev('onOverlayClick()');
   ok(inicial(), 'tocar no fundo escuro de novo: fecha as Listas');
-  ev("openListSheet(); openColumnMenuFromHeader(); openRenameColumn(); document.querySelector('#column-name-modal input').value = 'Nome novo';"); await sleep(5);
+  ev("openListSheet(); openColumnMenuFromHeader(); openRenameColumn();"); await sleep(5);
+  ev("document.querySelector('#column-name-modal input').value = 'Nome novo';"); // digitado depois de abrir (V40.46.0: o ponto de partida é o da abertura)
   ev('onOverlayClick()');
   ok(visivel('column-name-modal') && ev("document.querySelector('#column-name-modal input').value") === 'Nome novo' && aberta('list-sheet'), 'janelinha com campo de digitar (renomear lista): tocar no fundo escuro não fecha (às vezes é só pra baixar o teclado; o digitado não se perde)');
   await voltar();
-  ok(!visivel('column-name-modal') && aberta('list-sheet') && !fosca() && !J('backlogColumnsDb').some((c) => c.name === 'Nome novo'), 'o voltar fecha ela pelo Cancelar (o nome não muda)');
+  // V40.46.0: com o nome mudado, o voltar pergunta antes ("Descartar?"); o voltar de novo é o "Continuar escrevendo"
+  ok(visivel('discard-modal') && visivel('column-name-modal') && ev("document.querySelector('#column-name-modal input').value") === 'Nome novo', 'com o nome mudado, o voltar pergunta "Descartar?" (a janelinha e o texto ficam)');
+  await voltar();
+  ok(!visivel('discard-modal') && visivel('column-name-modal') && ev("document.querySelector('#column-name-modal input').value") === 'Nome novo' && aberta('list-sheet'), 'o voltar de novo é o "Continuar escrevendo": a pergunta fecha e o texto fica');
+  await voltar();
+  ev('fgDiscard()'); await sleep(5);
+  ok(!visivel('discard-modal') && !visivel('column-name-modal') && aberta('list-sheet') && !fosca() && !J('backlogColumnsDb').some((c) => c.name === 'Nome novo'), '"Descartar": fecha ela pelo Cancelar (o nome não muda)');
   await voltar();
   ok(inicial(), 'e o voltar seguinte fecha as Listas');
   // janelinhas da agenda

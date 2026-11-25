@@ -204,6 +204,8 @@ const IPHONES = [
         ['Janelinha: apagar bloco', `closeAllSheets(); openDeleteModal(db.find((x) => x.date === '2026-11-16').id);`, '#delete-task-modal', { depois: 'cancelDelete();' }],
         ['Janelinha: horário', `closeAllSheets(); openTimePicker(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} });`, '#time-picker-modal', { depois: 'cancelTimePicker();' }],
         ['Janelinha: repetir', `closeAllSheets(); duplicateTask(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} }); promptCloneQtd('daily');`, '#clone-qtd-modal', { depois: 'cancelCloneQtd();' }], // V40.36.1: −/+ e o resumo
+        // V40.46.0: a pergunta "Descartar?" (por cima do formulário da tarefa nova com texto)
+        ['Janelinha: descartar?', "closeAllSheets(); openListSheet(); switchListTab('backlog'); openBacklogForm(); setTimeout(() => { document.getElementById('backlog-input').value = 'Comprar pão'; document.querySelector('#backlog-form-view [data-voltar]').click(); }, 80);", '#discard-modal', { espera: 500, depois: 'fgDiscard(); closeAllSheets();' }],
         ['Janelinha: filtrar a agenda', "closeAllSheets(); openAgFilter();", '#ag-filter-modal', { depois: 'closeAgFilter();' }], // V40.45.0: o botão TAGs
         ['Janelinha: categoria das metas', "closeAllSheets(); openListSheet(); switchListTab('goals'); openGoalListMenu('gl_pessoal');", '#goal-list-menu-modal', { depois: "hideModal('goal-list-menu-modal'); closeAllSheets();" }], // V40.37.0: Pôr na agenda
         ['Tarefa na mão', `closeAllSheets(); scheduleBacklogItem(backlogDb[0].id);`, '#floating-task', { depois: 'cancelPendingTask();' }],

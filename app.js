@@ -3595,7 +3595,7 @@ function navBack() {
     if (top.kind === 'days') { tlBackToDays(); return true; }
     if (top.kind === 'menu') { closeBacklogZoomMenu(); return true; }
     const b = navButton(top.el);
-    if (b) b.click();
+    if (b) { fgVia = 'voltar'; try { b.click(); } finally { fgVia = ''; } } // V40.46.0: o "Descartar?" sabe que veio do voltar
     else if (top.kind === 'modal') closeTopmostModal();
     else if (top.kind === 'sheet') closeAllSheets();
     else if (top.kind === 'hand') cancelPendingTask();
@@ -3633,6 +3633,96 @@ window.onOverlayClick = function() {
         return;
     }
     closeAllSheets();
+};
+
+// =====================================================
+// V40.46.0 — "DESCARTAR?" AO FECHAR UM FORMULÁRIO COM TEXTO NÃO SALVO
+// =====================================================
+// Formulário guardado = elemento com data-form no index.html: a tarefa, a rotina, a nota, a despesa e a meta das
+// Listas e as janelinhas de nome (bloco, lista, categoria) e do cartão da sublista: os que começam do zero (ou do
+// item) ao abrir de novo, então fechar perde o texto. O +, o "novo período" e a "nova tag" guardam o rascunho (fechar
+// e abrir de novo mostra o que estava escrito): ficam de fora, não há o que descartar. O
+// ponto de partida é o texto dele quando ele abre (já preenchido); quando ele some da tela, por qualquer caminho
+// (salvar, cancelar, fechar), o ponto de partida vai embora. Pergunta só quando o texto mudou e o
+// fechar pode ter sido sem querer: o X da tela, o ← (ou o X) do formulário, o voltar do celular e o toque no fundo
+// escuro. O "Cancelar" escrito de uma janelinha é escolha clara: fecha sem perguntar (o voltar, que toca nele, pergunta).
+const FG_SKIP = /^(hidden|checkbox|radio|button|submit|reset|range|color|file|password|search)$/i;
+const FG_HID = /(^|\s)(hidden|translate-y-full)(\s|$)/;
+const fgBase = new Map(); // formulário → o texto dele no começo
+var fgVia = '', fgPass = false, fgPending = null; // "var": o navBack usa o fgVia
+function fgFields(root) { return [...root.querySelectorAll('input, textarea')].filter(el => !FG_SKIP.test(el.type || '') && !el.hasAttribute('data-fg-skip')); }
+function fgSnap(root) { return JSON.stringify(fgFields(root).map(el => String(el.value || '').trim())); } // espaço sozinho não é texto
+function fgOpen(root) {
+    for (let p = root; p && p !== document.body; p = p.parentElement) if (FG_HID.test(typeof p.className === 'string' ? p.className : '')) return false;
+    return true;
+}
+function fgDirty(root) { return fgBase.has(root) && fgOpen(root) && fgSnap(root) !== fgBase.get(root); }
+document.addEventListener('focusin', (e) => {
+    const el = e.target;
+    if (!el || !el.matches || !el.matches('input, textarea') || FG_SKIP.test(el.type || '') || el.hasAttribute('data-fg-skip')) return;
+    const root = el.closest('[data-form]');
+    if (root && !fgBase.has(root) && fgOpen(root)) fgBase.set(root, fgSnap(root)); // escondido não conta (ex.: foco devolvido a um campo de formulário já fechado)
+}, true);
+// Abriu (ele, a sub-tela ou a tela de fora): o ponto de partida é o texto de agora (o formulário já foi preenchido e
+// ninguém digitou ainda). Sumiu da tela: esquece. Fechou e abriu de novo no mesmo toque (ex.: outro item no mesmo
+// formulário): vale o texto de agora. O focusin acima só cobre o que já estava aberto antes disto existir.
+(function () {
+    if (typeof MutationObserver === 'undefined') return;
+    const roots = [...document.querySelectorAll('[data-form]')];
+    const obs = new MutationObserver((recs) => {
+        const touched = new Set();
+        recs.forEach((r, i) => {
+            const el = r.target;
+            let after = typeof el.className === 'string' ? el.className : '';
+            for (let j = i + 1; j < recs.length; j++) if (recs[j].target === el) { after = recs[j].oldValue || ''; break; }
+            if (FG_HID.test(r.oldValue || '') !== FG_HID.test(after)) touched.add(el);
+        });
+        if (!touched.size) return;
+        roots.forEach(root => {
+            for (const el of touched) if (el === root || el.contains(root)) { if (fgOpen(root)) fgBase.set(root, fgSnap(root)); else fgBase.delete(root); break; }
+        });
+    });
+    const seen = new Set();
+    roots.forEach(f => { for (let p = f; p && p !== document.body; p = p.parentElement) seen.add(p); });
+    seen.forEach(el => obs.observe(el, { attributes: true, attributeFilter: ['class'], attributeOldValue: true }));
+})();
+// O que esse toque fecharia (só os formulários abertos com ponto de partida)
+function fgRoots(t) {
+    const open = () => [...fgBase.keys()].filter(fgOpen);
+    if (t.id === 'overlay') return getOpenModal() ? [] : open(); // com janelinha, o fundo não fecha formulário (a de digitar nem fecha)
+    if (t.dataset.voltar === 'fechar') { const sh = t.closest('[id$="-sheet"]'); return sh ? open().filter(r => sh.contains(r)) : []; }
+    const md = t.closest('[id$="-modal"]');
+    if (md) return fgVia === 'voltar' ? open().filter(r => r === md || md.contains(r)) : [];
+    const f = t.closest('[data-form]');
+    if (f) return open().filter(r => r === f || f.contains(r));
+    if (t.id === 'config-back-btn') { const sh = t.closest('[id$="-sheet"]'); return sh ? open().filter(r => sh.contains(r)) : []; } // ← das Configurações fecha a sub-tela
+    return [];
+}
+document.addEventListener('click', (e) => {
+    if (fgPass || !e.target || !e.target.closest) return;
+    const t = e.target.closest('[data-voltar], #overlay');
+    if (!t) return;
+    const roots = fgRoots(t).filter(fgDirty);
+    if (!roots.length) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    fgPending = { t: t, roots: roots };
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); // baixa o teclado
+    showModal('discard-modal');
+    const ov = document.getElementById('overlay');
+    if (ov && navOpenModals().length > 1) ov.style.zIndex = '65'; // por cima de outra janelinha: escurece ela também
+}, true);
+// "Continuar escrevendo": fecha a pergunta e fica no formulário
+window.fgKeep = function() { fgPending = null; closeTopmostModal(); };
+// "Descartar": fecha a pergunta e faz o que o toque ia fazer (sem perguntar de novo)
+window.fgDiscard = function() {
+    const p = fgPending;
+    fgPending = null;
+    closeTopmostModal();
+    if (!p) return;
+    p.roots.forEach(r => fgBase.delete(r));
+    fgPass = true;
+    try { p.t.click(); } finally { fgPass = false; }
 };
 
 function navArm() {
@@ -3947,7 +4037,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.45.0',
+            version: 'v40.46.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

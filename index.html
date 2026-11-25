@@ -382,7 +382,7 @@
                 </div>
 
                 <!-- Sub-view 2: Formulário criar/editar (igual padrão Rotinas) -->
-                <div id="backlog-form-view" class="hidden flex-1 flex-col min-h-0 bg-white">
+                <div data-form="tarefa" id="backlog-form-view" class="hidden flex-1 flex-col min-h-0 bg-white">
                     <div class="shrink-0 px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <button data-voltar onclick="closeBacklogForm()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-full hover:bg-zinc-200 transition active:scale-90">
@@ -485,7 +485,7 @@
                      V40.3.2-fix3: flex-1 + min-h-0 (era h-full) pra propagar altura corretamente
                      dentro da hierarquia flex da list-sheet. Sem isso, o botão "Salvar" e o 
                      "+ Adicionar item" ficavam fora da área visível. -->
-                <div id="routines-form-view" class="hidden flex-1 flex-col min-h-0 relative bg-white">
+                <div data-form="rotina" id="routines-form-view" class="hidden flex-1 flex-col min-h-0 relative bg-white">
                     <div class="shrink-0 px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <button data-voltar onclick="closeRoutineForm()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-full hover:bg-zinc-200 transition active:scale-90">
@@ -584,7 +584,7 @@
                 </div>
 
                 <!-- Estado B: Form aberto (criando nota) -->
-                <div id="notes-form" class="shrink-0 mb-4 mx-4 bg-zinc-50 border border-zinc-200 p-3 rounded-2xl hidden">
+                <div data-form="nota" id="notes-form" class="shrink-0 mb-4 mx-4 bg-zinc-50 border border-zinc-200 p-3 rounded-2xl hidden">
                     <div class="flex items-center justify-between mb-2">
                         <span id="notes-form-label" class="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Nova nota</span>
                         <button data-voltar onclick="cancelNoteForm()" class="w-7 h-7 flex items-center justify-center bg-white border border-zinc-200 text-zinc-500 rounded-lg hover:bg-zinc-100 transition" title="Cancelar">
@@ -654,7 +654,7 @@
                 </div>
 
                 <!-- Sub-view 2: Form criar/editar -->
-                <div id="financial-form-view" class="hidden flex-1 flex-col min-h-0 relative bg-white">
+                <div data-form="despesa" id="financial-form-view" class="hidden flex-1 flex-col min-h-0 relative bg-white">
                     <div class="shrink-0 px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <button data-voltar onclick="closeFinancialForm()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-full hover:bg-zinc-200 transition active:scale-90">
@@ -760,7 +760,7 @@
                 </div>
 
                 <!-- Sub-view 2: criar / editar meta -->
-                <div id="goals-form-view" class="hidden flex-1 flex-col min-h-0 relative bg-white">
+                <div data-form="meta" id="goals-form-view" class="hidden flex-1 flex-col min-h-0 relative bg-white">
                     <div class="shrink-0 px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <button data-voltar onclick="closeGoalForm()" aria-label="Voltar" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-full hover:bg-zinc-200 transition active:scale-90">
@@ -1323,7 +1323,7 @@
         </div>
 
         <!-- MODAL 1: EDIÇÃO (COMBO A) -->
-        <div id="edit-task-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+        <div data-form="nome-bloco" id="edit-task-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
             <h3 id="edit-task-heading" class="text-lg font-bold text-zinc-900 mb-4 text-center">Editar Tarefa</h3>
             <input type="text" id="edit-task-title" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-4 text-sm text-center">
             <p class="text-xs text-zinc-500 font-medium mb-2 uppercase tracking-wider text-center">Etiqueta</p>
@@ -1343,7 +1343,7 @@
         </div>
 
         <!-- V40.24.0: CARTÃO DA SUBLISTA (os mesmos campos do formulário da Lista: nome, etiqueta, cor e checklist) -->
-        <div id="sub-card-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[88%] max-w-[340px] max-h-[86%] overflow-y-auto no-scrollbar bg-white rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100">
+        <div data-form="cartao" id="sub-card-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[88%] max-w-[340px] max-h-[86%] overflow-y-auto no-scrollbar bg-white rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100">
             <p id="sub-card-from" class="text-[11px] font-bold text-amber-700 uppercase tracking-wider text-center mb-1 truncate"></p>
             <h3 class="text-lg font-bold text-zinc-900 mb-3 text-center">Cartão da sublista</h3>
             <input type="text" id="sub-card-title" maxlength="200" autocomplete="off" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-4 text-sm text-center">
@@ -1444,7 +1444,7 @@
         </div>
 
         <!-- V40.5.0: MODAL INPUT NOME DA LISTA (criar/renomear) -->
-        <div id="column-name-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+        <div data-form="nome-lista" id="column-name-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
             <h3 class="text-lg font-bold text-zinc-900 mb-4 text-center" id="column-name-title">Nova Lista</h3>
             <input type="text" id="column-name-input" maxlength="30" placeholder="Ex: GJM, QUALITE, LOIE..." autocomplete="off" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition mb-6">
             <div class="flex flex-col gap-2">
@@ -1522,7 +1522,7 @@
                 </button>
             </div>
         </div>
-        <div id="goal-list-name-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
+        <div data-form="nome-categoria" id="goal-list-name-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
             <h3 class="text-lg font-bold text-zinc-900 mb-4 text-center" id="goal-list-name-title">Nova categoria</h3>
             <input type="text" id="goal-list-name-input" maxlength="30" placeholder="Ex: Saúde, Estudos, Casa..." autocomplete="off" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition mb-6">
             <div class="flex flex-col gap-2">
@@ -1606,6 +1606,18 @@
             </div>
         </div>
 
+        <!-- V40.46.0: "DESCARTAR?" ao fechar um formulário com texto não salvo (pelo X, pelo ←, pelo voltar do celular ou
+             pelo fundo escuro). Fica por cima de tudo (z 70); o "Continuar escrevendo" é o que o voltar toca. -->
+        <div id="discard-modal" role="alertdialog" aria-modal="true" aria-labelledby="discard-title" aria-describedby="discard-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[70] hidden flex-col border border-zinc-100">
+            <div class="w-12 h-12 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center mx-auto mb-3">
+                <i class="ph-bold ph-note-pencil text-xl text-amber-600"></i>
+            </div>
+            <h3 id="discard-title" class="text-base font-bold text-zinc-900 text-center">Descartar o que você escreveu?</h3>
+            <p id="discard-text" class="text-[13px] text-zinc-500 text-center mt-1 mb-5 leading-snug">O texto que não foi salvo some.</p>
+            <button type="button" id="discard-yes" onclick="fgDiscard()" class="w-full py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition active:scale-[0.98]">Descartar</button>
+            <button type="button" data-voltar onclick="fgKeep()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-700 font-bold text-sm hover:bg-zinc-200 transition mt-2">Continuar escrevendo</button>
+        </div>
+
         <!-- V3.0 - COMBO E: Relatórios -->
         <div id="reports-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
             <!-- V40.3.7-fix: header fundido com X colorido (Gemini fix #1) — removido X cinza antigo da esquerda -->
@@ -1629,7 +1641,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.45.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.46.0</div>
 
     </div>
 

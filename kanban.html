@@ -573,7 +573,7 @@
         </div>
         <p id="tg-hint" class="px-5 -mt-1 pb-3 text-[12px] text-zinc-500">Clique no nome pra renomear e na bolinha pra trocar a cor. Vale aqui e no celular.</p>
         <div id="tg-list" class="px-5 pb-1 overflow-y-auto thin-scroll flex flex-col gap-2"></div>
-        <div class="px-5 pt-3 pb-5 mt-2 border-t border-zinc-100">
+        <div id="tg-new-box" data-form="tag" class="px-5 pt-3 pb-5 mt-2 border-t border-zinc-100">
             <p class="text-xs font-semibold text-zinc-500">Nova tag</p>
             <div class="mt-2 flex items-center gap-2">
                 <input id="tg-new-name" maxlength="40" placeholder="Nome da tag" aria-label="Nome da tag nova" class="flex-1 min-w-0 border border-zinc-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-zinc-500">
@@ -585,7 +585,7 @@
 </div>
 
 <!-- V40.19.0: criar / editar despesa -->
-<div id="modal-fin" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="fn-f-head">
+<div id="modal-fin" data-form="despesa" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="fn-f-head">
     <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
         <div class="p-5 pb-3 overflow-y-auto thin-scroll">
             <h3 id="fn-f-head" class="text-base font-bold text-zinc-900">Nova despesa</h3>
@@ -643,7 +643,7 @@
 </div>
 
 <!-- V40.21.0: criar / editar meta -->
-<div id="modal-goal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="mt-f-head">
+<div id="modal-goal" data-form="meta" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="mt-f-head">
     <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
         <div class="p-5 pb-3 overflow-y-auto thin-scroll">
             <h3 id="mt-f-head" class="text-base font-bold text-zinc-900">Nova meta</h3>
@@ -724,7 +724,7 @@
 </div>
 
 <!-- V40.17.0: editar rotina -->
-<div id="modal-rt" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="rt-f-title">
+<div id="modal-rt" data-form="rotina" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="rt-f-title">
     <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
         <div class="p-5 pb-3 overflow-y-auto thin-scroll">
             <div class="flex items-center gap-2.5">
@@ -775,7 +775,7 @@
 
 <!-- V40.8.0: detalhe do bloco da agenda (só leitura) -->
 <!-- Cartão aberto: tarefa (Listas) ou bloco (Agenda). V40.11.0: o bloco abre aqui também. -->
-<div id="modal-task" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="f-title">
+<div id="modal-task" data-form="cartao" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="f-title">
     <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
         <div class="p-5 pb-3 overflow-y-auto thin-scroll">
             <!-- V40.24.0: cartão de uma sublista aberto: volta pra sublista -->
@@ -856,7 +856,7 @@
                 <div id="f-card-pick" class="hidden mt-2 p-2 rounded-xl border border-zinc-200 bg-zinc-50">
                     <label class="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-zinc-400 focus-within:border-zinc-400">
                         <i class="ph ph-magnifying-glass"></i>
-                        <input id="f-card-q" maxlength="80" autocomplete="off" placeholder="Buscar tarefa nas Listas" aria-label="Buscar tarefa pra pôr na sublista" class="min-w-0 flex-1 text-[13px] text-zinc-800 outline-none bg-transparent">
+                        <input id="f-card-q" data-fg-skip maxlength="80" autocomplete="off" placeholder="Buscar tarefa nas Listas" aria-label="Buscar tarefa pra pôr na sublista" class="min-w-0 flex-1 text-[13px] text-zinc-800 outline-none bg-transparent">
                     </label>
                     <div id="f-card-opts" class="mt-1.5 max-h-48 overflow-y-auto thin-scroll flex flex-col"></div>
                 </div>
@@ -872,7 +872,7 @@
                 <div id="f-note-pick" class="hidden mt-2 p-2 rounded-xl border border-zinc-200 bg-zinc-50">
                     <label class="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-zinc-400 focus-within:border-zinc-400">
                         <i class="ph ph-magnifying-glass"></i>
-                        <input id="f-note-q" maxlength="80" autocomplete="off" placeholder="Buscar nota" aria-label="Buscar nota pra vincular" class="min-w-0 flex-1 text-[13px] text-zinc-800 outline-none bg-transparent">
+                        <input id="f-note-q" data-fg-skip maxlength="80" autocomplete="off" placeholder="Buscar nota" aria-label="Buscar nota pra vincular" class="min-w-0 flex-1 text-[13px] text-zinc-800 outline-none bg-transparent">
                     </label>
                     <div id="f-note-opts" class="mt-1.5 max-h-48 overflow-y-auto thin-scroll flex flex-col"></div>
                 </div>
@@ -1024,7 +1024,7 @@
             <!-- V40.41.0: períodos (os mesmos do celular, nos 2 sentidos). No Novo bloco, clicar num preenche o horário. -->
             <p class="mt-5 text-xs font-semibold text-zinc-500">Períodos <span class="font-normal text-zinc-400">· no Novo bloco, preenchem o horário</span></p>
             <div id="cfg-pers" class="mt-2 flex flex-col gap-1.5"></div>
-            <div class="mt-2 p-3 rounded-xl border border-zinc-200 bg-zinc-50">
+            <div id="cfg-per-box" data-form="periodo" class="mt-2 p-3 rounded-xl border border-zinc-200 bg-zinc-50">
                 <input id="cfg-per-name" type="text" maxlength="60" autocomplete="off" placeholder="Nome do período (ex.: Madrugada)" class="w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none">
                 <div class="mt-2 flex items-end gap-3">
                     <div class="min-w-0 flex-1">
@@ -1085,7 +1085,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.45.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.46.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -2768,7 +2768,7 @@
         ta.addEventListener('input', function () { if (S.composer) S.composer.text = ta.value; });
         ta.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComposer(); }
-            else if (e.key === 'Escape') { e.stopPropagation(); closeComposer(); }
+            else if (e.key === 'Escape') { e.stopPropagation(); fgComposer(); } // V40.46.0: com texto, pergunta
         });
         footer.querySelector('.composer-add').addEventListener('click', submitComposer);
         footer.querySelector('.composer-cancel').addEventListener('click', closeComposer);
@@ -2931,13 +2931,14 @@
             inp.classList.toggle('hidden', !o.input);
             if (o.input) { inp.value = o.input.value || ''; inp.placeholder = o.input.placeholder || ''; inp.maxLength = o.input.max || 100; }
             okB.textContent = o.okLabel || 'OK';
+            cancelB.textContent = o.cancelLabel || 'Cancelar'; // V40.46.0: "Continuar editando" no "Descartar?"
             altB.textContent = o.altLabel || '';
             altB.classList.toggle('hidden', !o.altLabel);
             okB.className = 'text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90 ' + (o.danger ? 'bg-red-600' : 'bg-focus');
             d.classList.remove('hidden');
             d.classList.add('flex');
             var prevFocus = document.activeElement;
-            if (o.input) { inp.focus(); inp.select(); } else okB.focus();
+            if (o.input) { inp.focus(); inp.select(); } else if (o.focusCancel) cancelB.focus(); else okB.focus(); // V40.46.0: no "Descartar?", o Enter é o lado seguro
             function finish(v) {
                 d.classList.add('hidden');
                 d.classList.remove('flex');
@@ -2966,6 +2967,60 @@
             d.addEventListener('keydown', onKey);
             d.addEventListener('mousedown', onBackdrop);
         });
+    }
+
+    // ---------- V40.46.0: "Descartar?" ao fechar com texto não salvo ----------
+    // Formulário guardado = elemento com data-form: o cartão (tarefa, bloco, cartão da sublista, Novo bloco), a
+    // despesa, a meta, a rotina, o "novo período" das Configurações e a "nova tag" (todos começam do zero, ou do item, ao
+    // abrir de novo: fechar perde o texto). O ponto de partida é o texto dele quando ele abre (já preenchido); quando
+    // ele fecha, por qualquer caminho, o ponto de partida vai embora. Pergunta no fechar que pode ter sido sem
+    // querer: Esc, clique fora, o Fechar/X e a seta de volta pra sublista. O "Cancelar" escrito é escolha clara: fecha
+    // sem perguntar. As buscas de dentro do cartão (data-fg-skip) não contam. O campo de nova tarefa das Listas também
+    // pergunta no Esc (fgComposer).
+    var FG_SKIP = /^(hidden|checkbox|radio|button|submit|reset|range|color|file|password|search)$/i, FG_HID = /(^|\s)hidden(\s|$)/;
+    var fgBase = new Map(); // formulário → o texto dele no começo
+    function fgFields(root) { return Array.prototype.filter.call(root.querySelectorAll('input, textarea'), function (el) { return !FG_SKIP.test(el.type || '') && !el.hasAttribute('data-fg-skip'); }); }
+    function fgSnap(root) { return JSON.stringify(fgFields(root).map(function (el) { return String(el.value || '').trim(); })); } // espaço sozinho não é texto
+    function fgOpen(root) { for (var p = root; p && p !== document.body; p = p.parentElement) if (FG_HID.test(typeof p.className === 'string' ? p.className : '')) return false; return true; }
+    function fgDirty(root) { return !!root && fgBase.has(root) && fgOpen(root) && fgSnap(root) !== fgBase.get(root); }
+    document.addEventListener('focusin', function (e) {
+        var el = e.target;
+        if (!el || !el.matches || !el.matches('input, textarea') || FG_SKIP.test(el.type || '') || el.hasAttribute('data-fg-skip')) return;
+        var root = el.closest('[data-form]');
+        if (root && !fgBase.has(root) && fgOpen(root)) fgBase.set(root, fgSnap(root)); // escondido não conta (o diálogo devolve o foco a um campo já fechado)
+    }, true);
+    // Abriu (ele ou a janela de fora): o ponto de partida é o texto de agora (já preenchido; ninguém digitou ainda).
+    // Fechou: esquece. Fechou e abriu de novo no mesmo clique (ex.: o cartão da sublista volta pro bloco): vale o de agora.
+    (function () {
+        if (typeof MutationObserver === 'undefined') return;
+        var roots = Array.prototype.slice.call(document.querySelectorAll('[data-form]'));
+        var obs = new MutationObserver(function (recs) {
+            var touched = [];
+            recs.forEach(function (r, i) {
+                var el = r.target, after = typeof el.className === 'string' ? el.className : '';
+                for (var j = i + 1; j < recs.length; j++) if (recs[j].target === el) { after = recs[j].oldValue || ''; break; }
+                if (FG_HID.test(r.oldValue || '') !== FG_HID.test(after) && touched.indexOf(el) < 0) touched.push(el);
+            });
+            if (!touched.length) return;
+            roots.forEach(function (root) {
+                if (touched.some(function (el) { return el === root || el.contains(root); })) { if (fgOpen(root)) fgBase.set(root, fgSnap(root)); else fgBase.delete(root); }
+            });
+        });
+        var seen = [];
+        roots.forEach(function (f) { for (var p = f; p && p !== document.body; p = p.parentElement) if (seen.indexOf(p) < 0) seen.push(p); });
+        seen.forEach(function (el) { obs.observe(el, { attributes: true, attributeFilter: ['class'], attributeOldValue: true }); });
+    })();
+    function fgAsk() { return dialog({ title: 'Descartar o que você escreveu?', text: 'O texto que não foi salvo some.', okLabel: 'Descartar', cancelLabel: 'Continuar editando', danger: true, focusCancel: true }); }
+    // Fecha pelo fn; com o texto mudado, pergunta antes. Devolve a promessa (true = fechou).
+    function fgClose(root, fn) {
+        root = typeof root === 'string' ? $(root) : root;
+        if (!fgDirty(root)) { fn(); return Promise.resolve(true); }
+        return fgAsk().then(function (ok) { if (ok) { fgBase.delete(root); fn(); } return !!ok; });
+    }
+    // O campo de nova tarefa no pé de uma lista: com texto, o Esc pergunta antes de apagar
+    function fgComposer() {
+        if (!S.composer || !String(S.composer.text || '').trim()) { closeComposer(); return Promise.resolve(true); }
+        return fgAsk().then(function (ok) { if (ok) closeComposer(); return !!ok; });
     }
 
     // ---------- editar tarefa ----------
@@ -5897,7 +5952,7 @@
         $('f-goal').addEventListener('change', function () { if (S.editing) { S.editing.goal = this.value || null; goalPlaceholder(); } }); // V40.34.0; V40.36.1: nome da meta clarinho
         $('f-cancel').addEventListener('click', closeTaskUi);
         $('f-delete').addEventListener('click', deleteTask);
-        $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeTaskUi(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
+        $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('modal-task', closeTaskUi); }); // V40.25.1: o 2º clique de um clique duplo não fecha
 
         // V40.17.0: Rotinas
         $('rt-new').addEventListener('click', function () { openRoutine(null); });
@@ -5911,7 +5966,7 @@
             var c = e.target.closest && e.target.closest('[data-rt]');
             if (c && e.target === c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openRoutine(c.dataset.rt); }
         });
-        $('modal-rt').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeRoutine(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
+        $('modal-rt').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('modal-rt', closeRoutine); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('rt-f-cancel').addEventListener('click', closeRoutine);
         $('rt-f-save').addEventListener('click', function () { saveRoutine(); });
         $('rt-f-goal').addEventListener('change', function () { if (S.rtEdit) S.rtEdit.goal = this.value || null; }); // V40.34.0
@@ -5995,7 +6050,7 @@
         $('f-sched-ok').addEventListener('click', scheduleTask);
         $('f-tolist').addEventListener('click', blockToList);
         // V40.24.0: sublista
-        $('f-card-back').addEventListener('click', closeTaskUi);
+        $('f-card-back').addEventListener('click', function () { fgClose('modal-task', closeTaskUi); }); // V40.46.0
         $('f-sub').addEventListener('change', function () { $('f-mbs-wrap').classList.toggle('hidden', this.checked); if (this.checked && !$('f-title').value.trim()) $('f-title').placeholder = 'Nome da sublista (ex.: Pendências rápidas)'; });
         $('f-cards').addEventListener('click', async function (e) {
             var ed = S.editing, b = ed && ed.kind === 'blocos' ? S.blocos[ed.id] : null, x;
@@ -6116,21 +6171,21 @@
             if (WZ) return wzStop(false, 'esc'); // V40.28.0: idem, puxando a duração na Semana
             if (!$('dialog').classList.contains('hidden')) return;
             if (!$('cal-pop').classList.contains('hidden')) return closeCal();
-            if (!$('modal-tags').classList.contains('hidden')) return closeTags(); // V40.18.0: fica por cima do cartão
+            if (!$('modal-tags').classList.contains('hidden')) return fgClose('tg-new-box', closeTags); // V40.18.0: fica por cima do cartão; V40.46.0: "Descartar?"
             if (S.fnScope) return S.fnScope(null); // V40.19.0
-            if (S.fnEdit) return closeFin();
-            if (S.mtEdit) return closeGoal(); // V40.21.0
+            if (S.fnEdit) return fgClose('modal-fin', closeFin);
+            if (S.mtEdit) return fgClose('modal-goal', closeGoal); // V40.21.0
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
             if (!$('modal-rep').classList.contains('hidden')) return closeReports(); // V40.29.0
             if (repeatOpen()) return closeRepeat(); // V40.36.0
-            if (!$('modal-cfg').classList.contains('hidden')) return closeCfg(); // V40.32.0
-            if (S.rtEdit) return closeRoutine(); // V40.17.0
+            if (!$('modal-cfg').classList.contains('hidden')) return fgClose('cfg-per-box', closeCfg); // V40.32.0
+            if (S.rtEdit) return fgClose('modal-rt', closeRoutine); // V40.17.0
             if (menuEl) return closeColMenu();
             if (!$('f-card-pick').classList.contains('hidden')) { cardPick(false); return $('f-card-pull').focus(); } // V40.24.0: Esc fecha só a busca
-            if (S.editing) return closeTaskUi();
+            if (S.editing) return fgClose('modal-task', closeTaskUi);
             if (AGS.open) return agsClose(false); // V40.35.0: fecha a busca (o texto fica; clicar no campo reabre)
             if (S.placing) return cancelPlacing();
-            if (S.composer) closeComposer();
+            if (S.composer) fgComposer();
         });
 
         // V40.8.0: abas e agenda
@@ -6508,8 +6563,8 @@
         $('btn-archive').addEventListener('click', openArchive);
         // V40.18.0: Tags
         $('btn-tags').addEventListener('click', function () { openTags(); });
-        $('tg-close').addEventListener('click', closeTags);
-        $('modal-tags').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeTags(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
+        $('tg-close').addEventListener('click', function () { fgClose('tg-new-box', closeTags); }); // V40.46.0
+        $('modal-tags').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('tg-new-box', closeTags); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('tg-new-add').addEventListener('click', function () { createTag(); });
         $('tg-new-name').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); createTag(); } });
         $('tg-new-colors').addEventListener('click', function (e) {
@@ -6594,7 +6649,7 @@
         $('fn-f-delete').addEventListener('click', function () { if (S.fnEdit && S.fnEdit.id) deleteFin(S.fnEdit.id); });
         $('fn-f-end').addEventListener('click', endFin); // V40.30.0
         $('fn-f-reopen').addEventListener('click', reopenFin);
-        $('modal-fin').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeFin(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
+        $('modal-fin').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('modal-fin', closeFin); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         // V40.21.0: Metas
         $('mt-new').addEventListener('click', function () { openGoal(null); });
         $('mt-new-cat').addEventListener('click', function () { createGoalList(); }); // V40.23.0
@@ -6633,7 +6688,7 @@
         $('mt-f-save').addEventListener('click', function () { saveGoal(); });
         $('mt-f-cancel').addEventListener('click', closeGoal);
         $('mt-f-delete').addEventListener('click', function () { if (S.mtEdit && S.mtEdit.id) deleteGoal(S.mtEdit.id); });
-        $('modal-goal').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeGoal(); }); // V40.25.1: o 2º clique de um clique duplo não fecha
+        $('modal-goal').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('modal-goal', closeGoal); }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('ar-close').addEventListener('click', closeArchive);
         // V40.29.0: Relatórios
         $('ag-rep').addEventListener('click', openReports);
@@ -6662,8 +6717,8 @@
         });
         // V40.32.0: Configurações
         $('btn-cfg').addEventListener('click', openCfg);
-        $('cfg-close').addEventListener('click', closeCfg);
-        $('modal-cfg').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeCfg(); });
+        $('cfg-close').addEventListener('click', function () { fgClose('cfg-per-box', closeCfg); }); // V40.46.0
+        $('modal-cfg').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('cfg-per-box', closeCfg); });
         $('cfg-colors').addEventListener('click', function (e) {
             var b = e.target.closest('[data-cfg-color]');
             if (b && b.dataset.cfgColor !== S.theme) savePrefs(b.dataset.cfgColor, S.hours, 'theme');

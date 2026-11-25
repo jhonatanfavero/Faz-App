@@ -147,6 +147,15 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     Planejado continuam contando todos os blocos; código novo que desenha a agenda passa por `agVisible` só na hora de
     desenhar o bloco, nunca na lista que calcula os vagos. A busca acha tudo; ir pro dia de um achado escondido
     desliga o filtro que esconde ele. Mexeu na regra de um lado, mexa na do outro.
+22. **"Descartar?" ao fechar com texto não salvo (V40.46.0).** Formulário que começa do zero (ou do item) ao abrir
+    de novo ganha `data-form` (celular: `index.html`; PC: `kanban.html`). O ponto de partida é o texto dele quando
+    abre (um `MutationObserver` olha o `hidden`/`translate-y-full` dele e de quem está por fora); fechou, some. No
+    celular, um `click` em fase de captura segura o `[data-voltar]` e o `#overlay` (e o `navBack` marca `fgVia =
+    'voltar'`): pergunta no X, no ←, no voltar e no fundo escuro; o Cancelar escrito de janelinha não pergunta. No PC,
+    `fgClose(raiz, fn)` vai no Esc, no clique fora e no Fechar/X (nunca no Cancelar nem no Salvar). Formulário que
+    guarda rascunho (o + do celular, a nova tag, o novo período do celular) fica sem `data-form`: não há o que
+    descartar. Campo de busca dentro de formulário: `data-fg-skip`. Teste em jsdom que abre e digita no mesmo passo
+    precisa esperar uns 10 ms entre os dois (o ponto de partida é marcado logo depois de abrir).
 
 ## Publicar uma versão
 

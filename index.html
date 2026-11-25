@@ -117,8 +117,9 @@
                         <i class="ph-bold ph-columns text-lg text-app-focus"></i>
                         <span id="tl-days-badge" class="tl-days-badge hidden"></span>
                     </button>
-                    <button onclick="openTagsSheet()" class="bg-white border border-app-focus px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
-                        <i class="ph ph-tag text-sm text-app-focus"></i> TAGs
+                    <!-- V40.45.0: o TAGs é o filtro da agenda (uma tag ou "Sem tag", e "Ocultar concluídos"); "Gerenciar tags" fica dentro dele -->
+                    <button id="ag-filter-btn" onclick="openAgFilter()" aria-haspopup="dialog" aria-pressed="false" aria-label="Filtrar a agenda" title="Filtrar a agenda por tag (ou ocultar os concluídos)" class="bg-white border border-app-focus px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 min-w-0 flex justify-center items-center gap-1">
+                        <i class="ph ph-tag text-sm text-app-focus"></i> <span class="agf-txt">TAGs</span>
                     </button>
                     <button onclick="openReportsSheet()" aria-label="Relatórios" title="Relatórios" class="bg-white border border-app-focus px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
                         <i class="ph ph-chart-bar text-sm text-app-focus"></i> <span class="rel-txt">Relatórios</span>
@@ -1485,6 +1486,22 @@
             </div>
         </div>
 
+        <!-- V40.45.0: FILTRO DA AGENDA (o botão TAGs): uma tag (ou "Sem tag") e "Ocultar concluídos". Só esconde da tela. -->
+        <div id="ag-filter-modal" role="dialog" aria-modal="true" aria-labelledby="ag-filter-title" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] max-h-[86%] bg-white rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100">
+            <h3 id="ag-filter-title" class="text-base font-bold text-zinc-900 text-center shrink-0">Filtrar a agenda</h3>
+            <p class="text-[11px] font-semibold text-zinc-400 text-center mt-0.5 mb-3 leading-snug shrink-0">Só esconde da tela: o horário continua ocupado.</p>
+            <div id="ag-filter-list" role="radiogroup" aria-label="Mostrar os blocos de qual tag" class="flex flex-col gap-1.5 overflow-y-auto no-scrollbar min-h-0"></div>
+            <button id="ag-filter-done" type="button" role="switch" aria-checked="false" onclick="toggleAgHideDone()" class="agf-row mt-3 shrink-0">
+                <i class="ph ph-eye-slash text-lg text-zinc-500"></i><span class="flex-1 min-w-0">Ocultar concluídos</span><span class="agf-switch" aria-hidden="true"></span>
+            </button>
+            <button type="button" onclick="agFilterManageTags()" class="w-full flex items-center gap-3 py-3 px-4 mt-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-sm hover:bg-zinc-100 transition shrink-0">
+                <i class="ph ph-tag text-lg text-zinc-600"></i><span class="flex-1 text-left">Gerenciar tags</span><i class="ph-bold ph-caret-right text-zinc-400"></i>
+            </button>
+            <button type="button" data-voltar onclick="closeAgFilter()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2 shrink-0">
+                Fechar
+            </button>
+        </div>
+
         <!-- V40.21.0: MODAIS DAS METAS (menu da categoria, nome da categoria e confirmação; V40.23.0: "lista" virou "categoria") -->
         <div id="goal-list-menu-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
             <h3 class="text-base font-bold text-zinc-900 mb-4 text-center break-words" id="goal-list-menu-title">Categoria</h3>
@@ -1612,7 +1629,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.44.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.45.0</div>
 
     </div>
 

@@ -651,3 +651,25 @@ mark.bl-hl { background: #fde68a; color: inherit; border-radius: 3px; padding: 0
 .bl-dot-n.on { background: var(--theme-color, #4f46e5); color: #fff; }
 .bl-dot-0 { width: 6px; height: 6px; border-radius: 9999px; flex: none; background: #e4e4e7; }
 .bl-dot-0.on { background: var(--theme-color, #4f46e5); opacity: .45; }
+
+/* V40.45.0: filtro da agenda no celular (o botão TAGs). Ligado, o botão fica cheio na cor do app, com a bolinha e o
+   nome da tag (e o olho riscado do "Ocultar concluídos"). O bloco escondido vira só o contorno no horário dele. */
+#ag-filter-btn .agf-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#ag-filter-btn.agf-on { background-color: var(--theme-color, #4f46e5) !important; border-color: var(--theme-color, #4f46e5) !important; color: #fff !important; }
+#ag-filter-btn.agf-on i { color: #fff !important; }
+#ag-filter-btn.agf-on .agf-dot { box-shadow: 0 0 0 1.5px #fff; }
+.agf-dot { width: 9px; height: 9px; border-radius: 9999px; flex-shrink: 0; display: inline-block; }
+.agf-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #fafafa; border: 1px solid #e4e4e7; color: #27272a; font-weight: 700; font-size: 14px; text-align: left; flex-shrink: 0; transition: background-color .15s, border-color .15s; }
+.agf-row:active { transform: scale(0.98); }
+.agf-row.on { border-color: var(--theme-color, #4f46e5); background: #fff; box-shadow: inset 0 0 0 1px var(--theme-color, #4f46e5); }
+.agf-row .agf-dot { width: 11px; height: 11px; }
+.agf-radio { width: 18px; height: 18px; border-radius: 9999px; border: 2px solid #a1a1aa; flex-shrink: 0; position: relative; }
+.agf-row.on .agf-radio { border-color: var(--theme-color, #4f46e5); }
+.agf-row.on .agf-radio::after { content: ''; position: absolute; inset: 3px; border-radius: 9999px; background: var(--theme-color, #4f46e5); }
+.agf-switch { width: 38px; height: 22px; border-radius: 9999px; background: #d4d4d8; position: relative; flex-shrink: 0; transition: background-color .2s; }
+.agf-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 9999px; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: transform .2s; }
+#ag-filter-done[aria-checked="true"] .agf-switch { background: var(--theme-color, #4f46e5); }
+#ag-filter-done[aria-checked="true"] .agf-switch::after { transform: translateX(16px); }
+.tl-hidden { position: absolute; left: 4px; right: 4px; z-index: 9; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer;
+    border: 1.5px dashed rgba(113, 113, 122, 0.45); border-radius: 16px; background: rgba(244, 244, 245, 0.6); color: rgba(113, 113, 122, 0.8); font-size: 15px; }
+.tl-hidden.mini { left: 2px; right: 2px; border-radius: 8px; font-size: 12px; }

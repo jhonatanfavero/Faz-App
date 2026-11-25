@@ -375,6 +375,7 @@ window.addTag = function(name, color) {
 window.deleteTag = function(id) {
     tagsDb = tagsDb.filter(t => t.id !== id);
     saveTags();
+    if (agTagFilter === id) { agTagFilter = ''; agFilterSave(); renderTimeline(); } // V40.45.0: era a tag do filtro da agenda
     
     // Remove a tag deletada das tarefas que a usavam para não quebrar a UI
     let modified = false;
@@ -896,6 +897,105 @@ window.toggleTlCompact = function() {
     updateTlCompactBtn();
     renderTimeline(); // V40.36.1: vale também com 2 ou 3 dias (some o horário livre em TODOS os dias da tela)
 };
+// =====================================================
+// V40.45.0 — FILTRO DA AGENDA NO CELULAR (o "Todas as tags" e o "Ocultar concluídos" do PC)
+// =====================================================
+// O botão TAGs da linha dos filtros abre "Filtrar a agenda": uma tag (ou "Sem tag", que vale também pra tag que não
+// existe mais, como no PC) e "Ocultar concluídos". Fica guardado neste aparelho (tb__filtro_tag e
+// tb__ocultar_concluidos, fora do backup), como o "Ocultar vagos". Só esconde da tela, igual ao PC: o bloco escondido
+// vira um contorno tracejado no horário dele (o espaço livre, o conflito, o "↓" e o Planejado contam todos os blocos).
+// Na busca não vale (ela acha tudo); nos filtros de atrasados e concluídos, quem ele esconde sai da lista (o "Ocultar
+// concluídos" não vale no "só concluídos"). "Gerenciar tags" (a tela de antes do botão) fica no pé da janelinha.
+var agTagFilter = '', agHideDone = false; // "var": o renderTimeline pode rodar antes desta linha (como o subDrag)
+try { agTagFilter = localStorage.getItem('tb__filtro_tag') || ''; agHideDone = localStorage.getItem('tb__ocultar_concluidos') === '1'; } catch (e) {}
+function agFilterSave() {
+    try { localStorage.setItem('tb__filtro_tag', agTagFilter); localStorage.setItem('tb__ocultar_concluidos', agHideDone ? '1' : '0'); } catch (e) {}
+}
+function agTagFind(id) { return id ? tagsDb.find(t => t && t.id === id) || null : null; }
+function agTagOk() { // a tag escolhida foi apagada (aqui ou no PC): volta pra "Todas as tags"
+    if (agTagFilter && agTagFilter !== '__none__' && !agTagFind(agTagFilter)) { agTagFilter = ''; agFilterSave(); }
+}
+function agFiltering() { agTagOk(); return !!agTagFilter || (agHideDone && !showOnlyCompleted); }
+function agVisible(b) {
+    if (!b) return false;
+    if (agHideDone && b.completed && !showOnlyCompleted) return false;
+    if (!agTagFilter) return true;
+    return agTagFilter === '__none__' ? !agTagFind(b.tagId) : b.tagId === agTagFilter;
+}
+function agHiddenTxt(n) { return n ? ` · ${n} ${n === 1 ? 'escondido' : 'escondidos'}` : ''; }
+function agSafeHex(c) { return /^#[0-9a-fA-F]{3,8}$/.test(String(c || '')) ? c : '#a1a1aa'; }
+// O bloco escondido pelo filtro: só o contorno no horário dele. Tocar abre o filtro (com a tarefa na mão, nada: é horário ocupado).
+function tlHiddenEl(b, mini) {
+    const top = tlY(b.startMin), h = Math.max(tlY(b.startMin + b.duration) - top - 2, mini ? 4 : 6);
+    const el = document.createElement('div');
+    el.className = 'tl-hidden' + (mini ? ' mini' : '');
+    el.style.top = (top + 1) + 'px';
+    el.style.height = h + 'px';
+    el.dataset.hiddenId = b.id;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', `${formatClock(b.startMin)}–${formatClock(b.startMin + b.duration)}: escondido pelo filtro (toque pra mudar o filtro)`);
+    if (h >= 22) el.innerHTML = '<i class="ph ph-eye-slash"></i>';
+    el.onclick = (e) => { e.stopPropagation(); if (!pendingIntent) openAgFilter(); };
+    return el;
+}
+// O botão TAGs mostra o filtro ligado: cheio na cor do app, com a bolinha e o nome da tag (e o olho riscado).
+function renderAgFilterBtn() {
+    const btn = document.getElementById('ag-filter-btn');
+    if (!btn) return;
+    agTagOk();
+    const tag = agTagFilter === '__none__' ? null : agTagFind(agTagFilter), on = !!agTagFilter || agHideDone;
+    const key = [agTagFilter, agHideDone ? 1 : 0, tag ? tag.name + '|' + tag.color : ''].join('|');
+    if (btn.dataset.agf === key) return;
+    btn.dataset.agf = key;
+    btn.classList.toggle('agf-on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    const name = tag ? (tag.name || 'Sem nome') : agTagFilter === '__none__' ? 'Sem tag' : 'TAGs';
+    btn.innerHTML = (agHideDone ? '<i class="ph-bold ph-eye-slash text-sm text-app-focus"></i>' : '') +
+        (tag ? `<span class="agf-dot" style="background:${agSafeHex(tag.color)}"></span>` : agHideDone ? '' : '<i class="ph ph-tag text-sm text-app-focus"></i>') +
+        ` <span class="agf-txt">${escapeHtml(name)}</span>`;
+    const what = [tag ? 'só ' + name : agTagFilter === '__none__' ? 'só os sem tag' : '', agHideDone ? 'sem os concluídos' : ''].filter(Boolean).join(', ');
+    btn.setAttribute('aria-label', 'Filtrar a agenda' + (what ? ' (agora: ' + what + ')' : ''));
+}
+function renderAgFilterList() {
+    const box = document.getElementById('ag-filter-list');
+    if (!box) return;
+    const rows = [{ id: '', name: 'Todas as tags' }]
+        .concat(tagsDb.filter(t => t && t.id).map(t => ({ id: t.id, name: t.name || 'Sem nome', color: t.color })))
+        .concat([{ id: '__none__', name: 'Sem tag' }]);
+    box.innerHTML = rows.map(r => {
+        const on = agTagFilter === r.id;
+        return `<button type="button" role="radio" aria-checked="${on ? 'true' : 'false'}" class="agf-row${on ? ' on' : ''}" data-agf-tag="${escapeHtml(r.id)}">` +
+            '<span class="agf-radio" aria-hidden="true"></span>' +
+            (r.color ? `<span class="agf-dot" style="background:${agSafeHex(r.color)}"></span>` : '') +
+            `<span class="flex-1 min-w-0 truncate">${escapeHtml(r.name)}</span></button>`;
+    }).join('');
+    box.querySelectorAll('[data-agf-tag]').forEach(b => { b.onclick = () => setAgTagFilter(b.dataset.agfTag); });
+    const sw = document.getElementById('ag-filter-done');
+    if (sw) sw.setAttribute('aria-checked', agHideDone ? 'true' : 'false');
+}
+window.openAgFilter = function() {
+    agTagOk();
+    renderAgFilterList();
+    showModal('ag-filter-modal');
+    const on = document.querySelector('#ag-filter-list .agf-row.on');
+    if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' }); // muitas tags: a escolhida fica à vista
+};
+window.closeAgFilter = function() { hideModal('ag-filter-modal'); };
+// Escolher a tag fecha a janelinha (é o que se quer ver); o "Ocultar concluídos" liga e desliga com ela aberta.
+function setAgTagFilter(id) {
+    agTagFilter = id === '__none__' || agTagFind(id) ? id : '';
+    agFilterSave();
+    closeAgFilter();
+    renderTimeline();
+}
+window.toggleAgHideDone = function() {
+    agHideDone = !agHideDone;
+    agFilterSave();
+    renderAgFilterList();
+    renderTimeline();
+};
+window.agFilterManageTags = function() { closeAgFilter(); openTagsSheet(); };
+
 // Tocar 2 vezes numa faixa ou no Tempo Livre (sem tarefa na mão) abre o + já mirando ali: o que for criado entra direto lá (V40.25.1: eram 1 toque, só na faixa).
 let sheetSlot = null; // { date, start, dur }
 function tlSlotLabel() {
@@ -1087,7 +1187,7 @@ function tlRenderMulti() {
     container.classList.add('tl-multi');
     const nowLine = document.getElementById('now-line');
     if (nowLine) nowLine.style.display = 'none';
-    let occupied = 0;
+    let occupied = 0, hidden = 0;
     days.forEach((ds, i) => {
         const col = document.createElement('div');
         col.className = 'tl-col' + (ds === today ? ' tl-col-today' : '') + (i ? ' tl-col-next' : '');
@@ -1099,7 +1199,7 @@ function tlRenderMulti() {
         let cur = lo;
         list.forEach(b => {
             if (b.startMin > cur) col.appendChild(tlMiniGap(ds, cur, b.startMin - cur));
-            col.appendChild(tlMiniBlock(b, ds));
+            if (agVisible(b)) col.appendChild(tlMiniBlock(b, ds)); else { hidden++; col.appendChild(tlHiddenEl(b, true)); } // V40.45.0
             cur = Math.max(cur, b.startMin + b.duration);
             if (b.type !== 'past') occupied += b.duration;
         });
@@ -1126,7 +1226,7 @@ function tlRenderMulti() {
     });
     const pct = Math.round((occupied / (TOTAL_MINS * n)) * 100) || 0;
     document.getElementById('progress-bar').style.width = `${pct}%`;
-    document.getElementById('progress-text').innerText = `Planejado (${pct}%)`;
+    document.getElementById('progress-text').textContent = `Planejado (${pct}%)` + agHiddenTxt(hidden); // V40.45.0
     tlDayhead(days);
     const hint = document.getElementById('floating-hint');
     if (hint) hint.textContent = pendingIntent && container.querySelector('.tl-push') ? 'Toque num espaço livre (ou num ↓) de um dos dias' : 'Toque num espaço livre de um dos dias'; // V40.44.0
@@ -1226,6 +1326,7 @@ function renderTimeline() {
     if (mbDragActive || subDrag || (blkDrag && !blkDrag.paging)) return;
     container.innerHTML = ''; 
     container.classList.remove('tl-multi'); // V40.26.0: volta a ser um dia só até saber se a agenda está afastada
+    renderAgFilterBtn(); // V40.45.0: o botão TAGs mostra o filtro ligado (e a tag apagada volta pra "Todas")
     
     const timelineContainer = document.getElementById('timeline-container');
     const isSearching = !!(searchQuery && searchQuery.trim());
@@ -1267,6 +1368,7 @@ function renderTimeline() {
         if (showOnlyCompleted) {
             filteredForWindow = filteredForWindow.filter(b => b.completed === true);
         }
+        if (!isSearching) filteredForWindow = filteredForWindow.filter(agVisible); // V40.45.0: o filtro da agenda tira da lista
         if (isSearching) {
             const q = normalizeText(searchQuery);
             // V40.2.24: filtro expandido pra título + microblocos + tag
@@ -1306,6 +1408,11 @@ function renderTimeline() {
         dailyDb = dailyDb.filter(b => b.completed === true);
     }
 
+    // V40.45.0: filtro da agenda (tag / ocultar concluídos). Nos filtros (lista) quem ele esconde sai; na agenda normal
+    // fica no lugar como contorno (lá embaixo), e o espaço livre continua contando com ele.
+    let agHidden = 0;
+    if (showOnlyDelayed || showOnlyCompleted) { const n0 = dailyDb.length; dailyDb = dailyDb.filter(agVisible); agHidden = n0 - dailyDb.length; }
+
     // V40.2.5: filtro de busca por nome (normaliza acentos, case-insensitive)
     // V40.2.24: expandido pra incluir microblocos e tag via cardMatchesSearch
     if (searchQuery && searchQuery.trim()) {
@@ -1315,6 +1422,7 @@ function renderTimeline() {
 
     dailyDb = dailyDb.filter(b => b.startMin < END_HOUR * 60 && (b.startMin + b.duration) > START_HOUR * 60);
     dailyDb.sort((a, b) => a.startMin - b.startMin);
+    if (!showOnlyDelayed && !showOnlyCompleted) agHidden = dailyDb.filter(b => !agVisible(b)).length; // V40.45.0
     
     let cursorMin = START_HOUR * 60;
     let occupied = 0;
@@ -1336,15 +1444,16 @@ function renderTimeline() {
     
     const pct = Math.round((occupied / TOTAL_MINS) * 100) || 0;
     document.getElementById('progress-bar').style.width = `${pct}%`;
-    document.getElementById('progress-text').innerText = `Planejado (${pct}%)`;
+    document.getElementById('progress-text').textContent = `Planejado (${pct}%)` + agHiddenTxt(agHidden); // V40.45.0: "· 2 escondidos" (textContent: o jsdom não tem innerText)
 
-    renderQueue.forEach(block => drawBlock(block));
+    // V40.45.0: o bloco escondido pelo filtro vira só o contorno no horário dele
+    renderQueue.forEach(block => { if (block.type !== 'empty' && !showOnlyDelayed && !showOnlyCompleted && !agVisible(block)) container.appendChild(tlHiddenEl(block, false)); else drawBlock(block); });
     if (pendingIntent && !showOnlyDelayed && !showOnlyCompleted) pushPillsInto(container, dailyDb, getActiveDateStr(), false); // V40.44.0
     // V40.24.0: com tarefa na mão e sublista no dia, a dica lembra que dá pra soltar nela também
     const hint = document.getElementById('floating-hint');
     // V40.44.0: com "↓" entre blocos colados, a dica lembra que ele encaixa descendo os de baixo
     const pills = pendingIntent && !!container.querySelector('.tl-push');
-    if (hint) hint.textContent = pendingIntent && subCanDrop() && dailyDb.some(isSublist) ? (pills ? 'Toque num espaço livre, numa sublista ou num ↓' : 'Toque num espaço livre ou numa sublista') :
+    if (hint) hint.textContent = pendingIntent && subCanDrop() && dailyDb.some(b => isSublist(b) && agVisible(b)) ? (pills ? 'Toque num espaço livre, numa sublista ou num ↓' : 'Toque num espaço livre ou numa sublista') :
         pills ? 'Toque num espaço livre ou num ↓ entre os blocos' : 'Toque num espaço livre';
 }
 
@@ -1444,6 +1553,14 @@ window.goToDateFromSearch = function(dateStr) {
     if (!dateStr) return;
     const today = getTodayStr();
     const label = formatSearchDate(dateStr, today);
+    // V40.45.0: o que a busca achou nesse dia está escondido pelo filtro da agenda? Desliga o que esconde (como o PC).
+    let off = false;
+    if (agFiltering() && searchQuery && searchQuery.trim()) {
+        const q = normalizeText(searchQuery), hits = db.filter(b => b.date === dateStr && cardMatchesSearch(b, q));
+        if (agHideDone && hits.some(b => b.completed)) { agHideDone = false; off = true; }
+        if (hits.some(b => !agVisible(b))) { agTagFilter = ''; off = true; }
+        if (off) agFilterSave();
+    }
     
     closeSearchBar();
     
@@ -1451,7 +1568,7 @@ window.goToDateFromSearch = function(dateStr) {
     runRealTimeEngine();
     renderTimeline();
     
-    setTimeout(() => showToast(`Indo pra ${label}`), 100);
+    setTimeout(() => showToast(`Indo pra ${label}` + (off ? ' · filtro desligado' : '')), 100);
 }
 
 function drawBlock(block) {
@@ -3830,7 +3947,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.44.0',
+            version: 'v40.45.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

@@ -139,6 +139,14 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     celular, mexa nos blocos e grave com um `saveDb()` só no mesmo toque; no PC, os `patchRow` saem todos no mesmo
     gesto (sem `await` entre o clique e eles, a não ser o do `placeHere`, que espera os de baixo descerem antes de
     criar o bloco novo). Arrastar um bloco pra cima de outro continua dando "Conflito" (escolha dele).
+21. **Filtro da agenda: só esconde da tela (V40.45.0).** Celular: `agVisible(b)` (`app.js`, com `agTagFilter` e
+    `agHideDone`, guardados em `tb__filtro_tag` e `tb__ocultar_concluidos`, fora do backup); PC: `agVisible(b)`
+    (`kanban.html`, `faz_pc_ag_tag` e `faz_pc_ag_hidedone`). As mesmas regras nos dois: "Sem tag" (`__none__`) vale
+    também pra tag que não existe mais; tag do filtro apagada volta pra "Todas as tags". O bloco escondido vira o
+    contorno no horário dele (`tlHiddenEl` no celular, `.ag-hidden` no Dia do PC): espaço livre, conflito, os "↓" e o
+    Planejado continuam contando todos os blocos; código novo que desenha a agenda passa por `agVisible` só na hora de
+    desenhar o bloco, nunca na lista que calcula os vagos. A busca acha tudo; ir pro dia de um achado escondido
+    desliga o filtro que esconde ele. Mexeu na regra de um lado, mexa na do outro.
 
 ## Publicar uma versão
 

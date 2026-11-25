@@ -181,6 +181,8 @@ const IPHONES = [
         ['Lista: nova meta', 'openGoalForm(null);', '#list-sheet', { fim: true }],
         ['Lista: meta com gráfico', "openGoalForm(goalsDb.find((g) => g.title === 'Ler').id);", '#list-sheet'], // V40.34.0: o gráfico fica no topo
         ['Agenda: selos das metas', `closeAllSheets(); activeDateObj = new Date(2026, 10, 16); renderTimeline(); setTimeout(() => { const el = document.querySelector('.block-item .goal-badge'); if (el) el.closest('.block-item').scrollIntoView({ block: 'center' }); }, 50);`, null], // V40.34.0
+        // V40.45.0: o filtro da agenda ligado (o botão TAGs com a tag e o olho; os escondidos viram contorno)
+        ['Agenda: filtro por tag', "closeAllSheets(); activeDateObj = new Date(2026, 10, 16); agTagFilter = tagsDb[0].id; agHideDone = true; renderTimeline(); document.getElementById('timeline-scroll').scrollTop = 0;", null, { depois: "agTagFilter = ''; agHideDone = false; agFilterSave(); renderTimeline();" }],
         ['Config', 'closeAllSheets(); openConfigSheet();', '#config-sheet', { fim: true }],
         ['Config: Horário', 'openConfigHours();', '#config-sheet', { fim: true }],
         ['Config: Aparência', 'openConfigSheet(); openConfigAppearance();', '#config-sheet', { fim: true }],
@@ -202,6 +204,7 @@ const IPHONES = [
         ['Janelinha: apagar bloco', `closeAllSheets(); openDeleteModal(db.find((x) => x.date === '2026-11-16').id);`, '#delete-task-modal', { depois: 'cancelDelete();' }],
         ['Janelinha: horário', `closeAllSheets(); openTimePicker(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} });`, '#time-picker-modal', { depois: 'cancelTimePicker();' }],
         ['Janelinha: repetir', `closeAllSheets(); duplicateTask(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} }); promptCloneQtd('daily');`, '#clone-qtd-modal', { depois: 'cancelCloneQtd();' }], // V40.36.1: −/+ e o resumo
+        ['Janelinha: filtrar a agenda', "closeAllSheets(); openAgFilter();", '#ag-filter-modal', { depois: 'closeAgFilter();' }], // V40.45.0: o botão TAGs
         ['Janelinha: categoria das metas', "closeAllSheets(); openListSheet(); switchListTab('goals'); openGoalListMenu('gl_pessoal');", '#goal-list-menu-modal', { depois: "hideModal('goal-list-menu-modal'); closeAllSheets();" }], // V40.37.0: Pôr na agenda
         ['Tarefa na mão', `closeAllSheets(); scheduleBacklogItem(backlogDb[0].id);`, '#floating-task', { depois: 'cancelPendingTask();' }],
         // V40.43.0: com a tarefa na mão, o espaço livre dividido pelos Períodos (as partes são tocáveis: nada por cima delas)

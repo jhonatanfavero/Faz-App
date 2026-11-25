@@ -963,8 +963,50 @@
         return out;
     }
 
+    // V40.44.0 — "BLOCOS DE BAIXO ABREM ESPAÇO SOZINHOS" (escolhas dele em 24/11: "Soltar e esticar" e "Só o necessário").
+    // A regra, a mesma no celular e no PC. Põe [from, to) no dia (a tarefa que entra, ou o pedaço a mais do bloco que
+    // estica) e desce só o necessário: os blocos que começam em "from" ou depois e esbarram descem até encostar no de
+    // cima; um vago que caiba segura o empurrão (dali pra baixo nada mexe). blocks: [{ id, start, dur }] do dia, SEM o
+    // bloco que entra ou estica. Devolve { moves: [{ id, from, to }], end } (end = onde termina o último que desceu; sem
+    // ninguém pra descer, moves vazio) ou null: um bloco atravessa "from" (não dá pra empurrar ele pra cima) ou alguém
+    // passaria de dayEnd (o fim do dia).
+    function pushNum(v) { var n = Math.round(Number(v)); return isFinite(n) ? n : NaN; }
+    function pushList(blocks, from) {
+        var list = [];
+        (Array.isArray(blocks) ? blocks : []).forEach(function (b) {
+            var s = pushNum(b && b.start), d = pushNum(b && b.dur);
+            if (!(s >= 0) || !(d > 0) || s + d <= from) return; // acaba antes (ou encostado em cima): não mexe
+            list.push({ id: b.id, s: s, d: d });
+        });
+        return list.sort(function (x, y) { return x.s - y.s || x.d - y.d; });
+    }
+    function pushPlan(blocks, from, to, dayEnd) {
+        from = pushNum(from); to = pushNum(to); dayEnd = dayEnd == null ? 1440 : pushNum(dayEnd);
+        if (!(from >= 0) || !(to > from) || !(to <= dayEnd)) return null;
+        var list = pushList(blocks, from), cur = to, moves = [];
+        for (var i = 0; i < list.length; i++) {
+            var b = list[i];
+            if (b.s < from) return null; // atravessa o ponto onde entra
+            if (b.s >= cur) break; // vago que segura o resto
+            moves.push({ id: b.id, from: b.s, to: cur });
+            cur += b.d;
+            if (cur > dayEnd) return null; // passaria do fim do dia
+        }
+        return { moves: moves, end: cur };
+    }
+    // Até onde dá pra esticar (ou o maior "to" que cabe) a partir de "from": o fim do dia menos os blocos que começam em
+    // "from" ou depois (todos encostados no fim). null se um bloco atravessa "from".
+    function pushRoom(blocks, from, dayEnd) {
+        from = pushNum(from); dayEnd = dayEnd == null ? 1440 : pushNum(dayEnd);
+        if (!(from >= 0)) return null;
+        var list = pushList(blocks, from), sum = 0;
+        for (var i = 0; i < list.length; i++) { if (list[i].s < from) return null; sum += list[i].d; }
+        return dayEnd - sum;
+    }
+
     return {
         periodSlots: periodSlots, periodBand: periodBand, // V40.43.0
+        pushPlan: pushPlan, pushRoom: pushRoom, // V40.44.0
         DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS, MONTH: MONTH, DEFAULT_GOAL_LISTS: DEFAULT_GOAL_LISTS,
         cleanOverrides: cleanOverrides, cleanMonths: cleanMonths, safeCards: safeCards, MAX_CARDS: MAX_CARDS, // V40.24.0
         stable: stable, same: same, validDate: validDate, assignPositions: assignPositions, fixTies: fixTies,

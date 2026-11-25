@@ -295,7 +295,9 @@ const { abrir } = require('./apoio');
   const t1 = await m.evaluate(() => backlogDb[0].id);
   await m.evaluate((id) => scheduleBacklogItem(id), t1); await m.waitForTimeout(350);
   const tgt = await m.evaluate((s) => { const e = document.querySelector(s); return { alvo: e.classList.contains('sub-target'), txt: e.textContent.includes('Colocar aqui') }; }, subSel);
-  ok(tgt.alvo && tgt.txt && await m.evaluate(() => document.getElementById('floating-hint').textContent) === 'Toque num espaço livre ou numa sublista', 'com a tarefa na mão, a sublista mostra "Colocar aqui" e a dica fala dela');
+  // V40.44.0: a sublista começa às 07:00 (colada no começo do dia), então tem um "↓ 07:00" e a dica fala dele também
+  const dica = await m.evaluate(() => [document.getElementById('floating-hint').textContent, !!document.querySelector('#blocks-container .tl-push')]);
+  ok(tgt.alvo && tgt.txt && dica[0] === (dica[1] ? 'Toque num espaço livre, numa sublista ou num ↓' : 'Toque num espaço livre ou numa sublista'), 'com a tarefa na mão, a sublista mostra "Colocar aqui" e a dica fala dela');
   await foto(m, 'cel-sublista-mao.png');
   await m.tap(`${subSel} .sub-drop`); await m.waitForTimeout(350);
   ok(await m.evaluate(([id, t]) => db.find((b) => b.id === id).cards.length === 4 && !backlogDb.some((x) => x.id === t) && pendingIntent === null, [S1, t1]), 'tocar em "Colocar aqui": a tarefa entra na sublista e sai da Lista');

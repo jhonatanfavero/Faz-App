@@ -1057,6 +1057,8 @@ function tlMiniGap(ds, start, dur) {
             if (dur >= 25) el.innerHTML = '<i class="ph ph-hand-pointing"></i>';
             el.onclick = (e) => { e.stopPropagation(); performEncaixeMatematico(start, dur, false, ds); };
             perZonesInto(el, start, start + dur, ds, true); // V40.43.0: uma parte por período, com a cor dele
+        } else if (dur >= 10 && (perZonesInto(el, start, start + dur, ds, true) || pushFieldInto(el, start, start + dur, ds, true))) {
+            el.classList.add('drop'); // V40.44.0: cabe descendo os de baixo
         } else el.classList.add('short');
     } else {
         el.onclick = (e) => tlEmptyTap(e, { startMin: start, duration: dur }, ds);
@@ -1102,6 +1104,7 @@ function tlRenderMulti() {
             if (b.type !== 'past') occupied += b.duration;
         });
         if (cur < hi) col.appendChild(tlMiniGap(ds, cur, hi - cur));
+        pushPillsInto(col, list, ds, true); // V40.44.0: entre blocos colados, o "↓" que encaixa descendo os de baixo
         if (ds === today && currentRealMins >= lo && currentRealMins <= hi) {
             const nl = document.createElement('div');
             nl.className = 'tl-now-mini';
@@ -1126,7 +1129,7 @@ function tlRenderMulti() {
     document.getElementById('progress-text').innerText = `Planejado (${pct}%)`;
     tlDayhead(days);
     const hint = document.getElementById('floating-hint');
-    if (hint) hint.textContent = 'Toque num espaço livre de um dos dias';
+    if (hint) hint.textContent = pendingIntent && container.querySelector('.tl-push') ? 'Toque num espaço livre (ou num ↓) de um dos dias' : 'Toque num espaço livre de um dos dias'; // V40.44.0
     blkDragSetup(); // V40.31.0: segurar um bloco e arrastar pra outro dia
 }
 
@@ -1336,9 +1339,13 @@ function renderTimeline() {
     document.getElementById('progress-text').innerText = `Planejado (${pct}%)`;
 
     renderQueue.forEach(block => drawBlock(block));
+    if (pendingIntent && !showOnlyDelayed && !showOnlyCompleted) pushPillsInto(container, dailyDb, getActiveDateStr(), false); // V40.44.0
     // V40.24.0: com tarefa na mão e sublista no dia, a dica lembra que dá pra soltar nela também
     const hint = document.getElementById('floating-hint');
-    if (hint) hint.textContent = pendingIntent && subCanDrop() && dailyDb.some(isSublist) ? 'Toque num espaço livre ou numa sublista' : 'Toque num espaço livre';
+    // V40.44.0: com "↓" entre blocos colados, a dica lembra que ele encaixa descendo os de baixo
+    const pills = pendingIntent && !!container.querySelector('.tl-push');
+    if (hint) hint.textContent = pendingIntent && subCanDrop() && dailyDb.some(isSublist) ? (pills ? 'Toque num espaço livre, numa sublista ou num ↓' : 'Toque num espaço livre ou numa sublista') :
+        pills ? 'Toque num espaço livre ou num ↓ entre os blocos' : 'Toque num espaço livre';
 }
 
 // V40.2.6: Renderiza resultados de busca de TODOS os dias como lista
@@ -1484,6 +1491,9 @@ function drawBlock(block) {
                 el.onclick = () => performEncaixeMatematico(block.startMin, block.duration);
                 el.innerHTML = `<span class="tl-gap-txt text-app-focus"><i class="ph ph-hand-pointing"></i>Soltar aqui · ${range}</span>`;
                 perChipsInto(el, block.startMin, block.startMin + block.duration, getActiveDateStr()); // V40.43.0: uma parte por período
+            } else if (perChipsInto(el, block.startMin, block.startMin + block.duration, getActiveDateStr()) ||
+                pushFieldInto(el, block.startMin, block.startMin + block.duration, getActiveDateStr())) { // V40.44.0: cabe descendo os de baixo
+                el.classList.add('border-black/20', 'cursor-pointer', 'z-30');
             } else {
                 el.classList.add('border-red-500/20', 'opacity-60');
                 el.innerHTML = `<span class="tl-gap-txt text-red-500">${range} · muito curto</span>`;
@@ -1502,6 +1512,9 @@ function drawBlock(block) {
                 el.onclick = () => performEncaixeMatematico(block.startMin, block.duration);
                 el.innerHTML = `<i class="ph ph-hand-pointing ${block.duration < 15 ? 'text-xs' : 'text-2xl mb-1'} text-app-focus drop-shadow-md"></i> ${!isSmall ? `<span class="text-[10px] font-bold text-app-focus uppercase tracking-widest">Soltar Aqui</span>` : ''}`;
                 perZonesInto(el, block.startMin, block.startMin + block.duration, getActiveDateStr()); // V40.43.0: uma parte por período, com a cor dele
+            } else if (block.duration >= 10 && (perZonesInto(el, block.startMin, block.startMin + block.duration, getActiveDateStr()) ||
+                pushFieldInto(el, block.startMin, block.startMin + block.duration, getActiveDateStr()))) { // V40.44.0: cabe descendo os de baixo
+                el.classList.add('cursor-pointer', 'z-30');
             } else {
                 el.classList.add('border-red-500/20', 'opacity-50');
                 el.innerHTML = `<span class="text-[9px] text-red-500 font-bold uppercase">Muito Curto</span>`;
@@ -2628,68 +2641,156 @@ function perActive() { const C = window.FazSyncCore; return !!(C && typeof C.per
 function perSlots(a, b) {
     return perActive() ? window.FazSyncCore.periodSlots(a, b, periodsDb).filter(s => s.b - s.a >= 5) : []; // pedacinho de menos de 5 min não vira campo
 }
-function perStart(slot, gapEnd, ds) { // onde a tarefa entra nesta parte; null = não cabe
+function perAt(slot, ds) { // onde a tarefa começaria nesta parte (hoje, na parte de agora: a partir de agora), de 5 em 5
     let st = slot.a;
     if (ds === getTodayStr() && currentRealMins > slot.a && currentRealMins < slot.b) st = currentRealMins;
-    st = Math.ceil(st / 5) * 5;
+    return Math.ceil(st / 5) * 5;
+}
+function perStart(slot, gapEnd, ds) { // onde a tarefa entra nesta parte; null = não cabe
+    const st = perAt(slot, ds);
     return pendingIntent && st + pendingIntent.duration <= gapEnd ? st : null;
 }
+// V40.44.0: cada parte num de 3 jeitos: cabe ("ok"), cabe descendo os blocos de baixo ("push", com o plano) ou não cabe.
+function perState(slot, gapEnd, ds) {
+    const at = perAt(slot, ds);
+    if (!pendingIntent) return { at, kind: 'nao', plan: null };
+    if (at + pendingIntent.duration <= gapEnd) return { at, kind: 'ok', plan: null };
+    const plan = pushAllowed(ds, at) ? pushPlanAt(ds, at) : null;
+    return plan && plan.moves.length ? { at, kind: 'push', plan } : { at, kind: 'nao', plan: null };
+}
+function perTap(slot, gapEnd, ds) { // o toque numa parte, com a hora de agora (a agenda pode estar aberta há uns minutos)
+    const now = perState(slot, gapEnd, ds);
+    if (now.kind === 'ok') performEncaixeMatematico(now.at, gapEnd - now.at, true, ds);
+    else if (now.kind === 'push') pushPlace(now.at, ds);
+    else showToast('Não cabe nesse período: toque em outro 👇');
+}
+function pushN(n) { return n === 1 ? 'empurra 1' : 'empurra ' + n; }
 // Põe as partes dentro do campo do espaço livre (el, já posicionado na régua). mini: os dias lado a lado.
 // O nome da parte acompanha a rolagem (fica logo abaixo do cabeçalho enquanto a parte aparece: o style.css).
+// V40.44.0: parte onde a tarefa não cabe mas cabe descendo os de baixo: "↓ … · empurra N". Nada pra fazer em
+// nenhuma parte (vago curto no fim do dia): false, e fica o campo de sempre.
 function perZonesInto(el, a, b, ds, mini) {
     const slots = perSlots(a, b);
     if (!slots.length) return false; // nenhum período criado: fica o campo de sempre
+    const states = slots.map(s => perState(s, b, ds));
+    if (!states.some(x => x.kind !== 'nao')) return false;
     const y0 = tlY(a), today = ds === getTodayStr();
     el.innerHTML = '';
     el.classList.add('tl-pz-box');
-    slots.forEach(s => {
-        const st = perStart(s, b, ds), top = tlY(s.a) - y0, h = tlY(s.b) - tlY(s.a), z = document.createElement('div');
-        const nm = s.name || 'Livre', name = escapeHtml(nm), at = formatClock(st === null ? s.a : st);
-        z.className = (mini ? 'tl-pz mini' : 'tl-pz') + ' per-' + (s.band || 'livre') + (st === null ? ' nao' : '') +
+    slots.forEach((s, i) => {
+        const S2 = states[i], top = tlY(s.a) - y0, h = tlY(s.b) - tlY(s.a), z = document.createElement('div');
+        const nm = s.name || 'Livre', name = escapeHtml(nm), at = formatClock(S2.at), push = S2.kind === 'push', no = S2.kind === 'nao';
+        z.className = (mini ? 'tl-pz mini' : 'tl-pz') + ' per-' + (s.band || 'livre') + (no ? ' nao' : '') + (push ? ' push' : '') +
             (today && s.b <= currentRealMins ? ' past' : '') + (h < 24 ? ' tiny' : '') + (h < 14 ? ' micro' : '');
         z.style.top = top + 'px';
         z.style.height = Math.max(h - 2, 2) + 'px';
-        z.dataset.perStart = st === null ? '' : String(st);
+        z.dataset.perStart = no ? '' : String(S2.at);
         z.dataset.perName = nm;
+        if (push) z.dataset.push = String(S2.plan.moves.length);
         z.setAttribute('role', 'button');
-        z.setAttribute('aria-label', st === null ? `${nm}: não cabe` : `Soltar às ${at} (${nm})`);
-        z.innerHTML = mini ? `<span class="tl-pz-txt"><b>${name}</b><span>${at}</span></span>` : `<span class="tl-pz-txt"><i class="ph ph-hand-pointing"></i><b>${name}</b> <span>· ${at}${st === null ? ' · não cabe' : ''}</span></span>`;
-        z.onclick = (e) => {
-            e.stopPropagation();
-            const now = perStart(s, b, ds); // a hora de agora (a agenda pode estar aberta há uns minutos)
-            if (now === null) { showToast('Não cabe nesse período: toque em outro 👇'); return; }
-            performEncaixeMatematico(now, b - now, true, ds);
-        };
+        z.setAttribute('aria-label', no ? `${nm}: não cabe` : push ? `Encaixar às ${at} (${nm}), descendo ${S2.plan.moves.length === 1 ? '1 bloco' : S2.plan.moves.length + ' blocos'}` : `Soltar às ${at} (${nm})`);
+        z.innerHTML = mini ? `<span class="tl-pz-txt"><b>${name}</b><span>${at}${push ? ' ↓' : ''}</span></span>` :
+            `<span class="tl-pz-txt"><i class="ph ${push ? 'ph-arrow-line-down' : 'ph-hand-pointing'}"></i><b>${name}</b> <span>· ${at}${no ? ' · não cabe' : push ? ' · ' + pushN(S2.plan.moves.length) : ''}</span></span>`;
+        z.onclick = (e) => { e.stopPropagation(); perTap(s, b, ds); };
         el.appendChild(z);
     });
     return true;
 }
-// A faixa de um vago oculto (36 px): as partes lado a lado, com o nome em cima e a hora embaixo.
+// A faixa de um vago oculto (36 px): as partes lado a lado, com o nome em cima e a hora embaixo (V40.44.0: "↓" nas que
+// entram descendo os de baixo).
 function perChipsInto(el, a, b, ds) {
-    const slots = perSlots(a, b).filter(s => perStart(s, b, ds) !== null);
-    if (!slots.length) return false;
+    const slots = perSlots(a, b), states = slots.map(s => perState(s, b, ds));
+    if (!states.some(x => x.kind !== 'nao')) return false;
     const range = `${formatClock(a)}–${formatClock(b)}`;
     el.innerHTML = `<span class="sr-only">Soltar aqui · ${range}</span>`; // o que o leitor de tela fala (e o texto de antes)
     el.classList.add('tl-pz-strip');
     const row = document.createElement('div');
     row.className = 'tl-pchips';
-    slots.forEach(s => {
-        const st = perStart(s, b, ds), c = document.createElement('button');
+    slots.forEach((s, i) => {
+        const S2 = states[i];
+        if (S2.kind === 'nao') return;
+        const push = S2.kind === 'push', c = document.createElement('button'), at = formatClock(S2.at);
         c.type = 'button';
-        c.className = 'tl-pchip per-' + (s.band || 'livre');
-        c.dataset.perStart = String(st);
+        c.className = 'tl-pchip per-' + (s.band || 'livre') + (push ? ' push' : '');
+        c.dataset.perStart = String(S2.at);
         c.dataset.perName = s.name || 'Livre';
-        c.innerHTML = `<b>${escapeHtml(s.name || 'Livre')}</b><span>${formatClock(st)}</span>`;
-        c.title = `Soltar às ${formatClock(st)} (${s.name || 'Livre'})`;
-        c.onclick = (e) => {
-            e.stopPropagation();
-            const now = perStart(s, b, ds);
-            if (now === null) { showToast('Não cabe nesse período: toque em outro 👇'); return; }
-            performEncaixeMatematico(now, b - now, true, ds);
-        };
+        if (push) c.dataset.push = String(S2.plan.moves.length);
+        c.innerHTML = `<b>${escapeHtml(s.name || 'Livre')}</b><span>${at}${push ? ' ↓' : ''}</span>`;
+        c.title = push ? `Encaixar às ${at} (${s.name || 'Livre'}): ${pushN(S2.plan.moves.length)}` : `Soltar às ${at} (${s.name || 'Livre'})`;
+        c.onclick = (e) => { e.stopPropagation(); perTap(s, b, ds); };
         row.appendChild(c);
     });
     el.appendChild(row);
+    return true;
+}
+
+// ---------- V40.44.0: BLOCOS DE BAIXO ABREM ESPAÇO SOZINHOS ----------
+// Escolhas dele em 24/11: "Soltar e esticar" (a tarefa na mão entre blocos colados, num vago curto ou numa parte que não
+// comporta; e esticar a duração de um bloco) e "Só o necessário" (desce só a fila de blocos encostados; um vago que
+// caiba segura o empurrão). Arrastar um bloco pra cima de outro continua dando "Conflito". A regra é a do PC
+// (FazSyncCore.pushPlan/pushRoom, no sync.js); o fim é o fim do dia da agenda (END_HOUR). Hoje, só daqui pra frente.
+function pushDayRows(ds, exceptId) { return db.filter(b => b.date === ds && b.id !== exceptId).map(b => ({ id: b.id, start: b.startMin, dur: b.duration })); }
+function pushPlanAt(ds, st, dur, exceptId) {
+    const C = window.FazSyncCore, d = dur == null ? (pendingIntent ? pendingIntent.duration : 0) : dur;
+    return C && typeof C.pushPlan === 'function' && d > 0 ? C.pushPlan(pushDayRows(ds, exceptId), st, st + d, END_HOUR * 60) : null;
+}
+function pushAllowed(ds, st) { return ds !== getTodayStr() || st >= currentRealMins; }
+function pushRetime(b) { // a regra do arrastar: horário que ainda não passou volta a ser foco (e, se estava atrasado, fica marcado)
+    const isPastDay = b.date < getTodayStr(), isPastTimeToday = b.date === getTodayStr() && b.startMin + b.duration <= currentRealMins;
+    if (!isPastDay && !isPastTimeToday) { if (b.type === 'past') b.wasDelayed = true; b.type = 'focus'; }
+}
+function pushApply(ds, plan) { // desce os blocos do plano (quem chamou grava, num passo só do Desfazer)
+    let n = 0;
+    (plan ? plan.moves : []).forEach(m => { const b = db.find(x => x.id === m.id && x.date === ds); if (b) { b.startMin = m.to; pushRetime(b); n++; } });
+    return n;
+}
+function pushWord(n) { return n === 1 ? '1 bloco desceu' : n + ' blocos desceram'; }
+// A tarefa da mão às "st", descendo os de baixo só o necessário.
+function pushPlace(st, ds) {
+    if (!pendingIntent) return;
+    st = Math.ceil(st / 5) * 5;
+    const plan = pushAllowed(ds, st) ? pushPlanAt(ds, st) : null;
+    if (!plan) { showToast('Não cabe: os de baixo passariam do fim do dia 👇'); return; }
+    const n = pushApply(ds, plan);
+    performEncaixeMatematico(st, pendingIntent.duration, true, ds);
+    if (n) undoNameStep('Encaixada · ' + pushWord(n)); // na barrinha do Desfazer (o passo é um só)
+}
+// Entre dois blocos colados (ou com menos de 10 min entre eles) não há campo pra tocar: um "↓ Encaixar" na emenda.
+// list: os blocos do dia, em ordem. parent: o #blocks-container (1 dia) ou a coluna do dia (mini).
+function pushPillsInto(parent, list, ds, mini) {
+    if (!pendingIntent) return;
+    let prev = START_HOUR * 60;
+    list.forEach(b => {
+        const gap = b.startMin - prev, at = Math.ceil(prev / 5) * 5;
+        if (gap >= 0 && gap < 10 && at <= b.startMin && pushAllowed(ds, at)) {
+            const plan = pushPlanAt(ds, at);
+            if (plan && plan.moves.length) {
+                const y = tlY(b.startMin), p = document.createElement('button'), n = plan.moves.length;
+                p.type = 'button';
+                p.className = 'tl-push' + (mini ? ' mini' : '');
+                p.style.top = (y - 12) + 'px'; // bem na emenda (no começo do dia, metade fica no respiro de cima: dentro do bloco cobriria o horário dele)
+                p.dataset.pushStart = String(at);
+                p.dataset.push = String(n);
+                p.innerHTML = `<i class="ph ph-arrow-line-down"></i>${formatClock(at)}`; // curtinho: num dia cheio são vários (a dica da mão explica)
+                p.setAttribute('aria-label', `Encaixar às ${formatClock(at)}, descendo ${n === 1 ? '1 bloco' : n + ' blocos'}`);
+                p.onclick = (e) => { e.stopPropagation(); pushPlace(at, ds); };
+                parent.appendChild(p);
+            }
+        }
+        prev = Math.max(prev, b.startMin + b.duration);
+    });
+}
+// Vago curto demais sem períodos (ou com, mas sem parte nenhuma que dê): o campo vira "↓ Encaixar aqui" se der descendo.
+function pushFieldInto(el, a, b, ds, mini) {
+    if (!pendingIntent) return false;
+    const at = perAt({ a, b }, ds), plan = pushAllowed(ds, at) ? pushPlanAt(ds, at) : null;
+    if (!plan || !plan.moves.length) return false;
+    const n = plan.moves.length;
+    el.classList.add('tl-push-box');
+    el.dataset.push = String(n);
+    el.innerHTML = mini ? '<i class="ph ph-arrow-line-down"></i>' : `<span class="tl-push-txt"><i class="ph ph-arrow-line-down"></i>Encaixar · ${formatClock(at)} · ${pushN(n)}</span>`;
+    el.setAttribute('aria-label', `Encaixar às ${formatClock(at)}, descendo ${n === 1 ? '1 bloco' : n + ' blocos'}`);
+    el.onclick = (e) => { e.stopPropagation(); pushPlace(perAt({ a, b }, ds), ds); };
     return true;
 }
 
@@ -3051,6 +3152,7 @@ function enablePhysics(el, block) {
     const resizer = el.querySelector('.resize-handle');
     
     let startY = 0, initialVal = 0, maxVal = 0;
+    let pushRows = null, pushFrom = 0, pushMoved = 0; // V40.44.0: esticar desce os blocos de baixo só o necessário
 
     function onDragStart(e) {
         e.preventDefault(); e.stopPropagation();
@@ -3138,6 +3240,13 @@ function enablePhysics(el, block) {
         const nextBlock = dailyDb.find(b => b.startMin >= block.startMin + block.duration && b.id !== block.id);
         maxVal = nextBlock ? (nextBlock.startMin - block.startMin) : ((END_HOUR * 60) - block.startMin);
         maxVal = Math.floor(maxVal / 5) * 5; 
+        // V40.44.0: dá pra passar do próximo bloco: os de baixo descem (até todos encostarem no fim do dia)
+        const C = window.FazSyncCore;
+        pushFrom = block.startMin + block.duration; pushMoved = 0;
+        pushRows = C && typeof C.pushRoom === 'function' ? pushDayRows(block.date || getActiveDateStr(), block.id) : null;
+        const room = pushRows ? C.pushRoom(pushRows, pushFrom, END_HOUR * 60) : null;
+        if (room !== null) maxVal = Math.max(maxVal, Math.floor((room - block.startMin) / 5) * 5);
+        else pushRows = null;
         
         document.addEventListener('touchmove', onResizeMove, {passive: false});
         document.addEventListener('mousemove', onResizeMove);
@@ -3164,7 +3273,32 @@ function enablePhysics(el, block) {
             if (newDur <= 25) el.classList.add('micro-block');
             else el.classList.remove('micro-block');
             el.classList.toggle('nano-block', newDur <= 10); el.classList.toggle('nano-5', newDur < 10); // V40.8.0
+            pushPreview(newDur);
         }
+    }
+    // V40.44.0: enquanto estica, os blocos que vão descer já aparecem no lugar novo (e voltam se encolher de novo)
+    function pushPreview(dur) {
+        const C = window.FazSyncCore;
+        const plan = pushRows && block.startMin + dur > pushFrom ? C.pushPlan(pushRows, pushFrom, block.startMin + dur, END_HOUR * 60) : null;
+        const to = new Map((plan ? plan.moves : []).map(m => [m.id, m.to]));
+        container.querySelectorAll('.block-item[data-block-id]').forEach(bel => {
+            const id = bel.dataset.blockId;
+            if (id === block.id) return;
+            const b = db.find(x => x.id === id && x.date === block.date);
+            if (!b) return;
+            const st = to.has(id) ? to.get(id) : b.startMin;
+            bel.style.top = `${tlY(st) + 1}px`;
+            bel.classList.toggle('tl-pushed', to.has(id));
+            const tl = bel.querySelector('.time-label'); // o horário novo (o de antes volta se encolher)
+            if (tl) {
+                if (tl.dataset.orig == null) tl.dataset.orig = tl.innerHTML;
+                tl.innerHTML = to.has(id) ? `${formatClock(st)} - ${formatClock(st + b.duration)} &bull; ${formatDur(b.duration)}` : tl.dataset.orig;
+            }
+        });
+        pushMoved = to.size;
+        const lbl = el.querySelector('.time-label'), mv = el.querySelector('.micro-time-val');
+        if (lbl) lbl.innerHTML = `${formatClock(block.startMin)} - ${formatClock(block.startMin + dur)} &bull; ${formatDur(dur)}${pushMoved ? ` <span class="tl-push-n">· ${pushN(pushMoved)}</span>` : ''}`;
+        if (mv) mv.textContent = formatDur(dur) + (pushMoved ? ' · ' + pushN(pushMoved) : ''); // bloco pequeno: a duração fica ao lado do nome
     }
 
     function onResizeEnd() {
@@ -3173,7 +3307,16 @@ function enablePhysics(el, block) {
         document.removeEventListener('touchend', onResizeEnd);
         document.removeEventListener('mouseup', onResizeEnd);
         block.expanded = false; 
+        // V40.44.0: os de baixo descem só o necessário (o plano de novo, com a duração final)
+        let moved = 0;
+        if (pushRows && block.startMin + block.duration > pushFrom) {
+            const plan = window.FazSyncCore.pushPlan(pushRows, pushFrom, block.startMin + block.duration, END_HOUR * 60);
+            if (plan) moved = pushApply(block.date || getActiveDateStr(), plan);
+            else { block.duration = initialVal; showToast('Não cabe: os de baixo passariam do fim do dia.'); }
+        }
+        pushRows = null;
         saveDb();
+        if (moved) undoNameStep('Duração ' + formatDur(block.duration) + ' · ' + pushWord(moved));
         renderTimeline(); 
         // V40.1.3: liberar auto-retrair após pequeno delay
         setTimeout(() => { isPhysicsBusy = false; }, 200);
@@ -3687,7 +3830,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.43.0',
+            version: 'v40.44.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

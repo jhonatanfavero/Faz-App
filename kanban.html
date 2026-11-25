@@ -79,13 +79,22 @@
     .ag-clash { border-color: #dc2626 !important; box-shadow: 0 0 0 2px #dc2626, 0 10px 24px rgba(0,0,0,.20); }
     .ag-limit { box-shadow: 0 3px 0 0 #d97706, 0 10px 24px rgba(0,0,0,.20); }
     .ag-note { color: #dc2626; font-weight: 700; }
-    .ag-limit .ag-note { color: #b45309; }
+    .ag-limit .ag-note, .ag-pushing .ag-note { color: #b45309; } /* V40.44.0: "empurra N" em âmbar, não em vermelho */
     .ag-origin { position: absolute; left: 56px; right: 0; border: 1.5px dashed #a1a1aa; border-radius: 6px; pointer-events: none; }
     body.ag-grabbing, body.ag-grabbing * { cursor: grabbing !important; }
     body.ag-resizing, body.ag-resizing * { cursor: ns-resize !important; }
     /* V40.14.0: Semana — enquanto um bloco é arrastado, os espaços livres viram lugar de soltar */
     .ag-drop.over { background: var(--focus); color: #fff; border-style: solid; }
     .ag-drop.per.over { background: var(--per-bd); color: #fff; } /* V40.43.0: a parte do dia acende na cor dela */
+    /* V40.44.0: onde a tarefa só entra descendo os de baixo: borda contínua e a seta ("Encaixar às … · empurra N").
+       Na visão Dia, o "↓ Encaixar" fica na emenda de dois blocos colados. Esticando, os que vão descer ficam com contorno. */
+    .ag-gap.ag-push { border-style: solid; border-width: 1px; padding: 1px 8px; font-size: 11.5px; line-height: 1.5; } /* mais fininho: num dia cheio são vários */
+    .ag-push-n { font-weight: 700; opacity: .8; white-space: nowrap; }
+    .ag-push-pill { position: absolute; left: calc(50% + 28px); transform: translateX(-50%); z-index: 6; display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 11px; border-radius: 9999px;
+        border: 1.5px solid var(--focus); background: #fff; color: var(--focus); font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.16); cursor: copy; }
+    .ag-push-pill:hover, .ag-push-pill:focus-visible { background: var(--focus); color: #fff; }
+    .ag-cgap .ag-pchip.push { border-style: solid; }
+    .ag-card.ag-pushed { outline: 2.5px solid rgba(245,158,11,.9); outline-offset: -1px; transition: top .12s; }
     /* V40.17.0: Rotinas e Notas */
     .rt-theme { color: #71717a; }
     .rt-theme.on { background: #fff; color: #18181b; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -1076,7 +1085,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.43.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.44.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1416,6 +1425,8 @@
         if (has('listas', 'd')) return pcWord('listas', st.listas.d, 'apagad');
         if (has('tags', 'd')) return pcWord('tags', st.tags.d, 'apagad');
         if (has('metas_listas', 'd')) return pcWord('metas_listas', st.metas_listas.d, 'apagad');
+        if (has('blocos', 'n') && has('blocos', 'm') && !has('blocos', 'd')) // V40.44.0: encaixou descendo os de baixo
+            return (has('tarefas', 'd') ? 'Tarefa encaixada' : st.blocos.n === 1 ? 'Bloco encaixado' : pcWord('blocos', st.blocos.n, 'criad')) + ' · ' + pushWord(st.blocos.m.length);
         if (has('tarefas', 'd') && has('blocos', 'n')) return st.tarefas.d === 1 ? 'Tarefa agendada' : st.tarefas.d + ' tarefas agendadas';
         if (has('tarefas', 'd') && has('blocos', 'm')) return msg || 'Tarefa entrou na sublista';
         if (has('blocos', 'd') && has('tarefas', 'n')) return msg || 'Bloco voltou pra lista';
@@ -1813,7 +1824,56 @@
     }
     // o nome do período numa etiqueta que não quebra no meio ("Meio-dia"): se não couber na linha, desce inteira
     function perLabel(g) { return g.name && g.name !== 'Livre' ? ' <span class="ag-per">' + esc(g.name) + '</span>' : ''; }
+
+    // V40.44.0 — BLOCOS DE BAIXO ABREM ESPAÇO SOZINHOS (escolhas dele em 24/11: "Soltar e esticar" e "Só o necessário").
+    // Com a tarefa na mão, onde ela não cabe (entre blocos colados, num vago curto ou numa parte que não comporta) e ao
+    // esticar um bloco (Dia e Semana), os blocos de baixo descem só o necessário: a fila encostada desce, um vago que
+    // caiba segura o resto. Arrastar um bloco pra cima de outro continua dando "Conflito". A regra é a do celular
+    // (FazSyncCore.pushPlan/pushRoom, no sync.js); o fim é o fim do dia das Configurações. Hoje, só daqui pra frente.
+    function pushEnd() { var h = Number(S.hours && S.hours[1]); return (h >= 1 && h <= 24 ? h : 24) * 60; }
+    function pushRows(day, exceptId) { return dayOthers(day, exceptId || null).map(function (b) { return { id: b.id, start: b.start_min, dur: b.duration }; }); }
+    function pushPlanPc(day, st, dur, exceptId) { var C = window.FazSyncCore; return C && typeof C.pushPlan === 'function' && dur > 0 ? C.pushPlan(pushRows(day, exceptId), st, st + dur, pushEnd()) : null; }
+    function pushRoomPc(day, from, exceptId) { var C = window.FazSyncCore; return C && typeof C.pushRoom === 'function' ? C.pushRoom(pushRows(day, exceptId), from, pushEnd()) : null; }
+    function pushAllowed(day, st) { return day !== todayStr() || st >= nowMin(); }
+    function pushWord(n) { return n === 1 ? '1 bloco desceu' : n + ' blocos desceram'; }
+    function pushN(n) { return 'empurra ' + n; }
+    // Desce os blocos do plano (patchRow: o mesmo passo do Desfazer do clique). true = todos foram.
+    async function pushApply(day, plan) {
+        var oks = await Promise.all((plan ? plan.moves : []).map(function (m) {
+            var b = S.blocos[m.id];
+            return b ? patchRow('blocos', m.id, Object.assign({ start_min: m.to }, retimeFields(b, day, m.to, b.duration))) : true;
+        }));
+        return oks.every(Boolean);
+    }
+    // O que a Semana mostra com a tarefa na mão: os "Colocar às" (gapSlotsOf) e, onde ela não cabe mas cabe descendo os de
+    // baixo, um "Encaixar às … ↓" (push = quantos descem). Entre blocos colados (ou a menos de 10 min), no fim do de cima.
+    function placeSlotsOf(list, day, dur) {
+        var out = gapSlotsOf(list, day, dur), have = {}, cur = S.hours[0] * 60, on = perActive();
+        out.forEach(function (g) { have[g.st] = 1; });
+        if (day === todayStr()) cur = Math.max(cur, Math.ceil(nowMin() / 5) * 5);
+        function add(st, name, band) {
+            if (have[st] || !pushAllowed(day, st)) return;
+            var plan = pushPlanPc(day, st, dur);
+            if (!plan || !plan.moves.length) return;
+            have[st] = 1;
+            out.push({ st: st, name: name, band: band, push: plan.moves.length });
+        }
+        list.forEach(function (b) {
+            if (b.start_min >= cur) {
+                var a = cur, e = b.start_min;
+                if (e - a < 10) add(Math.ceil(a / 5) * 5, '', '');
+                else (on ? perParts(a, e) : [{ a: a, b: e, name: '', band: '' }]).forEach(function (x) {
+                    if (x.a + dur > e) add(x.a, on ? x.name || 'Livre' : '', on ? x.band || 'livre' : '');
+                });
+            }
+            cur = Math.max(cur, b.start_min + b.duration);
+        });
+        return out.sort(function (x, y) { return x.st - y.st; });
+    }
     function gapHtml(day, g, first) {
+        if (g.push) return '<button type="button" class="ag-gap ag-push' + (g.band ? ' per per-' + g.band : '') + '" data-gap-day="' + day + '" data-gap-start="' + g.st + '"' +
+            (g.name ? ' data-per-name="' + esc(g.name) + '"' : '') + ' data-push="' + g.push + '" title="Encaixar a tarefa às ' + clock(g.st) + ': ' + (g.push === 1 ? '1 bloco desce' : g.push + ' blocos descem') +
+            '"><i class="ph ph-arrow-line-down mr-1"></i>Encaixar às ' + clock(g.st) + perLabel(g) + '</button>'; // fininho (num dia cheio são vários): quantos descem fica no title
         return '<button type="button" class="ag-gap' + (g.band ? ' per per-' + g.band : '') + (first ? ' first' : '') + '" data-gap-day="' + day + '" data-gap-start="' + g.st + '"' +
             (g.name ? ' data-per-name="' + esc(g.name) + '"' : '') + '><i class="ph ph-plus mr-1"></i>Colocar às ' + clock(g.st) + perLabel(g) + (first ? ' (primeiro livre)' : '') + '</button>';
     }
@@ -1845,9 +1905,10 @@
         var list = all.filter(agVisible); // o que aparece; os espaços livres (tarefa na mão) contam todos os blocos
         if (!S.placing) return list.map(function (b) { return agCardHtml(b, day, today, nm); }).join('') +
             '<button type="button" class="ag-add shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[12.5px] font-medium text-zinc-500 hover:bg-zinc-200/70 hover:text-zinc-800" data-add-day="' + day + '"><i class="ph ph-plus"></i>Adicionar bloco</button>';
-        var gaps = gapSlotsOf(all, day, S.placing.dur), gi = 0, html = ''; // V40.43.0: um por período
+        var gaps = placeSlotsOf(all, day, S.placing.dur), gi = 0, html = ''; // V40.43.0: um por período; V40.44.0: + "Encaixar às ↓"
+        var fit = gaps.filter(function (g) { return !g.push; })[0];
         // Dia cheio: o primeiro espaço livre pode estar lá embaixo, depois de vários blocos. Um atalho fixo no topo resolve.
-        if (gaps.length && list.length && gaps[0].st > list[0].start_min) html += gapHtml(day, gaps[0], true);
+        if (fit && list.length && fit.st > list[0].start_min) html += gapHtml(day, fit, true);
         list.forEach(function (b) {
             while (gi < gaps.length && gaps[gi].st <= b.start_min) html += gapHtml(day, gaps[gi++]);
             html += agCardHtml(b, day, today, nm);
@@ -2104,11 +2165,34 @@
     function cgapChips(day, a, b) {
         var dur = S.placing ? S.placing.dur : 0, nm = day === todayStr() ? nowMin() : -1, parts = perParts(a, b), html = '';
         parts.forEach(function (x) {
-            var st = nm > x.a && nm < x.b ? Math.ceil(nm / 5) * 5 : x.a, name = esc(x.name || 'Livre');
-            if (st + dur > b) return;
-            html += '<span class="ag-pchip per per-' + (x.band || 'livre') + '" data-cgap="' + st + '" data-per-name="' + name + '" title="Colocar a tarefa às ' + clock(st) + ' (' + name + ')"><b>' + name + '</b>' + clock(st) + '</span>';
+            var st = nm > x.a && nm < x.b ? Math.ceil(nm / 5) * 5 : x.a, name = esc(x.name || 'Livre'), push = 0;
+            if (st + dur > b) { // V40.44.0: não cabe → entra descendo os de baixo (se der)
+                var plan = pushAllowed(day, st) ? pushPlanPc(day, st, dur) : null;
+                if (!plan || !plan.moves.length) return;
+                push = plan.moves.length;
+            }
+            html += '<span class="ag-pchip per per-' + (x.band || 'livre') + (push ? ' push' : '') + '" data-cgap="' + st + '" data-per-name="' + name + '"' + (push ? ' data-push="' + push + '"' : '') +
+                ' title="' + (push ? 'Encaixar a tarefa às ' + clock(st) + ' (' + name + '): ' + pushN(push) : 'Colocar a tarefa às ' + clock(st) + ' (' + name + ')') + '"><b>' + name + '</b>' + clock(st) + (push ? ' ↓' : '') + '</span>';
         });
         return html ? '<span class="ag-pchips">' + html + '</span>' : '';
+    }
+    // V40.44.0: visão Dia com a tarefa na mão: na emenda de dois blocos colados (ou a menos de 10 min um do outro), um
+    // "↓ Encaixar às …" (clicar = placeHere, que desce os de baixo). Num vago curto, clicar no horário já encaixa descendo.
+    function dayPushPills(day, list) {
+        var dur = S.placing ? S.placing.dur : 0, prev = S.hours[0] * 60, html = '';
+        list.forEach(function (b) {
+            var gap = b.start_min - prev, at = Math.ceil(prev / 5) * 5;
+            if (gap >= 0 && gap < 10 && at <= b.start_min && pushAllowed(day, at)) {
+                var plan = pushPlanPc(day, at, dur);
+                if (plan && plan.moves.length) {
+                    var y = agY(b.start_min);
+                    html += '<button type="button" class="ag-push-pill" data-gap-day="' + day + '" data-gap-start="' + at + '" data-push="' + plan.moves.length + '" style="top:' + (y - 12) +
+                        'px" title="Os blocos de baixo descem pra abrir espaço"><i class="ph ph-arrow-line-down"></i>Encaixar às ' + clock(at) + ' <span class="ag-push-n">· ' + pushN(plan.moves.length) + '</span></button>';
+                }
+            }
+            prev = Math.max(prev, b.start_min + b.duration);
+        });
+        return html;
     }
     function renderDay(day, map, today, nm) {
         var list = map[day] || [], d = parseYmd(day), box = $('ag-timeline');
@@ -2148,6 +2232,7 @@
                 '" style="left:56px;right:0;top:' + top + 'px;height:' + height + 'px;' + paint.css + 'border-left-color:' + esc(safeColor(tag ? tag.color : (paint.hex || '#d4d4d8'))) + '" tabindex="0" data-block="' + esc(b.id) + '">' +
                 dayInnerHtml(b) + '</div>';
         });
+        if (S.placing) html += dayPushPills(day, list); // V40.44.0
         if (day === today && nm >= h0 * 60 && nm <= h1 * 60) html += '<div class="now-line" style="top:' + agY(nm) + 'px"></div>';
         if (!list.length) html += '<p class="absolute left-14 right-0 ' + (S.agCompact ? 'top-12' : 'top-10') + ' text-center text-sm text-zinc-500 pointer-events-none">Nada agendado neste dia.' + (S.placing ? '' : S.agCompact ? ' Clique na faixa pra criar um bloco.' : ' Clique num horário pra criar um bloco.') + '</p>';
         else if (!shownN) html += '<p class="absolute left-14 right-0 top-10 text-center text-sm text-zinc-500 pointer-events-none">Nenhum bloco com esse filtro neste dia.</p>';
@@ -2243,6 +2328,9 @@
             for (var i = 0; i < g.others.length && !next; i++) if (g.others[i].start_min >= g.st0 + g.dur0) next = g.others[i];
             g.next = next;
             g.max = Math.floor(((next ? next.start_min : S.agH1 * 60) - g.st0) / 5) * 5;
+            // V40.44.0: passa do próximo bloco descendo os de baixo, só o necessário (até todos encostarem no fim do dia)
+            var room = pushRoomPc(g.day, g.st0 + g.dur0, g.id);
+            if (room !== null) { g.push = true; g.max = Math.max(g.max, Math.floor((Math.min(room, S.agH1 * 60) - g.st0) / 5) * 5); }
         } else { // marca tracejada no lugar de onde o bloco saiu
             g.origin = document.createElement('div');
             g.origin.className = 'ag-origin';
@@ -2281,7 +2369,10 @@
             var want = Math.round((at - g.st0) / 5) * 5; // duração de 5 em 5 min
             g.dur = Math.max(5, Math.min(want, g.max));
             g.over = want > g.max; // tentou passar do limite
-            if (g.over) note = g.next ? 'o próximo começa às ' + clock(g.next.start_min) : 'fim da régua';
+            g.plan = g.push && g.dur > g.dur0 ? pushPlanPc(g.day, g.st0 + g.dur0, g.dur - g.dur0, g.id) : null; // V40.44.0
+            dgPushShow(g);
+            if (g.over) note = g.push ? 'os de baixo chegaram ao fim do dia' : g.next ? 'o próximo começa às ' + clock(g.next.start_min) : 'fim da régua';
+            else if (g.plan && g.plan.moves.length) note = pushN(g.plan.moves.length);
         }
         g.el.style.top = (agY(g.start) + 1) + 'px';
         g.el.style.height = (g.mode === 'move' ? Math.max(g.dur0 * PXM - 2, 14) : Math.max(agY(g.st0 + g.dur) - agY(g.st0) - 2, 14)) + 'px'; // movendo, o bloco não muda de tamanho
@@ -2290,6 +2381,19 @@
         g.el.classList.toggle('ag-into-sub', !!g.sub); // V40.40.0
         var key = g.start + '|' + g.dur + '|' + note;
         if (key !== g.key) { g.key = key; g.el.innerHTML = dayInnerHtml(Object.assign({}, b, { start_min: g.start, duration: g.dur }), note); }
+    }
+    function dgPushShow(g) { // V40.44.0: esticando, os blocos que vão descer já aparecem no lugar novo (e voltam se encolher)
+        var to = {};
+        (g.plan ? g.plan.moves : []).forEach(function (m) { to[m.id] = m.to; });
+        (g.others || []).forEach(function (o) {
+            var el = dgCard(o.id);
+            if (!el) return;
+            var st = to[o.id] != null ? to[o.id] : o.start_min;
+            el.style.top = (agY(st) + 1) + 'px';
+            el.classList.toggle('ag-pushed', to[o.id] != null);
+            if (String(st) !== (el.dataset.pv || String(o.start_min))) { el.dataset.pv = String(st); el.innerHTML = dayInnerHtml(Object.assign({}, o, { start_min: st })); } // o horário novo
+        });
+        if (g.el) g.el.classList.toggle('ag-pushing', !!(g.plan && g.plan.moves.length));
     }
     function dgEdge() { // perto da borda de cima ou de baixo, a régua rola sozinha
         var g = DG, sc = $('ag-day'), r = sc.getBoundingClientRect(), zone = 48, v = 0;
@@ -2338,17 +2442,21 @@
             if (b.start_min !== g.st0 || b.duration !== g.dur0) toast('Esse bloco mudou em outro aparelho. Tente de novo.');
             else if (g.mode === 'move' && g.sub) { renderAgenda(); blockIntoSub(g.id, g.sub); return; } // V40.40.0: vira cartão da sublista (o desenho volta já; a gravação redesenha)
             else if (g.mode === 'move') saved = moveBlock(g.id, g.day, g.start, 'Bloco movido: ' + clock(g.start) + '–' + clock(g.start + g.dur0));
-            else if (g.dur !== g.dur0) {
-                if (g.dur > g.dur0 && hits(dayOthers(g.day, g.id), g.st0 + g.dur0, g.dur - g.dur0)) toast('Conflito! A duração voltou ao que era.');
-                else {
-                    patchRow('blocos', g.id, Object.assign({ duration: g.dur }, retimeFields(b, g.day, g.st0, g.dur)), 'Duração ajustada: ' + fmtDur(g.dur) + ' (' + clock(g.st0) + '–' + clock(g.st0 + g.dur) + ')');
-                    saved = true;
-                }
-            } else if (g.over) toast(g.next ? 'O próximo bloco começa às ' + clock(g.next.start_min) + '. Abra espaço antes de aumentar.' : 'A régua do dia termina às ' + clock(S.agH1 * 60) + '.', 4200);
+            else if (g.dur !== g.dur0) saved = sizeCommit(g, b); // V40.44.0: os de baixo descem só o necessário
+            else if (g.over) toast(g.push ? 'Os blocos de baixo já chegaram ao fim do dia.' : g.next ? 'O próximo bloco começa às ' + clock(g.next.start_min) + '. Abra espaço antes de aumentar.' : 'A régua do dia termina às ' + clock(S.agH1 * 60) + '.', 4200);
         }
         if (!saved) renderAgenda(); // volta o desenho ao que está gravado
     }
     function dgUp() { dgStop(true, 'up'); }
+    // V40.44.0: grava a duração nova (Dia e Semana) e, se esticou passando do próximo, desce os de baixo (um passo do Desfazer)
+    function sizeCommit(g, b) {
+        var plan = g.dur > g.dur0 ? (g.push ? pushPlanPc(g.day, g.st0 + g.dur0, g.dur - g.dur0, g.id) : hits(dayOthers(g.day, g.id), g.st0 + g.dur0, g.dur - g.dur0) ? null : { moves: [] }) : { moves: [] };
+        if (!plan) { toast(g.push ? 'Não cabe: os de baixo passariam do fim do dia.' : 'Conflito! A duração voltou ao que era.'); return false; }
+        var n = plan.moves.length;
+        if (n) pushApply(g.day, plan);
+        patchRow('blocos', g.id, Object.assign({ duration: g.dur }, retimeFields(b, g.day, g.st0, g.dur)), 'Duração ajustada: ' + fmtDur(g.dur) + ' (' + clock(g.st0) + '–' + clock(g.st0 + g.dur) + ')' + (n ? ' · ' + pushWord(n) : ''));
+        return true;
+    }
     function dgAbort() { dgStop(false, 'desistiu'); }
 
     // ---------- V40.40.0: visão Dia — o cartão sai da sublista arrastando (o mesmo da Semana e do celular) ----------
@@ -2508,6 +2616,8 @@
         g.el = el;
         g.next = next;
         g.max = Math.max(g.dur0, Math.floor(((next ? next.start_min : 1440) - g.st0) / 5) * 5);
+        var room = pushRoomPc(g.day, g.st0 + g.dur0, g.id); // V40.44.0: passa do próximo descendo os de baixo
+        if (room !== null) { g.push = true; g.max = Math.max(g.max, Math.floor((room - g.st0) / 5) * 5); }
         S.agDrag = g.id; // segura o redesenho da agenda até soltar
         el.classList.add('ag-sizing');
         document.body.classList.add('ag-resizing');
@@ -2524,7 +2634,18 @@
         var want = g.dur0 + Math.round(dy / (5 * PXM)) * 5;
         g.dur = Math.max(5, Math.min(want, g.max));
         g.over = want > g.max; // tentou passar do limite
-        var note = g.over ? (g.next ? 'o próximo começa às ' + clock(g.next.start_min) : 'fim do dia') : '';
+        g.plan = g.push && g.dur > g.dur0 ? pushPlanPc(g.day, g.st0 + g.dur0, g.dur - g.dur0, g.id) : null; // V40.44.0
+        var to = {};
+        (g.plan ? g.plan.moves : []).forEach(function (m) { to[m.id] = m.to; });
+        $('ag-cols').querySelectorAll('.ag-list[data-day="' + g.day + '"] [data-block]').forEach(function (c) { // os que vão descer: contorno e o horário novo
+            var on = to[c.dataset.block] != null, tm = c.querySelector('.ag-tm'), o = S.blocos[c.dataset.block];
+            c.classList.toggle('ag-pushed', on);
+            if (!tm || !o || c === g.el) return;
+            if (tm.dataset.orig == null) tm.dataset.orig = tm.innerHTML;
+            tm.innerHTML = on ? clock(to[c.dataset.block]) + '–' + clock(to[c.dataset.block] + o.duration) + '<span class="font-medium"> · ' + fmtDur(o.duration) + '</span>' : tm.dataset.orig;
+        });
+        g.el.classList.toggle('ag-pushing', !!(g.plan && g.plan.moves.length));
+        var note = g.over ? (g.push ? 'os de baixo chegaram ao fim do dia' : g.next ? 'o próximo começa às ' + clock(g.next.start_min) : 'fim do dia') : g.plan && g.plan.moves.length ? pushN(g.plan.moves.length) : '';
         g.el.classList.toggle('ag-limit', !!g.over);
         var key = g.dur + '|' + note, tm = g.el.querySelector('.ag-tm');
         if (key === g.key || !tm) return;
@@ -2554,13 +2675,8 @@
         var b = S.blocos[g.id], saved = false;
         if (commit && b && !b.deleted && !b.archived && String(b.date).slice(0, 10) === g.day) {
             if (b.start_min !== g.st0 || b.duration !== g.dur0) toast('Esse bloco mudou em outro aparelho. Tente de novo.');
-            else if (g.dur !== g.dur0) {
-                if (g.dur > g.dur0 && hits(dayOthers(g.day, g.id), g.st0 + g.dur0, g.dur - g.dur0)) toast('Conflito! A duração voltou ao que era.');
-                else {
-                    patchRow('blocos', g.id, Object.assign({ duration: g.dur }, retimeFields(b, g.day, g.st0, g.dur)), 'Duração ajustada: ' + fmtDur(g.dur) + ' (' + clock(g.st0) + '–' + clock(g.st0 + g.dur) + ')');
-                    saved = true;
-                }
-            } else if (g.over) toast(g.next ? 'O próximo bloco começa às ' + clock(g.next.start_min) + '. Abra espaço antes de aumentar.' : 'O bloco não passa da meia-noite.', 4200);
+            else if (g.dur !== g.dur0) saved = sizeCommit(g, b); // V40.44.0: os de baixo descem só o necessário
+            else if (g.over) toast(g.push ? 'Os blocos de baixo já chegaram ao fim do dia.' : g.next ? 'O próximo bloco começa às ' + clock(g.next.start_min) + '. Abra espaço antes de aumentar.' : 'O bloco não passa da meia-noite.', 4200);
         }
         if (!saved || S.agPending) renderAgenda(); // volta o desenho ao que está gravado
     }
@@ -2581,7 +2697,8 @@
         if (pl) {
             $('ag-place-title').textContent = pl.title || 'Sem nome';
             $('ag-place-meta').textContent = ' · ' + fmtDur(pl.dur) + (pl.cards ? ' · sublista com ' + pl.cards.length + (pl.cards.length === 1 ? ' meta' : ' metas') : ''); // V40.37.0
-            $('ag-place-hint').textContent = S.agView === 'day' ? 'Clique no horário onde quer colocar.' : 'Clique num espaço tracejado pra colocar. Pra escolher o horário exato, clique no nome do dia.';
+            $('ag-place-hint').textContent = S.agView === 'day' ? 'Clique no horário onde quer colocar (onde não cabe, os blocos de baixo descem).' : // V40.44.0
+                'Clique num espaço tracejado pra colocar ("Encaixar" desce os blocos de baixo). Pra escolher o horário exato, clique no nome do dia.';
         }
         $('ag-tip').textContent = pl ? '' : S.agView === 'day' ? 'Arraste um bloco pra mudar o horário (ou pra dentro de uma sublista). Puxe a borda de baixo pra mudar a duração. Cartão da sublista sai arrastando.'
             : 'Arraste um bloco pra outro dia ou pra um espaço livre. Puxe a borda de baixo pra mudar a duração.';
@@ -3619,7 +3736,8 @@
     // V40.17.0: a origem também pode ser uma rotina (src.kind === 'rotinas'): a rotina continua existindo,
     // e o bloco leva o tipo dela (Foco ou Descanso), como o "carimbar" do app.
     function placingAlive(src) { if (src.kind === 'metas') return true; var k = src.kind === 'rotinas' ? 'rotinas' : 'tarefas', r = S[k][src.id]; return !!r && !r.deleted; } // V40.37.0: a sublista de metas não sai de lugar nenhum
-    async function createBlockFromTask(src, day, slot, asked) {
+    async function createBlockFromTask(src, day, slot, asked, note) { // V40.44.0: note = " · 2 blocos desceram"
+        note = note || '';
         var isRt = src.kind === 'rotinas';
         if (src.kind === 'metas') { // V40.37.0: sublista de metas, um cartão por meta (ligado a ela)
             var sub = {
@@ -3627,7 +3745,7 @@
                 tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, deleted: false, goal_id: null,
                 cards: src.cards.map(function (c) { var o = { id: subNewId(), title: c.title, done: false, microblocks: [] }; if (goalKeep(c.goalId)) o.goalId = c.goalId; return o; })
             };
-            return insertRow('blocos', sub, 'Sublista de metas: ' + dayLabel(day) + ' às ' + clock(slot) + (asked != null && slot !== asked ? ' (às ' + clock(asked) + ' já tinha bloco)' : ''));
+            return insertRow('blocos', sub, 'Sublista de metas: ' + dayLabel(day) + ' às ' + clock(slot) + (asked != null && slot !== asked ? ' (às ' + clock(asked) + ' já tinha bloco)' : '') + note);
         }
         if (!placingAlive(src)) { toast(isRt ? 'Essa rotina foi apagada em outro aparelho.' : 'Essa tarefa foi apagada em outro aparelho.'); return false; }
         var n = Date.now();
@@ -3640,7 +3758,7 @@
             column_id: isRt ? null : listRef(src.col) // V40.38.0: a lista de onde a tarefa veio ("Voltar pra lista" volta pra ela)
         };
         if (!(await insertRow('blocos', block))) return false;
-        var where = dayLabel(day) + ' às ' + clock(slot) + (asked != null && slot !== asked ? ' (às ' + clock(asked) + ' já tinha bloco)' : '');
+        var where = dayLabel(day) + ' às ' + clock(slot) + (asked != null && slot !== asked ? ' (às ' + clock(asked) + ' já tinha bloco)' : '') + note;
         if (isRt) { toast('Rotina na Agenda: ' + where); return true; }
         await patchRow('tarefas', src.id, { deleted: true }, 'Agendado para ' + where);
         return true;
@@ -3701,11 +3819,18 @@
         var p = S.placing;
         if (!p || !isYmd(day)) return;
         st = Math.max(0, Math.min(Math.round(Number(st) || 0), 1440 - p.dur));
-        var slot = freeSlot(day, st, p.dur);
+        var slot = st, plan = null;
+        if (hits(dayOthers(day, null), st, p.dur)) { // V40.44.0: não cabe aqui → os de baixo descem só o necessário
+            plan = pushAllowed(day, st) ? pushPlanPc(day, Math.ceil(st / 5) * 5, p.dur) : null;
+            if (plan) slot = Math.ceil(st / 5) * 5;
+            else slot = freeSlot(day, st, p.dur); // não dá (passaria do fim do dia, ou é antes de agora): o próximo livre, como antes
+        }
         if (slot === null) return toast('Esse dia não tem um espaço livre de ' + fmtDur(p.dur) + '.');
         S.placing = null;
         renderAgenda();
-        if (!(await createBlockFromTask(p, day, slot, st)) && placingAlive(p)) { S.placing = p; renderAgenda(); } // não deu: volta pra mão
+        if (plan && plan.moves.length && !(await pushApply(day, plan))) { if (placingAlive(p)) { S.placing = p; renderAgenda(); } return; } // não desceram: volta pra mão
+        var note = plan && plan.moves.length ? ' · ' + pushWord(plan.moves.length) : '';
+        if (!(await createBlockFromTask(p, day, slot, plan ? null : st, note)) && placingAlive(p)) { S.placing = p; renderAgenda(); } // não deu: volta pra mão
     }
 
     // ---------- V40.17.0: ROTINAS (as mesmas do celular) ----------
@@ -6191,7 +6316,7 @@
                 if (tl && !e.target.closest('[data-block]')) return placeHere(S.agAnchor, Math.round(agMin(e.clientY - tl.getBoundingClientRect().top) / 5) * 5);
                 var pb = e.target.closest('[data-block]');
                 if (pb && isSub(S.blocos[pb.dataset.block]) && subCanDrop()) return dropIntoSub(pb.dataset.block); // V40.24.0: clicar na sublista põe a tarefa nela
-                if (pb) return toast(isSub(S.blocos[pb.dataset.block]) ? 'Descanso não entra numa sublista: clique num espaço livre.' : 'Clique num espaço livre pra colocar a tarefa.');
+                if (pb) return toast(isSub(S.blocos[pb.dataset.block]) ? 'Descanso não entra numa sublista: clique num espaço livre.' : 'Clique num espaço livre (ou no "Encaixar", entre dois blocos) pra colocar a tarefa.');
             }
             var c = e.target.closest('[data-block]');
             if (c) return openBlock(c.dataset.block);

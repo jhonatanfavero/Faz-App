@@ -16,6 +16,7 @@
 // V40.41.0: Períodos em Configurações e no Novo bloco; Salvar backup (o download de verdade).
 // V40.42.0: Avisos dos compromissos em Configurações (cabe na janela; não registra o service worker só de abrir).
 // V40.43.0: "Colocar às"/"Soltar às" pelos Períodos (Semana com a tarefa na mão, arrastando, e a faixa do Dia compactado).
+// V40.44.0: blocos de baixo abrem espaço (esticar empurrando no Dia; "Encaixar às" na Semana e o "↓" no Dia).
 // O jsdom não mede tela nem rola; aqui é um Chrome de verdade, com a "nuvem" de mentira do apoio.js.
 // Opcional: precisa do Playwright. Uso: node tests/navegador/tela_pc.js   (CHROME=… e FOTOS=… como nos outros)
 const fs = require('fs');
@@ -83,16 +84,24 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   console.log('\nD) Duração pela borda de baixo:');
   const travado = dia[dia.length - 3]; // tem outro bloco encostado logo abaixo
   cx = await caixa(travado.id);
+  const abaixo = dia[dia.length - 2], abaixo0 = await caixa(abaixo.id); // V40.44.0: o de baixo, antes de puxar
   await p.mouse.move(cx.x + 300, cx.y + cx.h - 3); await p.waitForTimeout(60);
   const alca = await p.evaluate((id) => getComputedStyle([...document.querySelectorAll('#ag-timeline [data-block]')].find((e) => e.dataset.block === id).querySelector('.ag-rz'), '::after').opacity, travado.id);
   ok(Number(alca) > 0.3, 'com o mouse em cima aparece o tracinho da alça');
   await p.mouse.down(); await p.mouse.move(cx.x + 300, cx.y + cx.h - 3 + 20, { steps: 3 }); await p.mouse.move(cx.x + 300, cx.y + cx.h - 3 + 64, { steps: 4 }); await p.waitForTimeout(80);
   meio = await caixa(travado.id);
-  ok(/ag-sizing/.test(meio.cls) && /ag-limit/.test(meio.cls) && Math.abs(meio.h - cx.h) < 1 && /o próximo começa às/.test(meio.texto), 'bloco encostado no de baixo não cresce e explica: "' + meio.texto + '"');
-  await foto(p, 'pc-dia-limite.png');
+  // V40.44.0: o bloco encostado no de baixo cresce e os de baixo descem só o necessário (antes ficava travado)
+  ok(/ag-sizing/.test(meio.cls) && /ag-pushing/.test(meio.cls) && meio.h > cx.h + 50 && /empurra \d/.test(meio.texto), 'bloco encostado no de baixo cresce e avisa que empurra: "' + meio.texto + '"');
+  const depoisCx = await caixa(abaixo.id);
+  ok(/ag-pushed/.test(depoisCx.cls) && depoisCx.y > abaixo0.y + 50, 'o de baixo já aparece mais pra baixo, com contorno');
+  await foto(p, 'pc-dia-empurrando.png');
   await solta();
   g = await nuvem(travado.id);
-  ok(g.dur === travado.dur && /^O próximo bloco começa às/.test(await aviso()) && !(await cartaoAberto()), 'soltou: duração igual | "' + (await aviso()) + '"');
+  const desceu = await nuvem(abaixo.id);
+  ok(g.dur === travado.dur + 20 && desceu.st === abaixo.st + 20 && /desce/.test(await aviso()) && !(await cartaoAberto()), 'soltou: +20 min e o de baixo desceu 20 | "' + (await aviso()) + '"');
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(500);
+  g = await nuvem(travado.id);
+  ok(g.dur === travado.dur && (await nuvem(abaixo.id)).st === abaixo.st, 'Ctrl+Z: volta os dois num passo só');
   cx = await caixa(travado.id);
   await p.mouse.move(cx.x + 300, cx.y + cx.h - 3); await p.mouse.down(); await p.mouse.move(cx.x + 300, cx.y + cx.h - 13, { steps: 3 }); await p.mouse.move(cx.x + 300, cx.y + cx.h - 3 - 10 * PXM, { steps: 4 }); await p.waitForTimeout(60);
   await solta();
@@ -1135,6 +1144,46 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   const nd = await blocos(livre);
   ok(nd.length === 1 && nd[0].st === 480, 'clique na parte "Manhã" da faixa: às 08:00');
   if (!jaCompacto) { await p.locator('#ag-compact').click(); await p.waitForTimeout(200); }
+  }
+
+  {
+  console.log('\nAD) Blocos de baixo abrem espaço (V40.44.0):');
+  // um dia só deste teste (03/12): três blocos colados (09:00, 09:30, 10:00) e um longe (12:00)
+  const DE = '2026-12-03';
+  await p.evaluate(([uid, de]) => [['f_ad1', 540, 30, 'Reunião A'], ['f_ad2', 570, 30, 'Reunião B'], ['f_ad3', 600, 60, 'Almoço cedo'], ['f_ad4', 720, 30, 'Depois']].forEach(([id, st, du, t]) =>
+    window.__nuvem.insert('blocos', uid, { id, date: de, start_min: st, duration: du, title: t, type: 'focus', theme: 'focus', microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], archived: false, deleted: false })), [UID, DE]);
+  await p.waitForTimeout(400);
+  await p.locator('#tab-listas').click(); await p.waitForTimeout(250);
+  const ct = p.locator('section.col .card').first();
+  await ct.hover(); await p.waitForTimeout(150);
+  await ct.locator('[data-hand]').click(); await p.waitForTimeout(400);
+  await p.locator('.ag-view[data-view="week"]').click(); await p.waitForTimeout(150);
+  await p.locator('#ag-today').click(); await p.waitForTimeout(150);
+  for (let i = 0; i < 2; i++) { await p.locator('#ag-next').click(); await p.waitForTimeout(250); }
+  const dur = await p.evaluate(() => { const m = /(\d+)m/.exec(document.getElementById('ag-place-meta').textContent) || /(\d+)h/.exec(document.getElementById('ag-place-meta').textContent); return m ? Number(m[1]) * (/h/.test(m[0]) ? 60 : 1) : 0; });
+  const bt = await p.evaluate((de) => [...document.querySelectorAll(`#ag-cols .ag-list[data-day="${de}"] .ag-push`)].map((b) => {
+    const r = b.getBoundingClientRect(), col = b.closest('section').getBoundingClientRect();
+    return { st: b.dataset.gapStart, n: b.dataset.push, t: b.textContent.replace(/\s+/g, ' ').trim(), linhas: Math.round(r.height), dentro: r.left >= col.left && r.right <= col.right };
+  }), DE);
+  ok(bt.map((b) => b.st).join() === '570,600' && bt.every((b) => b.dentro && b.linhas <= 26), 'Semana, tarefa de ' + dur + ' min na mão: "Encaixar às" nas emendas 09:30 e 10:00, numa linha só e dentro da coluna: ' + bt.map((b) => b.t + ' [' + b.n + ']').join(' | '));
+  await foto(p, 'pc-encaixar-semana.png');
+  await p.locator(`#ag-cols .ag-list[data-day="${DE}"] .ag-push[data-gap-start="570"]`).click(); await p.waitForTimeout(800);
+  const dp = await blocos(DE);
+  ok(dp.length === 5 && dp[1].st === 570 && dp[1].dur === dur && dp[2].st === 570 + dur && dp[3].st === Math.max(600, 570 + dur + 30) && dp[4].st === 720 && /desce/.test(await aviso()),
+    'clique de verdade no "Encaixar às 09:30": a tarefa entra às 09:30 e os de baixo descem só o necessário | "' + (await aviso()) + '"');
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(600);
+  const dv = await blocos(DE);
+  ok(dv.length === 4 && dv.map((b) => b.st).join() === '540,570,600,720', 'Ctrl+Z: volta tudo num passo só');
+  // visão Dia com a tarefa na mão: o "↓" na emenda, sem cobrir o horário do bloco
+  await p.locator('#tab-listas').click(); await p.waitForTimeout(250);
+  const ct2 = p.locator('section.col .card').first();
+  await ct2.hover(); await p.waitForTimeout(150);
+  await ct2.locator('[data-hand]').click(); await p.waitForTimeout(400);
+  await p.locator(`#ag-cols .ag-day-btn[data-day="${DE}"]`).click(); await p.waitForTimeout(400);
+  const pil = await p.evaluate(() => [...document.querySelectorAll('#ag-timeline .ag-push-pill')].map((x) => { const r = x.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return { st: x.dataset.gapStart, livre: !!hit && x.contains(hit), w: Math.round(r.width) }; }));
+  ok(pil.map((x) => x.st).join() === '570,600' && pil.every((x) => x.livre), 'visão Dia: o "↓ Encaixar às" nas duas emendas, por cima de tudo (dá pra clicar): ' + pil.map((x) => x.st + ' (' + x.w + ' px)').join(', '));
+  await foto(p, 'pc-encaixar-dia.png');
+  await p.locator('#ag-place-cancel').click(); await p.waitForTimeout(200);
   }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));

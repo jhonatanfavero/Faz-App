@@ -130,6 +130,16 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     roubam o toque dos botões dele ao rolar. Sem nenhum período criado, volta o campo de sempre. No PC, os nomes
     `perOn` (o período escolhido no Novo bloco) e `perActive` (há períodos?) são coisas diferentes.
 
+20. **Blocos de baixo abrem espaço: uma regra só, no `sync.js` (V40.44.0).** `FazSyncCore.pushPlan(blocos, de, até,
+    fimDoDia)` diz quem desce e pra onde (só o necessário: a fila encostada; um vago segura; null se passaria do fim
+    do dia ou se um bloco atravessa o ponto) e `pushRoom` diz até onde dá pra esticar. Celular: `pushPlace`,
+    `pushPillsInto`, `pushFieldInto` e o `pushPreview` do `enablePhysics` (`app.js`). PC: `pushPlanPc`, `pushApply`,
+    `placeSlotsOf`, `dayPushPills`, `sizeCommit` (`kanban.html`). O fim é o fim do dia das Configurações (`END_HOUR` /
+    `S.hours[1]`). Com a tarefa na mão, hoje só daqui pra frente (`pushAllowed`). Tudo num passo só do Desfazer: no
+    celular, mexa nos blocos e grave com um `saveDb()` só no mesmo toque; no PC, os `patchRow` saem todos no mesmo
+    gesto (sem `await` entre o clique e eles, a não ser o do `placeHere`, que espera os de baixo descerem antes de
+    criar o bloco novo). Arrastar um bloco pra cima de outro continua dando "Conflito" (escolha dele).
+
 ## Publicar uma versão
 
 1. Faça a mudança e suba a versão nos cinco lugares da regra 2.

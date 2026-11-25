@@ -90,7 +90,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const T1 = ev("backlogDb[0].id"), t1 = J('backlogDb[0]');
   w.scheduleBacklogItem(T1);
   ok(ev('tlDays') === 2 && gaps('2026-11-18').some((g) => g.classList.contains('drop')), 'com a tarefa na mão, os vazios onde ela cabe piscam em todas as colunas');
-  ok($('floating-hint').textContent === 'Toque num espaço livre de um dos dias', 'a dica fala dos dias');
+  ok(/^Toque num espaço livre( \(ou num ↓\))? de um dos dias$/.test($('floating-hint').textContent), 'a dica fala dos dias ("' + $('floating-hint').textContent + '"; V40.44.0: com blocos colados, também do ↓)');
   tap(gaps('2026-11-18')[0]); await sleep(5);
   ok(J(`db.filter((b) => b.title === ${JSON.stringify(t1.title)} && b.date === '2026-11-18').length`) === 1 && !ev(`backlogDb.some((x) => x.id === '${T1}')`) && !ev('pendingIntent'), 'um toque no vazio do dia 18 solta ela lá (e ela sai da Lista)');
   w.fazUndo();

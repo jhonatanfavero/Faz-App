@@ -10,6 +10,7 @@
 // até embaixo, ATRÁS da barra de navegação (opaca), e o env(safe-area-inset-bottom) diz quanto ela ocupa. Sem o bloco
 // só de iOS. Foto dele de 22/11: os botões "54 itens" e "+" ficavam pela metade atrás da barra.
 // V40.43.0: a agenda com a tarefa na mão (o espaço livre dividido pelos Períodos), com vagos ocultos e com 3 dias.
+// V40.44.0: a tarefa na mão num dia cheio (o "↓" de cada emenda).
 // Uso: CHROME=/usr/bin/google-chrome FOTOS=<pasta> TZ='America/Sao_Paulo' node tests/navegador/iphone.js
 const { abrir, celular } = require('./apoio');
 
@@ -206,6 +207,8 @@ const IPHONES = [
         // V40.43.0: com a tarefa na mão, o espaço livre dividido pelos Períodos (as partes são tocáveis: nada por cima delas)
         ['Agenda: tarefa na mão, partes por período', "closeAllSheets(); activeDateObj = new Date(2026, 10, 18); renderTimeline(); runRealTimeEngine(); scheduleBacklogItem(backlogDb[0].id); document.getElementById('timeline-scroll').scrollTop = 0;", null, { depois: 'cancelPendingTask();' }],
         ['Agenda: tarefa na mão, vagos ocultos', "closeAllSheets(); db.push({ id: 'f_ip_reu', type: 'focus', title: 'Reunião', startMin: 600, duration: 60, date: '2026-11-19', microblocks: [], completed: false, theme: 'focus', tagId: null, linkedNoteIds: [], expanded: false }); tlCompact = true; activeDateObj = new Date(2026, 10, 19); renderTimeline(); runRealTimeEngine(); scheduleBacklogItem(backlogDb[0].id); document.getElementById('timeline-scroll').scrollTop = 0;", null, { depois: "cancelPendingTask(); db = db.filter((b) => b.id !== 'f_ip_reu'); tlCompact = false; renderTimeline();" }],
+        // V40.44.0: dia cheio (17/11, blocos colados): o "↓" de cada emenda encaixa descendo os de baixo
+        ['Agenda: tarefa na mão, encaixar entre blocos', "closeAllSheets(); activeDateObj = new Date(2026, 10, 17); renderTimeline(); runRealTimeEngine(); scheduleBacklogItem(backlogDb[0].id); changeFloatDuration(30); document.getElementById('timeline-scroll').scrollTop = 0;", null, { depois: 'cancelPendingTask();' }],
         ['Agenda: tarefa na mão, 3 dias', "closeAllSheets(); activeDateObj = new Date(2026, 10, 16); setTlDays(3); scheduleBacklogItem(backlogDb[0].id); document.getElementById('timeline-scroll').scrollTop = 0; document.getElementById('toast').classList.add('opacity-0');", null, { espera: 600, depois: 'cancelPendingTask(); setTlDays(1); renderTimeline();' }],
         ['Barrinha do Desfazer', `closeAllSheets(); (() => { const b = db.find((x) => x.date === '2026-11-16'); toggleBlockCompletion(b.id, { stopPropagation() {} }); })();`, '#undo-bar', { espera: 400, depois: '(() => { const b = db.find((x) => x.date === "2026-11-16"); toggleBlockCompletion(b.id, { stopPropagation() {} }); undoBarHide && undoBarHide(); })();' }]
     ];

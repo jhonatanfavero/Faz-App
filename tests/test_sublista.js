@@ -268,7 +268,8 @@ const UID = '11111111-1111-1111-1111-111111111111';
   two(gaps()[0]); $('task-input').value = 'Grande demais'; d.querySelector('.sheet-dur-btn[data-time="60"]').click(); w.changeFloatDuration && 0;
   ev('selectedDur = 120'); w.commitIntent();
   ok(ev('pendingIntent && pendingIntent.title') === 'Grande demais' && lastToast() === 'Não cabe nesse vago: toque onde quer colocar 👇', 'não cabe no vago: fica na mão e avisa');
-  ok(/muito curto/.test(gaps()[0].textContent) && /Soltar aqui · 14:00–24:00/.test(gaps()[gaps().length - 1].textContent), 'com tarefa na mão: faixa pequena diz "muito curto"; a grande, "Soltar aqui"');
+  // V40.44.0: a faixa pequena (07:00–08:00, menor que as 2h da mão) deixou de ser "muito curto": encaixa descendo os de baixo
+  ok(!!gaps()[0].querySelector('.tl-pchip.push[data-per-start="420"]') && /Soltar aqui · 14:00–24:00/.test(gaps()[gaps().length - 1].textContent), 'com tarefa na mão: a faixa pequena encaixa descendo os de baixo ("↓"); a grande, "Soltar aqui"');
   gaps()[gaps().length - 1].click();
   ok(ev("JSON.stringify(db.filter((b) => b.date === '2026-11-23' && b.title === 'Grande demais').map((b) => [b.startMin, b.duration]))") === '[[840,120]]' && ev('pendingIntent') === null, 'soltou na faixa: 14:00 às 16:00');
   // arrastar e esticar pela régua encolhida

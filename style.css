@@ -584,6 +584,28 @@ body { overflow-x: hidden; max-width: 100vw; }
 .tl-pchip b { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
 .tl-pchip span { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .tl-pz, .tl-pchip { animation: none; } }
+/* V40.44.0 — BLOCOS DE BAIXO ABREM ESPAÇO: onde a tarefa da mão só entra descendo os de baixo, o campo mostra "↓".
+   Partes (e botõezinhos da faixa) que encaixam empurrando: borda contínua e a seta. Entre dois blocos colados, o
+   "↓ Encaixar" (tl-push) fica na emenda (z 29: abaixo do cabeçalho, como as partes). Vago curto sem períodos: o campo
+   todo vira "↓ Encaixar aqui" (tl-push-box). Esticando um bloco, os que vão descer ganham um contorno (tl-pushed). */
+.tl-pz.push { border-style: solid; border-width: 1.5px; animation: none; }
+.tl-pz.push .tl-pz-txt { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.tl-pchip.push { border-style: solid; animation: none; }
+.tl-push {
+    position: absolute; left: 50%; transform: translateX(-50%); z-index: 29; display: inline-flex; align-items: center; gap: 4px;
+    height: 24px; padding: 0 10px; border-radius: 9999px; border: 1.5px solid var(--theme-color, #4f46e5); background: #fff;
+    color: var(--theme-color, #4f46e5); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.tl-push:active { transform: translateX(-50%) scale(0.96); }
+.tl-push i { font-size: 13px; }
+.tl-push.mini { height: 20px; padding: 0 6px; gap: 2px; font-size: 9.5px; }
+.tl-push.mini i { font-size: 11px; }
+.tl-push-box { z-index: 29 !important; border: 1.5px solid var(--theme-color, #4f46e5) !important; background: #fff !important; background-image: none !important; opacity: 1 !important; animation: none !important; cursor: pointer; }
+.tl-push-txt { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; color: var(--theme-color, #4f46e5); font-size: 11px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.tl-mini-gap.tl-push-box { color: var(--theme-color, #4f46e5); font-size: 14px; display: flex; align-items: center; justify-content: center; }
+.block-item.tl-pushed { outline: 2.5px solid rgba(245, 158, 11, 0.9); outline-offset: -1px; } /* outline: a borda da tag é box-shadow em linha */
+.tl-push-n { color: #b45309; font-weight: 800; }
 /* V40.36.1: vagos ocultos com 2 ou 3 dias: a faixa do horário que encolheu passa por cima das colunas (o toque vai pra
    coluna de baixo) */
 .tl-multi-band { position: absolute; left: 2px; right: 2px; z-index: 6; pointer-events: none; display: flex; align-items: center; justify-content: center;

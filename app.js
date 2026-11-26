@@ -249,6 +249,12 @@ let backlogSelectedDur = 30;
 // Coluna "Geral" (id: 'col_geral') é criada automaticamente. Não pode ser apagada.
 let backlogColumnsDb = fazLoadList('tb_backlog_columns', []);
 let activeColumnId = 'col_geral'; // coluna que está sendo visualizada (pra criar nova tarefa nela)
+// V40.48.0: o quadro aberto nas Listas ('' = Pessoal: as listas sem quadro, com a Geral). Guardado neste aparelho
+// (tb__quadro_aberto, fora do backup). _blLastCol: a lista ativa no último desenho (pra saber quando alguém mandou abrir
+// uma lista de outro quadro e o quadro tem que ir junto); _blBoardCol: a última lista vista em cada quadro.
+var activeBoardId = '';
+try { activeBoardId = localStorage.getItem('tb__quadro_aberto') || ''; } catch (e) {}
+var _blLastCol = activeColumnId, _blBoardCol = {};
 
 function saveBacklogColumns() {
     localStorage.setItem('tb_backlog_columns', JSON.stringify(backlogColumnsDb));
@@ -3521,6 +3527,7 @@ window.openSheet = () => {
 }
 
 window.openListSheet = () => {
+    hubVia = false; // V40.48.0: aberta por dentro do app (agendar, voltar pra lista...): o voltar fecha
     clearFilters();
     switchListTab('backlog');
     overlay.classList.remove('opacity-0', 'pointer-events-none');
@@ -3575,7 +3582,13 @@ function navOpenSheets() { return [...document.querySelectorAll('[id$="-sheet"]'
 // O botão que o voltar toca: o de sub-tela (seta ←, Cancelar) antes do X da tela.
 function navButton(layer) {
     const bs = [...layer.querySelectorAll('[data-voltar]')].filter(b => navShown(b, layer));
-    return bs.find(b => b.dataset.voltar !== 'fechar') || bs[0] || null;
+    // V40.48.0: "menu" (voltar pro menu grande) só depois das setas e Cancelar de dentro, antes do X da tela, e só se a
+    // tela veio do menu grande (aberta por dentro do app, o voltar fecha, como antes)
+    const inner = bs.find(b => b.dataset.voltar !== 'fechar' && b.dataset.voltar !== 'menu');
+    if (inner) return inner;
+    const menu = hubVia && bs.find(b => b.dataset.voltar === 'menu');
+    if (menu) return menu;
+    return bs.find(b => b.dataset.voltar === 'fechar') || bs.find(b => b.dataset.voltar !== 'menu') || null;
 }
 // A tela de cima (o que o voltar fecha). null = tela inicial.
 function navTop() {
@@ -4083,7 +4096,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.47.1',
+            version: 'v40.48.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -4522,7 +4535,9 @@ function backlogSearchInfo(n, lists) {
 }
 // As bolinhas embaixo do nome da lista. Com a busca, cada uma vira o número de achados daquela lista (sem achado: bolinha apagada).
 function backlogDotsHtml(hits) {
-    return backlogColumnsDb.map(col => {
+    const cols = blCols();
+    if (cols.length < 1) return ''; // V40.48.0: quadro sem lista
+    return cols.map(col => {
         const isActive = col.id === activeColumnId, name = escapeHtml(col.name);
         if (blSearchQ) {
             const n = (hits && hits[col.id]) || 0;
@@ -4620,6 +4635,9 @@ function renderBacklogCard(item) {
 function renderBacklog() {
     // V40.5.0: KANBAN — colunas horizontais com scroll-snap
     ensureDefaultColumn(); // K3: garante que Geral sempre existe
+    // V40.48.0: só as listas do quadro aberto (a aba de cima); a lista ativa e o quadro andam juntos (blSyncBoard)
+    const bst = blState(), cols = blSyncBoard(bst);
+    renderBoardTabs(bst);
     
     const wrapper = document.getElementById('backlog-columns-wrapper');
     const dotsContainer = document.getElementById('backlog-column-dots');
@@ -4660,8 +4678,9 @@ function renderBacklog() {
     backlogZoomUi();
     // V40.39.0: com a busca, cada lista só com os cartões que batem
     const searchHits = blSearchQ ? backlogSearchHits() : {};
-    const searchN = backlogColumnsDb.reduce((a, c) => a + (searchHits[c.id] || 0), 0);
-    wrapper.innerHTML = backlogColumnsDb.map((col, idx) => {
+    const searchN = cols.reduce((a, c) => a + (searchHits[c.id] || 0), 0);
+    blEmptyUi(!cols.length, bst); // V40.48.0: quadro sem lista
+    wrapper.innerHTML = !cols.length ? blEmptyHtml(bst) : cols.map((col, idx) => {
         const allItems = backlogDb.filter(item => getItemColumn(item) === col.id);
         const colItems = blSearchQ ? allItems.filter(blSearchShown) : allItems;
         let cardsHtml;
@@ -4694,11 +4713,11 @@ function renderBacklog() {
     
     // Dots de navegação (V40.39.0: com a busca, o número de achados de cada lista)
     if (dotsContainer) dotsContainer.innerHTML = backlogDotsHtml(searchHits);
-    backlogSearchInfo(searchN, backlogColumnsDb.filter(c => searchHits[c.id]).length);
+    backlogSearchInfo(searchN, cols.filter(c => searchHits[c.id]).length);
     
     // Após render, garante que o scroll está na coluna ativa (sem animação)
     requestAnimationFrame(() => {
-        const activeIdx = backlogColumnsDb.findIndex(c => c.id === activeColumnId);
+        const activeIdx = cols.findIndex(c => c.id === activeColumnId);
         if (backlogZoomOut) {
             // afastado: o quadro fica onde estava. Só encosta a lista ativa na esquerda ao entrar no modo
             // ou quando a lista ativa mudou por fora (lista criada/apagada) e não está aparecendo.
@@ -4725,7 +4744,7 @@ function renderBacklog() {
         if (blSearchJump) {
             blSearchJump = false;
             if (blSearchQ && !searchHits[activeColumnId]) {
-                const to = backlogColumnsDb.find(c => searchHits[c.id]);
+                const to = cols.find(c => searchHits[c.id]);
                 if (to) scrollToColumn(to.id);
             }
         }
@@ -4758,9 +4777,10 @@ function onBacklogColumnsScroll() {
             const dist = Math.abs(colCenter - viewportCenter);
             if (dist < bestDist) { bestDist = dist; bestIdx = i; }
         }
-        const newCol = backlogColumnsDb[bestIdx];
+        const newCol = blCols()[bestIdx]; // V40.48.0: as listas do quadro aberto
         if (newCol && newCol.id !== activeColumnId) {
             activeColumnId = newCol.id;
+            _blLastCol = newCol.id;
             updateActiveColumnHeader();
             updateColumnDots();
         }
@@ -4769,8 +4789,8 @@ function onBacklogColumnsScroll() {
 
 function updateActiveColumnHeader() {
     document.querySelectorAll('#backlog-columns-wrapper > [data-column-id]').forEach(el => el.classList.toggle('zoom-active', el.dataset.columnId === activeColumnId)); // V40.9.1
-    const col = backlogColumnsDb.find(c => c.id === activeColumnId) || backlogColumnsDb[0];
-    if (!col) return;
+    const bcols = blCols(), col = bcols.find(c => c.id === activeColumnId) || bcols[0]; // V40.48.0: do quadro aberto
+    if (!col) return; // quadro sem lista: o blEmptyUi cuida do cabeçalho
     const titleEl = document.getElementById('backlog-column-title');
     const countEl = document.getElementById('backlog-count');
     if (titleEl) titleEl.textContent = col.name; // V40.39.0: textContent (o innerText não existe no jsdom dos testes)
@@ -4791,8 +4811,9 @@ function updateColumnDots() {
     const dotsContainer = document.getElementById('backlog-column-dots');
     if (!dotsContainer) return;
     if (blSearchQ) { dotsContainer.innerHTML = backlogDotsHtml(backlogSearchHits()); return; } // V40.39.0: os números
+    const bcols = blCols(); // V40.48.0
     Array.from(dotsContainer.children).forEach((dot, idx) => {
-        const col = backlogColumnsDb[idx];
+        const col = bcols[idx];
         if (!col) return;
         if (col.id === activeColumnId) {
             dot.className = 'w-2 h-2 rounded-full bg-app-focus shrink-0 transition active:scale-90';
@@ -4941,8 +4962,9 @@ document.addEventListener('click', function(e) {
     closeBacklogZoomMenu();
 }, true);
 window.setActiveColumnFromZoom = function(colId) {
-    if (!backlogColumnsDb.some(c => c.id === colId)) return;
+    if (!blCols().some(c => c.id === colId)) return; // V40.48.0: do quadro aberto
     activeColumnId = colId;
+    _blLastCol = colId;
     _zoomLastActive = colId;
     updateActiveColumnHeader();
     updateColumnDots();
@@ -5266,7 +5288,7 @@ function moveBacklogColumn(colId, beforeId) {
 
 // Menu da lista: "Posição 2 de 5" e as setas (apagadas nas pontas; com uma lista só, some tudo).
 function columnMenuPosUi() {
-    const n = backlogColumnsDb.length, i = backlogColumnsDb.findIndex(c => c.id === activeColumnId);
+    const bcols = blCols(), n = bcols.length, i = bcols.findIndex(c => c.id === activeColumnId); // V40.48.0: dentro do quadro
     const pos = document.getElementById('column-menu-pos'), row = document.getElementById('column-menu-move');
     const left = document.getElementById('column-menu-left'), right = document.getElementById('column-menu-right');
     if (pos) pos.textContent = n > 1 && i >= 0 ? `Posição ${i + 1} de ${n}` : '';
@@ -5275,9 +5297,9 @@ function columnMenuPosUi() {
     if (right) right.disabled = i < 0 || i >= n - 1;
 }
 window.moveActiveColumn = function(dir) {
-    const i = backlogColumnsDb.findIndex(c => c.id === activeColumnId), to = i + (dir < 0 ? -1 : 1);
-    if (i < 0 || to < 0 || to >= backlogColumnsDb.length) return;
-    const beforeId = dir < 0 ? backlogColumnsDb[to].id : (backlogColumnsDb[to + 1] ? backlogColumnsDb[to + 1].id : null);
+    const bcols = blCols(), i = bcols.findIndex(c => c.id === activeColumnId), to = i + (dir < 0 ? -1 : 1); // V40.48.0: dentro do quadro
+    if (i < 0 || to < 0 || to >= bcols.length) return;
+    const beforeId = dir < 0 ? bcols[to].id : (bcols[to + 1] ? bcols[to + 1].id : null);
     if (!moveBacklogColumn(activeColumnId, beforeId)) return;
     _colMenuMoves++;
     _zoomReveal = true;
@@ -5290,7 +5312,7 @@ window.moveActiveColumn = function(dir) {
 function colDragPress(e) {
     if (colDrag || _dragState) return;
     if (e.touches ? e.touches.length !== 1 : e.button !== 0) return;
-    if (backlogColumnsDb.length < 2) return; // uma lista só: não tem pra onde ir
+    if (blCols().length < 2) return; // uma lista só (no quadro aberto): não tem pra onde ir
     const t = e.target && e.target.closest ? e.target : null;
     const press = t && (t.closest('.zoom-col-head') || t.closest('#backlog-column-head'));
     if (!press) return;
@@ -5301,8 +5323,8 @@ function colDragPress(e) {
 
 function colDragBegin(colId, press, x, y) {
     const sheet = document.getElementById('list-sheet'), wrapper = document.getElementById('backlog-columns-wrapper');
-    if (colDrag || _dragState || !press.isConnected || !wrapper || backlogColumnsDb.length < 2) return;
-    if (!backlogColumnsDb.some(c => c.id === colId)) return;
+    if (colDrag || _dragState || !press.isConnected || !wrapper || blCols().length < 2) return;
+    if (!blCols().some(c => c.id === colId)) return;
     if (!sheet || sheet.classList.contains('translate-y-full') || activeListTab !== 'backlog') return; // a Lista fechou no meio
     closeBacklogZoomMenu();
     const st = colDrag = { colId, press, temp: !backlogZoomOut, prevCols: backlogZoomCols, x0: x, x: x, edge: 0, beforeId: null, hasTarget: false };
@@ -5469,8 +5491,13 @@ function colDragEnd(e) {
 window.scrollToColumn = function(columnId) {
     const wrapper = document.getElementById('backlog-columns-wrapper');
     if (!wrapper) return;
-    const idx = backlogColumnsDb.findIndex(c => c.id === columnId);
-    if (idx < 0) return;
+    let idx = blCols().findIndex(c => c.id === columnId);
+    if (idx < 0) { // V40.48.0: lista de outro quadro: abre o quadro dela
+        if (!backlogColumnsDb.some(c => c.id === columnId)) return;
+        activeColumnId = columnId;
+        renderBacklog();
+        return;
+    }
     const col = wrapper.children[idx];
     if (!col) return;
     // Posiciona o centro da coluna no centro do viewport
@@ -5849,6 +5876,7 @@ let editingNoteId = null;
 
 window.switchListTab = function(tabName) {
     activeListTab = tabName;
+    hideHub(); // V40.48.0: quem abre uma parte direto sai do menu grande
     
     // V40.4.1: tabs agora inclui 'financial'. V40.20.0: + 'assistant' na frente (pílula só com o ícone, mais estreita).
     // V40.21.0: + 'goals' (Metas) no fim, também só com o ícone.
@@ -8282,7 +8310,7 @@ window.openColumnMenuFromHeader = function() {
     if (alias) deleteBtn.classList.add('hidden');
     document.getElementById('column-menu-rename-btn').classList.toggle('hidden', alias);
     document.getElementById('column-menu-share-btn').classList.toggle('hidden', alias || !!col.isDefault || col.id === 'col_geral');
-    document.getElementById('column-menu-share-txt').textContent = col.quadroId ? 'Compartilhamento' : 'Compartilhar com um quadro';
+    document.getElementById('column-menu-share-txt').textContent = 'Mudar de quadro'; // V40.48.0 (era "Compartilhar com um quadro")
     document.getElementById('column-menu-shared').classList.toggle('hidden', !info);
     document.getElementById('column-menu-shared-txt').textContent = info;
     document.getElementById('column-menu-board-btn').classList.toggle('hidden', !(alias ? (col.shared && col.shared.quadro) : col.quadroId));
@@ -8329,6 +8357,8 @@ window.confirmColumnName = function() {
             isDefault: false,
             createdAt: Date.now()
         };
+        const qb = blCur(blState().Q); // V40.48.0: a lista nova entra no quadro aberto
+        if (qb) newCol.quadroId = qb;
         backlogColumnsDb.push(newCol);
         saveBacklogColumns();
         hideModal('column-name-modal');
@@ -8384,6 +8414,9 @@ window.confirmDeleteColumn = function() {
         return;
     }
     
+    // V40.48.0: fica no quadro aberto, na lista vizinha (sem vizinha: o quadro fica vazio)
+    const bcols = blCols(), bi = bcols.findIndex(c => c.id === colId), viz = bcols[bi + 1] || bcols[bi - 1];
+    
     // Apaga TODOS os cards dessa coluna
     backlogDb = backlogDb.filter(item => getItemColumn(item) !== colId);
     
@@ -8393,8 +8426,9 @@ window.confirmDeleteColumn = function() {
     saveBacklog();
     saveBacklogColumns();
     
-    // Volta pra coluna Geral
-    activeColumnId = 'col_geral';
+    // Volta pra coluna Geral (V40.48.0: num quadro, pra vizinha do quadro; sem vizinha, o quadro fica vazio)
+    activeColumnId = blCur(blState().Q) && viz ? viz.id : 'col_geral';
+    _blLastCol = activeColumnId;
     
     hideModal('column-delete-modal');
     renderBacklog();
@@ -8427,12 +8461,18 @@ window.openMoveCardModal = function(cardId) {
     document.getElementById('column-move-subtitle').innerText = `"${card.title}" pra qual lista?`;
     
     const optionsEl = document.getElementById('column-move-options');
-    optionsEl.innerHTML = others.map(col => `
+    const btn = col => `
         <button onclick="confirmMoveCard('${col.id}')" class="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-sm hover:bg-zinc-100 active:scale-[0.98] transition">
             <i class="ph-fill ph-list-dashes text-lg text-app-focus"></i>
             <span class="truncate">${escapeHtml(col.name)}</span>
-        </button>
-    `).join('');
+        </button>`;
+    // V40.48.0: separadas por quadro (as do quadro aberto primeiro); com tudo num quadro só, sem os títulos
+    const st = blState(), cur = blCur(st.Q), byBoard = {};
+    others.forEach(c => { const b = blBoardOf(c, st.Q); (byBoard[b] = byBoard[b] || []).push(c); });
+    const order = [cur, ''].concat((st.Q || []).map(q => q.id)).filter((b, i, a) => a.indexOf(b) === i && byBoard[b]);
+    const multi = order.length > 1 || order[0] !== cur;
+    const title = b => b === cur ? 'Neste quadro' : !b ? 'Pessoal' : 'Quadro ' + (((st.Q || []).find(q => q.id === b) || {}).nome || '');
+    optionsEl.innerHTML = order.map(b => (multi ? `<p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider px-1 pt-2 first:pt-0">${escapeHtml(title(b))}</p>` : '') + byBoard[b].map(btn).join('')).join('');
     
     showModal('column-move-modal');
 };
@@ -8488,10 +8528,15 @@ function sharedColInfo(col) { // o texto do menu da lista
         const s = col.shared || {};
         return `Lista de ${s.de || 'outra pessoa'}, no quadro ${s.quadroNome || '…'}. Você vê e mexe nas tarefas; só quem é dono dela renomeia ou apaga.`;
     }
-    if (col.quadroId) { const q = qdFind(col.quadroId); return `Compartilhada com o quadro ${q ? q.nome : '…'}: todo mundo dele vê a lista e mexe nas tarefas.`; }
+    if (col.quadroId) {
+        const q = qdFind(col.quadroId);
+        if (q && !blBoardShared(q)) return `No quadro ${q.nome}, só seu (ninguém mais vê).`; // V40.48.0: quadro pra organizar
+        return `Compartilhada com o quadro ${q ? q.nome : '…'}: todo mundo dele vê a lista e mexe nas tarefas.`;
+    }
     return '';
 }
-function sharedColIcon(col) { return !!col && (fazSharedColId(col.id) || !!col.quadroId); }
+// V40.48.0: o ícone de pessoas só quando tem mais gente (a lista de outra pessoa, ou a sua num quadro com gente)
+function sharedColIcon(col) { if (!col) return false; if (fazSharedColId(col.id)) return true; if (!col.quadroId) return false; const q = qdFind(col.quadroId); return !q || blBoardShared(q); }
 
 // ---- menu ⋮ da lista → compartilhar ----
 let _shareColId = null;
@@ -8500,45 +8545,66 @@ window.openShareColumn = function() {
     if (!col || fazSharedColId(col.id)) return;
     if (col.isDefault || col.id === 'col_geral') return showToast('A lista Geral não pode ser compartilhada.');
     hideModal('column-menu-modal');
-    if (!qdState().logado) return showToast('Entre na sua conta (Config → Sincronizar com a nuvem) pra compartilhar listas.');
+    if (!qdState().logado) return showToast('Entre na sua conta (Config → Sincronizar com a nuvem) pra usar quadros.');
     _shareColId = col.id;
+    _shareMode = 'mover';
     renderShareList();
     showModal('share-list-modal');
     const a = qdApi();
     if (a && !qdState().carregado) a.atualizar().then(renderShareList);
 };
 function renderShareList() {
-    const col = backlogColumnsDb.find(c => c.id === _shareColId), box = document.getElementById('share-list-options');
-    if (!col || !box) return;
-    document.getElementById('share-list-title').textContent = `Compartilhar "${col.name}"`;
-    const st = qdState(), cur = col.quadroId || null;
-    const row = (id, title, sub) => {
-        const on = (id || null) === cur;
-        return `<button type="button" role="radio" aria-checked="${on}" class="agf-row${on ? ' on' : ''}" onclick="shareListPick(${id ? `'${id}'` : 'null'})">` +
-            `<span class="agf-radio" aria-hidden="true"></span><span class="flex-1 min-w-0"><span class="block truncate">${escapeHtml(title)}</span>` +
-            (sub ? `<span class="block text-[11px] font-semibold text-zinc-400 truncate">${escapeHtml(sub)}</span>` : '') + `</span></button>`;
-    };
-    let html = row(null, 'Só minha', 'ninguém mais vê');
-    st.quadros.forEach(q => { html += row(q.id, q.nome, qdPeople(q.membros.length) + (q.souDono ? ' · você criou' : '')); });
-    if (!st.quadros.length) html += `<p class="text-[12px] text-zinc-500 text-center leading-snug px-2 py-2">${st.carregado ? 'Você ainda não está em nenhum quadro. Crie um (Casa, Empresa…) e ponha as pessoas pelo e-mail.' : 'Carregando seus quadros…'}</p>`;
+    const box = document.getElementById('share-list-options');
+    if (!box) return;
+    const st = qdState(), sub = document.getElementById('share-list-sub'), nb = document.getElementById('share-list-new');
+    const row = (fn, id, title, sub, on) =>
+        `<button type="button" role="radio" aria-checked="${on}" class="agf-row${on ? ' on' : ''}" onclick="${fn}(${id ? `'${id}'` : 'null'})">` +
+        `<span class="agf-radio" aria-hidden="true"></span><span class="flex-1 min-w-0"><span class="block truncate">${escapeHtml(title)}</span>` +
+        (sub ? `<span class="block text-[11px] font-semibold text-zinc-400 truncate">${escapeHtml(sub)}</span>` : '') + `</span></button>`;
+    const qSub = q => blBoardShared(q) ? qdPeople(q.membros.length) + (q.souDono ? ' · você criou' : '') : 'só você';
+    if (_shareMode === 'trazer') { // V40.48.0: quadro vazio → qual lista sua vem pra cá
+        const bs = blState(), dest = blCur(bs.Q), q = qdFind(dest);
+        document.getElementById('share-list-title').textContent = `Trazer uma lista pro quadro ${q ? q.nome : ''}`.trim();
+        if (sub) sub.textContent = q && blBoardShared(q) ? 'Ela passa a aparecer pra quem está no quadro, com as tarefas.' : 'A lista sai de onde está e vem pra cá, com as tarefas.';
+        if (nb) nb.classList.add('hidden');
+        const mine = backlogColumnsDb.filter(c => !fazSharedColId(c.id) && !c.isDefault && c.id !== 'col_geral' && blBoardOf(c, bs.Q) !== dest);
+        box.innerHTML = mine.map(c => { const fq = blBoardOf(c, bs.Q) ? qdFind(blBoardOf(c, bs.Q)) : null; return row('shareListBring', c.id, c.name, 'agora em: ' + (fq ? fq.nome : 'Pessoal'), false); }).join('') ||
+            '<p class="text-[12px] text-zinc-500 text-center leading-snug px-2 py-2">Você não tem outra lista pra trazer. Crie uma aqui.</p>';
+        return;
+    }
+    const col = backlogColumnsDb.find(c => c.id === _shareColId);
+    if (!col) return;
+    document.getElementById('share-list-title').textContent = `Mudar "${col.name}" de quadro`; // V40.48.0 (era "Compartilhar")
+    if (sub) sub.textContent = 'Num quadro com outras pessoas, todo mundo dele vê a lista e mexe nas tarefas. Só você renomeia ou apaga a lista.';
+    if (nb) nb.classList.remove('hidden');
+    const cur = col.quadroId || null;
+    let html = row('shareListPick', null, 'Pessoal', 'sem quadro · só você vê', cur === null);
+    st.quadros.forEach(q => { html += row('shareListPick', q.id, q.nome, qSub(q), q.id === cur); });
+    if (!st.quadros.length) html += `<p class="text-[12px] text-zinc-500 text-center leading-snug px-2 py-2">${st.carregado ? 'Você ainda não tem nenhum quadro. Crie um (Qualitê, Casa, Empresa…): só seu, ou com as pessoas pelo e-mail.' : 'Carregando seus quadros…'}</p>`;
     box.innerHTML = html;
 }
 window.shareListPick = function(quadroId) {
     const col = backlogColumnsDb.find(c => c.id === _shareColId), a = qdApi();
     if (!col || !a) return;
-    const q = quadroId ? qdFind(quadroId) : null;
+    const q = quadroId ? qdFind(quadroId) : null, from = col.quadroId ? qdFind(col.quadroId) : null;
     if ((col.quadroId || null) === (quadroId || null)) { closeShareList(); return; }
-    if (!quadroId && !confirm(`Parar de compartilhar "${col.name}"?\n\nA lista some pra quem é do quadro. As tarefas continuam aqui com você.`)) return;
+    // V40.48.0: sair de um quadro com gente pergunta (ela some pra eles); de um quadro só seu, não
+    if (from && blBoardShared(from) && !confirm(`Tirar "${col.name}" do quadro ${from.nome}?\n\nA lista some pra quem é do quadro. As tarefas continuam aqui com você.`)) return;
     closeShareList();
+    // V40.48.0: você fica no quadro aberto; se a lista que saiu era a da tela, abre a vizinha
+    if (col.id === activeColumnId) {
+        const cols = blCols(), i = cols.findIndex(c => c.id === col.id), viz = cols[i + 1] || cols[i - 1];
+        if (viz) activeColumnId = viz.id;
+        _blLastCol = activeColumnId;
+    }
     a.compartilhar(col.id, quadroId).then(r => {
         if (!r.ok) return showToast(r.msg || 'Não consegui agora.');
-        showToast(quadroId ? `Lista compartilhada com ${q ? q.nome : 'o quadro'}! 👥` : 'A lista agora é só sua.');
         renderBacklog();
     });
-    undoNameStep(quadroId ? 'Lista compartilhada' : 'Lista parou de ser compartilhada');
+    undoNameStep(quadroId ? `"${col.name}" foi pro quadro ${q ? q.nome : ''}`.trim() : `"${col.name}" voltou pro Pessoal`);
     renderBacklog();
 };
-window.closeShareList = function() { _shareColId = null; hideModal('share-list-modal'); };
+window.closeShareList = function() { _shareColId = null; _shareMode = 'mover'; hideModal('share-list-modal'); };
 window.shareListNewBoard = function() { const c = _shareColId; closeShareList(); _shareColAfterNew = c; openQuadroName('create'); };
 window.openColumnBoard = function() {
     const col = backlogColumnsDb.find(c => c.id === activeColumnId);
@@ -8586,6 +8652,7 @@ function qdMenuStatus() {
 // Desenha a tela (chamada também pelo sync.js quando chega coisa nova). Os campos de digitar não são redesenhados.
 window.fazQuadrosRender = function() {
     qdMenuStatus();
+    blBoardsChanged(); // V40.48.0: as abas dos quadros (e as listas, se o quadro aberto mudou)
     const view = document.getElementById('config-quadros-view');
     if (!view || view.classList.contains('hidden')) return;
     const st = qdState(), $q = (id) => document.getElementById(id);
@@ -8676,7 +8743,7 @@ function openQuadroName(mode) {
     showModal('quadro-name-modal');
     setTimeout(() => { try { input.focus({ preventScroll: true }); } catch (e) {} }, 100);
 }
-window.cancelQuadroName = function() { _qdNameMode = null; _shareColAfterNew = null; hideModal('quadro-name-modal'); };
+window.cancelQuadroName = function() { _qdNameMode = null; _shareColAfterNew = null; _boardAfterNew = false; hideModal('quadro-name-modal'); };
 window.confirmQuadroName = function() {
     const a = qdApi(), input = document.getElementById('quadro-name-input'), btn = document.getElementById('quadro-name-save');
     if (!a || !_qdNameMode) return;
@@ -8690,17 +8757,229 @@ window.confirmQuadroName = function() {
         if (!r.ok) return showToast(r.msg);
         _qdNameMode = null;
         hideModal('quadro-name-modal');
-        showToast(r.msg);
+        const fromTabs = _boardAfterNew; // V40.48.0: veio do "+ Quadro" das abas (o quadro novo, aberto, já diz que deu certo)
+        if (!fromTabs) showToast(r.msg);
+        _boardAfterNew = false;
         if (mode === 'create' && r.id) {
             const view = document.getElementById('config-quadros-view');
-            if (view && !view.classList.contains('hidden')) qdOpen(r.id);
-            else if (col) { _shareColId = col; renderShareList(); showModal('share-list-modal'); } // veio do Compartilhar: volta pra escolher
+            const go = () => {
+                if (fromTabs) blSetBoard(r.id); // abre o quadro novo (vazio: "Nova lista" ou "Trazer uma lista")
+                else if (view && !view.classList.contains('hidden')) qdOpen(r.id);
+                else if (col) { _shareColId = col; _shareMode = 'mover'; renderShareList(); showModal('share-list-modal'); } // veio do Mudar de quadro: volta pra escolher
+            };
+            // V40.48.0: com a janelinha (e o campo com foco) aberta, a releitura dos quadros que o criar pede fica pra depois;
+            // sem ela o quadro novo ainda não está na lista: relê agora, com a janelinha fechada, e só então abre
+            if (qdFind(r.id)) go(); else a.atualizar().then(go);
         }
         fazQuadrosRender();
     });
 };
 let _shareColAfterNew = null;
 function _shareColPending() { const c = _shareColAfterNew; _shareColAfterNew = null; return c; }
+
+// =====================================================
+// V40.48.0 — QUADROS COM ABAS (e o menu grande, logo abaixo)
+// Pedido dele (26/11, com fotos): "vamos mudar listas pra quadros, aí vamos pôr abas na linha de baixo pra que possamos
+// ter mais de um quadro e mudar as listas entre eles"; e "pode ser só meu" (quadro pra organizar, sem ninguém).
+// Um quadro é o `quadros` da nuvem (V40.47.0): a lista é de um quadro pelo `quadroId` (a sua) ou pelo `shared.quadro`
+// (a de outra pessoa). "Pessoal" = as listas sem quadro (a Geral sempre). Quadro com mais gente = compartilhado (ícone
+// de pessoas); quadro só seu = só pra organizar. Cada aba mostra só as listas dela (bolinhas, deslizar, afastado, busca).
+// Pôr uma lista num quadro com gente = compartilhar (o "Mudar de quadro" do menu da lista).
+// =====================================================
+// Os quadros que este aparelho conhece. Q null = ainda não sabe (o sync.js não carregou, ou logado e os quadros ainda não
+// foram lidos): aí confia no que está gravado na lista e não mexe no quadro aberto. sure = dá pra limpar quadro que sumiu.
+function blState() {
+    const a = qdApi();
+    if (!a) return { Q: null, sure: false };
+    let s;
+    try { s = a.estado(); } catch (e) { return { Q: null, sure: false }; }
+    if (!s.logado) return { Q: [], sure: false }; // sem conta (ou a sessão ainda voltando): tudo no Pessoal, sem esquecer o quadro aberto
+    if (!s.carregado) return { Q: null, sure: false };
+    return { Q: s.quadros || [], sure: true };
+}
+function blRawBoard(col) { return !col ? '' : (fazSharedColId(col.id) ? (col.shared && col.shared.quadro) : col.quadroId) || ''; }
+function blBoardOf(col, Q) {
+    const b = blRawBoard(col);
+    if (!b || !Q) return b; // Q null: confia no que a lista diz
+    return Q.some(q => q.id === b) ? b : '';
+}
+function blCur(Q) { return !activeBoardId ? '' : (!Q || Q.some(q => q.id === activeBoardId)) ? activeBoardId : ''; } // o quadro que aparece
+function blCols(st) { st = st || blState(); const cur = blCur(st.Q); return backlogColumnsDb.filter(c => blBoardOf(c, st.Q) === cur); }
+function blBoardShared(q) { return !!q && Array.isArray(q.membros) && q.membros.length > 1; }
+function blSaveBoard() { try { localStorage.setItem('tb__quadro_aberto', activeBoardId || ''); } catch (e) {} }
+// Acerta o quadro aberto e a lista ativa antes de desenhar; devolve as listas do quadro aberto.
+function blSyncBoard(st) {
+    if (st.sure && activeBoardId && !st.Q.some(q => q.id === activeBoardId)) { activeBoardId = ''; blSaveBoard(); } // apagado, ou você saiu
+    const col = backlogColumnsDb.find(c => c.id === activeColumnId);
+    if (col && activeColumnId !== _blLastCol) { // mandaram abrir uma lista (voltar pra lista, busca, bolinha): o quadro dela vai junto
+        const b = blBoardOf(col, st.Q);
+        if (b !== blCur(st.Q)) { activeBoardId = b; blSaveBoard(); }
+    }
+    const cur = blCur(st.Q), cols = backlogColumnsDb.filter(c => blBoardOf(c, st.Q) === cur);
+    if (cols.length && !cols.some(c => c.id === activeColumnId)) {
+        const m = _blBoardCol[cur];
+        activeColumnId = (cols.find(c => c.id === m) || cols[0]).id;
+    }
+    _blLastCol = activeColumnId;
+    if (cols.some(c => c.id === activeColumnId)) _blBoardCol[cur] = activeColumnId;
+    return cols;
+}
+// A linha de abas: Pessoal, cada quadro (o aberto com os 3 pontinhos: pessoas, nome, apagar) e o "+ Quadro".
+function renderBoardTabs(st) {
+    const box = document.getElementById('qb-tabs');
+    if (!box) return;
+    st = st || blState();
+    const cur = blCur(st.Q), Q = st.Q || [];
+    const tab = (id, nome, ico, sub) => {
+        const on = id === cur;
+        const opt = on && id ? `<button type="button" class="qb-opt" onclick="blBoardOptions('${id}')" aria-label="Opções do quadro ${escapeHtml(nome)}" title="Pessoas, nome e apagar"><i class="ph-bold ph-dots-three"></i></button>` : '';
+        return `<span class="qb-tab-wrap${on ? ' on' : ''}" data-board="${id}"><button type="button" role="tab" aria-selected="${on}" class="qb-tab" onclick="blSetBoard('${id}')" title="${escapeHtml(sub)}"><i class="ph-bold ${ico}"></i><span class="qb-name">${escapeHtml(nome)}</span></button>${opt}</span>`;
+    };
+    let html = tab('', 'Pessoal', 'ph-user', 'Suas listas sem quadro');
+    Q.forEach(q => { html += tab(q.id, q.nome, blBoardShared(q) ? 'ph-users-three' : 'ph-kanban', blBoardShared(q) ? 'Compartilhado: ' + qdPeople(q.membros.length) : 'Só seu'); });
+    if (!st.Q && cur) html += tab(cur, 'Quadro', 'ph-kanban', ''); // ainda carregando os nomes
+    html += `<button type="button" class="qb-new" onclick="blNewBoard()" aria-label="Novo quadro" title="Novo quadro"><i class="ph-bold ph-plus"></i>Quadro</button>`;
+    box.innerHTML = html;
+    const on = box.querySelector('.qb-tab-wrap.on'); // a aba aberta fica à vista
+    if (on && (on.offsetLeft < box.scrollLeft || on.offsetLeft + on.offsetWidth > box.scrollLeft + box.clientWidth)) box.scrollLeft = Math.max(0, on.offsetLeft - 16);
+}
+window.blSetBoard = function(id) {
+    const st = blState();
+    id = id && (!st.Q || st.Q.some(q => q.id === id)) ? id : '';
+    const now = blCols(st);
+    if (now.some(c => c.id === activeColumnId)) _blBoardCol[blCur(st.Q)] = activeColumnId;
+    activeBoardId = id;
+    blSaveBoard();
+    const cols = blCols(st), m = _blBoardCol[blCur(st.Q)];
+    if (cols.length) activeColumnId = (cols.find(c => c.id === m) || cols[0]).id;
+    _blLastCol = activeColumnId;
+    renderBacklog();
+};
+// Quadro sem lista: o cabeçalho diz o nome do quadro e esconde o que é de lista.
+function blEmptyUi(empty, st) {
+    ['backlog-search-btn', 'backlog-column-menu-btn', 'backlog-new-task-btn', 'backlog-count'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.toggle('hidden', empty); });
+    const zb = document.getElementById('backlog-zoom-btn');
+    if (zb && zb.parentElement) zb.parentElement.classList.toggle('hidden', empty);
+    if (!empty) return;
+    const q = (st.Q || []).find(x => x.id === blCur(st.Q));
+    const t = document.getElementById('backlog-column-title');
+    if (t) t.textContent = q ? q.nome : 'Quadro';
+    const sh = document.getElementById('backlog-column-shared');
+    if (sh) sh.classList.add('hidden');
+}
+function blEmptyHtml(st) {
+    const q = (st.Q || []).find(x => x.id === blCur(st.Q)), nome = q ? q.nome : 'este quadro';
+    const mine = backlogColumnsDb.some(c => !fazSharedColId(c.id) && !c.isDefault && c.id !== 'col_geral' && blBoardOf(c, st.Q) !== blCur(st.Q));
+    return `<div class="qb-empty w-full shrink-0 flex flex-col items-center justify-center text-center px-6 py-10">
+            <span class="w-14 h-14 rounded-2xl bg-app-focus-soft text-app-focus flex items-center justify-center mb-3"><i class="ph ph-kanban text-3xl"></i></span>
+            <p class="text-sm font-bold text-zinc-700">Nenhuma lista no quadro ${escapeHtml(nome)}</p>
+            <p class="text-[12px] text-zinc-500 mt-1 leading-snug">${q && blBoardShared(q) ? 'Toda lista daqui aparece pra quem está no quadro.' : 'Crie uma lista aqui ou traga uma que você já tem.'}</p>
+            <div class="flex flex-col gap-2 mt-5 w-full max-w-[240px]">
+                <button type="button" onclick="promptCreateColumn()" class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-app-focus text-white font-bold text-sm active:scale-95 transition"><i class="ph-bold ph-plus"></i>Nova lista</button>
+                ${mine ? '<button type="button" onclick="blBringList()" class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-zinc-200 bg-white text-zinc-700 font-bold text-sm active:scale-95 transition"><i class="ph ph-arrow-square-in"></i>Trazer uma lista</button>' : ''}
+            </div>
+        </div>`;
+}
+// Os quadros mudaram (criou, renomeou, entrou, saiu, chegou da nuvem): redesenha as abas; se o que aparece nas Listas
+// mudou (o quadro aberto sumiu, uma lista mudou de quadro), as listas também. Nunca no meio de um arrasto.
+var _blSeen = '';
+function blBoardsChanged() {
+    const st = blState(), sig = st.Q === null ? 'null' : st.Q.map(q => q.id + ':' + q.nome + ':' + (blBoardShared(q) ? 1 : 0)).join('|');
+    if (sig === _blSeen) return;
+    _blSeen = sig;
+    if (colDrag || _dragState) return;
+    const sheet = document.getElementById('list-sheet');
+    if (sheet && !sheet.classList.contains('translate-y-full') && activeListTab === 'backlog') renderBacklog();
+    else renderBoardTabs(st);
+}
+window.blBoardOptions = function(id) { // pessoas, nome, apagar/sair: a tela do quadro na Config (a mesma da V40.47.0)
+    if (!id) return;
+    closeAllSheets();
+    openConfigSheet();
+    openConfigQuadros(id);
+};
+let _boardAfterNew = false;
+window.blNewBoard = function() {
+    if (!qdState().logado) return showToast('Entre na sua conta (Config → Sincronizar com a nuvem) pra criar quadros.');
+    _boardAfterNew = true;
+    openQuadroName('create');
+};
+// Quadro vazio → "Trazer uma lista": as suas que estão em outro quadro (a janelinha do "Mudar de quadro", ao contrário)
+let _shareMode = 'mover'; // 'mover' (uma lista → qual quadro) | 'trazer' (qual lista → este quadro)
+window.blBringList = function() {
+    if (!qdState().logado) return showToast('Entre na sua conta (Config → Sincronizar com a nuvem) pra usar quadros.');
+    _shareMode = 'trazer';
+    _shareColId = null;
+    renderShareList();
+    showModal('share-list-modal');
+};
+window.shareListBring = function(colId) {
+    const a = qdApi(), st = blState(), dest = blCur(st.Q), col = backlogColumnsDb.find(c => c.id === colId);
+    if (!a || !col || !dest) return;
+    const from = col.quadroId ? qdFind(col.quadroId) : null, q = qdFind(dest);
+    if (from && blBoardShared(from) && !confirm(`Tirar "${col.name}" do quadro ${from.nome}?\n\nEla some pra quem é de lá. As tarefas vêm junto.`)) return;
+    closeShareList();
+    a.compartilhar(col.id, dest).then(r => { if (!r.ok) showToast(r.msg || 'Não consegui agora.'); renderBacklog(); });
+    activeColumnId = col.id; // a lista que chegou vira a aberta (já é deste quadro: o quadro não muda)
+    _blLastCol = col.id;
+    undoNameStep(`"${col.name}" veio pro quadro ${q ? q.nome : ''}`.trim());
+    renderBacklog();
+};
+
+// ---- MENU GRANDE (o botão dos itens) ----
+// Pedido dele (26/11): "quando clica no botão dos itens aparece os menus maiores pra daí acessar, não entrando direto
+// nas listas". Escolha dele: "Grade de botões" (2 por linha, com um número embaixo; a Config no pé). Dentro de cada
+// parte, o "Menu" lá em cima (e o voltar do celular) volta pra cá. Quem abre a tela por dentro do app (agendar,
+// voltar pra lista...) continua indo direto pra lista (openListSheet).
+var hubVia = false; // a tela veio do menu grande? (o voltar volta pra ele; aberta por dentro do app, o voltar fecha)
+window.openHub = function() {
+    clearFilters();
+    showHub();
+    overlay.classList.remove('opacity-0', 'pointer-events-none');
+    listSheet.classList.remove('translate-y-full');
+    pushNavState();
+};
+window.showHub = function() {
+    hubVia = true;
+    ['assistant', 'backlog', 'routines', 'notes', 'financial', 'goals'].forEach(t => { const v = document.getElementById(`view-${t}`); if (v) v.classList.add('hidden'); });
+    if (typeof closeBacklogZoomMenu === 'function') { try { closeBacklogZoomMenu(); } catch (e) {} }
+    const hub = document.getElementById('view-hub');
+    hub.classList.remove('hidden');
+    hub.classList.add('flex');
+    hub.scrollTop = 0;
+    document.getElementById('list-tabs').classList.add('hidden');
+    document.getElementById('list-menu-btn').classList.add('hidden');
+    document.getElementById('hub-title').classList.remove('hidden');
+    renderHub();
+};
+function hideHub() {
+    const hub = document.getElementById('view-hub');
+    if (!hub || hub.classList.contains('hidden')) return;
+    hub.classList.add('hidden');
+    hub.classList.remove('flex');
+    document.getElementById('list-tabs').classList.remove('hidden');
+    document.getElementById('list-menu-btn').classList.remove('hidden');
+    document.getElementById('hub-title').classList.add('hidden');
+}
+window.hubGo = function(tab) { hideHub(); switchListTab(tab); };
+function renderHub() {
+    const box = document.getElementById('hub-grid');
+    if (!box) return;
+    const n = (k, one, many) => k + ' ' + (k === 1 ? one : many);
+    const mes = getLocalMonthStr(), doMes = financialDb.filter(i => isItemInMonth(i, mes));
+    const aPagar = doMes.filter(i => !isPaidInMonth(i, mes)).reduce((a, i) => a + getAmountInMonth(i, mes), 0);
+    const Q = blState().Q || [];
+    const tiles = [
+        ['backlog', 'ph-kanban', 'Quadros', n(backlogDb.length, 'tarefa', 'tarefas') + (Q.length ? ' · ' + n(Q.length + 1, 'quadro', 'quadros') : '')],
+        ['routines', 'ph-arrows-clockwise', 'Rotinas', n(routinesDb.length, 'rotina', 'rotinas')],
+        ['notes', 'ph-note', 'Notas', n(notesDb.length, 'nota', 'notas')],
+        ['financial', 'ph-currency-circle-dollar', 'Finanças', !doMes.length ? 'Nada neste mês' : aPagar > 0 ? formatBRL(aPagar) + ' a pagar' : 'Tudo pago neste mês'],
+        ['goals', 'ph-target', 'Metas', n(goalsDb.length, 'meta', 'metas')],
+        ['assistant', 'ph-sparkle', 'Assistente', 'Pergunte do seu dia'],
+    ];
+    box.innerHTML = tiles.map(([tab, ico, nome, sub]) =>
+        `<button type="button" class="hub-tile" data-hub="${tab}" onclick="hubGo('${tab}')"><span class="hub-ico bg-app-focus-soft text-app-focus"><i class="ph-bold ${ico}"></i></span><span class="hub-name">${nome}</span><span class="hub-sub">${escapeHtml(sub)}</span></button>`).join('');
+}
 
 // Helpers de modal (centraliza show/hide com overlay)
 function showColumnNameModal() {

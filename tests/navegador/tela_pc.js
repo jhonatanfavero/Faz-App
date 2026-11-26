@@ -846,7 +846,7 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(await nomes() === N0 && await p.evaluate(() => !document.querySelector('body > div.fixed.z-40.w-52') && document.getElementById('modal-task').classList.contains('hidden')), 'clicar no título sem arrastar não muda nada');
   await cabeca('BETA').locator('.col-menu-btn').click(); await p.waitForTimeout(200);
   const mn = await p.evaluate(() => { const m = document.querySelector('body > div.fixed.z-40.w-52'); if (!m) return null; const r = m.getBoundingClientRect(); return { itens: [...m.querySelectorAll('button')].map((b) => b.innerText.trim() + (b.disabled ? '(off)' : '')), dentro: r.right <= innerWidth && r.bottom <= innerHeight }; });
-  ok(!!mn && mn.itens.join('|') === 'Renomear lista|Mover pra esquerda|Mover pra direita|Compartilhar com um quadro…|Apagar lista' && mn.dentro, 'menu da lista: Renomear | Mover pra esquerda | Mover pra direita | Compartilhar com um quadro… (V40.47.0) | Apagar');
+  ok(!!mn && mn.itens.join('|') === 'Renomear lista|Mover pra esquerda|Mover pra direita|Mudar de quadro…|Apagar lista' && mn.dentro, 'menu da lista: Renomear | Mover pra esquerda | Mover pra direita | Mudar de quadro… (V40.48.0; era o Compartilhar da V40.47.0) | Apagar');
   await foto(p, 'pc-lista-menu.png');
   await p.locator('body > div.fixed.z-40.w-52 [data-act="right"]').click(); await p.waitForTimeout(400);
   ok(await nomes() === 'ALFA,GAMA,BETA,DELTA,OMEGA', 'Mover pra direita: BETA passa GAMA');
@@ -1203,6 +1203,11 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   }, UID);
   await p.locator('#tab-listas').click(); await p.waitForTimeout(200);
   await p.locator('#btn-refresh').click(); await p.waitForTimeout(1200);
+  // V40.48.0: a lista da Ana fica na aba do quadro "Casa"
+  const abas = await p.evaluate(() => [...document.querySelectorAll('#qb-bar .qb-tab-wrap')].map((w) => (w.classList.contains('on') ? '*' : '') + w.textContent.trim()).join('|'));
+  ok(abas === '*Pessoal|Casa', 'V40.48.0: as abas dos quadros em cima das listas: ' + abas);
+  await foto(p, 'pc-quadros-abas.png');
+  await p.locator('#qb-bar [data-board="22222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb"]').click(); await p.waitForTimeout(300);
   const sh = await p.evaluate(() => {
     const cols = [...document.querySelectorAll('section.col')], last = cols[cols.length - 1];
     if (!last) return null;
@@ -1211,7 +1216,7 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
     return { id: last.dataset.col, n: last.querySelectorAll('.card').length, head: h.textContent.replace(/\s+/g, ' ').trim(), icon: !!h.querySelector('.ph-users-three'), dashed: getComputedStyle(last).borderStyle, w: Math.round(r.width) };
   });
   ok(!!sh && /^sh_dddddddd_col_ana$/.test(sh.id) && sh.n === 4 && sh.icon && /Mercado da casa/.test(sh.head) && /de ana@teste\.com · Casa/.test(sh.head) && sh.dashed === 'dashed',
-    'a lista da Ana aparece no fim, tracejada, com o ícone, "de ana@teste.com · Casa" e as 4 tarefas: ' + (sh ? sh.head.slice(0, 80) : '-'));
+    'na aba "Casa", a lista da Ana, tracejada, com o ícone, "de ana@teste.com · Casa" e as 4 tarefas: ' + (sh ? sh.head.slice(0, 80) : '-'));
   await p.waitForTimeout(300);
   await foto(p, 'pc-lista-compartilhada.png');
   // o menu da lista dela
@@ -1228,11 +1233,12 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(cq.vis && /Casa/.test(cq.t) && /de ana@teste\.com/.test(cq.t) && /Mercado da casa \(de ana@teste\.com\)/.test(cq.t) && cq.fora === 0, '"Ver o quadro" abre Configurações → Quadros: o quadro Casa, as pessoas e as listas, tudo dentro da janela');
   await foto(p, 'pc-configuracoes-quadros.png');
   await p.locator('#cfg-close').click(); await p.waitForTimeout(200);
-  // compartilhar uma lista sua (o submenu)
+  // compartilhar uma lista sua (o submenu; V40.48.0: "Mudar de quadro…", na aba Pessoal)
+  await p.locator('#qb-bar [data-board=""]').click(); await p.waitForTimeout(300);
   await p.locator('section.col:nth-of-type(2) .col-menu-btn').click(); await p.waitForTimeout(200);
   await p.locator('body > div.fixed button[data-act="share"]').click(); await p.waitForTimeout(200);
   const sm = await p.evaluate(() => { const m = document.querySelector('body > div.fixed[role="menu"]'); if (!m) return null; const r = m.getBoundingClientRect(); return { n: m.querySelectorAll('[data-share]').length, t: m.textContent.replace(/\s+/g, ' ').trim(), dentro: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; });
-  ok(!!sm && sm.dentro && sm.n === 2 && /Só minha/.test(sm.t) && /Casa/.test(sm.t) && /Criar um quadro/.test(sm.t), 'compartilhar uma lista sua: "Só minha", o quadro Casa e "Criar um quadro…", dentro da tela');
+  ok(!!sm && sm.dentro && sm.n === 2 && /Pessoal/.test(sm.t) && /Casa/.test(sm.t) && /Novo quadro/.test(sm.t), 'mudar uma lista sua de quadro: "Pessoal", o quadro Casa e "Novo quadro…", dentro da tela');
   await foto(p, 'pc-compartilhar-lista.png');
   await p.keyboard.press('Escape'); await p.mouse.click(5, 450); await p.waitForTimeout(200);
   }

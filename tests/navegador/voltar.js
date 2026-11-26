@@ -56,6 +56,8 @@ const ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KH
 
   console.log('\nC) Listas com "Apagar tarefa?" por cima:');
   await tap('#list-btn');
+  ok(await visivel('view-hub'), 'V40.48.0: o botão dos itens abre o menu grande');
+  await tap('#hub-grid [data-hub="backlog"]');
   const lixo = '#backlog-columns-wrapper [onclick*="requestDeleteBacklog"]';
   const n0 = await m.evaluate(() => backlogDb.length);
   await tap(lixo);
@@ -70,10 +72,13 @@ const ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KH
   ok(!(await visivel('backlog-delete-modal')) && await aberta('list-sheet') && (await meio()).em === 'list-sheet', 'tocar no fundo escuro fora da janelinha: também fecha só ela (antes ela ficava aberta)');
   ok(await m.evaluate(() => document.querySelectorAll('.z-\\[60\\].hidden:not([id$="-modal"])').length) === z0, 'e nenhum botão de bloco ou cartão some');
   await voltar();
+  ok(await aberta('list-sheet') && await visivel('view-hub') && await semFosca(), 'voltar: volta pro menu grande (as Listas vieram dele)');
+  await voltar();
   ok(!(await aberta('list-sheet')) && await semFosca(), 'voltar: fecha as Listas');
 
   console.log('\nD) Tarefa na mão:');
   await tap('#list-btn');
+  await tap('#hub-grid [data-hub="backlog"]');
   await tap('#backlog-columns-wrapper [onclick*="scheduleBacklogItem"]');
   ok(await m.evaluate(() => !!pendingIntent) && await visivel('floating-task'), 'tocou em agendar: tarefa na mão');
   await voltar();

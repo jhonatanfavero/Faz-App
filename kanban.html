@@ -155,6 +155,19 @@
     .swatch.on { box-shadow: 0 0 0 2px #18181b; }
     /* V40.24.0: SUBLISTA — bloco com vários cartões dentro (amarelinho e tracejado, como no celular) */
     .ag-sub { border: 2px dashed #f59e0b !important; background-color: #fffbeb; }
+    /* V40.48.0: abas dos quadros (como no celular) */
+    .qb-tab-wrap { flex: none; display: inline-flex; align-items: center; height: 32px; border-radius: 9999px; border: 1px solid #e4e4e7; background: #fff; }
+    .qb-tab-wrap:hover { border-color: #d4d4d8; }
+    .qb-tab-wrap.on { background: var(--focus); border-color: transparent; }
+    .qb-tab { display: inline-flex; align-items: center; gap: 6px; height: 100%; max-width: 220px; padding: 0 13px; border-radius: 9999px; color: #52525b; font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .qb-tab .qb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .qb-tab-wrap.on .qb-tab { color: #fff; }
+    .qb-tab-wrap.on .qb-tab.has-opt { padding-right: 3px; }
+    .qb-opt { flex: none; width: 28px; height: 28px; margin-right: 2px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, .92); font-size: 15px; }
+    .qb-opt:hover { background: rgba(0, 0, 0, .15); }
+    .qb-new { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 13px; border-radius: 9999px; border: 1px dashed #d4d4d8; color: #71717a; font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .qb-new:hover { background: #fff; color: #3f3f46; }
+    .qb-empty { width: 380px; flex: none; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 36px 24px 32px; border: 2px dashed #e4e4e7; border-radius: 16px; background: rgba(255, 255, 255, .5); color: #71717a; }
     /* V40.47.1: sublista de 5 e 10 min na visão Dia: uma linha só, no meio (a de 5 min tem 14 px: borda de 1 px em cima e embaixo) */
     .ag-sub.ag-sub-tiny { padding-top: 0 !important; padding-bottom: 0 !important; justify-content: center; }
     .ag-sub.ag-sub-5 { border-top-width: 1px !important; border-bottom-width: 1px !important; }
@@ -324,7 +337,7 @@
         <nav class="inline-flex p-1 bg-zinc-100 rounded-xl shrink-0" role="tablist" aria-label="Seções">
             <!-- V40.20.0: Assistente, a primeira aba (versão padrão, sem IA paga) -->
             <button id="tab-assistente" role="tab" data-tab="assistente" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold inline-flex items-center gap-1.5"><i class="ph-fill ph-sparkle"></i>Assistente</button>
-            <button id="tab-listas" role="tab" data-tab="listas" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold">Listas</button>
+            <button id="tab-listas" role="tab" data-tab="listas" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold">Quadros</button>
             <button id="tab-agenda" role="tab" data-tab="agenda" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold">Agenda</button>
             <!-- V40.17.0: Rotinas e Notas, as mesmas do celular -->
             <button id="tab-rotinas" role="tab" data-tab="rotinas" class="tab px-2 xl:px-3 py-1.5 rounded-lg text-[13px] font-semibold">Rotinas</button>
@@ -365,6 +378,9 @@
             <button id="btn-logout" class="shrink-0 text-xs font-semibold text-zinc-600 hover:text-zinc-900 px-2.5 py-2 rounded-lg hover:bg-zinc-100">Sair</button>
         </div>
     </header>
+    <!-- V40.48.0: QUADROS COM ABAS (como no celular): "Pessoal" (as listas sem quadro, com a Geral), cada quadro da conta
+         e o "+ Novo quadro". Cada aba mostra só as listas dela. Desenhado pelo qbRender(). -->
+    <div id="qb-bar" role="tablist" aria-label="Quadros" class="hidden shrink-0 items-center gap-1.5 px-4 sm:px-5 pt-3 overflow-x-auto thin-scroll"></div>
     <!-- V40.39.0: busca nas Listas. Filtra as próprias listas (nome, checklist e tag, sem acento; as mesmas regras da busca
          da agenda) e diz em quais listas achou (clicar leva até ela). Atalho: / -->
     <div id="ls-bar" class="hidden shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-4 sm:px-5 pt-3">
@@ -1101,7 +1117,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.47.1</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.48.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1666,7 +1682,7 @@
 
     function colShTitle(c) { // V40.47.0: lista compartilhada (a sua num quadro, ou a de outra pessoa)
         if (c.__sh) return 'Lista de ' + (c.__sh.de || 'outra pessoa') + ' · quadro ' + (c.__sh.quadroNome || '');
-        if (c.quadro_id) { var q = qdFind(c.quadro_id); return 'Compartilhada com o quadro ' + (q ? q.nome : ''); }
+        if (c.quadro_id) { var q = qdFind(c.quadro_id); if (q && !qbShared(q)) return ''; return 'Compartilhada com o quadro ' + (q ? q.nome : ''); } // V40.48.0: quadro só seu não é "compartilhado"
         return '';
     }
     function colHtml(c, tasks, shown) {
@@ -1698,13 +1714,27 @@
         wrap.querySelectorAll('.col-list').forEach(function (el) { colScroll[el.dataset.col] = el.scrollTop; });
         var composerFocused = !!(document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('composer-input'));
 
-        var cols = alive('listas'), ids = {}, byCol = {};
-        cols.forEach(function (c) { ids[c.id] = true; byCol[c.id] = []; });
+        var allCols = alive('listas'), ids = {}, byCol = {};
+        allCols.forEach(function (c) { ids[c.id] = true; byCol[c.id] = []; });
         var tasks = alive('tarefas');
         tasks.forEach(function (t) { var c = colOf(t, ids); (byCol[c] = byCol[c] || []).push(t); });
+        // V40.48.0: só as listas do quadro aberto (as tarefas de todas, pra órfã não cair na Geral por engano)
+        var cur = qbCur(), cols = allCols.filter(function (c) { return qbBoardOf(c) === cur; });
+        var nTasks = cols.reduce(function (a, c) { return a + (byCol[c.id] || []).length; }, 0);
+        qbRender();
 
-        if (S.tab === 'listas') $('board-summary').textContent = tasks.length + (tasks.length === 1 ? ' tarefa em ' : ' tarefas em ') + cols.length + (cols.length === 1 ? ' lista' : ' listas');
+        if (S.tab === 'listas') $('board-summary').textContent = nTasks + (nTasks === 1 ? ' tarefa em ' : ' tarefas em ') + cols.length + (cols.length === 1 ? ' lista' : ' listas') + (cur ? ' · quadro ' + ((qdFind(cur) || {}).nome || '') : '');
         lsBar(cols.length > 0); // V40.39.0
+        if (!cols.length && allCols.length) { // V40.48.0: quadro sem lista
+            var qe = qdFind(cur), mine = allCols.some(function (c) { return !c.__sh && !c.is_default && c.id !== DEFAULT_COL; });
+            $('board-empty').classList.add('hidden');
+            wrap.innerHTML = '<div class="qb-empty"><i class="ph ph-kanban text-3xl text-focus"></i><p class="mt-2 text-[14px] font-bold text-zinc-700">Nenhuma lista no quadro ' + esc(qe ? qe.nome : '') + '</p>' +
+                '<p class="mt-1 text-[12.5px] leading-snug">' + (qe && qbShared(qe) ? 'Toda lista daqui aparece pra quem está no quadro.' : 'Crie uma lista aqui ou traga uma que você já tem: no menu (…) dela, "Mudar de quadro…".') + '</p>' +
+                (mine ? '<button type="button" id="qb-bring" class="mt-4 inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50"><i class="ph ph-arrow-square-in"></i>Trazer uma lista</button>' : '') + '</div>' +
+                '<button id="btn-new-list" class="w-[296px] shrink-0 flex items-center gap-2 px-4 py-3 rounded-2xl border-2 border-dashed border-zinc-300 text-[13px] font-semibold text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 hover:bg-white/60"><i class="ph ph-plus"></i>Nova lista</button>';
+            lsInfo([], 0);
+            return;
+        }
         if (!cols.length) {
             wrap.innerHTML = '';
             $('empty-email').textContent = S.email;
@@ -2766,6 +2796,7 @@
         try { localStorage.setItem('faz_pc_tab', S.tab); } catch (e) {}
         $('board').classList.toggle('hidden', S.tab !== 'listas');
         lsBar(S.tab === 'listas'); // V40.39.0 (o render das Listas esconde de novo se não tiver lista)
+        qbRender(); // V40.48.0
         ['assistente', 'agenda', 'rotinas', 'notas', 'financas', 'metas'].forEach(function (t) {
             $(t).classList.toggle('hidden', S.tab !== t);
             $(t).classList.toggle('flex', S.tab === t);
@@ -2833,7 +2864,7 @@
     async function createList() {
         var name = await dialog({ title: 'Nova lista', input: { placeholder: 'Nome da lista', max: 30 }, okLabel: 'Criar lista' });
         if (!name) return;
-        insertRow('listas', { user_id: S.uid, id: newId('col_', 'listas'), name: name, is_default: false, position: maxPos('listas') + STEP, created_ms: Date.now(), deleted: false }, 'Lista criada');
+        insertRow('listas', { user_id: S.uid, id: newId('col_', 'listas'), name: name, is_default: false, position: maxPos('listas') + STEP, created_ms: Date.now(), quadro_id: qbCur() || null, deleted: false }, 'Lista criada'); // V40.48.0: no quadro aberto
     }
     async function renameList(colId) {
         var c = S.listas[colId];
@@ -2935,7 +2966,7 @@
         if (c.__sh) return shColMenu(colId, btn); // V40.47.0: lista de outra pessoa
         var isDefault = c.is_default || colId === DEFAULT_COL;
         var r = btn.getBoundingClientRect();
-        var all = alive('listas').filter(function (x) { return !x.__sh; }), ci = all.indexOf(c); // V40.33.0: mudar de lugar também pelo menu (uma casa por clique); V40.47.0: entre as suas
+        var cur = qbCur(), all = alive('listas').filter(function (x) { return !x.__sh && qbBoardOf(x) === cur; }), ci = all.indexOf(c); // V40.33.0: mudar de lugar também pelo menu (uma casa por clique); V40.47.0: entre as suas; V40.48.0: do quadro aberto
         var mv = function (act, icon, label, off) {
             return '<button data-act="' + act + '"' + (off ? ' disabled' : '') + ' class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-default"><i class="ph ' + icon + '"></i>' + label + '</button>';
         };
@@ -2945,8 +2976,8 @@
         menuEl.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 216, r.right - 208))) + 'px';
         menuEl.innerHTML = '<button data-act="rename" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-pencil-simple"></i>Renomear lista</button>' +
             (all.length > 1 ? mv('left', 'ph-arrow-left', 'Mover pra esquerda', ci <= 0) + mv('right', 'ph-arrow-right', 'Mover pra direita', ci >= all.length - 1) : '') +
-            (isDefault ? '' : '<button data-act="share" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-users-three"></i>' + (c.quadro_id ? 'Compartilhamento…' : 'Compartilhar com um quadro…') + '</button>') + // V40.47.0
-            (c.quadro_id ? '<p class="px-3 pb-1.5 text-[11.5px] text-zinc-500 leading-snug">' + esc(colShTitle(c)) + '</p>' : '') +
+            (isDefault ? '' : '<button data-act="share" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-kanban"></i>Mudar de quadro…</button>') + // V40.47.0; V40.48.0: "Mudar de quadro"
+            (c.quadro_id && colShTitle(c) ? '<p class="px-3 pb-1.5 text-[11.5px] text-zinc-500 leading-snug">' + esc(colShTitle(c)) + '</p>' : '') +
             (isDefault ? '<p class="px-3 py-2 text-[11.5px] text-zinc-400 leading-snug">A lista padrão não pode ser apagada.</p>'
                 : '<button data-act="delete" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-red-600 hover:bg-red-50"><i class="ph ph-trash"></i>Apagar lista</button>');
         menuEl.addEventListener('click', function (e) {
@@ -3116,7 +3147,12 @@
             setDateVal('f-date', String(r.date).slice(0, 10));
             setTimeVal('f-start', clock(r.start_min));
         } else {
-            $('f-col').innerHTML = alive('listas').map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + (c.__sh ? ' (de ' + esc(c.__sh.de || 'outra pessoa') + ')' : '') + '</option>'; }).join(''); // V40.47.0: a lista de outra pessoa diz de quem é
+            var colOpt = function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + (c.__sh ? ' (de ' + esc(c.__sh.de || 'outra pessoa') + ')' : '') + '</option>'; }; // V40.47.0: a lista de outra pessoa diz de quem é
+            var byB = {}; alive('listas').forEach(function (c) { var b = qbBoardOf(c); (byB[b] = byB[b] || []).push(c); });
+            var bOrd = [''].concat(SH.quadros.map(function (q) { return q.id; })).concat(Object.keys(byB)).filter(function (b, i, a) { return a.indexOf(b) === i && byB[b]; });
+            $('f-col').innerHTML = bOrd.length > 1 // V40.48.0: separadas por quadro
+                ? bOrd.map(function (b) { var q = qdFind(b); return '<optgroup label="' + esc(b ? 'Quadro ' + (q ? q.nome : '') : 'Pessoal') + '">' + byB[b].map(colOpt).join('') + '</optgroup>'; }).join('')
+                : (byB[bOrd[0]] || []).map(colOpt).join('');
             $('f-col').value = colOf(r);
         }
         var d = Number(r.duration) || 30;
@@ -5900,7 +5936,7 @@
     }
     // Menu: uma casa pra esquerda (-1) ou pra direita (+1). A lista continua na tela.
     function moveListBy(id, dir) {
-        var all = alive('listas').filter(function (x) { return !x.__sh; }), ci = all.indexOf(S.listas[id]), to = ci + dir; // V40.47.0: entre as suas
+        var cur = qbCur(), all = alive('listas').filter(function (x) { return !x.__sh && qbBoardOf(x) === cur; }), ci = all.indexOf(S.listas[id]), to = ci + dir; // V40.47.0: entre as suas; V40.48.0: do quadro aberto
         if (ci < 0 || to < 0 || to >= all.length) return;
         if (!moveList(id, to)) return;
         var sec = $('columns').querySelector('section.col[data-col="' + CSS.escape(id) + '"]');
@@ -6150,7 +6186,86 @@
     }
     function openCfgQuadros() { openCfg(); var sec = $('cfg-qd-title'); if (sec && sec.scrollIntoView) sec.scrollIntoView({ block: 'start' }); }
 
+    // ===================== V40.48.0: QUADROS COM ABAS (como no celular) =====================
+    // A aba Listas virou "Quadros": em cima, uma aba por quadro ("Pessoal" = as listas sem quadro, com a Geral), e cada aba
+    // mostra só as listas dela. Um quadro pode ser só seu (pra organizar) ou ter gente (compartilhado: ícone de pessoas).
+    // A lista é de um quadro pelo quadro_id (a sua) ou pelo __sh.quadro (a de outra pessoa). Antes da 1ª leitura dos
+    // quadros (SH.at = 0) confia no que a lista diz e não esquece o quadro aberto.
+    function qbBoardOf(c) {
+        var b = c ? (c.__sh ? c.__sh.quadro : c.quadro_id) : null;
+        if (!b) return '';
+        return !SH.at || qdFind(b) ? b : '';
+    }
+    function qbCur() { var b = S.board || ''; return !b ? '' : (!SH.at || qdFind(b)) ? b : ''; }
+    function qbShared(q) { return !!q && Array.isArray(q.membros) && q.membros.length > 1; }
+    function qbSet(id) {
+        S.board = id || '';
+        try { localStorage.setItem('faz_pc_quadro', S.board); } catch (e) {}
+        if (LS.words) LS.keep = {};
+        $('board').scrollLeft = 0;
+        render();
+        qbRender();
+    }
+    function qbRender() {
+        var bar = $('qb-bar');
+        if (!bar) return;
+        var on = !!S.uid && S.tab === 'listas';
+        bar.classList.toggle('hidden', !on);
+        bar.classList.toggle('flex', on);
+        if (!on) return;
+        if (SH.at && S.board && !qdFind(S.board)) { S.board = ''; try { localStorage.setItem('faz_pc_quadro', ''); } catch (e) {} } // apagado, ou você saiu
+        var cur = qbCur();
+        var tab = function (id, nome, ico, tip) {
+            var act = id === cur;
+            return '<span class="qb-tab-wrap' + (act ? ' on' : '') + '" data-board-wrap="' + esc(id) + '"><button type="button" role="tab" aria-selected="' + act + '" class="qb-tab' + (act && id ? ' has-opt' : '') + '" data-board="' + esc(id) + '" title="' + esc(tip) + '"><i class="ph-bold ' + ico + '"></i><span class="qb-name">' + esc(nome) + '</span></button>' +
+                (act && id ? '<button type="button" class="qb-opt" data-qb-opt="' + esc(id) + '" title="Pessoas, nome e apagar" aria-label="Opções do quadro ' + esc(nome) + '"><i class="ph-bold ph-dots-three"></i></button>' : '') + '</span>';
+        };
+        bar.innerHTML = tab('', 'Pessoal', 'ph-user', 'Suas listas sem quadro') +
+            SH.quadros.map(function (q) { return tab(q.id, q.nome, qbShared(q) ? 'ph-users-three' : 'ph-kanban', qbShared(q) ? 'Compartilhado: ' + qdPeople(q.membros.length) : 'Só seu'); }).join('') +
+            (!SH.at && cur ? tab(cur, 'Quadro', 'ph-kanban', '') : '') +
+            '<button type="button" class="qb-new" data-qb-new title="Novo quadro: só seu, ou com as pessoas pelo e-mail"><i class="ph-bold ph-plus"></i>Novo quadro</button>';
+    }
+    async function qbNewBoard() {
+        var C = shC(), nome = await dialog({ title: 'Novo quadro', text: 'Ex.: Qualitê, Casa, Empresa. Pode ser só seu (pra organizar as listas) ou com as pessoas: elas entram em Configurações → Quadros.', input: { placeholder: 'Nome do quadro', max: C.QUADRO_NOME_MAX }, okLabel: 'Criar quadro' });
+        nome = nome ? String(nome).replace(/\s+/g, ' ').trim() : '';
+        if (!nome) return;
+        try {
+            var r = await S.sb.rpc('faz_quadro_criar', { p_nome: nome });
+            if (r.error) return toast(/faz_limite_quadros/.test(String(r.error.message)) ? 'Você chegou no limite de 20 quadros.' : 'Não consegui criar o quadro agora. Tente de novo.');
+            await shLoad();
+            qbSet(C.uuidRef(r.data) || '');
+            toast('Quadro "' + nome + '" criado');
+        } catch (e) { fail(e); }
+    }
+    function qbBringMenu(btn) { // quadro vazio: qual lista sua vem pra cá
+        closeColMenu();
+        var cur = qbCur(), Q = qdFind(cur), r = btn.getBoundingClientRect();
+        if (!cur) return;
+        var mine = alive('listas').filter(function (c) { return !c.__sh && !c.is_default && c.id !== DEFAULT_COL && qbBoardOf(c) !== cur; });
+        menuEl = document.createElement('div');
+        menuEl.setAttribute('role', 'menu');
+        menuEl.className = 'fixed z-40 w-64 max-h-[60vh] overflow-y-auto bg-white border border-zinc-200 rounded-xl shadow-lg p-1';
+        menuEl.style.top = Math.round(r.bottom + 6) + 'px';
+        menuEl.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 264, r.left))) + 'px';
+        menuEl.innerHTML = '<p class="px-3 pt-2 pb-1 text-[11.5px] text-zinc-500 leading-snug">Trazer pro quadro ' + esc(Q ? Q.nome : '') + ' (a lista vem com as tarefas):</p>' +
+            mine.map(function (c) { var f = qdFind(qbBoardOf(c)); return '<button type="button" role="menuitem" data-bring="' + esc(c.id) + '" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-list-dashes text-zinc-400"></i><span class="min-w-0 flex-1"><span class="block truncate">' + (esc(c.name) || 'Sem nome') + '</span><span class="block text-[11px] text-zinc-400 truncate">agora em: ' + esc(f ? f.nome : 'Pessoal') + '</span></span></button>'; }).join('');
+        menuEl.addEventListener('click', async function (e) {
+            var b = e.target.closest('[data-bring]');
+            if (!b) return;
+            closeColMenu();
+            var c = S.listas[b.dataset.bring], from = c && qdFind(c.quadro_id);
+            if (!c) return;
+            if (from && qbShared(from) && !(await dialog({ title: 'Tirar "' + c.name + '" do quadro ' + from.nome + '?', text: 'Ela some pra quem é de lá. As tarefas vêm junto.', okLabel: 'Trazer pra cá' }))) return;
+            if (await patchRow('listas', c.id, { quadro_id: cur }, '"' + c.name + '" veio pro quadro ' + (Q ? Q.nome : ''))) shLoadSoon(600);
+        });
+        document.body.appendChild(menuEl);
+        setTimeout(function () { document.addEventListener('pointerdown', outsideMenu, true); document.addEventListener('scroll', closeColMenu, true); }, 0);
+        var first = menuEl.querySelector('button');
+        if (first) first.focus();
+    }
+
     // ---- o menu da lista: compartilhar (a sua) / de quem é (a dos outros) ----
+    // V40.48.0: "Mudar de quadro…" (Pessoal ou um quadro; num quadro com gente, ela fica compartilhada com eles)
     function shareMenu(colId, btn) {
         closeColMenu();
         var c = S.listas[colId];
@@ -6166,19 +6281,20 @@
         menuEl.className = 'fixed z-40 w-60 bg-white border border-zinc-200 rounded-xl shadow-lg p-1';
         menuEl.style.top = Math.round(r.bottom + 6) + 'px';
         menuEl.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 248, r.right - 240))) + 'px';
-        menuEl.innerHTML = '<p class="px-3 pt-2 pb-1 text-[11.5px] text-zinc-500 leading-snug">Compartilhar "' + esc(c.name) + '": todo mundo do quadro vê a lista e mexe nas tarefas dela.</p>' +
-            opt(null, 'Só minha', 'ninguém mais vê') + SH.quadros.map(function (q) { return opt(q.id, q.nome, qdPeople(q.membros.length) + (q.souDono ? ' · você criou' : '')); }).join('') +
-            '<button type="button" data-share-new class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-plus"></i>Criar um quadro…</button>';
+        menuEl.innerHTML = '<p class="px-3 pt-2 pb-1 text-[11.5px] text-zinc-500 leading-snug">Mudar "' + esc(c.name) + '" de quadro. Num quadro com outras pessoas, todo mundo dele vê a lista e mexe nas tarefas.</p>' +
+            opt(null, 'Pessoal', 'sem quadro · só você vê') + SH.quadros.map(function (q) { return opt(q.id, q.nome, qbShared(q) ? qdPeople(q.membros.length) + (q.souDono ? ' · você criou' : '') : 'só você'); }).join('') +
+            '<button type="button" data-share-new class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-plus"></i>Novo quadro…</button>';
         menuEl.addEventListener('click', async function (e) {
             var b = e.target.closest('button');
             if (!b) return;
             closeColMenu();
-            if (b.hasAttribute('data-share-new')) return openCfgQuadros();
+            if (b.hasAttribute('data-share-new')) return qbNewBoard();
             var q = b.dataset.share || null;
             if ((c.quadro_id || null) === q) return;
-            if (!q && !(await dialog({ title: 'Parar de compartilhar "' + c.name + '"?', text: 'A lista some pra quem é do quadro. As tarefas continuam aqui com você.', okLabel: 'Parar de compartilhar' }))) return;
+            var from = c.quadro_id && qdFind(c.quadro_id); // V40.48.0: sair de um quadro com gente pergunta; de um quadro só seu, não
+            if (from && qbShared(from) && !(await dialog({ title: 'Tirar "' + c.name + '" do quadro ' + from.nome + '?', text: 'A lista some pra quem é do quadro. As tarefas continuam aqui com você.', okLabel: 'Tirar do quadro' }))) return;
             var Q = q && qdFind(q);
-            if (await patchRow('listas', colId, { quadro_id: q }, q ? 'Lista compartilhada com ' + (Q ? Q.nome : 'o quadro') : 'A lista agora é só sua')) shLoadSoon(600);
+            if (await patchRow('listas', colId, { quadro_id: q }, '"' + c.name + '" ' + (q ? 'foi pro quadro ' + (Q ? Q.nome : '') : 'voltou pro Pessoal'))) shLoadSoon(600);
         });
         document.body.appendChild(menuEl);
         setTimeout(function () { document.addEventListener('pointerdown', outsideMenu, true); document.addEventListener('scroll', closeColMenu, true); }, 0);
@@ -6209,11 +6325,18 @@
     }
     function bindEvents() {
         var wrap = $('columns');
+        $('qb-bar').addEventListener('click', function (e) { // V40.48.0: as abas dos quadros
+            var b;
+            if (e.target.closest('[data-qb-opt]')) return openCfgQuadros();
+            if (e.target.closest('[data-qb-new]')) return qbNewBoard();
+            if ((b = e.target.closest('[data-board]'))) return qbSet(b.dataset.board);
+        });
         wrap.addEventListener('click', function (e) {
             var b;
             if ((b = e.target.closest('.col-menu-btn'))) return openColMenu(b.dataset.col, b);
             if ((b = e.target.closest('.add-btn'))) return openComposer(b.dataset.col, '', true);
             if (e.target.closest('#btn-new-list')) return createList();
+            if ((b = e.target.closest('#qb-bring'))) return qbBringMenu(b); // V40.48.0: quadro vazio → trazer uma lista
             if ((b = e.target.closest('[data-more]'))) return openCardMenu('tarefas', b.dataset.more, b); // V40.15.0
             if ((b = e.target.closest('[data-hand]'))) return startPlacingFromTask(b.dataset.hand); // V40.12.0
             if ((b = e.target.closest('[data-sched]'))) { openTask(b.dataset.sched); return openSched(); } // V40.11.0
@@ -7253,6 +7376,7 @@
         try { savedTab = localStorage.getItem('faz_pc_tab') || 'listas'; S.agView = localStorage.getItem('faz_pc_agview') === 'day' ? 'day' : 'week'; } catch (e) {}
         try { S.agTag = localStorage.getItem('faz_pc_ag_tag') || ''; S.agHideDone = localStorage.getItem('faz_pc_ag_hidedone') === '1'; } catch (e) {} // V40.17.0
         try { S.agCompact = localStorage.getItem('faz_pc_ag_compact') === '1'; } catch (e) {} // V40.22.0
+        try { S.board = localStorage.getItem('faz_pc_quadro') || ''; } catch (e) {} // V40.48.0: o quadro aberto nas Listas
         try { // V40.20.0: colunas por tela (o zoom de tudo da V40.18.0 ficou pra trás)
             S.zoom = { listas: Number(localStorage.getItem('faz_pc_listas_por_tela')) || 0, agenda: Number(localStorage.getItem('faz_pc_dias_por_tela')) || 0 };
             localStorage.removeItem('faz_pc_zoom_listas'); localStorage.removeItem('faz_pc_zoom_agenda');

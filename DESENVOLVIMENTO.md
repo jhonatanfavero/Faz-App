@@ -176,6 +176,16 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     em toda tela da agenda que nada do bloco recolhido passa da altura dele ("cortado no bloco"), e o `tela_pc.js`
     (seção AF) confere a sublista curta no Dia. Ao abrir uma tela, nada de `.focus()` sozinho no celular: o teclado do
     Android sobe por cima e às vezes deixa um buraco branco (o + fazia isso até a V40.47.1).
+25. **Quadros com abas: a tela só anda nas listas do quadro aberto (V40.48.0).** O quadro de uma lista é o
+    `quadroId` dela (ou `shared.quadro`, se é apelido de lista de outra pessoa); no PC, `quadro_id` / `__sh.quadro`.
+    "Pessoal" = sem quadro (a Geral fica sempre lá). No celular, tudo que percorre as listas na tela (bolinhas,
+    cabeçalho, deslizar, zoom, mover pra esquerda/direita, arrastar lista) usa `blCols()` (`app.js`), nunca o
+    `backlogColumnsDb` inteiro; no PC, o `render()` filtra por `qbBoardOf(c) === qbCur()` (`kanban.html`). Quando a
+    lista aberta muda pra uma de outro quadro (busca, "Ver na lista", desfazer), o quadro vai junto (`blSyncBoard`).
+    Quadro que sumiu só cai pro Pessoal quando a lista de quadros é certa (logado e carregada); antes disso vale o
+    lembrado (`tb__quadro_aberto`, fora do backup; no PC, `faz_pc_quadro`). Mudar lista de quadro é o mesmo
+    `quadro_id` da V40.47.0: nada novo no banco. O voltar só leva pro menu grande se a tela veio dele (`hubVia`);
+    aberta de dentro do app (agendar, "Ver na lista"), fecha como antes.
 
 ## Publicar uma versão
 

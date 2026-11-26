@@ -52,7 +52,7 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   const today = server.alive('blocos', UID).filter((b) => b.date === '2026-11-16' && !b.archived);
 
   console.log('A) A aba Assistente:');
-  ok([...d.querySelectorAll('.tab')].map((b) => b.textContent.trim()).join(',') === 'Assistente,Listas,Agenda,Rotinas,Notas,Finanças,Metas', 'é a primeira aba: Assistente, Listas, Agenda, Rotinas, Notas, Finanças (e Metas, desde a V40.21.0)');
+  ok([...d.querySelectorAll('.tab')].map((b) => b.textContent.trim()).join(',') === 'Assistente,Quadros,Agenda,Rotinas,Notas,Finanças,Metas', 'é a primeira aba: Assistente, Quadros (eram as Listas até a V40.47.1), Agenda, Rotinas, Notas, Finanças (e Metas, desde a V40.21.0)');
   ok(visible('board') && !visible('assistente'), 'quem já usava continua abrindo onde estava (aqui, nas Listas)');
   click($('tab-assistente'));
   ok(visible('assistente') && !visible('board') && $('tab-assistente').classList.contains('on') && w.localStorage.getItem('faz_pc_tab') === 'assistente' && !visible('zoom-ctl'), 'abre, fica lembrada e não tem zoom');

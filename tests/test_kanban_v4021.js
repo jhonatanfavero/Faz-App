@@ -58,7 +58,7 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
   await waitFor(() => d.querySelectorAll('section.col').length === 5);
 
   console.log('A) Primeira vez na aba Metas:');
-  ok([...d.querySelectorAll('.tab')].map((b) => b.textContent.trim()).join(',') === 'Assistente,Listas,Agenda,Rotinas,Notas,Finanças,Metas', 'aba Metas no fim: Assistente, Listas, Agenda, Rotinas, Notas, Finanças, Metas');
+  ok([...d.querySelectorAll('.tab')].map((b) => b.textContent.trim()).join(',') === 'Assistente,Quadros,Agenda,Rotinas,Notas,Finanças,Metas', 'aba Metas no fim: Assistente, Quadros (eram as Listas até a V40.47.1), Agenda, Rotinas, Notas, Finanças, Metas');
   ok(server.log.some((l) => l.op === 'select' && l.t === 'metas_listas') && server.log.some((l) => l.op === 'select' && l.t === 'metas_dias'), 'a tela já carrega as metas da nuvem junto com o resto');
   ok(alive('metas_listas').length === 0, 'só abrir o PC não cria nada');
   click($('tab-metas'));

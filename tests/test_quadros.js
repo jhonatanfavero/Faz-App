@@ -280,7 +280,7 @@ const AUTH = 'sb-zlwocojndrjnuvoowzzu-auth-token';
   EB(`backlogColumnsDb.push({ id: 'col_dela2', name: 'FEIRA', isDefault: false, createdAt: Date.now() }); saveBacklogColumns(); activeColumnId = 'col_dela2'; renderBacklog(); openColumnMenuFromHeader();`);
   ok(!B.$('column-menu-share-btn').classList.contains('hidden') && B.$('column-menu-shared').classList.contains('hidden'), 'lista dela, ainda não compartilhada: botão "Compartilhar com um quadro"');
   EB(`openShareColumn()`);
-  ok(!B.$('share-list-modal').classList.contains('hidden') && B.$('share-list-options').textContent.includes('Empresa') && B.$('share-list-options').textContent.includes('Só minha') && B.$('share-list-options').querySelector('.agf-row.on').textContent.includes('Só minha'), 'a janelinha mostra os quadros dela ("Só minha" marcado)');
+  ok(!B.$('share-list-modal').classList.contains('hidden') && B.$('share-list-options').textContent.includes('Empresa') && B.$('share-list-options').textContent.includes('Pessoal') && B.$('share-list-options').querySelector('.agf-row.on').textContent.includes('Pessoal'), 'V40.48.0 ("Mudar de quadro"): a janelinha mostra os quadros dela ("Pessoal" marcado)');
   EB(`shareListPick('${EMP}')`);
   await waitFor(() => server.get('listas', MEMBRO, 'col_dela2') && server.get('listas', MEMBRO, 'col_dela2').quadro_id === EMP);
   ok(server.get('listas', MEMBRO, 'col_dela2').quadro_id === EMP && B.$('share-list-modal').classList.contains('hidden'), 'escolheu "Empresa": a FEIRA foi pro quadro');

@@ -70,10 +70,15 @@ async function pc(uid, email) {
   const cardBy = (id, title) => [...sec(id).querySelectorAll('.card')].find((c) => T(c).includes(title));
   const dono = (id) => server.get('tarefas', DONO, id);
 
-  console.log('A) No PC de quem está no quadro, a lista do outro aparece no fim, com as tarefas:');
+  // V40.48.0: cada quadro na sua aba (a lista do dono fica na aba "Casa"; as dela, no "Pessoal")
+  const tab = async (id) => { await waitFor(() => d.querySelector(`#qb-bar [data-board="${id}"]`), 6000); click(d.querySelector(`#qb-bar [data-board="${id}"]`)); await sleep(40); };
+  console.log('A) No PC de quem está no quadro, a lista do outro aparece no quadro dele, com as tarefas:');
+  await waitFor(() => d.querySelector(`#qb-bar [data-board="${CASA}"]`), 6000);
+  ok(!sec(AL) && !!sec('col_m'), 'V40.48.0: na aba "Pessoal" só as listas dela (a do dono fica na aba do quadro)');
+  await tab(CASA);
   await waitFor(() => sec(AL) && cards(AL).length === betaIds.length, 6000);
   const order = [...d.querySelectorAll('section.col')].map((s) => s.dataset.col);
-  ok(sec(AL) && order[order.length - 1] === AL && order.indexOf('col_m') < order.indexOf(AL), 'a BETA (do dono) apareceu no fim, depois das listas dela');
+  ok(sec(AL) && order.join() === AL && !sec('col_m'), 'na aba "Casa": a BETA (do dono)');
   ok(cards(AL).length === betaIds.length && cards(AL).every((id) => id.startsWith('sh_aaaaaaaa_')), 'com as ' + betaIds.length + ' tarefas (cada uma com o prefixo da conta do dono)');
   ok(/de dono@teste\.com · Casa/.test(T(sec(AL).querySelector('header'))) && sec(AL).classList.contains('col-shared') && !!sec(AL).querySelector('header .ph-users-three') && !sec(AL).querySelector('header').hasAttribute('draggable'), 'cabeçalho: de quem é e o quadro, com o ícone (e não arrasta pro lado)');
   ok(!cards(GAMA).length && !d.querySelector(`section.col[data-col="${CORE.sharedAlias(DONO, GAMA)}"]`), 'as outras listas do dono continuam invisíveis');
@@ -87,6 +92,7 @@ async function pc(uid, email) {
   click($('f-save'));
   await waitFor(() => dono(rid0).title === 'Editada no PC dela');
   ok(dono(rid0).title === 'Editada no PC dela', 'editou: mudou na conta do dono');
+  ok([...$('f-col').querySelectorAll('optgroup')].map((g) => g.label).join('|') === 'Pessoal|Quadro Casa', 'V40.48.0: o campo "Lista" separado por quadro');
   const taggedRid = betaIds[0], taggedLocal = CORE.sharedLocalId(DONO, taggedRid);
   click(d.querySelector(`.card[data-id="${taggedLocal}"]`));
   await waitFor(() => !$('modal-task').classList.contains('hidden'));
@@ -123,10 +129,14 @@ async function pc(uid, email) {
   await waitFor(() => dono(ridMv).deleted === true && server.rows('tarefas', MEMBRO).some((t) => t.title === mvTitle && !t.deleted));
   const copia = server.rows('tarefas', MEMBRO).find((t) => t.title === mvTitle && !t.deleted);
   ok(dono(ridMv).deleted === true && copia && copia.column_id === 'col_m' && copia.id !== ridMv, 'levou pra lista dela: saiu da conta do dono e nasceu na dela (id novo)');
-  ok(cards('col_m').includes(copia.id) && !cards(AL).includes(mv), 'na tela: está na MINHA');
+  ok(!cards(AL).includes(mv), 'na tela: saiu da BETA');
+  await tab('');
+  ok(cards('col_m').includes(copia.id), 'e está na MINHA (aba "Pessoal")');
   press(d.body, 'z', { ctrlKey: true });
   await waitFor(() => dono(ridMv).deleted === false && server.get('tarefas', MEMBRO, copia.id).deleted === true);
+  await tab(CASA);
   ok(dono(ridMv).deleted === false && server.get('tarefas', MEMBRO, copia.id).deleted === true && cards(AL).includes(mv), 'Ctrl+Z: voltou pra BETA do dono (e a cópia dela some)');
+  await tab('');
   // da lista dela pra do outro, pelo cartão
   click(d.querySelector('.card[data-id="bl_m1"]'));
   await waitFor(() => !$('modal-task').classList.contains('hidden'));
@@ -134,6 +144,7 @@ async function pc(uid, email) {
   click($('f-save'));
   await waitFor(() => server.get('tarefas', MEMBRO, 'bl_m1').deleted === true && [...server.tables.tarefas.values()].some((t) => t.user_id === DONO && t.title === 'Minha tarefa' && !t.deleted));
   ok([...server.tables.tarefas.values()].some((t) => t.user_id === DONO && t.title === 'Minha tarefa' && t.column_id === BETA && t.id !== 'bl_m1'), 'trouxe uma dela pra BETA: nasceu na conta do dono com id novo');
+  await tab(CASA);
 
   console.log('\nD) Ao vivo: o que o dono muda aparece sozinho:');
   server.patch('tarefas', DONO, rid0, { title: 'O dono mudou' });
@@ -169,13 +180,16 @@ async function pc(uid, email) {
   const A = await pc(DONO, 'dono@teste.com');
   const a$ = A.$, ad = A.d, aclick = (el) => el.dispatchEvent(new A.w.MouseEvent('click', { bubbles: true, cancelable: true }));
   const asec = (id) => ad.querySelector(`section.col[data-col="${id}"]`);
+  const atab = async (id) => { await waitFor(() => ad.querySelector(`#qb-bar [data-board="${id}"]`), 6000); aclick(ad.querySelector(`#qb-bar [data-board="${id}"]`)); await sleep(40); };
+  await atab(CASA);
   await waitFor(() => asec(BETA) && /quadro Casa/.test(asec(BETA).querySelector('h2').getAttribute('title') || ''));
   ok(!!asec(BETA).querySelector('header .ph-users-three') && /Compartilhada com o quadro Casa/.test(asec(BETA).querySelector('h2').getAttribute('title')), 'a BETA dele mostra que está compartilhada com a Casa');
   ok(T(asec(BETA)).includes('Criada no PC dela') && T(asec(BETA)).includes('Minha tarefa'), 'e já tem o que ela criou e trouxe (é a conta dele)');
+  await atab('');
   aclick(asec(GAMA).querySelector('.col-menu-btn'));
-  aclick([...ad.querySelectorAll('[role="menu"] button, body > div.fixed button')].find((b) => /Compartilhar com um quadro/.test(b.textContent)));
+  aclick([...ad.querySelectorAll('[role="menu"] button, body > div.fixed button')].find((b) => /Mudar de quadro/.test(b.textContent)));
   await waitFor(() => [...ad.querySelectorAll('[data-share]')].length >= 2);
-  ok(/Só minha/.test(T(ad.querySelector('[role="menu"]'))) && [...ad.querySelectorAll('[data-share]')].some((b) => b.dataset.share === CASA), 'Compartilhar: "Só minha" e os quadros dele');
+  ok(/Pessoal/.test(T(ad.querySelector('[role="menu"]'))) && [...ad.querySelectorAll('[data-share]')].some((b) => b.dataset.share === CASA), 'V40.48.0 "Mudar de quadro…": "Pessoal" e os quadros dele');
   aclick([...ad.querySelectorAll('[data-share]')].find((b) => b.dataset.share === CASA));
   await waitFor(() => server.get('listas', DONO, GAMA).quadro_id === CASA);
   ok(server.get('listas', DONO, GAMA).quadro_id === CASA, 'escolheu "Casa": a GAMA foi pro quadro');

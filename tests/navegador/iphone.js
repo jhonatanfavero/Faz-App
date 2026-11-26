@@ -230,9 +230,14 @@ const IPHONES = [
         ['Config: Quadros (sem conta)', 'closeAllSheets(); openConfigSheet(); openConfigQuadros();', '#config-sheet', { fim: true }],
         ['Config: Quadros', QD_FAKE + 'openConfigSheet(); openConfigQuadros();', '#config-sheet', { fim: true }],
         ['Config: um quadro', "qdOpen('11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa');", '#config-sheet', { fim: true }],
-        ['Janelinha: compartilhar a lista', QD_FAKE + "closeAllSheets(); openListSheet(); switchListTab('backlog'); scrollToColumn(backlogColumnsDb[1].id); activeColumnId = backlogColumnsDb[1].id; openShareColumn();", '#share-list-modal', { depois: 'closeShareList(); closeAllSheets();' }],
+        ['Janelinha: mudar de quadro', QD_FAKE + "closeAllSheets(); openListSheet(); switchListTab('backlog'); scrollToColumn(backlogColumnsDb[1].id); activeColumnId = backlogColumnsDb[1].id; openShareColumn();", '#share-list-modal', { depois: 'closeShareList(); closeAllSheets();' }],
         ['Lista: compartilhada comigo', QD_COL + "closeAllSheets(); openListSheet(); switchListTab('backlog'); activeColumnId = 'sh_aaaaaaaa_col_x'; renderBacklog(); scrollToColumn('sh_aaaaaaaa_col_x');", '#list-sheet', { espera: 600 }],
         ['Janelinha: menu da lista compartilhada', 'openColumnMenuFromHeader();', '#column-menu-modal', { depois: QD_UNDO + 'closeColumnMenu(); closeAllSheets();' }],
+        // V40.48.0: o menu grande (botão dos itens) e os quadros com abas (com os quadros de mentira: Casa com gente, Empresa vazio)
+        ['Menu grande', 'closeAllSheets(); openHub();', '#list-sheet'],
+        ['Quadros: aba de um quadro', QD_FAKE + QD_COL + "closeAllSheets(); openListSheet(); blSetBoard('" + QD.id + "');", '#list-sheet', { espera: 600, depois: QD_UNDO + "blSetBoard(''); closeAllSheets();" }],
+        ['Quadros: quadro vazio', QD_FAKE + "closeAllSheets(); openListSheet(); blSetBoard('" + QD2.id + "');", '#list-sheet', { depois: "blSetBoard(''); if (window.__qdReal) window.fazQuadros = window.__qdReal; closeAllSheets();" }],
+        ['Janelinha: trazer uma lista', QD_FAKE + "closeAllSheets(); openListSheet(); blSetBoard('" + QD2.id + "'); blBringList();", '#share-list-modal', { depois: "closeShareList(); blSetBoard(''); if (window.__qdReal) window.fazQuadros = window.__qdReal; closeAllSheets();" }],
         ['Janelinha: categoria das metas', "closeAllSheets(); openListSheet(); switchListTab('goals'); openGoalListMenu('gl_pessoal');", '#goal-list-menu-modal', { depois: "hideModal('goal-list-menu-modal'); closeAllSheets();" }], // V40.37.0: Pôr na agenda
         ['Tarefa na mão', `closeAllSheets(); scheduleBacklogItem(backlogDb[0].id);`, '#floating-task', { depois: 'cancelPendingTask();' }],
         // V40.43.0: com a tarefa na mão, o espaço livre dividido pelos Períodos (as partes são tocáveis: nada por cima delas)

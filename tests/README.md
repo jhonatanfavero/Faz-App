@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 50 suítes (cerca de 10 minutos)
+npm test        # confere o CSS pronto e roda as 51 suítes (cerca de 10 minutos)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -62,6 +62,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_descartar.js` | app de verdade e `kanban.html` de verdade | V40.46.0: "Descartar?" ao fechar com texto não salvo. Celular: o ←, o X da tela, o voltar do celular e o fundo escuro perguntam só com o texto mudado ("Continuar escrevendo" fica; "Descartar" faz o que o toque ia fazer, sem gravar); sem mudar, apagar o que escreveu ou só espaço: fecha direto; Salvar não pergunta; tarefa nova e existente, rotina, nota, despesa, meta; janelinhas (o Cancelar escrito não pergunta, o voltar pergunta; o fundo escuro cobre as duas); o +, e a nova tag guardam rascunho (ficam de fora). PC: o cartão (Esc, clique fora, checklist, Cancelar e Salvar não perguntam, a busca de dentro não conta), despesa, meta, rotina, Configurações, Tags e a nova tarefa no pé da lista; os outros diálogos continuam com "Cancelar" |
 | `test_quadros.js` | o motor do `sync.js`, a "nuvem" com as regras da migration e dois celulares de verdade (o dono e quem está no quadro) | V40.47.0: quadros e listas compartilhadas: apelido igual nos dois lados, o que sai da vista nunca vira "apagado", sem base vale a nuvem; as regras do banco (só vê e grava a lista compartilhada, quem põe lista, quem põe e tira gente); criar quadro, pôr pelo e-mail (sem conta, você mesmo, já está), compartilhar (a Geral não), a lista chegando no outro celular, editar/criar/apagar/mover de conta/agendar/voltar pra lista gravando na conta do dono, conflito por campo, backup e restaurar sem mexer na lista dos outros, estado perdido, parar de compartilhar (o que não subiu vai pra uma lista sua), tirar pessoa, sair, apagar quadro, trocar de conta, sair da conta, as telas (Config → Quadros, menu da lista, janelinha de compartilhar) |
 | `test_quadros_pc.js` | `kanban.html` de verdade (dois PCs: quem está no quadro e o dono) | V40.47.0: a lista do outro no fim, com as tarefas e de quem é; editar (a tag do dono fica), criar, apagar e Ctrl+Z na conta do dono; mudar de conta pelo cartão (id novo) e Ctrl+Z; ao vivo (editou, criou, renomeou; o que não é compartilhado não chega); tag de mesmo id; menu da lista do outro; Configurações → Quadros; o dono compartilha pelo menu da lista, põe e tira pessoa, cria quadro |
+| `test_v40471.js` | app de verdade + `kanban.html` de verdade | V40.47.1: sublista de 5 e 10 min numa linha só (celular e visão Dia do PC) e a duração nas curtas; "Colocar aqui" na linha do nome; sublista escura com letra clara na agenda afastada; o + abre sem foco no nome (teclado); o Config do + vira só a engrenagem, na linha do Descanso e da Sublista |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)

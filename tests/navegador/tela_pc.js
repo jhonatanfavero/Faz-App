@@ -1237,6 +1237,33 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await p.keyboard.press('Escape'); await p.mouse.click(5, 450); await p.waitForTimeout(200);
   }
 
+  { // V40.47.1 (bloco próprio: os nomes daqui não se misturam com os de cima)
+  console.log('\nAF) Sublista de 5 e 10 min na visão Dia (V40.47.1):');
+  const DF = '2026-12-16'; // quarta, sem nada nos dados de teste
+  await p.evaluate(([uid, dz]) => {
+    const n = window.__nuvem, base = { type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, deleted: false, date: dz };
+    const cs = (k, done) => Array.from({ length: k }, (_, i) => ({ id: 'cd_af' + k + i + (done ? 'd' : ''), title: 'Cartão ' + (i + 1), done: done || i === 0, microblocks: [] }));
+    n.insert('blocos', uid, Object.assign({}, base, { id: 'f_af1', start_min: 600, duration: 5, title: 'CAR CHEVETTE' }));
+    n.insert('blocos', uid, Object.assign({}, base, { id: 'f_af2', start_min: 605, duration: 5, title: 'CONSULTA DO DIA', cards: cs(4) }));
+    n.insert('blocos', uid, Object.assign({}, base, { id: 'f_af3', start_min: 610, duration: 10, title: 'LIGAÇÕES RÁPIDAS', cards: cs(3) }));
+    n.insert('blocos', uid, Object.assign({}, base, { id: 'f_af4', start_min: 620, duration: 5, title: 'FEITA', cards: cs(1, true), completed: true }));
+  }, [UID, DF]);
+  for (let i = 0; i < 3 && await p.evaluate(() => !!document.querySelector('[role="dialog"]:not(.hidden)')); i++) { await p.keyboard.press('Escape'); await p.waitForTimeout(200); } // o que a seção de cima deixou aberto
+  await p.locator('#tab-agenda').click(); await p.waitForTimeout(250);
+  await p.evaluate(() => { document.querySelector('.ag-view[data-view="week"]').click(); document.getElementById('ag-today').click(); for (let i = 0; i < 4; i++) document.getElementById('ag-next').click(); }); await p.waitForTimeout(300);
+  await p.evaluate((dz) => document.querySelector('#ag-cols .ag-day-btn[data-day="' + dz + '"]').click(), DF); await p.waitForTimeout(300);
+  await p.evaluate(() => { document.getElementById('ag-day').scrollTop = (10 * 60 - 7 * 60) * 3.2 - 120; }); await p.waitForTimeout(150);
+  const af = await p.evaluate(() => ['f_af2', 'f_af3', 'f_af4'].map((id) => {
+    const el = [...document.querySelectorAll('#ag-timeline [data-block]')].find((e) => e.dataset.block === id);
+    if (!el) return id + ': não achou';
+    const r = el.getBoundingClientRect(), cs = getComputedStyle(el), top = r.top + parseFloat(cs.borderTopWidth), bot = r.bottom - parseFloat(cs.borderBottomWidth);
+    const dentro = (x) => { if (!x) return false; const q = x.getBoundingClientRect(), mid = (q.top + q.bottom) / 2; return mid > top && mid < bot && q.bottom - bot < 3 && top - q.top < 3; };
+    return id + ': ' + (dentro(el.querySelector('.ag-sub-time')) && dentro(el.querySelector('.ag-sub-title')) ? 'ok' : 'cortado (' + Math.round(r.height) + ' px)');
+  }));
+  ok(af.every((s) => /: ok$/.test(s)), 'Dia: a sublista de 5 e a de 10 min mostram o horário, os cartões e o nome numa linha, dentro dela (' + af.join(', ') + ')');
+  await foto(p, 'pc-dia-sublista-curta.png');
+  }
+
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));
   await fim();
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

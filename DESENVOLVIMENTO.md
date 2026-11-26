@@ -169,6 +169,13 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     listas dos outros não vão no backup, e restaurar um backup (ou desfazer) não mexe nelas; (e) quadros e pessoas não
     vão no "ao vivo" (o aviso de apagado não passa pelas regras): releitura a cada rodada/minuto. A lista Geral não se
     compartilha. Estado em `tb__compartilhadas` (base por dono) e `tb__quadros` (o que a tela mostra).
+24. **Bloco curto tem que caber na altura dele (V40.47.1).** Na agenda do celular o bloco de 5 min tem 13 px e o de
+    10 min, 28 px (no Dia do PC, 14 e 30 px). Desenho novo de bloco (ou de sublista) precisa da versão de uma linha
+    pra esses tamanhos, como `.nano-block`/`.nano-5` e `.sub-nano`/`.sub-nano-5` (`style.css`) e `.ag-sub-tiny`/
+    `.ag-sub-5` (`kanban.html`); a sublista de 5 min chegou a mostrar o nome cortado ao meio. O `iphone.js` confere
+    em toda tela da agenda que nada do bloco recolhido passa da altura dele ("cortado no bloco"), e o `tela_pc.js`
+    (seção AF) confere a sublista curta no Dia. Ao abrir uma tela, nada de `.focus()` sozinho no celular: o teclado do
+    Android sobe por cima e às vezes deixa um buraco branco (o + fazia isso até a V40.47.1).
 
 ## Publicar uma versão
 

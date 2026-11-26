@@ -46,7 +46,8 @@
 // V10.51 - v40.45.0 (Filtro da agenda no celular, o "Todas as tags" e o "Ocultar concluídos" do PC: o botão TAGs abre "Filtrar a agenda" (uma tag, "Sem tag" e "Ocultar concluídos"; "Gerenciar tags" no pé) e, ligado, mostra a tag escolhida. Só esconde da tela: o bloco escondido vira um contorno no horário dele e o espaço livre continua contando com ele. Guardado no aparelho, fora do backup.)
 // V10.52 - v40.46.0 ("Descartar?" ao fechar um formulário com texto não salvo, no celular e no PC: com o texto mudado, o X, o ← do formulário, o voltar do celular, o toque no fundo escuro, o Esc e o clique fora perguntam antes de apagar o que foi escrito ("Descartar" ou "Continuar escrevendo"). O Cancelar escrito fecha sem perguntar. Formulários que guardam o rascunho (o +, o novo período e a nova tag do celular) ficam de fora.)
 // V10.53 - v40.47.0 (Quadros e listas compartilhadas, no celular e no PC: um quadro (Casa, Empresa) junta pessoas pelo e-mail da conta; qualquer um do quadro põe uma lista sua nele e todo mundo vê e mexe nas tarefas dela (agendar tira da lista); só quem criou o quadro põe e tira gente, só o dono da lista renomeia ou apaga. As tarefas ficam na conta de quem é dono (regras novas no banco: faz_v40_47_0_quadros). Config → Quadros no celular; Configurações → Quadros e o menu da lista no PC.)
-const CACHE_NAME = 'timeblock-v40-47-0';
+// V10.54 - v40.47.1 (Consertos das fotos dele de 26/11: a sublista de 5 e 10 min aparece numa linha só, como os blocos curtos, sem o nome cortado ao meio (celular e visão Dia do PC), e toda sublista curta mostra a duração depois do nome; com a tarefa na mão, o "Colocar aqui" vai na linha do nome; o + abre sem subir o teclado; o Config do + virou só a engrenagem, na mesma linha do Descanso e da Sublista; na agenda afastada, a sublista pintada de cor escura ganha letra clara.)
+const CACHE_NAME = 'timeblock-v40-47-1';
 const ASSETS = [
   './',
   './index.html',

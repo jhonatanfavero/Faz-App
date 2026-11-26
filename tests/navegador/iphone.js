@@ -153,6 +153,17 @@ const IPHONES = [
             if (raiz === null) { // o nome do dia no topo da agenda não pode ficar cortado
                 const hd = document.getElementById('header-date');
                 if (hd && hd.clientWidth && hd.scrollWidth > hd.clientWidth + 1) out.push({ tipo: 'nome do dia cortado', quem: '"' + hd.textContent.trim() + '"', rect: [hd.clientWidth, hd.scrollWidth] });
+                // V40.47.1: nada do bloco recolhido passa da altura dele (a sublista de 5 min cortava o nome ao meio: foto dele de 26/11)
+                if (!document.querySelector('.filter-list-mode')) document.querySelectorAll('#blocks-container .block-item').forEach((bk) => {
+                    const id = bk.dataset.blockId, b = typeof db !== 'undefined' && db.find((x) => x.id === id);
+                    if (!b || b.expanded || b.type === 'empty') return;
+                    const r = bk.getBoundingClientRect(), cs = getComputedStyle(bk), top = r.top + parseFloat(cs.borderTopWidth), bot = r.bottom - parseFloat(cs.borderBottomWidth);
+                    bk.querySelectorAll('.block-title, .sub-title, .sub-count, .micro-time, .sub-drop-mini, .block-btn, .time-label').forEach((x) => {
+                        const s = getComputedStyle(x); if (s.display === 'none' || s.visibility === 'hidden' || x.closest('.hidden')) return;
+                        const q = x.getBoundingClientRect(); if (q.width < 1 || q.height < 1) return;
+                        if (q.top < top - 1 || q.bottom > bot + 1) out.push({ tipo: 'cortado no bloco', quem: (x.className.match(/block-title|sub-title|sub-count|micro-time|sub-drop-mini|block-btn|time-label/) || ['?'])[0] + ' de "' + (b.title || '').slice(0, 24) + '" (' + b.duration + ' min)', rect: [Math.round(q.top - top), Math.round(q.bottom - top), Math.round(bot - top)] });
+                    });
+                });
             }
             return out;
         }, { ip, raiz, opts: opts || null });
@@ -229,7 +240,9 @@ const IPHONES = [
         ['Agenda: tarefa na mão, vagos ocultos', "closeAllSheets(); db.push({ id: 'f_ip_reu', type: 'focus', title: 'Reunião', startMin: 600, duration: 60, date: '2026-11-19', microblocks: [], completed: false, theme: 'focus', tagId: null, linkedNoteIds: [], expanded: false }); tlCompact = true; activeDateObj = new Date(2026, 10, 19); renderTimeline(); runRealTimeEngine(); scheduleBacklogItem(backlogDb[0].id); document.getElementById('timeline-scroll').scrollTop = 0;", null, { depois: "cancelPendingTask(); db = db.filter((b) => b.id !== 'f_ip_reu'); tlCompact = false; renderTimeline();" }],
         // V40.44.0: dia cheio (17/11, blocos colados): o "↓" de cada emenda encaixa descendo os de baixo
         ['Agenda: tarefa na mão, encaixar entre blocos', "closeAllSheets(); activeDateObj = new Date(2026, 10, 17); renderTimeline(); runRealTimeEngine(); scheduleBacklogItem(backlogDb[0].id); changeFloatDuration(30); document.getElementById('timeline-scroll').scrollTop = 0;", null, { depois: 'cancelPendingTask();' }],
-        ['Agenda: tarefa na mão, 3 dias', "closeAllSheets(); activeDateObj = new Date(2026, 10, 16); setTlDays(3); scheduleBacklogItem(backlogDb[0].id); document.getElementById('timeline-scroll').scrollTop = 0; document.getElementById('toast').classList.add('opacity-0');", null, { espera: 600, depois: 'cancelPendingTask(); setTlDays(1); renderTimeline();' }],
+        // V40.47.1: sublistas de 5, 10, 15 e 20 min (e blocos de 5 e 15 min) numa tarde sem nada: tudo cabe no bloco
+        ['Agenda: sublistas curtas', "closeAllSheets(); (() => { const cs = (n) => Array.from({ length: n }, (_, i) => ({ id: 'cd_ipc' + n + i, title: 'Cartão ' + (i + 1), done: i === 0, microblocks: [] })), add = (o) => db.push(Object.assign({ type: 'focus', date: '2026-11-16', microblocks: [], completed: false, theme: 'focus', tagId: null, linkedNoteIds: [], expanded: false }, o)); add({ id: 'f_ipc1', title: 'CAR CHEVETTE', startMin: 840, duration: 5 }); add({ id: 'f_ipc2', title: 'CONSULTA DO DIA', startMin: 845, duration: 5, cards: cs(4) }); add({ id: 'f_ipc3', title: 'LIGAÇÕES RÁPIDAS', startMin: 850, duration: 10, cards: cs(3) }); add({ id: 'f_ipc4', title: 'PAPELADA DO CARTÓRIO', startMin: 860, duration: 15, cards: cs(2) }); add({ id: 'f_ipc5', title: 'MERCADO', startMin: 875, duration: 20, cards: cs(5) }); add({ id: 'f_ipc6', title: 'GEO FOGAÇA', startMin: 895, duration: 15 }); add({ id: 'f_ipc7', title: 'COR ESCURA', startMin: 910, duration: 5, cards: cs(1), color: '#1e3a8a' }); activeDateObj = new Date(2026, 10, 16); renderTimeline(); runRealTimeEngine(); const el = document.querySelector('[data-block-id=\"f_ipc1\"]'); if (el) el.scrollIntoView({ block: 'center' }); })();", null, { depois: "db = db.filter((b) => !/^f_ipc/.test(b.id)); renderTimeline();" }],
+        ['Agenda: tarefa na mão, 3 dias',"closeAllSheets(); activeDateObj = new Date(2026, 10, 16); setTlDays(3); scheduleBacklogItem(backlogDb[0].id); document.getElementById('timeline-scroll').scrollTop = 0; document.getElementById('toast').classList.add('opacity-0');", null, { espera: 600, depois: 'cancelPendingTask(); setTlDays(1); renderTimeline();' }],
         ['Barrinha do Desfazer', `closeAllSheets(); (() => { const b = db.find((x) => x.date === '2026-11-16'); toggleBlockCompletion(b.id, { stopPropagation() {} }); })();`, '#undo-bar', { espera: 400, depois: '(() => { const b = db.find((x) => x.date === "2026-11-16"); toggleBlockCompletion(b.id, { stopPropagation() {} }); undoBarHide && undoBarHide(); })();' }]
     ];
 

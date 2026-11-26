@@ -55,6 +55,7 @@ const SUITES = [
     ['"Descartar?" ao fechar um formulário com texto não salvo (celular e PC)', 'test_descartar.js', [ROOT, DADOS]],
     ['Quadros e listas compartilhadas: as regras, a nuvem e dois celulares (dono e quem está no quadro)', 'test_quadros.js', [ROOT, DADOS]],
     ['Quadros e listas compartilhadas na tela do PC (quem está no quadro e o dono, ao vivo)', 'test_quadros_pc.js', [ROOT, DADOS]],
+    ['V40.47.1: sublista curta numa linha (celular e PC), o + sem teclado e o Config só a engrenagem', 'test_v40471.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

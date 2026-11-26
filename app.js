@@ -1129,7 +1129,7 @@ function tlMiniBlock(b, ds) {
     const el = document.createElement('div');
     const sub = isSublist(b), rest = b.theme === 'rest', card = b.completed ? null : fazCardColor(b.color);
     el.className = 'tl-mini' + (b.completed ? ' done' : '') + (b.type === 'past' ? ' past' : '') + (rest && !b.completed ? ' rest' : '') + (sub && !b.completed ? ' sub' : '') +
-        (card && !fazIsDark(card) ? ' light' : '') + (h < 26 ? ' tiny' : '');
+        (card && !fazIsDark(card) ? ' light' : '') + (sub && card && fazIsDark(card) ? ' sub-dark' : '') + (h < 26 ? ' tiny' : ''); // V40.47.1: sublista de cor escura com letra clara
     el.style.top = (top + 1) + 'px';
     el.style.height = h + 'px';
     if (card) el.style.backgroundColor = card;
@@ -1962,8 +1962,12 @@ function drawSublist(el, b, heightPx, isSearching) {
     const tagColor = getTagColor(b.tagId);
     const placing = subCanDrop();
     const compact = !b.expanded && !listMode && b.duration <= 20; // até 20 min (58 px) só cabe o cabeçalho
+    // V40.47.1: 5 e 10 min (13 e 28 px de altura) numa linha só, como os blocos de 5 e 10 min (.nano-block, style.css):
+    // o cabeçalho e os botões de 28 px passavam da altura e o nome saía cortado ao meio (foto dele de 26/11). E toda
+    // sublista curta (até 20 min, sem a linha do horário) mostra a duração depois do nome ("• 15m"), como os blocos curtos.
+    const nano = compact && b.duration <= 10, nano5 = nano && b.duration < 10;
     const pb = b.expanded ? 'pb-12' : (compact ? 'pb-1' : 'pb-3');
-    el.className += ` sub-block ${b.completed ? 'sub-done' : (custom ? 'sub-custom' : 'sub-amber')}${dark ? ' sub-dark' : ''} pr-2 ${compact ? 'pt-1' : 'pt-2'} ${pb} group select-none`;
+    el.className += ` sub-block ${b.completed ? 'sub-done' : (custom ? 'sub-custom' : 'sub-amber')}${dark ? ' sub-dark' : ''}${nano ? ' sub-nano' + (nano5 ? ' sub-nano-5' : '') : ''} pr-2 ${compact ? 'pt-1' : 'pt-2'} ${pb} group select-none`;
     if (custom) el.style.backgroundColor = custom;
     if (tagColor) el.style.cssText += `border-left: 5px solid ${tagColor};`;
     if (b.expanded) {
@@ -1985,7 +1989,8 @@ function drawSublist(el, b, heightPx, isSearching) {
 
     let body = '';
     if (placing) {
-        body = `<div class="sub-drop ml-10 mr-1 ${compact ? 'mt-0.5' : 'mt-1.5'}"><i class="ph ph-hand-pointing text-sm"></i>Colocar aqui</div>`;
+        // V40.47.1: na sublista curta (até 20 min) a caixa "Colocar aqui" não cabia embaixo do nome: vai na linha dele
+        body = compact ? '' : `<div class="sub-drop ml-10 mr-1 mt-1.5"><i class="ph ph-hand-pointing text-sm"></i>Colocar aqui</div>`;
     } else if (!compact) {
         let shown = b.cards, more = 0;
         if (!b.expanded && !listMode) {
@@ -2023,7 +2028,8 @@ function drawSublist(el, b, heightPx, isSearching) {
                 <div class="title-wrapper flex items-center ${compact ? '' : 'mt-0.5'} min-w-0 pointer-events-none">
                     ${pastIcon}<i class="ph-bold ph-list-checks sub-ico text-[13px] shrink-0 mr-1"></i>
                     <h3 class="block-title sub-title text-[14px] font-bold leading-tight truncate${b.completed ? ' line-through' : ''}">${escapeHtml(b.title)}</h3>
-                    <span class="sub-count shrink-0 ml-1.5">${c.total ? `${c.done}/${c.total}` : '0'}</span>
+                    ${compact ? `<span class="micro-time sub-time text-[11px] font-bold ml-1 shrink-0 pointer-events-auto${timeClick ? ' cursor-pointer' : ''}" ${timeClick}${timeClick ? ' title="Alterar Horário"' : ''}>&bull; ${formatDur(b.duration)}</span>` : ''}
+                    ${placing && compact ? '<span class="sub-drop-mini shrink-0 ml-1.5"><i class="ph ph-hand-pointing"></i>Colocar aqui</span>' : `<span class="sub-count shrink-0 ml-1.5">${c.total ? `${c.done}/${c.total}` : '0'}</span>`}
                 </div>
             </div>
             ${placing ? '' : `<div class="flex gap-1.5 shrink-0 relative z-[60] pointer-events-auto select-auto">
@@ -3507,13 +3513,11 @@ window.openSheet = () => {
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     sheet.classList.remove('translate-y-full');
     pushNavState(); // V40.5.0-fix7: captura botão voltar
-    
-    // V40.1.4: foco automático no input após animação do sheet (350ms)
-    setTimeout(() => {
-        if (sheet.classList.contains('translate-y-full')) return; // V40.34.0: fechou antes dos 350 ms: não foca o campo escondido (segurava a sincronização)
-        const taskInput = document.getElementById('task-input');
-        if (taskInput) taskInput.focus();
-    }, 350);
+
+    // V40.47.1: o + abre SEM o teclado (pedido dele em 26/11: "já abre com o teclado aberto, não fica confortável").
+    // O foco automático da V40.1.4 (350 ms depois de abrir) subia o teclado no Android por cima de metade do formulário
+    // e, às vezes, a fileira Descanso/Sublista nem aparecia (o buraco branco da Regra de Ouro 2: nada de .focus()
+    // programático ao abrir tela). O teclado sobe quando a pessoa toca em "Nome da tarefa".
 }
 
 window.openListSheet = () => {
@@ -4079,7 +4083,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.47.0',
+            version: 'v40.47.1',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

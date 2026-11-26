@@ -155,6 +155,9 @@
     .swatch.on { box-shadow: 0 0 0 2px #18181b; }
     /* V40.24.0: SUBLISTA — bloco com vários cartões dentro (amarelinho e tracejado, como no celular) */
     .ag-sub { border: 2px dashed #f59e0b !important; background-color: #fffbeb; }
+    /* V40.47.1: sublista de 5 e 10 min na visão Dia: uma linha só, no meio (a de 5 min tem 14 px: borda de 1 px em cima e embaixo) */
+    .ag-sub.ag-sub-tiny { padding-top: 0 !important; padding-bottom: 0 !important; justify-content: center; }
+    .ag-sub.ag-sub-5 { border-top-width: 1px !important; border-bottom-width: 1px !important; }
     .ag-sub.done { background-color: #ecfdf5; border-color: #10b981 !important; }
     .ag-sub .ag-sub-title { color: #451a03; }
     .ag-sub .ag-sub-time { color: #92400e; }
@@ -1098,7 +1101,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.47.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.47.1</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -2253,7 +2256,9 @@
             if (!agVisible(b)) { html += '<div class="ag-hidden" style="top:' + top + 'px;height:' + height + 'px" title="Escondido pelo filtro"></div>'; return; }
             shownN++; shownMin += Number(b.duration) || 0;
             if (isSub(b)) { // V40.24.0: sublista (amarelinha, com os cartões que couberem)
-                html += '<div class="ag-card ag-sub absolute rounded-md overflow-hidden cursor-pointer px-2 py-1 flex flex-col ' + paint.cls + (b.completed ? 'done' : '') + (isNow(b, day, today, nm) ? ' ag-now' : '') +
+                // V40.47.1: 5 e 10 min (14 e 30 px) sem o respiro de cima e de baixo, com a linha no meio (a de 5 min, com
+                // borda de 1 px em cima e embaixo): antes a linha caía pra baixo da caixa e a sublista de 5 min ficava vazia.
+                html += '<div class="ag-card ag-sub absolute rounded-md overflow-hidden cursor-pointer px-2 py-1 flex flex-col ' + (b.duration <= 10 ? 'ag-sub-tiny ' + (b.duration < 10 ? 'ag-sub-5 ' : '') : '') + paint.cls + (b.completed ? 'done' : '') + (isNow(b, day, today, nm) ? ' ag-now' : '') +
                     '" style="left:56px;right:0;top:' + top + 'px;height:' + height + 'px;' + paint.css + (tag ? 'border-left:4px solid ' + esc(safeColor(tag.color)) + ' !important;' : '') + '" tabindex="0" data-block="' + esc(b.id) + '">' +
                     dayInnerHtml(b) + '</div>';
                 return;
@@ -3201,10 +3206,11 @@
     }
     function subDayInnerHtml(b, note) {
         var tag = tagOf(b.tag_id), h = b.duration * PXM - 2, compact = h < 50; // (blocos nunca ficam dentro de vago compactado: a altura é a de sempre)
+        var tiny = b.duration <= 10, lead = tiny ? ' leading-none' : ''; // V40.47.1: a linha cabe nos 10 px da sublista de 5 min (a caixa ganha .ag-sub-tiny)
         var warn = note ? '<span class="ag-note"> · ' + esc(note) + '</span>' : '';
-        var title = '<span class="text-[13px] font-semibold ag-sub-title' + (b.completed ? ' line-through' : '') + '"><i class="ph-bold ph-list-checks"></i> ' + (esc(b.title) || 'Sublista') + '</span>';
-        var head = '<div class="flex items-center gap-2 min-w-0">' + doneBtnHtml(b, '') + '<span class="min-w-0 flex-1 truncate">' +
-            '<span class="text-[10.5px] font-semibold ag-sub-time tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration) + ' · ' + subCountTxt(b) + (tag ? ' · ' + esc(tag.name) : '') + warn + '</span>' +
+        var title = '<span class="' + (tiny ? 'text-[11.5px]' : 'text-[13px]') + lead + ' font-semibold ag-sub-title' + (b.completed ? ' line-through' : '') + '"><i class="ph-bold ph-list-checks"></i> ' + (esc(b.title) || 'Sublista') + '</span>';
+        var head = '<div class="flex items-center gap-2 min-w-0' + (tiny ? ' h-full' : '') + '">' + doneBtnHtml(b, '') + '<span class="min-w-0 flex-1 truncate' + lead + '">' +
+            '<span class="text-[10.5px]' + lead + ' font-semibold ag-sub-time tabular-nums">' + clock(b.start_min) + '–' + clock(b.start_min + b.duration) + ' · ' + fmtDur(b.duration) + ' · ' + subCountTxt(b) + (tag ? ' · ' + esc(tag.name) : '') + warn + '</span>' +
             (compact ? ' ' + title : '') + '</span>' + dayMoreHtml(b, true) + '</div>' + (compact ? '' : '<div class="truncate">' + title + '</div>');
         var rows = compact ? 0 : Math.max(0, Math.floor((h - 50) / 27));
         var body = subCanDrop() ? (compact ? '' : subDropHtml(b)) : (rows ? '<div class="ag-sub-cards">' + subRowsHtml(b, rows) + '</div>' : '');

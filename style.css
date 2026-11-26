@@ -447,6 +447,36 @@ body { overflow-x: hidden; max-width: 100vw; }
 .sub-block.sub-target { cursor: pointer; outline: 3px solid #d97706; outline-offset: -2px; animation: subPulse 1.5s infinite; }
 @keyframes subPulse { 0%, 100% { outline-color: #d97706; } 50% { outline-color: rgba(217, 119, 6, 0.3); } }
 .sub-drop { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 8px; border-radius: 10px; border: 1.5px dashed #b45309; background: #fde68a; color: #78350f; font-size: 12px; font-weight: 800; }
+/* V40.47.1: na sublista curta (até 20 min) o "Colocar aqui" vai na linha do nome (a caixa de cima não cabia) */
+.sub-drop-mini { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 9999px; background: #fde68a; color: #78350f; font-size: 11px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
+
+/* V40.47.1 — SUBLISTA DE 5 E 10 MIN (13 e 28 px de altura): uma linha só, como os blocos de 5 e 10 min (.nano-block).
+   O cabeçalho (nome + "0/4") e os botões de 28 px passavam da altura e o nome saía cortado ao meio (foto dele de 26/11).
+   .sub-nano = 10 min ou menos (24 px por dentro das bordas); .sub-nano-5 = menos de 10 (11 px: borda de cima e de baixo
+   com 1 px, sem os botões; tocar na sublista abre). Só no recolhido e fora do modo lista (o app.js só põe as classes aí). */
+.sub-block.sub-nano { padding-top: 0 !important; padding-bottom: 0 !important; }
+.sub-block.sub-nano .drag-handle { padding-top: 0 !important; align-items: center !important; }
+.sub-block.sub-nano .drag-handle i { margin-top: 0 !important; }
+.sub-block.sub-nano .title-wrapper { margin-top: 0 !important; }
+.sub-block.sub-nano .sub-title { font-size: 12px !important; line-height: 24px !important; }
+.sub-block.sub-nano .micro-time { line-height: 24px !important; }
+.sub-block.sub-nano .block-btn { width: 24px !important; height: 24px !important; }
+.sub-block.sub-nano .resize-handle { height: 10px !important; padding-bottom: 2px !important; }
+.sub-block.sub-nano-5 { border-top-width: 1px !important; border-bottom-width: 1px !important; }
+.sub-block.sub-nano-5 .sub-title,
+.sub-block.sub-nano-5 .micro-time { font-size: 10px !important; line-height: 11px !important; }
+.sub-block.sub-nano-5 .sub-count,
+.sub-block.sub-nano-5 .sub-drop-mini { font-size: 9px; line-height: 11px; padding: 0 5px; }
+.sub-block.sub-nano-5 .block-btn { display: none !important; }
+.sub-block.sub-nano-5 .drag-handle i,
+.sub-block.sub-nano-5 .title-wrapper > i,
+.sub-block.sub-nano-5 .sub-drop-mini i { font-size: 10px !important; }
+.sub-block.sub-nano-5 .title-wrapper > div { width: 10px !important; height: 10px !important; } /* o (i) de atrasado */
+.sub-block.sub-nano-5 .resize-handle { height: 6px !important; padding-bottom: 1px !important; }
+.sub-block.sub-nano-5 .resize-handle > div { display: none !important; } /* a barrinha cobria o nome */
+/* arrastando um bloco por cima da sublista curta: o "Soltar aqui" no meio da linha (embaixo não cabia) */
+.sub-block.sub-nano.sub-over::after { top: 50%; bottom: auto; transform: translateY(-50%); padding: 0 10px; line-height: 20px; }
+.sub-block.sub-nano-5.sub-over::after { font-size: 9px; line-height: 11px; padding: 0 6px; }
 #sub-card-del.sub-armed { background: #ef4444; color: #fff; }
 
 /* V40.30.0 — cartão da sublista arrastando no celular */
@@ -525,6 +555,7 @@ body { overflow-x: hidden; max-width: 100vw; }
 .tl-mini.rest.past { background: #fafafa; color: #52525b; box-shadow: inset 0 0 0 1px #e4e4e7; }
 .tl-mini.sub { background: #fffbeb; color: #78350f; box-shadow: inset 0 0 0 1.5px #f59e0b; }
 .tl-mini.light { color: #18181b; }
+.tl-mini.sub.sub-dark { color: #fff; } /* V40.47.1: sublista pintada de cor escura (a letra marrom sumia no fundo escuro) */
 .tl-mini-gap { position: absolute; left: 1px; right: 1px; z-index: 5; cursor: pointer; }
 .tl-mini-gap.drop { display: flex; align-items: center; justify-content: center; border: 2px dashed var(--theme-color, #4f46e5); border-radius: 8px; background: rgba(0, 0, 0, 0.03); color: var(--theme-color, #4f46e5); font-size: 18px; z-index: 30; }
 .tl-mini-gap.short { cursor: default; }

@@ -213,17 +213,20 @@
                 </button>
             </div>
             
-            <div class="flex gap-2 overflow-x-auto no-scrollbar mb-5">
-                <button onclick="commitSpecialIntent('Descanso', 'rest')" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 text-sm font-medium hover:bg-emerald-100 transition whitespace-nowrap">
+            <div class="flex gap-1.5 min-[360px]:gap-2 overflow-x-auto no-scrollbar mb-5">
+                <button onclick="commitSpecialIntent('Descanso', 'rest')" class="flex items-center gap-1.5 px-3 min-[360px]:px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 text-sm font-medium hover:bg-emerald-100 transition whitespace-nowrap">
                     <i class="ph ph-tree text-lg"></i> Descanso
                 </button>
                 <!-- V40.24.0: sublista = um horário com vários cartões dentro (o nome e o tempo vêm do formulário abaixo) -->
-                <button onclick="commitSublistIntent()" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-dashed border-amber-400 text-amber-800 bg-amber-50 text-sm font-medium hover:bg-amber-100 transition whitespace-nowrap">
+                <button onclick="commitSublistIntent()" class="flex items-center gap-1.5 px-3 min-[360px]:px-4 py-2 rounded-full border border-dashed border-amber-400 text-amber-800 bg-amber-50 text-sm font-medium hover:bg-amber-100 transition whitespace-nowrap">
                     <i class="ph ph-list-checks text-lg"></i> Sublista
                 </button>
                 <!-- V40.22.0: o chip "Metas (em breve)" saiu daqui: as Metas moram na aba 🎯, junto das outras abas -->
-                <button onclick="openConfigSheet()" class="flex items-center gap-1.5 px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm font-medium hover:bg-zinc-50 transition whitespace-nowrap">
-                    <i class="ph ph-gear text-lg"></i> Config
+                <!-- V40.47.1: o Config virou só a engrenagem, no fim da linha (escrito, ele cortava na direita em celular
+                     estreito: foto dele de 26/11; escolha dele: "só a engrenagem, aí usa uma linha só"). Abaixo de 360 px os dois de
+                     antes ficam um pouco mais estreitos pra engrenagem caber inteira (320 px). -->
+                <button onclick="openConfigSheet()" aria-label="Configurações" title="Configurações" class="ml-auto shrink-0 self-center w-9 h-9 min-[360px]:w-10 min-[360px]:h-10 flex items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition">
+                    <i class="ph ph-gear text-lg"></i>
                 </button>
             </div>
             
@@ -1732,7 +1735,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.47.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.47.1</div>
 
     </div>
 

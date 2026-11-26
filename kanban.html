@@ -241,6 +241,16 @@
     .ls-go b { flex: none; color: var(--focus); }
     /* V40.34.0: ligado a uma meta: o emoji dela antes do nome */
     .goal-badge { display: inline-block; margin-right: 4px; font-size: .95em; line-height: 1; font-style: normal; text-decoration: none; }
+    /* V40.47.0: quadros (Configurações) e a lista de outra pessoa (fica no fim, com a borda tracejada) */
+    .qd-box { padding: 10px 12px; border-radius: 12px; border: 1px solid #e4e4e7; background: #fafafa; }
+    .qd-act { width: 30px; height: 30px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: #52525b; font-size: 16px; }
+    .qd-act:hover { background: #e4e4e7; color: #18181b; }
+    .qd-act.danger:hover { background: #fee2e2; color: #dc2626; }
+    .qd-person { display: flex; align-items: center; gap: 8px; min-height: 30px; }
+    .qd-av { width: 22px; height: 22px; flex: none; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #fff; background: var(--focus); }
+    .qd-x { width: 26px; height: 26px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; color: #a1a1aa; }
+    .qd-x:hover { background: #fee2e2; color: #dc2626; }
+    .col.col-shared { border-style: dashed; border-color: #d4d4d8; }
     #toast { transition: opacity .2s, transform .2s; }
     @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { transition: none !important; animation: none !important; }
@@ -1071,6 +1081,9 @@
                     <button id="cfg-av-teste" type="button" disabled class="shrink-0 inline-flex items-center gap-1.5 bg-white border border-zinc-300 text-zinc-800 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg hover:bg-zinc-50 disabled:opacity-50"><i class="ph ph-paper-plane-tilt"></i>Mandar um teste</button>
                 </div>
             </div>
+            <!-- V40.47.0: quadros (listas compartilhadas com a casa ou a equipe): os mesmos do celular -->
+            <p id="cfg-qd-title" class="mt-5 text-xs font-semibold text-zinc-500">Quadros <span class="font-normal text-zinc-400">· listas compartilhadas com a casa ou a equipe</span></p>
+            <div id="cfg-qd" class="mt-2 flex flex-col gap-2"></div>
             <!-- V40.41.0: backup (só salvar: restaurar continua no celular, escolha dele) -->
             <p class="mt-5 text-xs font-semibold text-zinc-500">Backup</p>
             <div class="mt-2 flex items-start gap-3">
@@ -1085,7 +1098,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.46.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.47.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1116,7 +1129,7 @@
     var KINDS = ['listas', 'tags', 'tarefas', 'blocos', 'rotinas', 'notas', 'financas', 'metas_listas', 'metas', 'metas_dias']; // V40.21.0: + metas
     var SELECT = {
         tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,goal_id,deleted', // V40.34.0: + goal_id (meta ligada)
-        listas: 'id,name,is_default,position,created_ms,deleted',
+        listas: 'id,name,is_default,position,created_ms,quadro_id,deleted', // V40.47.0: + quadro_id (a lista está num quadro)
         tags: 'id,name,color,position,deleted',
         blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,goal_id,column_id,deleted', // V40.22.0: + linked_note_ids (notas vinculadas); V40.24.0: + cards (sublista); V40.34.0: + goal_id; V40.38.0: + column_id (a lista de onde veio)
         // V40.17.0: rotinas, notas e finanças (as mesmas do celular)
@@ -1165,15 +1178,16 @@
     function aliveListIds() { var s = {}; alive('listas').forEach(function (c) { s[c.id] = true; }); return s; }
     // V40.38.0: pra qual lista volta um bloco (ou cartão de sublista): a de onde ele veio; se ela não existe mais (ou o bloco
     // nasceu na agenda), a primeira lista (a da esquerda). Pedido dele (23/11). O mesmo do celular (backToListColumn).
+    // V40.47.0: a primeira lista SUA (a de outra pessoa só recebe o que veio dela).
     function backToListId(colId) {
         if (colId && aliveListIds()[colId]) return String(colId);
-        var first = alive('listas')[0];
+        var first = alive('listas').filter(function (c) { return !c.__sh; })[0];
         return first ? first.id : DEFAULT_COL;
     }
     function listRef(v) { return v != null && v !== '' && /^[\w.\-]{1,64}$/.test(String(v)) ? String(v) : null; } // id de lista guardado no bloco (V40.38.0)
     function colOf(t, ids) { ids = ids || aliveListIds(); return ids[t.column_id] ? t.column_id : DEFAULT_COL; } // órfã → lista padrão (igual ao app)
     function tasksInCol(colId) { var ids = aliveListIds(); return alive('tarefas').filter(function (t) { return colOf(t, ids) === colId; }); }
-    function maxPos(kind) { return Object.keys(S[kind]).reduce(function (m, k) { return Math.max(m, Number(S[kind][k].position) || 0); }, 0); }
+    function maxPos(kind) { return Object.keys(S[kind]).reduce(function (m, k) { var r = S[kind][k]; return kind === 'listas' && r.__sh ? m : Math.max(m, Number(r.position) || 0); }, 0); } // V40.47.0: as listas dos outros (no fim) não contam
     function newId(prefix, kind) { var n = Date.now(); while (S[kind][prefix + n]) n++; return prefix + n; }
     function tagOf(id) { var t = id && S.tags[id]; return t && !t.deleted ? t : null; }
     function normMbs(a) { return (Array.isArray(a) ? a : []).map(function (m) { return { title: String((m && m.title) || '').trim(), done: !!(m && m.done) }; }).filter(function (m) { return m.title; }); }
@@ -1254,6 +1268,7 @@
             var results = await Promise.all(KINDS.map(fetchKind));
             KINDS.forEach(function (k, i) {
                 var map = {};
+                if (k === 'listas' || k === 'tarefas') Object.keys(S[k]).forEach(function (id) { if (S[k][id] && S[k][id].__sh) map[id] = S[k][id]; }); // V40.47.0: as dos outros ficam (vêm pelo shLoad)
                 results[i].forEach(function (r) { map[r.id] = r; });
                 S[k] = map;
             });
@@ -1262,6 +1277,7 @@
             renderAgenda();
             renderSide();
             renderTags(); // V40.18.0
+            shLoadSoon(0); // V40.47.0: quadros e listas compartilhadas comigo
         } catch (e) {
             console.error('[Faz kanban] load', e);
             if (!S.lastLoad) toast('Não consegui carregar suas Listas. Confira a internet.');
@@ -1298,9 +1314,11 @@
     async function insertRow(kind, row, okMsg) {
         var g = S.gesture, was = S[kind][row.id] ? undoClone(S[kind][row.id]) : null; // V40.25.0: pro Desfazer
         lsKeep(kind, row.id); // V40.39.0
+        var L = kind === 'tarefas' ? shList(row.column_id) : null; // V40.47.0: numa lista de outra pessoa, nasce na conta dela
+        if (L) { row.user_id = L.dono; row.__sh = { dono: L.dono, rid: row.__sh ? row.__sh.rid : row.id }; SH.rid[L.dono + '|' + row.__sh.rid] = row.id; }
         S[kind][row.id] = row;
         render(); renderAgenda(); renderSide(); renderTags();
-        var res = await S.sb.from(kind).upsert(row, { onConflict: 'user_id,id' });
+        var res = await S.sb.from(kind).upsert(shCloud(kind, row), { onConflict: 'user_id,id' });
         if (res.error) { delete S[kind][row.id]; render(); renderAgenda(); renderSide(); renderTags(); fail(res.error); return false; }
         undoRec(g, [undoIns(kind, row, was)], okMsg);
         if (okMsg) toast(okMsg);
@@ -1311,12 +1329,15 @@
     async function patchRow(kind, id, fields, okMsg) {
         var row = S[kind][id];
         if (!row) return false;
+        if (kind === 'listas' && row.__sh) { toast('Só quem é dono da lista pode mudar ela.'); return false; } // V40.47.0
+        if (kind === 'tarefas' && 'column_id' in fields && shNsCol(fields.column_id) !== shNsTask(row)) return shMove(id, fields, okMsg); // V40.47.0: mudou de conta
         var g = S.gesture, was = undoClone(row); // V40.25.0: pro Desfazer (cópia funda: listas e cartões dentro)
         lsKeep(kind, id); // V40.39.0
         var prev = Object.assign({}, row);
         Object.assign(row, fields);
         render(); renderAgenda(); renderArchive(); renderSide(); renderTags();
-        var res = await S.sb.from(kind).update(fields).eq('user_id', S.uid).eq('id', id);
+        var w = shWhere(kind, row); // V40.47.0: na conta certa (a tarefa de uma lista compartilhada é de quem é dono)
+        var res = await S.sb.from(kind).update(shFields(kind, fields)).eq('user_id', w.uid).eq('id', w.id);
         if (res.error) { S[kind][id] = prev; render(); renderAgenda(); renderArchive(); renderSide(); renderTags(); fail(res.error); return false; }
         undoRec(g, [undoUpd(kind, id, was, fields)], okMsg);
         if (okMsg) toast(okMsg);
@@ -1532,9 +1553,12 @@
                     });
                     continue;
                 }
-                var q = S.sb.from(gr.kind).update(gr.w).eq('user_id', S.uid);
-                var res = await (gr.ids.length === 1 ? q.eq('id', gr.ids[0]) : q.in('id', gr.ids));
-                if (res.error) err = res.error;
+                var parts = shSplit(gr.kind, gr.ids); // V40.47.0: a sua conta e a de cada dono de lista compartilhada
+                for (var pi = 0; pi < parts.length && !err; pi++) {
+                    var q = S.sb.from(gr.kind).update(shFields(gr.kind, gr.w)).eq('user_id', parts[pi].uid);
+                    var res = await (parts[pi].ids.length === 1 ? q.eq('id', parts[pi].ids[0]) : q.in('id', parts[pi].ids));
+                    if (res.error) err = res.error;
+                }
             }
         } catch (x) { err = x; }
         S.undoBusy = false;
@@ -1637,13 +1661,20 @@
         }).join('') + (hits.length > 2 ? '<span class="ag-sres-hit text-zinc-400">+' + (hits.length - 2) + ' no checklist</span>' : '') + '</div>';
     }
 
+    function colShTitle(c) { // V40.47.0: lista compartilhada (a sua num quadro, ou a de outra pessoa)
+        if (c.__sh) return 'Lista de ' + (c.__sh.de || 'outra pessoa') + ' · quadro ' + (c.__sh.quadroNome || '');
+        if (c.quadro_id) { var q = qdFind(c.quadro_id); return 'Compartilhada com o quadro ' + (q ? q.nome : ''); }
+        return '';
+    }
     function colHtml(c, tasks, shown) {
         var mins = tasks.reduce(function (a, t) { return a + (Number(t.duration) || 0); }, 0);
         var W = LS.words, miss = !!W && !shown.length; // V40.39.0: com a busca, só os cartões que batem ("2 de 12")
-        return '<section class="col' + (miss ? ' ls-miss' : '') + ' w-[296px] shrink-0 max-h-full flex flex-col bg-zinc-50 border border-zinc-200 rounded-2xl" data-col="' + esc(c.id) + '">' +
-            '<header class="px-3.5 pt-3 pb-2 flex items-start gap-2" draggable="true" data-col-drag="' + esc(c.id) + '">' + // V40.33.0: arrastar pelo título muda a lista de lugar
+        var sh = colShTitle(c);
+        return '<section class="col' + (miss ? ' ls-miss' : '') + (c.__sh ? ' col-shared' : '') + ' w-[296px] shrink-0 max-h-full flex flex-col bg-zinc-50 border border-zinc-200 rounded-2xl" data-col="' + esc(c.id) + '">' +
+            '<header class="px-3.5 pt-3 pb-2 flex items-start gap-2"' + (c.__sh ? '' : ' draggable="true" data-col-drag="' + esc(c.id) + '"') + '>' + // V40.33.0: arrastar pelo título muda a lista de lugar (V40.47.0: a dos outros fica no fim)
             '<div class="min-w-0 flex-1">' +
-            '<h2 class="text-[13px] font-bold text-zinc-800 truncate" title="' + esc(c.name) + '">' + (esc(c.name) || 'Sem nome') + '</h2>' +
+            '<h2 class="text-[13px] font-bold text-zinc-800 truncate flex items-center gap-1.5" title="' + esc(sh ? c.name + ' · ' + sh : c.name) + '">' + (sh ? '<i class="ph-fill ph-users-three text-focus shrink-0" aria-label="' + esc(sh) + '"></i>' : '') + '<span class="truncate">' + (esc(c.name) || 'Sem nome') + '</span></h2>' +
+            (c.__sh ? '<p class="mt-0.5 text-[11px] font-medium text-zinc-500 truncate">de ' + esc(c.__sh.de || 'outra pessoa') + ' · ' + esc(c.__sh.quadroNome || '') + '</p>' : '') +
             '<p class="mt-0.5 text-[11px] font-medium text-zinc-500 flex items-center gap-1"><i class="ph ph-clock"></i>' + (tasks.length ? fmtDur(mins) + ' planejados' : 'Vazia') + '</p>' +
             '</div>' +
             '<span class="mt-0.5 shrink-0 text-[11px] font-semibold text-zinc-600 bg-white border border-zinc-200 rounded-full px-2 py-0.5" title="' + (W ? 'Cartões desta lista que batem com a busca' : 'Tarefas nesta lista') + '">' + (W ? shown.length + ' de ' + tasks.length : tasks.length) + '</span>' +
@@ -2802,12 +2833,14 @@
     async function renameList(colId) {
         var c = S.listas[colId];
         if (!c) return;
+        if (c.__sh) return toast('Só quem é dono da lista pode renomear.'); // V40.47.0
         var name = await dialog({ title: 'Renomear lista', input: { value: c.name, placeholder: 'Nome da lista', max: 30 }, okLabel: 'Renomear' });
         if (!name || name === c.name) return;
         patchRow('listas', colId, { name: name }, 'Lista renomeada');
     }
     async function deleteList(colId) {
         var c = S.listas[colId];
+        if (c && c.__sh) return toast('Só quem é dono da lista pode apagar.'); // V40.47.0
         if (!c || c.is_default || colId === DEFAULT_COL) return toast('A lista padrão não pode ser apagada.');
         var tasks = tasksInCol(colId);
         var ok = await dialog({
@@ -2894,9 +2927,10 @@
         closeColMenu();
         var c = S.listas[colId];
         if (!c) return;
+        if (c.__sh) return shColMenu(colId, btn); // V40.47.0: lista de outra pessoa
         var isDefault = c.is_default || colId === DEFAULT_COL;
         var r = btn.getBoundingClientRect();
-        var all = alive('listas'), ci = all.indexOf(c); // V40.33.0: mudar de lugar também pelo menu (uma casa por clique)
+        var all = alive('listas').filter(function (x) { return !x.__sh; }), ci = all.indexOf(c); // V40.33.0: mudar de lugar também pelo menu (uma casa por clique); V40.47.0: entre as suas
         var mv = function (act, icon, label, off) {
             return '<button data-act="' + act + '"' + (off ? ' disabled' : '') + ' class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-default"><i class="ph ' + icon + '"></i>' + label + '</button>';
         };
@@ -2906,6 +2940,8 @@
         menuEl.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 216, r.right - 208))) + 'px';
         menuEl.innerHTML = '<button data-act="rename" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-pencil-simple"></i>Renomear lista</button>' +
             (all.length > 1 ? mv('left', 'ph-arrow-left', 'Mover pra esquerda', ci <= 0) + mv('right', 'ph-arrow-right', 'Mover pra direita', ci >= all.length - 1) : '') +
+            (isDefault ? '' : '<button data-act="share" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-users-three"></i>' + (c.quadro_id ? 'Compartilhamento…' : 'Compartilhar com um quadro…') + '</button>') + // V40.47.0
+            (c.quadro_id ? '<p class="px-3 pb-1.5 text-[11.5px] text-zinc-500 leading-snug">' + esc(colShTitle(c)) + '</p>' : '') +
             (isDefault ? '<p class="px-3 py-2 text-[11.5px] text-zinc-400 leading-snug">A lista padrão não pode ser apagada.</p>'
                 : '<button data-act="delete" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-red-600 hover:bg-red-50"><i class="ph ph-trash"></i>Apagar lista</button>');
         menuEl.addEventListener('click', function (e) {
@@ -2913,6 +2949,7 @@
             if (!b || b.disabled) return;
             closeColMenu();
             if (b.dataset.act === 'rename') renameList(colId);
+            else if (b.dataset.act === 'share') shareMenu(colId, btn); // V40.47.0
             else if (b.dataset.act === 'left') moveListBy(colId, -1);
             else if (b.dataset.act === 'right') moveListBy(colId, 1);
             else deleteList(colId);
@@ -3049,7 +3086,7 @@
         if (!r || r.deleted) return;
         closeComposer();
         var isB = kind === 'blocos', isNew = !!draft;
-        S.editing = { kind: kind, id: isNew ? null : id, isNew: isNew, orig: JSON.parse(JSON.stringify(r)), tag: tagOf(r.tag_id) ? r.tag_id : null, mbs: isB ? blockMbs(r.microblocks) : normMbs(r.microblocks), color: hex6(r.color) };
+        S.editing = { kind: kind, id: isNew ? null : id, isNew: isNew, orig: JSON.parse(JSON.stringify(r)), tag: tagOf(r.tag_id) || (r.__sh && r.tag_id) ? r.tag_id : null, mbs: isB ? blockMbs(r.microblocks) : normMbs(r.microblocks), color: hex6(r.color) };
         S.editing.goal = S.editing.goal0 = goalKeep(r.goal_id); // V40.34.0
         $('f-title').value = r.title || '';
         $('f-title').placeholder = isNew ? 'Nome do compromisso' : (isB ? 'Nome do bloco' : 'Nome da tarefa');
@@ -3074,7 +3111,7 @@
             setDateVal('f-date', String(r.date).slice(0, 10));
             setTimeVal('f-start', clock(r.start_min));
         } else {
-            $('f-col').innerHTML = alive('listas').map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('');
+            $('f-col').innerHTML = alive('listas').map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + (c.__sh ? ' (de ' + esc(c.__sh.de || 'outra pessoa') + ')' : '') + '</option>'; }).join(''); // V40.47.0: a lista de outra pessoa diz de quem é
             $('f-col').value = colOf(r);
         }
         var d = Number(r.duration) || 30;
@@ -5040,7 +5077,7 @@
         var g = S.gesture; // V40.25.0: a tag e quem perdeu a tag desfazem juntos
         if (!(await patchRow('tags', id, { deleted: true }, 'Tag apagada'))) return;
         for (var i = 0; i < TAG_KINDS.length; i++) {
-            var k = TAG_KINDS[i][0], ids = Object.keys(S[k]).filter(function (x) { return S[k][x].tag_id === id; });
+            var k = TAG_KINDS[i][0], ids = Object.keys(S[k]).filter(function (x) { return S[k][x].tag_id === id && !S[k][x].__sh; }); // V40.47.0: a tarefa da lista de outra pessoa usa a tag dela
             if (!ids.length) continue;
             var undoList = undoBulk(k, ids.filter(function (x) { return !S[k][x].deleted; }), 'tag_id', id, null);
             ids.forEach(function (x) { S[k][x].tag_id = null; });
@@ -5329,6 +5366,8 @@
         cfgPerReset();
         $('cfg-backup-msg').textContent = '';
         cfgAvOpen(); // V40.42.0
+        SH.msg = {};
+        renderCfgQuadros(); shLoadSoon(0); // V40.47.0
         $('cfg-close').focus();
         refreshPrefs(true); // traz o que mudou no celular desde a última olhada
     }
@@ -5804,7 +5843,7 @@
     }
     function startColDrag(e, head) {
         var sec = head.closest('section.col'), id = head.dataset.colDrag;
-        if (!sec || !S.listas[id] || S.listas[id].deleted) return;
+        if (!sec || !S.listas[id] || S.listas[id].deleted || S.listas[id].__sh) return; // V40.47.0: a dos outros fica no fim
         S.colDrag = id;
         closeColMenu();
         e.dataTransfer.effectAllowed = 'move';
@@ -5828,7 +5867,7 @@
         if (S.pendingRender && !skipRender) render();
     }
     async function renormalizeLists(movingId, index) {
-        var sibs = alive('listas').filter(function (x) { return x.id !== movingId; });
+        var sibs = alive('listas').filter(function (x) { return x.id !== movingId && !x.__sh; }); // V40.47.0: só as suas
         sibs.splice(index, 0, S.listas[movingId]);
         var base = sibs.length && Number.isFinite(sibs[0].position) ? sibs[0].position : STEP;
         for (var i = 0; i < sibs.length; i++) {
@@ -5839,8 +5878,8 @@
     // Põe a lista `id` na posição `index` entre as OUTRAS listas (0 = primeira). Soltar no mesmo lugar não grava nada.
     function moveList(id, index) {
         var c = S.listas[id];
-        if (!c || c.deleted) return false;
-        var all = alive('listas'), others = all.filter(function (x) { return x.id !== id; }), ci = all.indexOf(c);
+        if (!c || c.deleted || c.__sh) return false; // V40.47.0: a lista dos outros fica no fim
+        var all = alive('listas').filter(function (x) { return !x.__sh; }), others = all.filter(function (x) { return x.id !== id; }), ci = all.indexOf(c);
         index = Math.max(0, Math.min(others.length, index));
         var prev = others[index - 1] || null, next = others[index] || null;
         if (ci < 0 || ((all[ci - 1] || null) === prev && (all[ci + 1] || null) === next)) return false;
@@ -5855,11 +5894,306 @@
     }
     // Menu: uma casa pra esquerda (-1) ou pra direita (+1). A lista continua na tela.
     function moveListBy(id, dir) {
-        var all = alive('listas'), ci = all.indexOf(S.listas[id]), to = ci + dir;
+        var all = alive('listas').filter(function (x) { return !x.__sh; }), ci = all.indexOf(S.listas[id]), to = ci + dir; // V40.47.0: entre as suas
         if (ci < 0 || to < 0 || to >= all.length) return;
         if (!moveList(id, to)) return;
         var sec = $('columns').querySelector('section.col[data-col="' + CSS.escape(id) + '"]');
         if (sec && sec.scrollIntoView) sec.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+
+    // ===================== V40.47.0: QUADROS E LISTAS COMPARTILHADAS =====================
+    // As mesmas regras do celular (sync.js): um quadro (Casa, Empresa) junta pessoas pelo e-mail da conta; só quem criou põe
+    // e tira gente; qualquer um do quadro põe uma lista SUA nele, e todo mundo dele vê a lista e faz tudo nas tarefas dela
+    // (só o dono renomeia ou apaga a lista). A lista de outra pessoa entra aqui com o mesmo apelido do celular
+    // ('sh_…', FazSyncCore.sharedAlias), no fim do quadro; as tarefas dela com o prefixo da conta do dono no id (a criada aqui
+    // fica com o id dela). Gravar numa delas grava na conta de quem é dono (as regras do banco deixam). Mudar uma tarefa de
+    // conta (sua ↔ compartilhada, ou entre donos) = tarefa nova lá e a de cá apagada: o mesmo id nunca vai pra outra conta.
+    var SH = { quadros: [], rid: {}, off: false, loading: false, again: false, t: null, ch: [], donos: '', at: 0, msg: {} };
+    var SH_POS = 1e12; // as listas dos outros ficam depois das suas
+    function shC() { return window.FazSyncCore; }
+    function shIs(id) { var C = shC(); return !!C && typeof C.isShared === 'function' && C.isShared(id); }
+    function shList(colId) { var c = colId != null && S.listas[colId]; return c && c.__sh ? c.__sh : null; }
+    function shNsCol(colId) { var l = shList(colId); return l ? l.dono : S.uid; }
+    function shNsTask(t) { return t && t.__sh ? t.__sh.dono : S.uid; }
+    function shCloud(kind, row) { // a linha como vai pra nuvem (na conta de quem é dono, com o id e a lista de lá)
+        if (kind !== 'tarefas' || !row) return row;
+        var o = Object.assign({}, row), L = shList(row.column_id);
+        delete o.__sh;
+        if (L) { o.user_id = L.dono; o.column_id = L.lista; if (row.__sh) o.id = row.__sh.rid; }
+        return o;
+    }
+    function shFields(kind, fields) { // os campos que mudam, como vão pra nuvem
+        if (kind !== 'tarefas') return fields;
+        var o = Object.assign({}, fields), L = 'column_id' in o ? shList(o.column_id) : null;
+        delete o.__sh;
+        if (L) o.column_id = L.lista;
+        return o;
+    }
+    function shWhere(kind, row) { var s = kind === 'tarefas' && row && row.__sh; return { uid: s ? s.dono : S.uid, id: s ? s.rid : row.id }; }
+    // Desfazer em lote: os ids de cada conta (a sua e a de cada dono)
+    function shSplit(kind, ids) {
+        var by = {}, out = [];
+        ids.forEach(function (id) {
+            var w = shWhere(kind, S[kind][id] || { id: id });
+            (by[w.uid] || (by[w.uid] = out[out.push({ uid: w.uid, ids: [] }) - 1])).ids.push(w.id);
+        });
+        return out;
+    }
+    // Tarefa que muda de conta: nasce lá (id novo) e some daqui, no mesmo passo do Desfazer.
+    async function shMove(id, fields, okMsg) {
+        var t = S.tarefas[id];
+        if (!t) return false;
+        var copy = Object.assign({}, t, fields, { id: newId('bl_', 'tarefas'), user_id: S.uid, deleted: false, archived: false });
+        delete copy.__sh;
+        if (!(await insertRow('tarefas', copy))) return false;
+        return patchRow('tarefas', id, { deleted: true }, okMsg || 'Tarefa movida de lista');
+    }
+    async function shPages(build) {
+        var out = [];
+        for (var from = 0; ; from += 1000) {
+            var res = await build().range(from, from + 999);
+            if (res.error) throw res.error;
+            out = out.concat(res.data || []);
+            if (!res.data || res.data.length < 1000) break;
+        }
+        return out;
+    }
+    function shMissing(e) { return /42P01|PGRST205|Could not find the table|relation .* does not exist/i.test(String((e && (e.code + ' ' + e.message)) || '')); }
+    function shLoadSoon(ms) { clearTimeout(SH.t); SH.t = setTimeout(shLoad, ms == null ? 300 : ms); }
+    // Lê os quadros (com quem está neles e as listas postas neles) e as tarefas das listas dos outros.
+    async function shLoad() {
+        if (!S.uid || SH.off || !S.sb) return;
+        if (SH.loading) { SH.again = true; return; }
+        var C = shC(), uid = S.uid;
+        if (!C || typeof C.sharedShape !== 'function') return;
+        SH.loading = true;
+        try {
+            var mine = await shPages(function () { return S.sb.from('quadros_membros').select('quadro,membro,email,papel').eq('membro', uid).order('quadro'); });
+            var qids = [];
+            mine.forEach(function (m) { var q = C.uuidRef(m.quadro); if (q && qids.indexOf(q) < 0) qids.push(q); });
+            var quadros = [], membros = [], listas = [];
+            if (qids.length) {
+                quadros = await shPages(function () { return S.sb.from('quadros').select('id,dono,nome').in('id', qids).order('id'); });
+                membros = await shPages(function () { return S.sb.from('quadros_membros').select('quadro,membro,email,papel').in('quadro', qids).order('quadro'); });
+                listas = await shPages(function () { return S.sb.from('listas').select('user_id,id,name,created_ms,quadro_id,deleted').in('quadro_id', qids).order('id'); });
+            }
+            var got = C.sharedShape(uid, quadros, membros, listas), fetched = {}, failed = {};
+            var ds = Object.keys(got.donos);
+            for (var i = 0; i < ds.length; i++) {
+                var d = ds[i], ids = Object.keys(got.donos[d].lists);
+                try { fetched[d] = await shPages(function () { return S.sb.from('tarefas').select(SELECT.tarefas).eq('user_id', d).in('column_id', ids).order('id'); }); }
+                catch (e) { failed[d] = true; console.warn('[Faz kanban] lista compartilhada', e); }
+            }
+            if (S.uid !== uid) return; // saiu da conta no meio
+            shApply(got, fetched, failed);
+        } catch (e) {
+            if (shMissing(e)) SH.off = true; // a nuvem ainda não tem os quadros: segue como antes
+            else console.warn('[Faz kanban] quadros', e);
+        } finally {
+            SH.loading = false;
+            if (SH.again) { SH.again = false; shLoadSoon(200); }
+        }
+    }
+    function shRow(d, r, want) { // linha da nuvem (da conta "d") → linha daqui
+        var C = shC(), alias = C.sharedAlias(d, String(r.column_id));
+        if (!want[alias]) return null;
+        var key = SH.rid[d + '|' + r.id] || C.sharedLocalId(d, String(r.id));
+        SH.rid[d + '|' + r.id] = key;
+        return Object.assign({}, r, { id: key, user_id: d, column_id: alias, __sh: { dono: d, rid: String(r.id) } });
+    }
+    function shApply(got, fetched, failed) {
+        var C = shC(), want = {};
+        SH.quadros = got.quadros;
+        SH.at = Date.now();
+        Object.keys(got.donos).forEach(function (d) {
+            Object.keys(got.donos[d].lists).forEach(function (l) { want[C.sharedAlias(d, l)] = Object.assign({ dono: d, lista: l }, got.donos[d].lists[l]); });
+        });
+        Object.keys(S.listas).forEach(function (id) { var c = S.listas[id]; if (c && c.__sh && !want[id] && !failed[c.__sh.dono]) delete S.listas[id]; });
+        Object.keys(want).sort(function (a, b) {
+            var x = want[a], y = want[b];
+            return String(x.quadroNome).localeCompare(String(y.quadroNome), 'pt-BR', { sensitivity: 'base' }) || String(x.nome).localeCompare(String(y.nome), 'pt-BR', { sensitivity: 'base' }) || (a < b ? -1 : 1);
+        }).forEach(function (a, i) {
+            var w = want[a];
+            S.listas[a] = { id: a, user_id: w.dono, name: w.nome, is_default: false, position: SH_POS + i * STEP, created_ms: w.created || null, quadro_id: null, deleted: false, __sh: { dono: w.dono, lista: w.lista, quadro: w.quadro, quadroNome: w.quadroNome, de: w.de } };
+        });
+        var keep = {};
+        Object.keys(fetched).forEach(function (d) {
+            (fetched[d] || []).forEach(function (r) { var row = shRow(d, r, want); if (row) { S.tarefas[row.id] = row; keep[row.id] = true; } });
+        });
+        Object.keys(S.tarefas).forEach(function (k) { var t = S.tarefas[k]; if (t && t.__sh && !keep[k] && !failed[t.__sh.dono]) delete S.tarefas[k]; });
+        var donos = Object.keys(got.donos).sort().join(',');
+        if (donos !== SH.donos) { SH.donos = donos; shSubscribe(Object.keys(got.donos)); }
+        scheduleRender();
+        renderCfgQuadros();
+    }
+    // Ao vivo: as tarefas e as listas de cada dono (as regras do banco só mandam as das listas compartilhadas comigo). Os
+    // quadros e as pessoas não vão ao vivo (o aviso de linha apagada iria pra todo mundo): a cada minuto (e ao voltar pra
+    // aba) relê tudo, o que também pega o que saiu da vista.
+    function shSubscribe(donos) {
+        shUnsubscribe();
+        if (!S.uid || !S.sb || typeof S.sb.channel !== 'function') return;
+        (donos || []).forEach(function (d) {
+            var ch = S.sb.channel('faz-sh-' + d);
+            ch.on('postgres_changes', { event: '*', schema: 'public', table: 'tarefas', filter: 'user_id=eq.' + d }, function (p) { shTaskEvent(d, p); });
+            ch.on('postgres_changes', { event: '*', schema: 'public', table: 'listas', filter: 'user_id=eq.' + d }, function () { shLoadSoon(400); });
+            ch.subscribe();
+            SH.ch.push(ch);
+        });
+    }
+    function shUnsubscribe() { SH.ch.forEach(function (ch) { try { S.sb.removeChannel(ch); } catch (e) {} }); SH.ch = []; }
+    function shTaskEvent(d, p) {
+        var want = {};
+        Object.keys(S.listas).forEach(function (id) { var c = S.listas[id]; if (c && c.__sh && c.__sh.dono === d) want[id] = true; });
+        if (p.eventType === 'DELETE') { var k = p.old && p.old.id != null && SH.rid[d + '|' + p.old.id]; if (k) delete S.tarefas[k]; scheduleRender(); return; }
+        var r = p.new;
+        if (!r || r.id == null) return;
+        var row = shRow(d, r, want);
+        if (row) S.tarefas[row.id] = row;
+        else { var key = SH.rid[d + '|' + r.id]; if (key) delete S.tarefas[key]; } // foi pra uma lista que não está compartilhada comigo
+        scheduleRender();
+    }
+    function shReset() { shUnsubscribe(); clearTimeout(SH.t); SH.quadros = []; SH.rid = {}; SH.donos = ''; SH.at = 0; SH.msg = {}; SH.again = false; }
+
+    // ---- a tela: Configurações → Quadros ----
+    function qdFind(id) { return SH.quadros.find(function (q) { return q.id === id; }) || null; }
+    function qdPeople(n) { return n === 1 ? '1 pessoa' : n + ' pessoas'; }
+    function renderCfgQuadros() {
+        var box = $('cfg-qd');
+        if (!box || $('modal-cfg').classList.contains('hidden')) return;
+        var keep = {}, focus = document.activeElement && box.contains(document.activeElement) ? document.activeElement.id : null;
+        box.querySelectorAll('input[data-qd-email]').forEach(function (i) { keep[i.id] = i.value; });
+        if (SH.off) { box.innerHTML = '<p class="text-[12px] text-zinc-500">Os quadros ainda não estão disponíveis na nuvem.</p>'; return; }
+        box.innerHTML = (SH.quadros.length ? SH.quadros.map(function (q) {
+            var dono = q.membros.find(function (m) { return m.papel === 'dono'; }), msg = SH.msg[q.id];
+            return '<div class="qd-box" data-qd="' + esc(q.id) + '">' +
+                '<div class="flex items-start gap-2"><i class="ph-fill ph-users-three text-lg text-focus mt-0.5 shrink-0"></i><div class="min-w-0 flex-1">' +
+                '<p class="text-[13.5px] font-bold text-zinc-800 break-words">' + esc(q.nome) + '</p>' +
+                '<p class="text-[11.5px] text-zinc-500">' + qdPeople(q.membros.length) + ' · ' + (q.listas.length === 1 ? '1 lista' : q.listas.length + ' listas') + ' · ' + (q.souDono ? 'você criou' : 'de ' + esc(dono ? dono.email : 'outra pessoa')) + '</p></div>' +
+                (q.souDono ? '<button type="button" class="qd-act" data-qd-rename="' + esc(q.id) + '" title="Renomear o quadro" aria-label="Renomear o quadro ' + esc(q.nome) + '"><i class="ph ph-pencil-simple"></i></button>' +
+                    '<button type="button" class="qd-act danger" data-qd-del="' + esc(q.id) + '" title="Apagar o quadro" aria-label="Apagar o quadro ' + esc(q.nome) + '"><i class="ph ph-trash"></i></button>'
+                    : '<button type="button" class="qd-act" data-qd-leave="' + esc(q.id) + '" title="Sair do quadro" aria-label="Sair do quadro ' + esc(q.nome) + '"><i class="ph ph-sign-out"></i></button>') +
+                '</div>' +
+                '<div class="mt-2 flex flex-col gap-1">' + q.membros.map(function (m) {
+                    return '<div class="qd-person"><span class="qd-av" aria-hidden="true">' + esc((m.email || '?').charAt(0).toUpperCase()) + '</span>' +
+                        '<span class="min-w-0 flex-1 truncate text-[12.5px] text-zinc-700">' + esc(m.email || 'sem e-mail') + (m.eu ? ' <span class="text-zinc-400">(você)</span>' : '') + (m.papel === 'dono' ? ' <span class="text-zinc-400">· criou</span>' : '') + '</span>' +
+                        (q.souDono && !m.eu ? '<button type="button" class="qd-x" data-qd-rm="' + esc(q.id + '|' + m.membro) + '" title="Tirar do quadro" aria-label="Tirar ' + esc(m.email) + ' do quadro"><i class="ph ph-x"></i></button>' : '') + '</div>';
+                }).join('') + '</div>' +
+                (q.souDono ? '<div class="mt-2 flex gap-2"><input id="cfg-qd-email-' + esc(q.id) + '" data-qd-email="' + esc(q.id) + '" type="email" autocomplete="off" placeholder="E-mail da conta da pessoa no Faz" aria-label="E-mail da pessoa pra pôr no quadro ' + esc(q.nome) + '" class="min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2.5 py-1.5 text-[13px] outline-none">' +
+                    '<button type="button" data-qd-add="' + esc(q.id) + '" class="shrink-0 inline-flex items-center gap-1 bg-focus text-white text-[12.5px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-60"><i class="ph-bold ph-plus"></i>Pôr</button></div>' : '') +
+                (msg ? '<p class="mt-1.5 text-[12px] ' + (msg.ok ? 'text-emerald-600' : 'text-red-600') + '" role="status">' + esc(msg.text) + '</p>' : '') +
+                (q.listas.length ? '<p class="mt-2 text-[11.5px] text-zinc-500 leading-snug"><span class="font-semibold">Listas:</span> ' + q.listas.map(function (l) { return esc(l.nome) + (l.minha ? ' (sua)' : ' (de ' + esc(l.de || 'outra pessoa') + ')'); }).join(', ') + '</p>'
+                    : '<p class="mt-2 text-[11.5px] text-zinc-400 leading-snug">Nenhuma lista ainda. Pra pôr uma lista sua: nos 3 pontinhos da lista → Compartilhar com um quadro.</p>') +
+                '</div>';
+        }).join('') : '<p class="text-[12px] text-zinc-500 leading-snug">Um quadro junta pessoas (a casa, a equipe da empresa). Lista posta num quadro aparece pra todo mundo dele, aqui e no celular.</p>') +
+            '<div class="flex gap-2"><input id="cfg-qd-new" type="text" maxlength="60" autocomplete="off" placeholder="Nome do quadro novo (ex.: Casa, Empresa)" aria-label="Nome do quadro novo" class="min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none">' +
+            '<button type="button" id="cfg-qd-create" class="shrink-0 inline-flex items-center gap-1.5 bg-white border border-zinc-300 text-zinc-800 text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:bg-zinc-50 disabled:opacity-60"><i class="ph-bold ph-plus"></i>Criar quadro</button></div>' +
+            (SH.msg._new ? '<p class="text-[12px] ' + (SH.msg._new.ok ? 'text-emerald-600' : 'text-red-600') + '" role="status">' + esc(SH.msg._new.text) + '</p>' : '');
+        Object.keys(keep).forEach(function (id) { var i = $(id); if (i) i.value = keep[id]; });
+        if (focus && $(focus)) $(focus).focus();
+    }
+    async function qdRun(fn) { // ação nos quadros: depois relê (o celular vê na próxima sincronização)
+        if (!S.uid) return;
+        try { await fn(); } catch (e) { fail(e); }
+        await shLoad();
+        renderCfgQuadros();
+    }
+    function qdCreate() {
+        var C = shC(), inp = $('cfg-qd-new'), nome = inp ? inp.value.replace(/\s+/g, ' ').trim() : '';
+        if (!nome) { SH.msg._new = { ok: false, text: 'Dê um nome pro quadro.' }; renderCfgQuadros(); return; }
+        if (nome.length > C.QUADRO_NOME_MAX) { SH.msg._new = { ok: false, text: 'Nome muito longo (máx ' + C.QUADRO_NOME_MAX + ').' }; renderCfgQuadros(); return; }
+        return qdRun(async function () {
+            var r = await S.sb.rpc('faz_quadro_criar', { p_nome: nome });
+            if (r.error) { SH.msg._new = { ok: false, text: /faz_limite_quadros/.test(String(r.error.message)) ? 'Você chegou no limite de 20 quadros.' : 'Não consegui criar o quadro agora. Tente de novo.' }; return; }
+            SH.msg._new = { ok: true, text: 'Quadro "' + nome + '" criado. Agora ponha as pessoas pelo e-mail.' };
+            if (inp) inp.value = '';
+            toast('Quadro criado');
+        });
+    }
+    function qdAdd(q) {
+        var inp = $('cfg-qd-email-' + q), email = inp ? inp.value.trim() : '';
+        if (!email) { SH.msg[q] = { ok: false, text: 'Digite o e-mail da pessoa.' }; renderCfgQuadros(); return; }
+        return qdRun(async function () {
+            var r = await S.sb.rpc('faz_quadro_adicionar', { p_quadro: q, p_email: email });
+            var code = r.error ? '' : String(r.data);
+            SH.msg[q] = { ok: code === 'ok', text: r.error ? 'Não consegui agora. Tente de novo.' : shC().quadroMsg(code) };
+            if (code === 'ok' && inp) inp.value = '';
+        });
+    }
+    async function qdRemove(q, membro) {
+        var Q = qdFind(q), m = Q && Q.membros.find(function (x) { return x.membro === membro; });
+        if (!m || !(await dialog({ title: 'Tirar ' + (m.email || 'essa pessoa') + ' do quadro "' + Q.nome + '"?', text: 'Ela para de ver as listas do quadro. As listas que ela tinha posto voltam a ser só dela.', okLabel: 'Tirar do quadro', danger: true }))) return;
+        return qdRun(async function () { var r = await S.sb.from('quadros_membros').delete().eq('quadro', q).eq('membro', membro); if (r.error) throw r.error; delete SH.msg[q]; toast('A pessoa saiu do quadro'); });
+    }
+    async function qdLeave(q) {
+        var Q = qdFind(q);
+        if (!Q || !(await dialog({ title: 'Sair do quadro "' + Q.nome + '"?', text: 'As listas dos outros saem daqui. As suas que estavam no quadro voltam a ser só suas.', okLabel: 'Sair do quadro', danger: true }))) return;
+        return qdRun(async function () { var r = await S.sb.from('quadros_membros').delete().eq('quadro', q).eq('membro', S.uid); if (r.error) throw r.error; toast('Você saiu do quadro'); });
+    }
+    async function qdRename(q) {
+        var Q = qdFind(q), C = shC();
+        if (!Q) return;
+        var nome = await dialog({ title: 'Renomear o quadro', input: { value: Q.nome, placeholder: 'Nome do quadro', max: C.QUADRO_NOME_MAX }, okLabel: 'Renomear' });
+        nome = nome ? String(nome).replace(/\s+/g, ' ').trim() : '';
+        if (!nome || nome === Q.nome) return;
+        return qdRun(async function () { var r = await S.sb.from('quadros').update({ nome: nome }).eq('id', q); if (r.error) throw r.error; toast('Quadro renomeado'); });
+    }
+    async function qdDelete(q) {
+        var Q = qdFind(q);
+        if (!Q || !(await dialog({ title: 'Apagar o quadro "' + Q.nome + '"?', text: 'Todo mundo sai dele e cada lista volta a ser só de quem é dono. Nenhuma tarefa é apagada.', okLabel: 'Apagar quadro', danger: true }))) return;
+        return qdRun(async function () { var r = await S.sb.from('quadros').delete().eq('id', q); if (r.error) throw r.error; delete SH.msg[q]; toast('Quadro apagado'); });
+    }
+    function openCfgQuadros() { openCfg(); var sec = $('cfg-qd-title'); if (sec && sec.scrollIntoView) sec.scrollIntoView({ block: 'start' }); }
+
+    // ---- o menu da lista: compartilhar (a sua) / de quem é (a dos outros) ----
+    function shareMenu(colId, btn) {
+        closeColMenu();
+        var c = S.listas[colId];
+        if (!c || c.__sh) return;
+        var r = btn.getBoundingClientRect(), cur = c.quadro_id || null;
+        var opt = function (id, label, sub) {
+            var on = (id || null) === cur;
+            return '<button type="button" role="menuitemradio" aria-checked="' + on + '" data-share="' + (id ? esc(id) : '') + '" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100">' +
+                '<i class="ph ' + (on ? 'ph-radio-button text-focus' : 'ph-circle text-zinc-400') + '"></i><span class="min-w-0 flex-1"><span class="block truncate">' + esc(label) + '</span>' + (sub ? '<span class="block text-[11px] text-zinc-400 truncate">' + esc(sub) + '</span>' : '') + '</span></button>';
+        };
+        menuEl = document.createElement('div');
+        menuEl.setAttribute('role', 'menu');
+        menuEl.className = 'fixed z-40 w-60 bg-white border border-zinc-200 rounded-xl shadow-lg p-1';
+        menuEl.style.top = Math.round(r.bottom + 6) + 'px';
+        menuEl.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 248, r.right - 240))) + 'px';
+        menuEl.innerHTML = '<p class="px-3 pt-2 pb-1 text-[11.5px] text-zinc-500 leading-snug">Compartilhar "' + esc(c.name) + '": todo mundo do quadro vê a lista e mexe nas tarefas dela.</p>' +
+            opt(null, 'Só minha', 'ninguém mais vê') + SH.quadros.map(function (q) { return opt(q.id, q.nome, qdPeople(q.membros.length) + (q.souDono ? ' · você criou' : '')); }).join('') +
+            '<button type="button" data-share-new class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-plus"></i>Criar um quadro…</button>';
+        menuEl.addEventListener('click', async function (e) {
+            var b = e.target.closest('button');
+            if (!b) return;
+            closeColMenu();
+            if (b.hasAttribute('data-share-new')) return openCfgQuadros();
+            var q = b.dataset.share || null;
+            if ((c.quadro_id || null) === q) return;
+            if (!q && !(await dialog({ title: 'Parar de compartilhar "' + c.name + '"?', text: 'A lista some pra quem é do quadro. As tarefas continuam aqui com você.', okLabel: 'Parar de compartilhar' }))) return;
+            var Q = q && qdFind(q);
+            if (await patchRow('listas', colId, { quadro_id: q }, q ? 'Lista compartilhada com ' + (Q ? Q.nome : 'o quadro') : 'A lista agora é só sua')) shLoadSoon(600);
+        });
+        document.body.appendChild(menuEl);
+        setTimeout(function () { document.addEventListener('pointerdown', outsideMenu, true); document.addEventListener('scroll', closeColMenu, true); }, 0);
+        var first = menuEl.querySelector('button');
+        if (first) first.focus();
+    }
+
+    function shColMenu(colId, btn) { // a lista de outra pessoa: de quem é, e o quadro
+        var c = S.listas[colId], r = btn.getBoundingClientRect();
+        if (!c) return;
+        menuEl = document.createElement('div');
+        menuEl.setAttribute('role', 'menu');
+        menuEl.className = 'fixed z-40 w-60 bg-white border border-zinc-200 rounded-xl shadow-lg p-1';
+        menuEl.style.top = Math.round(r.bottom + 6) + 'px';
+        menuEl.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 248, r.right - 240))) + 'px';
+        menuEl.innerHTML = '<p class="px-3 pt-2 pb-1.5 text-[12px] text-zinc-600 leading-snug">' + esc(colShTitle(c)) + '. Você vê e mexe nas tarefas; só quem é dono renomeia ou apaga a lista.</p>' +
+            '<button type="button" role="menuitem" data-act="board" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-users-three"></i>Ver o quadro</button>';
+        menuEl.addEventListener('click', function (e) { if (e.target.closest('button')) { closeColMenu(); openCfgQuadros(); } });
+        document.body.appendChild(menuEl);
+        setTimeout(function () { document.addEventListener('pointerdown', outsideMenu, true); document.addEventListener('scroll', closeColMenu, true); }, 0);
+        menuEl.querySelector('button').focus();
     }
 
     // ---------- eventos ----------
@@ -6718,6 +7052,23 @@
         // V40.32.0: Configurações
         $('btn-cfg').addEventListener('click', openCfg);
         $('cfg-close').addEventListener('click', function () { fgClose('cfg-per-box', closeCfg); }); // V40.46.0
+        // V40.47.0: Quadros (a lista é redesenhada; os botões são achados pelo data-*)
+        $('cfg-qd').addEventListener('click', function (e) {
+            var b = e.target.closest('button');
+            if (!b || b.disabled) return;
+            if (b.id === 'cfg-qd-create') return void qdCreate();
+            if (b.dataset.qdAdd) return void qdAdd(b.dataset.qdAdd);
+            if (b.dataset.qdRm) { var x = b.dataset.qdRm.split('|'); return void qdRemove(x[0], x[1]); }
+            if (b.dataset.qdLeave) return void qdLeave(b.dataset.qdLeave);
+            if (b.dataset.qdRename) return void qdRename(b.dataset.qdRename);
+            if (b.dataset.qdDel) return void qdDelete(b.dataset.qdDel);
+        });
+        $('cfg-qd').addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            var t = e.target;
+            if (t.id === 'cfg-qd-new') { e.preventDefault(); qdCreate(); }
+            else if (t.dataset && t.dataset.qdEmail) { e.preventDefault(); qdAdd(t.dataset.qdEmail); }
+        });
         $('modal-cfg').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('cfg-per-box', closeCfg); });
         $('cfg-colors').addEventListener('click', function (e) {
             var b = e.target.closest('[data-cfg-color]');
@@ -6771,7 +7122,8 @@
         // rede / foco: garante que nada fica velho mesmo se o tempo real cair
         window.addEventListener('online', function () { if (S.uid) { setLive('connecting'); subscribe(); loadAll(); } });
         window.addEventListener('offline', function () { if (S.uid) setLive('off'); });
-        window.addEventListener('focus', function () { if (S.uid && Date.now() - S.lastLoad > 15000) loadAll(); });
+        window.addEventListener('focus', function () { if (S.uid && Date.now() - S.lastLoad > 15000) loadAll(); else if (S.uid && Date.now() - SH.at > 15000) shLoadSoon(0); }); // V40.47.0: + quadros
+        setInterval(function () { if (S.uid && document.visibilityState === 'visible' && (SH.quadros.length || Date.now() - SH.at > 180000)) shLoad(); }, 60000); // V40.47.0
         setInterval(function () {
             if (S.uid && document.visibilityState === 'visible' && (S.live !== 'live' || Date.now() - S.lastLoad > 300000)) loadAll();
         }, 30000);
@@ -6868,6 +7220,7 @@
         currentUid = uid;
         if (!session) {
             unsubscribe();
+            shReset(); // V40.47.0
             S.uid = null; S.listas = {}; S.tags = {}; S.tarefas = {}; S.blocos = {}; S.lastLoad = 0; S.composer = null;
             S.rotinas = {}; S.notas = {}; S.financas = {}; closeRoutine(); ntClose(); // V40.17.0
             S.metas_listas = {}; S.metas = {}; S.metas_dias = {}; S.mtWant = {}; S.mtQueue = {}; closeGoal(); // V40.21.0
@@ -6881,6 +7234,8 @@
             show('view-login');
             return;
         }
+        shReset(); // V40.47.0: outra conta (ou entrou agora)
+        S.listas = {}; S.tarefas = {};
         S.uid = uid;
         S.email = session.user.email || '';
         $('user-email').textContent = S.email;

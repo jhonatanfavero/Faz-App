@@ -846,7 +846,7 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(await nomes() === N0 && await p.evaluate(() => !document.querySelector('body > div.fixed.z-40.w-52') && document.getElementById('modal-task').classList.contains('hidden')), 'clicar no título sem arrastar não muda nada');
   await cabeca('BETA').locator('.col-menu-btn').click(); await p.waitForTimeout(200);
   const mn = await p.evaluate(() => { const m = document.querySelector('body > div.fixed.z-40.w-52'); if (!m) return null; const r = m.getBoundingClientRect(); return { itens: [...m.querySelectorAll('button')].map((b) => b.innerText.trim() + (b.disabled ? '(off)' : '')), dentro: r.right <= innerWidth && r.bottom <= innerHeight }; });
-  ok(!!mn && mn.itens.join('|') === 'Renomear lista|Mover pra esquerda|Mover pra direita|Apagar lista' && mn.dentro, 'menu da lista: Renomear | Mover pra esquerda | Mover pra direita | Apagar');
+  ok(!!mn && mn.itens.join('|') === 'Renomear lista|Mover pra esquerda|Mover pra direita|Compartilhar com um quadro…|Apagar lista' && mn.dentro, 'menu da lista: Renomear | Mover pra esquerda | Mover pra direita | Compartilhar com um quadro… (V40.47.0) | Apagar');
   await foto(p, 'pc-lista-menu.png');
   await p.locator('body > div.fixed.z-40.w-52 [data-act="right"]').click(); await p.waitForTimeout(400);
   ok(await nomes() === 'ALFA,GAMA,BETA,DELTA,OMEGA', 'Mover pra direita: BETA passa GAMA');
@@ -1187,6 +1187,54 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(pil.map((x) => x.st).join() === '570,600' && pil.every((x) => x.livre), 'visão Dia: o "↓ Encaixar às" nas duas emendas, por cima de tudo (dá pra clicar): ' + pil.map((x) => x.st + ' (' + x.w + ' px)').join(', '));
   await foto(p, 'pc-encaixar-dia.png');
   await p.locator('#ag-place-cancel').click(); await p.waitForTimeout(200);
+  }
+
+  {
+  console.log('\nAE) Quadros e listas compartilhadas (V40.47.0):');
+  // outra conta (Ana) com o quadro "Casa": a lista "Mercado da casa" dela está nele, e esta conta também
+  await p.evaluate((uid) => {
+    const s = window.__nuvem, ANA = 'dddddddd-4444-4444-8444-444444444444', Q = '22222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    s.addUser('ana@teste.com', 'x', ANA);
+    s.tables.quadros.set(Q, { id: Q, dono: ANA, nome: 'Casa', created_at: 'x', updated_at: 'x' });
+    s.tables.quadros_membros.set(Q + '|' + ANA, { quadro: Q, membro: ANA, email: 'ana@teste.com', papel: 'dono' });
+    s.tables.quadros_membros.set(Q + '|' + uid, { quadro: Q, membro: uid, email: 'pessoa@teste.com', papel: 'membro' });
+    s.insert('listas', ANA, { id: 'col_ana', name: 'Mercado da casa', position: 1024, quadro_id: Q });
+    ['Arroz 5kg', 'Detergente', 'Pão de forma', 'Café'].forEach((t, i) => s.insert('tarefas', ANA, { id: 'bl_ana' + i, column_id: 'col_ana', title: t, duration: 15, microblocks: [], position: (i + 1) * 1024 }));
+  }, UID);
+  await p.locator('#tab-listas').click(); await p.waitForTimeout(200);
+  await p.locator('#btn-refresh').click(); await p.waitForTimeout(1200);
+  const sh = await p.evaluate(() => {
+    const cols = [...document.querySelectorAll('section.col')], last = cols[cols.length - 1];
+    if (!last) return null;
+    last.scrollIntoView({ inline: 'end' });
+    const r = last.getBoundingClientRect(), h = last.querySelector('header');
+    return { id: last.dataset.col, n: last.querySelectorAll('.card').length, head: h.textContent.replace(/\s+/g, ' ').trim(), icon: !!h.querySelector('.ph-users-three'), dashed: getComputedStyle(last).borderStyle, w: Math.round(r.width) };
+  });
+  ok(!!sh && /^sh_dddddddd_col_ana$/.test(sh.id) && sh.n === 4 && sh.icon && /Mercado da casa/.test(sh.head) && /de ana@teste\.com · Casa/.test(sh.head) && sh.dashed === 'dashed',
+    'a lista da Ana aparece no fim, tracejada, com o ícone, "de ana@teste.com · Casa" e as 4 tarefas: ' + (sh ? sh.head.slice(0, 80) : '-'));
+  await p.waitForTimeout(300);
+  await foto(p, 'pc-lista-compartilhada.png');
+  // o menu da lista dela
+  await p.locator('section.col:last-of-type .col-menu-btn').click(); await p.waitForTimeout(200);
+  const mn = await p.evaluate(() => { const m = document.querySelector('body > div.fixed[role="menu"]'); if (!m) return null; const r = m.getBoundingClientRect(); return { t: m.textContent.replace(/\s+/g, ' ').trim(), dentro: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; });
+  ok(!!mn && mn.dentro && /Lista de ana@teste\.com · quadro Casa/.test(mn.t) && /Ver o quadro/.test(mn.t) && !/Renomear/.test(mn.t), 'menu da lista dela: de quem é e "Ver o quadro" (sem Renomear/Apagar), dentro da tela');
+  await foto(p, 'pc-menu-lista-compartilhada.png');
+  await p.locator('body > div.fixed[role="menu"] button').click(); await p.waitForTimeout(500);
+  const cq = await p.evaluate(() => {
+    const box = document.getElementById('cfg-qd'), m = document.querySelector('#modal-cfg > div'), r = m.getBoundingClientRect();
+    const fora = [...box.querySelectorAll('*')].filter((el) => { const q = el.getBoundingClientRect(); return q.width && (q.left < r.left - 1 || q.right > r.right + 1); }).length;
+    return { vis: !document.getElementById('modal-cfg').classList.contains('hidden'), t: box.textContent.replace(/\s+/g, ' ').trim(), fora };
+  });
+  ok(cq.vis && /Casa/.test(cq.t) && /de ana@teste\.com/.test(cq.t) && /Mercado da casa \(de ana@teste\.com\)/.test(cq.t) && cq.fora === 0, '"Ver o quadro" abre Configurações → Quadros: o quadro Casa, as pessoas e as listas, tudo dentro da janela');
+  await foto(p, 'pc-configuracoes-quadros.png');
+  await p.locator('#cfg-close').click(); await p.waitForTimeout(200);
+  // compartilhar uma lista sua (o submenu)
+  await p.locator('section.col:nth-of-type(2) .col-menu-btn').click(); await p.waitForTimeout(200);
+  await p.locator('body > div.fixed button[data-act="share"]').click(); await p.waitForTimeout(200);
+  const sm = await p.evaluate(() => { const m = document.querySelector('body > div.fixed[role="menu"]'); if (!m) return null; const r = m.getBoundingClientRect(); return { n: m.querySelectorAll('[data-share]').length, t: m.textContent.replace(/\s+/g, ' ').trim(), dentro: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; });
+  ok(!!sm && sm.dentro && sm.n === 2 && /Só minha/.test(sm.t) && /Casa/.test(sm.t) && /Criar um quadro/.test(sm.t), 'compartilhar uma lista sua: "Só minha", o quadro Casa e "Criar um quadro…", dentro da tela');
+  await foto(p, 'pc-compartilhar-lista.png');
+  await p.keyboard.press('Escape'); await p.mouse.click(5, 450); await p.waitForTimeout(200);
   }
 
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));

@@ -53,7 +53,7 @@ function fazLoadList(key, fallback) {
     } catch (e) {
         (window.fazCorruptKeys = window.fazCorruptKeys || []).push(key);
         try { if (raw != null) localStorage.setItem('tb__corrompido_' + key, raw); } catch (e2) {}
-        try { localStorage.removeItem('tb__sync'); } catch (e3) {}
+        try { localStorage.removeItem('tb__sync'); localStorage.removeItem('tb__compartilhadas'); } catch (e3) {} // V40.47.0: + a base das listas compartilhadas (a próxima rodada junta, sem apagar nada de ninguém)
         console.error('[Faz] dado corrompido em', key, e);
         return fallback;
     }
@@ -1894,7 +1894,8 @@ function subSyncDone(b) { const c = subCount(b); if (c.total) b.completed = c.do
 // devolvendo): a lista de onde ele veio; se ela não existe mais (ou o bloco nasceu na agenda), a primeira lista (a da
 // esquerda). Pedido dele (23/11); antes o bloco ia sempre pra Geral. O mesmo do PC (backToListId).
 function backToListColumn(columnId) {
-    return (columnId && backlogColumnsDb.find(c => c.id === columnId)) || backlogColumnsDb[0] || { id: 'col_geral', name: 'Geral' };
+    // V40.47.0: sem a lista de origem, a primeira lista SUA (a de outra pessoa só recebe o que veio dela)
+    return (columnId && backlogColumnsDb.find(c => c.id === columnId)) || backlogColumnsDb.find(c => !fazSharedColId(c.id)) || backlogColumnsDb[0] || { id: 'col_geral', name: 'Geral' };
 }
 // Cópia (duplicar, repetir): ids novos e tudo desmarcado, como a checklist dos blocos.
 function subCloneCards(cards) {
@@ -3885,10 +3886,13 @@ window.openConfigSheet = () => {
     document.getElementById('config-sync-view').classList.add('hidden'); // V40.7.0: nova sub-view Sincronizar
     document.getElementById('config-archive-view').classList.add('hidden'); // V40.9.0: nova sub-view Arquivados
     document.getElementById('config-avisos-view').classList.add('hidden'); // V40.42.0: nova sub-view Avisos
+    document.getElementById('config-quadros-view').classList.add('hidden'); // V40.47.0: Quadros
+    qdOpenId = null;
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
     document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
     avisosMenuStatus(); // V40.42.0
+    qdMenuStatus(); // V40.47.0
 
     document.getElementById('config-sheet').classList.remove('translate-y-full');
     pushNavState(); // V40.5.0-fix7
@@ -3980,6 +3984,44 @@ function collectFazData() {
     return out;
 }
 
+// V40.47.0: as listas que outras pessoas compartilharam com você (id 'sh_…', o mesmo do sync.js) não são suas: não vão
+// no backup, e restaurar um backup (ou desfazer a restauração) não mexe nelas, elas continuam aqui como estavam. Senão
+// um backup velho faria a sincronização achar que você apagou as tarefas novas da lista dos outros.
+function fazSharedColId(id) { return /^sh_[0-9a-f]{8}_./.test(String(id == null ? '' : id)); }
+const FAZ_SHARED_KEEP = {
+    tb_backlog_columns: (c) => !!c && fazSharedColId(c.id),
+    tb_backlog_db: (it) => !!it && fazSharedColId(it.columnId),
+    tb_archive_db: (a) => !!a && a.kind === 'tarefa' && !!a.item && fazSharedColId(a.item.columnId),
+};
+function fazBackupStripShared(data) { // { chave: texto } sem os itens das listas compartilhadas (texto cru quando não tem nenhum)
+    const out = Object.assign({}, data);
+    Object.keys(FAZ_SHARED_KEEP).forEach((key) => {
+        if (typeof out[key] !== 'string') return;
+        let v;
+        try { v = JSON.parse(out[key]); } catch (e) { return; }
+        if (!Array.isArray(v)) return;
+        const f = v.filter((x) => !FAZ_SHARED_KEEP[key](x));
+        if (f.length !== v.length) out[key] = JSON.stringify(f);
+    });
+    return out;
+}
+function fazSharedSnapshot() { // os itens das listas compartilhadas guardados agora
+    const s = {};
+    Object.keys(FAZ_SHARED_KEEP).forEach((key) => {
+        try { const v = JSON.parse(localStorage.getItem(key) || '[]'); s[key] = Array.isArray(v) ? v.filter(FAZ_SHARED_KEEP[key]) : []; } catch (e) { s[key] = []; }
+    });
+    return s;
+}
+function fazSharedPutBack(s) { // devolve (no fim de cada lista) o que fazSharedSnapshot guardou
+    Object.keys(FAZ_SHARED_KEEP).forEach((key) => {
+        if (!s || !s[key] || !s[key].length) return;
+        let v;
+        try { v = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { v = []; }
+        if (!Array.isArray(v)) v = [];
+        localStorage.setItem(key, JSON.stringify(v.filter((x) => !FAZ_SHARED_KEEP[key](x)).concat(s[key])));
+    });
+}
+
 // Contagem leve pra dar confiança ao usuário (quantos itens tem em cada coisa).
 function fazDataSummary(dataObj) {
     const countArr = (key) => {
@@ -4007,7 +4049,7 @@ function fazTimestampLabel() {
 window.renderBackupSummary = function() {
     const el = document.getElementById('backup-summary');
     if (!el) return;
-    const s = fazDataSummary(collectFazData());
+    const s = fazDataSummary(fazBackupStripShared(collectFazData())); // V40.47.0: sem as listas dos outros
     el.innerHTML =
         `<b>${s.tarefas}</b> tarefas · <b>${s.despesas}</b> despesas · ` +
         `<b>${s.rotinas}</b> rotinas · <b>${s.notas}</b> notas · ` +
@@ -4033,11 +4075,11 @@ window.closeConfigBackup = function() {
 window.exportFazBackup = async function() {
     let payload;
     try {
-        const data = collectFazData();
+        const data = fazBackupStripShared(collectFazData()); // V40.47.0: as listas que os outros compartilharam com você não vão
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.46.0',
+            version: 'v40.47.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -4148,11 +4190,12 @@ function applyFazImport(parsed) {
     }
 
     // Aceita só chaves de dados válidas (strings).
-    const incoming = {};
+    let incoming = {};
     let count = 0;
     for (const k in parsed.data) {
         if (isFazDataKey(k) && typeof parsed.data[k] === 'string') { incoming[k] = parsed.data[k]; count++; }
     }
+    incoming = fazBackupStripShared(incoming); // V40.47.0: lista compartilhada nunca vem de backup
     if (count === 0) { showToast('Backup vazio ou sem dados reconhecidos 🤔'); return; }
     if (!fazBackupLooksSafe(incoming)) { showToast('Backup com dados inválidos. Nada foi alterado 😕'); return; }
 
@@ -4184,6 +4227,7 @@ function applyFazImport(parsed) {
     // 2) Limpa chaves de dados atuais (tb_ mas não tb__) e grava as do backup.
     try {
         const prefsBefore = fazPrefsKeys(), periodsBefore = fazPeriodsRaw();
+        const shared = fazSharedSnapshot(); // V40.47.0: as listas compartilhadas ficam como estão
         const toRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
             const k = localStorage.key(i);
@@ -4191,6 +4235,7 @@ function applyFazImport(parsed) {
         }
         toRemove.forEach(k => localStorage.removeItem(k));
         for (const k in incoming) { localStorage.setItem(k, incoming[k]); }
+        fazSharedPutBack(shared);
         fazPrefsStampIfChanged(prefsBefore); // V40.32.0: a cor e o horário do backup valem também no PC
         fazPeriodsStampIfChanged(periodsBefore); // V40.41.0: e os períodos
     } catch (e) {
@@ -4220,13 +4265,16 @@ window.undoFazImport = function() {
 
     try {
         const prefsBefore = fazPrefsKeys(), periodsBefore = fazPeriodsRaw();
+        const shared = fazSharedSnapshot(); // V40.47.0: as listas compartilhadas ficam como estão agora
         const toRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
             const k = localStorage.key(i);
             if (isFazDataKey(k)) toRemove.push(k);
         }
         toRemove.forEach(k => localStorage.removeItem(k));
-        for (const k in rb.data) { localStorage.setItem(k, rb.data[k]); }
+        const back = fazBackupStripShared(rb.data);
+        for (const k in back) { localStorage.setItem(k, back[k]); }
+        fazSharedPutBack(shared);
         fazPrefsStampIfChanged(prefsBefore); // V40.32.0
         fazPeriodsStampIfChanged(periodsBefore); // V40.41.0
         localStorage.removeItem(FAZ_ROLLBACK_KEY);
@@ -4634,7 +4682,7 @@ function renderBacklog() {
         // Sem beiradinha — descoberta do swipe fica nos DOTS embaixo do header.
         return `
             <div class="snap-center snap-always shrink-0 w-full h-full overflow-y-auto no-scrollbar px-4 pb-4${col.id === activeColumnId ? ' zoom-active' : ''}" data-column-id="${col.id}">
-                <div class="zoom-col-head" onclick="setActiveColumnFromZoom('${col.id}')"><span class="truncate">${escapeHtml(col.name)}</span><span class="zoom-col-count">${blSearchQ ? colItems.length + '/' + allItems.length : colItems.length}</span></div>
+                <div class="zoom-col-head" onclick="setActiveColumnFromZoom('${col.id}')">${sharedColIcon(col) ? `<span class="min-w-0 flex items-center gap-1"><i class="ph-fill ph-users-three text-app-focus shrink-0" aria-label="Compartilhada"></i><span class="truncate">${escapeHtml(col.name)}</span></span>` : `<span class="truncate">${escapeHtml(col.name)}</span>`}<span class="zoom-col-count">${blSearchQ ? colItems.length + '/' + allItems.length : colItems.length}</span></div>
                 ${cardsHtml}
             </div>`;
     }).join('');
@@ -4722,6 +4770,13 @@ function updateActiveColumnHeader() {
     const titleEl = document.getElementById('backlog-column-title');
     const countEl = document.getElementById('backlog-count');
     if (titleEl) titleEl.textContent = col.name; // V40.39.0: textContent (o innerText não existe no jsdom dos testes)
+    const shEl = document.getElementById('backlog-column-shared'); // V40.47.0
+    if (shEl) {
+        const on = sharedColIcon(col), t = !on ? 'Lista compartilhada' : fazSharedColId(col.id) ? `Lista de ${(col.shared && col.shared.de) || 'outra pessoa'}` : 'Lista compartilhada com um quadro';
+        shEl.classList.toggle('hidden', !on);
+        shEl.title = t;
+        shEl.setAttribute('aria-label', t);
+    }
     if (countEl) {
         const colItems = backlogDb.filter(item => getItemColumn(item) === col.id);
         countEl.textContent = blSearchQ ? colItems.filter(blSearchShown).length + ' de ' + colItems.length : colItems.length; // V40.39.0: com a busca, "1 de 8"
@@ -5130,10 +5185,11 @@ function moveBacklogCardTo(fromId, destColId, beforeId) {
     if (!item || !destCol || fromId === beforeId) return;
     const changedList = getItemColumn(item) !== destColId;
     backlogDb.splice(backlogDb.indexOf(item), 1);
-    if (changedList) item.columnId = destColId;
+    const other = changedList && fazMoveTaskTo(item, destColId); // V40.47.0: lista de outra conta = tarefa nova lá
     const toIdx = beforeId ? backlogDb.findIndex(i => i.id === beforeId) : -1;
     if (toIdx >= 0) backlogDb.splice(toIdx, 0, item); else backlogDb.push(item);
     saveBacklog();
+    if (other) undoNameStep('Tarefa movida de lista');
     renderBacklog();
     if (changedList) showToast(`Movido pra ${destCol.name}!`);
 }
@@ -8105,7 +8161,8 @@ window.saveBacklogForm = function() {
             item.title = title;
             item.duration = currentBlDur;
             item.tagId = currentBlTagId;
-            if (goalKeep(currentBlGoalId)) item.goalId = currentBlGoalId; else delete item.goalId; // V40.34.0
+            if (goalKeep(currentBlGoalId)) item.goalId = currentBlGoalId;
+            else if (!(fazSharedColId(item.columnId) && item.goalId && !goalById(item.goalId))) delete item.goalId; // V40.34.0 (V40.47.0: a meta de quem é dono da lista compartilhada, que não existe aqui, fica)
             item.microblocks = validMbs;
             if (currentBlColor) item.color = currentBlColor; else delete item.color; // V40.9.0
         }
@@ -8216,6 +8273,15 @@ window.openColumnMenuFromHeader = function() {
     } else {
         deleteBtn.classList.remove('hidden');
     }
+    // V40.47.0: lista de outra pessoa não se renomeia nem se apaga daqui; a sua (menos a Geral) se compartilha
+    const alias = fazSharedColId(col.id), info = sharedColInfo(col);
+    if (alias) deleteBtn.classList.add('hidden');
+    document.getElementById('column-menu-rename-btn').classList.toggle('hidden', alias);
+    document.getElementById('column-menu-share-btn').classList.toggle('hidden', alias || !!col.isDefault || col.id === 'col_geral');
+    document.getElementById('column-menu-share-txt').textContent = col.quadroId ? 'Compartilhamento' : 'Compartilhar com um quadro';
+    document.getElementById('column-menu-shared').classList.toggle('hidden', !info);
+    document.getElementById('column-menu-shared-txt').textContent = info;
+    document.getElementById('column-menu-board-btn').classList.toggle('hidden', !(alias ? (col.shared && col.shared.quadro) : col.quadroId));
     
     showColumnMenuModal();
 };
@@ -8234,6 +8300,7 @@ window.closeColumnMenu = function() {
 window.openRenameColumn = function() {
     const col = backlogColumnsDb.find(c => c.id === activeColumnId);
     if (!col) return;
+    if (fazSharedColId(col.id)) return showToast('Só quem é dono da lista pode renomear.'); // V40.47.0
     
     hideModal('column-menu-modal');
     
@@ -8287,6 +8354,7 @@ window.openDeleteColumn = function() {
     const col = backlogColumnsDb.find(c => c.id === activeColumnId);
     if (!col) return;
     if (col.isDefault) return showToast('A lista padrão não pode ser apagada.');
+    if (fazSharedColId(col.id)) return showToast('Só quem é dono da lista pode apagar.'); // V40.47.0
     
     hideModal('column-menu-modal');
     
@@ -8307,7 +8375,7 @@ window.openDeleteColumn = function() {
 window.confirmDeleteColumn = function() {
     const colId = activeColumnId;
     const col = backlogColumnsDb.find(c => c.id === colId);
-    if (!col || col.isDefault) {
+    if (!col || col.isDefault || fazSharedColId(col.id)) { // V40.47.0: lista de outra pessoa não se apaga daqui
         hideModal('column-delete-modal');
         return;
     }
@@ -8369,8 +8437,9 @@ window.confirmMoveCard = function(destColId) {
     if (!_moveCardPendingId) return;
     const card = backlogDb.find(c => c.id === _moveCardPendingId);
     if (card) {
-        card.columnId = destColId;
+        const other = fazMoveTaskTo(card, destColId); // V40.47.0: lista de outra conta = tarefa nova lá
         saveBacklog();
+        if (other) undoNameStep('Tarefa movida de lista');
         const destCol = backlogColumnsDb.find(c => c.id === destColId);
         showToast(`Movido pra ${destCol ? destCol.name : 'lista'}!`);
     }
@@ -8383,6 +8452,251 @@ window.cancelMoveCard = function() {
     _moveCardPendingId = null;
     hideModal('column-move-modal');
 };
+
+// =====================================================
+// V40.47.0 — QUADROS E LISTAS COMPARTILHADAS (as telas; a sincronização e as regras ficam no sync.js)
+// Pedido dele (24 e 25/11): compartilhar listas com a esposa e com a equipe da empresa. Escolhas: entra pelo e-mail da
+// conta, direto; quem é do quadro faz tudo nas tarefas, igual ao dono; agendar tira da lista; qualquer um do quadro põe
+// uma lista SUA nele; só quem criou o quadro põe e tira pessoas. Um quadro (Casa, Empresa) junta pessoas; a lista posta
+// num quadro aparece pra todo mundo dele (menu ⋮ da lista → Compartilhar com um quadro). Só o dono da lista renomeia ou
+// apaga a lista. A lista de outra pessoa aparece aqui com o ícone de pessoas e o id 'sh_…' (fazSharedColId).
+// =====================================================
+function fazSharedOwner(colId) { return fazSharedColId(colId) ? String(colId).slice(3, 11) : ''; }
+// Mudou de "conta" (sua ↔ compartilhada, ou entre donos diferentes): a tarefa ganha id novo (some de onde saiu e nasce no
+// destino), assim o mesmo id nunca vai parar na conta de outra pessoa. Devolve true se mudou de conta.
+function fazMoveTaskTo(item, destColId) {
+    const other = fazSharedOwner(getItemColumn(item)) !== fazSharedOwner(destColId);
+    if (other) {
+        expandedBacklogIds.delete(item.id);
+        item.id = 'bl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    }
+    item.columnId = destColId;
+    return other;
+}
+function qdApi() { return window.fazQuadros || null; }
+function qdState() { const a = qdApi(); return a ? a.estado() : { configurado: false, logado: false, quadros: [], carregado: false }; }
+function qdFind(id) { return qdState().quadros.find(q => q.id === id) || null; }
+function qdPeople(n) { return n === 1 ? '1 pessoa' : n + ' pessoas'; }
+function qdListsN(n) { return n === 1 ? '1 lista' : n + ' listas'; }
+function sharedColInfo(col) { // o texto do menu da lista
+    if (!col) return '';
+    if (fazSharedColId(col.id)) {
+        const s = col.shared || {};
+        return `Lista de ${s.de || 'outra pessoa'}, no quadro ${s.quadroNome || '…'}. Você vê e mexe nas tarefas; só quem é dono dela renomeia ou apaga.`;
+    }
+    if (col.quadroId) { const q = qdFind(col.quadroId); return `Compartilhada com o quadro ${q ? q.nome : '…'}: todo mundo dele vê a lista e mexe nas tarefas.`; }
+    return '';
+}
+function sharedColIcon(col) { return !!col && (fazSharedColId(col.id) || !!col.quadroId); }
+
+// ---- menu ⋮ da lista → compartilhar ----
+let _shareColId = null;
+window.openShareColumn = function() {
+    const col = backlogColumnsDb.find(c => c.id === activeColumnId);
+    if (!col || fazSharedColId(col.id)) return;
+    if (col.isDefault || col.id === 'col_geral') return showToast('A lista Geral não pode ser compartilhada.');
+    hideModal('column-menu-modal');
+    if (!qdState().logado) return showToast('Entre na sua conta (Config → Sincronizar com a nuvem) pra compartilhar listas.');
+    _shareColId = col.id;
+    renderShareList();
+    showModal('share-list-modal');
+    const a = qdApi();
+    if (a && !qdState().carregado) a.atualizar().then(renderShareList);
+};
+function renderShareList() {
+    const col = backlogColumnsDb.find(c => c.id === _shareColId), box = document.getElementById('share-list-options');
+    if (!col || !box) return;
+    document.getElementById('share-list-title').textContent = `Compartilhar "${col.name}"`;
+    const st = qdState(), cur = col.quadroId || null;
+    const row = (id, title, sub) => {
+        const on = (id || null) === cur;
+        return `<button type="button" role="radio" aria-checked="${on}" class="agf-row${on ? ' on' : ''}" onclick="shareListPick(${id ? `'${id}'` : 'null'})">` +
+            `<span class="agf-radio" aria-hidden="true"></span><span class="flex-1 min-w-0"><span class="block truncate">${escapeHtml(title)}</span>` +
+            (sub ? `<span class="block text-[11px] font-semibold text-zinc-400 truncate">${escapeHtml(sub)}</span>` : '') + `</span></button>`;
+    };
+    let html = row(null, 'Só minha', 'ninguém mais vê');
+    st.quadros.forEach(q => { html += row(q.id, q.nome, qdPeople(q.membros.length) + (q.souDono ? ' · você criou' : '')); });
+    if (!st.quadros.length) html += `<p class="text-[12px] text-zinc-500 text-center leading-snug px-2 py-2">${st.carregado ? 'Você ainda não está em nenhum quadro. Crie um (Casa, Empresa…) e ponha as pessoas pelo e-mail.' : 'Carregando seus quadros…'}</p>`;
+    box.innerHTML = html;
+}
+window.shareListPick = function(quadroId) {
+    const col = backlogColumnsDb.find(c => c.id === _shareColId), a = qdApi();
+    if (!col || !a) return;
+    const q = quadroId ? qdFind(quadroId) : null;
+    if ((col.quadroId || null) === (quadroId || null)) { closeShareList(); return; }
+    if (!quadroId && !confirm(`Parar de compartilhar "${col.name}"?\n\nA lista some pra quem é do quadro. As tarefas continuam aqui com você.`)) return;
+    closeShareList();
+    a.compartilhar(col.id, quadroId).then(r => {
+        if (!r.ok) return showToast(r.msg || 'Não consegui agora.');
+        showToast(quadroId ? `Lista compartilhada com ${q ? q.nome : 'o quadro'}! 👥` : 'A lista agora é só sua.');
+        renderBacklog();
+    });
+    undoNameStep(quadroId ? 'Lista compartilhada' : 'Lista parou de ser compartilhada');
+    renderBacklog();
+};
+window.closeShareList = function() { _shareColId = null; hideModal('share-list-modal'); };
+window.shareListNewBoard = function() { const c = _shareColId; closeShareList(); _shareColAfterNew = c; openQuadroName('create'); };
+window.openColumnBoard = function() {
+    const col = backlogColumnsDb.find(c => c.id === activeColumnId);
+    const qid = col && (fazSharedColId(col.id) ? (col.shared && col.shared.quadro) : col.quadroId);
+    hideModal('column-menu-modal');
+    if (!qid) return;
+    closeAllSheets();
+    openConfigSheet();
+    openConfigQuadros(qid);
+};
+
+// ---- Config → Quadros ----
+let qdOpenId = null; // quadro aberto (detalhe) ou null (a lista de quadros)
+let _qdNameMode = null; // 'create' | 'rename'
+window.openConfigQuadros = function(id) {
+    document.getElementById('config-main-menu').classList.add('hidden');
+    document.getElementById('config-quadros-view').classList.remove('hidden');
+    qdOpenId = id || null;
+    qdHeader();
+    fazQuadrosRender();
+    const a = qdApi();
+    if (a && qdState().logado) a.atualizar().then(fazQuadrosRender);
+};
+window.closeConfigQuadros = function() {
+    qdOpenId = null;
+    document.getElementById('config-quadros-view').classList.add('hidden');
+    document.getElementById('config-main-menu').classList.remove('hidden');
+    document.getElementById('config-title').innerText = 'Configurações';
+    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+    qdMenuStatus();
+};
+window.qdBack = function() { qdOpenId = null; qdHeader(); fazQuadrosRender(); };
+function qdHeader() {
+    document.getElementById('config-title').innerText = 'Quadros';
+    document.getElementById('config-back-btn').setAttribute('onclick', qdOpenId ? 'qdBack()' : 'closeConfigQuadros()');
+}
+window.qdOpen = function(id) { qdOpenId = id; qdHeader(); fazQuadrosRender(); const v = document.getElementById('config-quadros-view'); if (v) v.scrollTop = 0; };
+window.qdGoLogin = function() { closeConfigQuadros(); if (typeof openConfigSync === 'function') openConfigSync(); };
+function qdMenuStatus() {
+    const el = document.getElementById('qd-menu-status');
+    if (!el) return;
+    const st = qdState();
+    el.textContent = st.logado && st.quadros.length ? (st.quadros.length === 1 ? '1 quadro: ' + st.quadros[0].nome : st.quadros.length + ' quadros') : 'Listas compartilhadas com a casa ou a equipe';
+}
+// Desenha a tela (chamada também pelo sync.js quando chega coisa nova). Os campos de digitar não são redesenhados.
+window.fazQuadrosRender = function() {
+    qdMenuStatus();
+    const view = document.getElementById('config-quadros-view');
+    if (!view || view.classList.contains('hidden')) return;
+    const st = qdState(), $q = (id) => document.getElementById(id);
+    $q('qd-need-login').classList.toggle('hidden', st.logado);
+    let q = qdOpenId ? st.quadros.find(x => x.id === qdOpenId) : null;
+    if (qdOpenId && !q && st.carregado) { qdOpenId = null; qdHeader(); } // apagado ou você saiu
+    $q('qd-home').classList.toggle('hidden', !st.logado || !!q);
+    $q('qd-detail').classList.toggle('hidden', !st.logado || !q);
+    if (!st.logado) return;
+    if (!q) {
+        $q('qd-list').innerHTML = st.quadros.length ? st.quadros.map(x => `
+            <button type="button" class="qd-card" onclick="qdOpen('${x.id}')">
+                <span class="qd-card-ico"><i class="ph-fill ph-users-three"></i></span>
+                <span class="flex-1 min-w-0"><span class="block font-bold text-sm text-zinc-800 truncate">${escapeHtml(x.nome)}</span>
+                <span class="block text-[11px] text-zinc-500 font-medium truncate">${qdPeople(x.membros.length)} · ${qdListsN(x.listas.length)}${x.souDono ? ' · você criou' : ''}</span></span>
+                <i class="ph ph-caret-right text-zinc-400 shrink-0"></i>
+            </button>`).join('') : `<p class="text-[13px] text-zinc-500 text-center py-6">${st.carregado ? 'Nenhum quadro ainda.' : 'Carregando…'}</p>`;
+        $q('qd-home-note').textContent = st.off ? 'Os quadros ainda não estão disponíveis na nuvem.' : 'Pra entrar num quadro, peça pra quem criou pôr o seu e-mail.';
+        return;
+    }
+    $q('qd-d-name').textContent = q.nome;
+    $q('qd-d-rename').classList.toggle('hidden', !q.souDono);
+    const dono = q.membros.find(m => m.papel === 'dono');
+    $q('qd-d-sub').textContent = q.souDono ? 'Você criou este quadro: só você põe e tira pessoas.' : `Criado por ${dono ? dono.email : 'outra pessoa'}.`;
+    $q('qd-d-members').innerHTML = q.membros.map(m => `
+        <div class="qd-person">
+            <span class="qd-avatar" aria-hidden="true">${escapeHtml((m.email || '?').charAt(0).toUpperCase())}</span>
+            <span class="flex-1 min-w-0"><span class="block text-[13px] font-bold text-zinc-800 truncate">${escapeHtml(m.email || 'sem e-mail')}${m.eu ? ' <span class="text-zinc-400 font-semibold">(você)</span>' : ''}</span>
+            <span class="block text-[11px] text-zinc-500">${m.papel === 'dono' ? 'criou o quadro' : 'membro'}</span></span>
+            ${q.souDono && !m.eu ? `<button type="button" onclick="qdRemove('${m.membro}')" class="qd-x" aria-label="Tirar ${escapeHtml(m.email)} do quadro" title="Tirar do quadro"><i class="ph ph-x"></i></button>` : ''}
+        </div>`).join('');
+    $q('qd-d-add').classList.toggle('hidden', !q.souDono);
+    $q('qd-d-lists').innerHTML = q.listas.length ? q.listas.map(l => `
+        <div class="qd-list-row"><i class="ph ph-list-dashes text-app-focus text-base shrink-0"></i>
+            <span class="flex-1 min-w-0 truncate font-bold text-[13px] text-zinc-800">${escapeHtml(l.nome)}</span>
+            <span class="text-[11px] text-zinc-500 shrink-0 max-w-[45%] truncate">${l.minha ? 'sua' : 'de ' + escapeHtml(l.de || 'outra pessoa')}</span></div>`).join('')
+        : `<p class="text-[12px] text-zinc-500 leading-snug">Nenhuma lista ainda. Pra pôr uma lista sua aqui: na Lista, menu ⋮ → Compartilhar com um quadro.</p>`;
+    $q('qd-d-leave').classList.toggle('hidden', q.souDono);
+    $q('qd-d-delete').classList.toggle('hidden', !q.souDono);
+};
+function qdMsg(text, ok) {
+    const el = document.getElementById('qd-add-msg');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('hidden', !text);
+    el.classList.toggle('text-emerald-600', !!ok);
+    el.classList.toggle('text-red-600', !ok);
+}
+window.qdAdd = function() {
+    const a = qdApi(), input = document.getElementById('qd-email'), btn = document.getElementById('qd-add-btn');
+    if (!a || !qdOpenId || !input) return;
+    const email = input.value.trim();
+    if (!email) { qdMsg('Digite o e-mail da pessoa.', false); return; }
+    btn.disabled = true;
+    a.adicionar(qdOpenId, email).then(r => {
+        btn.disabled = false;
+        qdMsg(r.msg, r.ok);
+        if (r.ok) input.value = '';
+        fazQuadrosRender();
+    });
+};
+window.qdRemove = function(membro) {
+    const a = qdApi(), q = qdFind(qdOpenId);
+    const m = q && q.membros.find(x => x.membro === membro);
+    if (!a || !m || !confirm(`Tirar ${m.email || 'essa pessoa'} do quadro "${q.nome}"?\n\nAs listas que ela tinha posto no quadro voltam a ser só dela.`)) return;
+    a.tirar(q.id, membro).then(r => { showToast(r.msg); fazQuadrosRender(); });
+};
+window.qdLeave = function() {
+    const a = qdApi(), q = qdFind(qdOpenId);
+    if (!a || !q || !confirm(`Sair do quadro "${q.nome}"?\n\nAs listas dos outros saem daqui. As suas que estavam no quadro voltam a ser só suas.`)) return;
+    a.sair(q.id).then(r => { showToast(r.msg); if (r.ok) qdOpenId = null; qdHeader(); fazQuadrosRender(); });
+};
+window.qdDelete = function() {
+    const a = qdApi(), q = qdFind(qdOpenId);
+    if (!a || !q || !confirm(`Apagar o quadro "${q.nome}"?\n\nTodo mundo sai dele e cada lista volta a ser só de quem é dono. Nenhuma tarefa é apagada.`)) return;
+    a.apagar(q.id).then(r => { showToast(r.msg); if (r.ok) qdOpenId = null; qdHeader(); fazQuadrosRender(); });
+};
+window.qdNew = function() { openQuadroName('create'); };
+window.qdRename = function() { openQuadroName('rename'); };
+function openQuadroName(mode) {
+    if (!qdState().logado) return showToast('Entre na sua conta (Config → Sincronizar com a nuvem) pra criar quadros.');
+    _qdNameMode = mode;
+    const q = mode === 'rename' ? qdFind(qdOpenId) : null;
+    if (mode === 'rename' && !q) return;
+    document.getElementById('quadro-name-title').innerText = mode === 'rename' ? 'Renomear o quadro' : 'Novo quadro';
+    const input = document.getElementById('quadro-name-input');
+    input.value = q ? q.nome : '';
+    showModal('quadro-name-modal');
+    setTimeout(() => { try { input.focus({ preventScroll: true }); } catch (e) {} }, 100);
+}
+window.cancelQuadroName = function() { _qdNameMode = null; _shareColAfterNew = null; hideModal('quadro-name-modal'); };
+window.confirmQuadroName = function() {
+    const a = qdApi(), input = document.getElementById('quadro-name-input'), btn = document.getElementById('quadro-name-save');
+    if (!a || !_qdNameMode) return;
+    const nome = input.value.replace(/\s+/g, ' ').trim();
+    if (!nome) return showToast('Dê um nome pro quadro.');
+    const mode = _qdNameMode, id = qdOpenId, col = _shareColPending();
+    btn.disabled = true;
+    const job = mode === 'rename' ? a.renomear(id, nome) : a.criar(nome);
+    job.then(r => {
+        btn.disabled = false;
+        if (!r.ok) return showToast(r.msg);
+        _qdNameMode = null;
+        hideModal('quadro-name-modal');
+        showToast(r.msg);
+        if (mode === 'create' && r.id) {
+            const view = document.getElementById('config-quadros-view');
+            if (view && !view.classList.contains('hidden')) qdOpen(r.id);
+            else if (col) { _shareColId = col; renderShareList(); showModal('share-list-modal'); } // veio do Compartilhar: volta pra escolher
+        }
+        fazQuadrosRender();
+    });
+};
+let _shareColAfterNew = null;
+function _shareColPending() { const c = _shareColAfterNew; _shareColAfterNew = null; return c; }
 
 // Helpers de modal (centraliza show/hide com overlay)
 function showColumnNameModal() {

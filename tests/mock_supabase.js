@@ -4,7 +4,7 @@ const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)
 const COLUMNS = {
   tarefas: ['user_id', 'id', 'column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived', 'goal_id', 'deleted', 'updated_at'], // V40.34.0: + goal_id
   blocos: ['user_id', 'id', 'date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'cards', 'goal_id', 'column_id', 'deleted', 'updated_at'], // V40.24.0: + cards (sublista); V40.34.0: + goal_id; V40.38.0: + column_id
-  listas: ['user_id', 'id', 'name', 'is_default', 'position', 'created_ms', 'deleted', 'updated_at'],
+  listas: ['user_id', 'id', 'name', 'is_default', 'position', 'created_ms', 'quadro_id', 'deleted', 'updated_at'], // V40.47.0: + quadro_id
   tags: ['user_id', 'id', 'name', 'color', 'position', 'deleted', 'updated_at'],
   // V40.17.0
   rotinas: ['user_id', 'id', 'title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms', 'goal_id', 'deleted', 'updated_at'],
@@ -16,11 +16,14 @@ const COLUMNS = {
   metas_dias: ['user_id', 'id', 'goal_id', 'date', 'amount', 'target', 'deleted', 'updated_at'],
   // V40.42.0: avisos dos compromissos (migration faz_v40_42_0_avisos)
   push_inscricoes: ['user_id', 'id', 'endpoint', 'p256dh', 'auth', 'aparelho', 'fuso', 'minutos', 'criado_em', 'atualizado_em'],
+  // V40.47.0: quadros (migration faz_v40_47_0_quadros)
+  quadros: ['id', 'dono', 'nome', 'created_at', 'updated_at'],
+  quadros_membros: ['quadro', 'membro', 'email', 'papel', 'created_at'],
 };
 const DEFAULTS = {
   tarefas: { column_id: 'col_geral', title: '', duration: 30, tag_id: null, microblocks: [], position: 0, color: null, archived: false, goal_id: null, deleted: false },
   blocos: { title: '', type: 'focus', theme: 'focus', tag_id: null, microblocks: [], completed: false, was_delayed: false, linked_note_ids: [], color: null, archived: false, cards: null, goal_id: null, column_id: null, deleted: false },
-  listas: { name: '', is_default: false, position: 0, created_ms: null, deleted: false },
+  listas: { name: '', is_default: false, position: 0, created_ms: null, quadro_id: null, deleted: false },
   tags: { name: '', color: '#a1a1aa', position: 0, deleted: false },
   rotinas: { title: '', emoji: '', duration: 60, theme: 'focus', tag_id: null, microblocks: [], created_ms: null, goal_id: null, deleted: false },
   notas: { title: '', content: '', created_ms: null, updated_ms: null, deleted: false },
@@ -29,7 +32,11 @@ const DEFAULTS = {
   metas: { list_id: null, title: '', emoji: '', period: 'dia', unit: 'vezes', target: 1, step: 1, position: 0, created_ms: null, count_from: null, deleted: false },
   metas_dias: { amount: 0, target: null, deleted: false },
   push_inscricoes: { aparelho: 'celular', fuso: 'America/Sao_Paulo', minutos: 10 },
+  quadros: {},
+  quadros_membros: { email: '', papel: 'membro' },
 };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const keyOf = (t, r) => (t === 'quadros' ? String(r.id) : t === 'quadros_membros' ? r.quadro + '|' + r.membro : r.user_id + '|' + r.id); // V40.47.0
 // V40.42.0: as mesmas regras da migration faz_v40_42_0_avisos (o teste confere o texto da migration)
 const PUSH_ENDPOINT = /^https:\/\/(fcm\.googleapis\.com|android\.googleapis\.com|updates\.push\.services\.mozilla\.com|web\.push\.apple\.com|[a-z0-9-]+\.notify\.windows\.com)\//;
 const sha256hex = (t) => (typeof require === 'function' ? require('crypto').createHash('sha256').update(String(t)).digest('hex') : null); // no navegador (tela_pc): não confere
@@ -125,6 +132,7 @@ function check(table, r) { // mesmas CHECKs da migration
   }
   if (table === 'listas') {
     if ('name' in r && (typeof r.name !== 'string' || r.name.length > 100)) return bad('name');
+    if ('quadro_id' in r && r.quadro_id !== null && !UUID.test(String(r.quadro_id))) return { code: '22P02', message: 'invalid input syntax for type uuid' }; // V40.47.0
     if ('is_default' in r && typeof r.is_default !== 'boolean') return bad('is_default');
     if ('created_ms' in r && r.created_ms !== null && !Number.isFinite(r.created_ms)) return bad('created_ms');
   }
@@ -137,7 +145,7 @@ function check(table, r) { // mesmas CHECKs da migration
 
 function makeServer() {
   const s = {
-    tables: { tarefas: new Map(), listas: new Map(), tags: new Map(), blocos: new Map(), rotinas: new Map(), notas: new Map(), financas: new Map(), metas_listas: new Map(), metas: new Map(), metas_dias: new Map(), push_inscricoes: new Map() },
+    tables: { tarefas: new Map(), listas: new Map(), tags: new Map(), blocos: new Map(), rotinas: new Map(), notas: new Map(), financas: new Map(), metas_listas: new Map(), metas: new Map(), metas_dias: new Map(), push_inscricoes: new Map(), quadros: new Map(), quadros_membros: new Map() },
     users: new Map(), clock: 0, log: [], channels: [], storedSession: null, createClientCalls: 0, failNext: 0, failAuth: 0,
   };
   s.emitters = [];
@@ -146,16 +154,76 @@ function makeServer() {
   s.rows = (t, uid) => [...s.tables[t].values()].filter((r) => r.user_id === uid);
   s.alive = (t, uid) => s.rows(t, uid).filter((r) => !r.deleted);
   s.get = (t, uid, id) => s.tables[t].get(uid + '|' + id);
+  // V40.47.0: as regras dos quadros (as mesmas da migration faz_v40_47_0_quadros), pra quem lê, grava e recebe ao vivo
+  s.inQuadro = (q, uid) => s.tables.quadros_membros.has(q + '|' + uid);
+  s.listaDoQuadro = (dono, lista, uid) => { const l = s.tables.listas.get(dono + '|' + lista); return !!l && !l.deleted && !!l.quadro_id && s.inQuadro(l.quadro_id, uid); };
+  s.tarefaDoQuadro = (r, uid) => r.user_id !== uid && s.listaDoQuadro(r.user_id, r.column_id, uid);
+  s.canSee = (t, r, uid) => {
+    if (t === 'quadros') return s.inQuadro(r.id, uid);
+    if (t === 'quadros_membros') return s.inQuadro(r.quadro, uid);
+    if (r.user_id === uid) return true;
+    if (t === 'listas') return !!r.quadro_id && s.inQuadro(r.quadro_id, uid);
+    if (t === 'tarefas') return s.tarefaDoQuadro(r, uid);
+    return false;
+  };
+  s.listaQuadroOk = (row) => { if (row.quadro_id && !s.inQuadro(row.quadro_id, row.user_id)) row.quadro_id = null; }; // gatilho listas_quadro_ok
+  s.membroSaiu = (m) => { // gatilho quadros_membros_saiu: as listas dele naquele quadro voltam a ser só dele
+    for (const l of s.tables.listas.values()) if (l.user_id === m.membro && l.quadro_id === m.quadro) { l.quadro_id = null; l.updated_at = s.stamp(); s.emit('listas', 'UPDATE', l); }
+  };
+  s.tirarMembro = (q, membro) => { const k = q + '|' + membro, m = s.tables.quadros_membros.get(k); if (!m) return false; s.tables.quadros_membros.delete(k); s.membroSaiu(m); s.emit('quadros_membros', 'DELETE', m); return true; };
+  s.apagarQuadro = (q) => {
+    for (const m of [...s.tables.quadros_membros.values()]) if (m.quadro === q) s.tirarMembro(q, m.membro); // on delete cascade (+ o gatilho)
+    for (const l of s.tables.listas.values()) if (l.quadro_id === q) { l.quadro_id = null; l.updated_at = s.stamp(); s.emit('listas', 'UPDATE', l); } // on delete set null
+    const row = s.tables.quadros.get(q);
+    s.tables.quadros.delete(q);
+    if (row) s.emit('quadros', 'DELETE', row);
+  };
+  s.rpc = (name, a, uid) => {
+    if (name === 'faz_quadro_criar') {
+      if (!uid) return { data: null, error: { code: 'P0001', message: 'faz_sem_login' } };
+      const nome = String((a && a.p_nome) || '').trim();
+      if (nome.length < 1 || nome.length > 60) return { data: null, error: { code: 'P0001', message: 'faz_nome_invalido' } };
+      if ([...s.tables.quadros.values()].filter((q) => q.dono === uid).length >= 20) return { data: null, error: { code: 'P0001', message: 'faz_limite_quadros' } };
+      const u = [...s.users.values()].find((x) => x.id === uid);
+      const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : require('crypto').randomUUID(); // no navegador (tela_pc) e no Node
+      const q = { id, dono: uid, nome, created_at: s.stamp(), updated_at: s.stamp() };
+      s.tables.quadros.set(id, q);
+      const m = { quadro: id, membro: uid, email: u ? u.email.toLowerCase() : '', papel: 'dono', created_at: s.stamp() };
+      s.tables.quadros_membros.set(id + '|' + uid, m);
+      s.emit('quadros', 'INSERT', q); s.emit('quadros_membros', 'INSERT', m);
+      s.log.push({ op: 'rpc', name, id });
+      return { data: id, error: null };
+    }
+    if (name === 'faz_quadro_adicionar') {
+      if (!uid) return { data: 'sem_login', error: null };
+      const q = s.tables.quadros.get(String(a && a.p_quadro));
+      if (!q || q.dono !== uid) return { data: 'sem_permissao', error: null };
+      const email = String((a && a.p_email) || '').trim().toLowerCase();
+      if (email.length > 320 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { data: 'email_invalido', error: null };
+      const u = [...s.users.values()].find((x) => x.email.toLowerCase() === email);
+      if (!u) return { data: 'sem_conta', error: null };
+      if (u.id === uid) return { data: 'voce_mesmo', error: null };
+      if (s.tables.quadros_membros.has(q.id + '|' + u.id)) return { data: 'ja_esta', error: null };
+      if ([...s.tables.quadros_membros.values()].filter((m) => m.quadro === q.id).length >= 50) return { data: 'limite', error: null };
+      const m = { quadro: q.id, membro: u.id, email, papel: 'membro', created_at: s.stamp() };
+      s.tables.quadros_membros.set(q.id + '|' + u.id, m);
+      s.emit('quadros_membros', 'INSERT', m);
+      s.log.push({ op: 'rpc', name, code: 'ok' });
+      return { data: 'ok', error: null };
+    }
+    return { data: null, error: { code: 'PGRST202', message: 'Could not find the function public.' + name } };
+  };
   s.emit = (table, eventType, row) => {
     for (const ch of s.channels) for (const h of ch.handlers) {
       if (h.f.table !== table) continue;
       if (h.f.filter && h.f.filter !== 'user_id=eq.' + row.user_id) continue;
-      h.cb({ eventType, new: clone(row), old: { id: row.id } });
+      if (eventType !== 'DELETE' && ch.uid && !s.canSee(table, row, ch.uid)) continue; // V40.47.0: o ao vivo respeita as regras de quem recebe
+      h.cb({ eventType, new: eventType === 'DELETE' ? {} : clone(row), old: table === 'quadros_membros' ? { quadro: row.quadro, membro: row.membro } : { id: row.id } });
     }
   };
   // "o PC" mexendo direto na nuvem (como o kanban faz: só campos alterados)
-  s.patch = (t, uid, id, fields) => { const r = s.get(t, uid, id); Object.assign(r, clone(fields), { updated_at: s.stamp() }); s.emit(t, 'UPDATE', r); };
-  s.insert = (t, uid, row) => { const r = { ...clone(DEFAULTS[t]), ...clone(row), user_id: uid, updated_at: s.stamp() }; s.tables[t].set(uid + '|' + r.id, r); s.emit(t, 'INSERT', r); };
+  s.patch = (t, uid, id, fields) => { const r = s.get(t, uid, id); Object.assign(r, clone(fields), { updated_at: s.stamp() }); if (t === 'listas') s.listaQuadroOk(r); s.emit(t, 'UPDATE', r); };
+  s.insert = (t, uid, row) => { const r = { ...clone(DEFAULTS[t]), ...clone(row), user_id: uid, updated_at: s.stamp() }; if (t === 'listas') s.listaQuadroOk(r); s.tables[t].set(uid + '|' + r.id, r); s.emit(t, 'INSERT', r); };
   return s;
 }
 
@@ -163,6 +231,7 @@ class Query {
   constructor(s, table, getSession) { this.s = s; this.t = table; this.gs = getSession; this.f = []; this.op = 'select'; this.a = 0; this.b = 1e9; }
   select(cols) { this.cols = cols; return this; }
   eq(c, v) { this.f.push((r) => r[c] === v); return this; }
+  neq(c, v) { this.f.push((r) => r[c] !== v); return this; }
   in(c, arr) { this.f.push((r) => arr.includes(r[c])); return this; }
   gt(c, v) { this.f.push((r) => r[c] > v); this.since = v; return this; }
   order(c) { this.ord = c; return this; }
@@ -180,25 +249,32 @@ class Query {
     if (this.op === 'select') {
       const cols = this.cols && this.cols !== '*' ? this.cols.split(',') : null;
       if (cols) for (const c of cols) if (!COLUMNS[this.t].includes(c)) return { data: null, error: { message: `column ${this.t}.${c} does not exist` } };
-      let rows = [...tb.values()].filter((r) => r.user_id === uid && this.f.every((fn) => fn(r)));
+      let rows = [...tb.values()].filter((r) => this.s.canSee(this.t, r, uid) && this.f.every((fn) => fn(r))); // V40.47.0: as regras de quem lê
       if (this.ord) rows.sort((x, y) => (x[this.ord] < y[this.ord] ? -1 : x[this.ord] > y[this.ord] ? 1 : 0));
       rows = rows.slice(this.a, this.b + 1).map((r) => { if (!cols) return clone(r); const o = {}; cols.forEach((c) => (o[c] = clone(r[c]))); return o; });
       this.s.log.push({ op: 'select', t: this.t, n: rows.length, since: this.since || null });
       return { data: rows, error: null };
     }
     if (this.op === 'upsert' || this.op === 'insert') {
+      const rls = { data: null, error: { code: '42501', message: 'new row violates row-level security policy' } };
+      if (this.t === 'quadros' || this.t === 'quadros_membros') return rls; // V40.47.0: só pelas funções (rpc)
       for (const r of this.payload) {
-        if (r.user_id !== uid) return { data: null, error: { code: '42501', message: 'new row violates row-level security policy' } };
+        if (r.user_id !== uid) { // V40.47.0: tarefa de uma lista compartilhada comigo (a nova e a que já estava lá)
+          if (this.t !== 'tarefas' || !this.s.tarefaDoQuadro(r, uid)) return rls;
+          const old = tb.get(r.user_id + '|' + r.id);
+          if (old && !this.s.tarefaDoQuadro(old, uid)) return { data: null, error: { code: '42501', message: 'new row violates row-level security policy (USING expression) for table "tarefas"' } };
+        }
         const err = check(this.t, r);
         if (err) return { data: null, error: err };
-        if (this.op === 'insert' && tb.has(uid + '|' + r.id)) return { data: null, error: { code: '23505', message: 'duplicate key' } };
+        if (this.op === 'insert' && tb.has(r.user_id + '|' + r.id)) return { data: null, error: { code: '23505', message: 'duplicate key' } };
         if (this.t === 'push_inscricoes' && !tb.has(uid + '|' + r.id) && [...tb.values()].filter((x) => x.user_id === uid).length >= 20) return { data: null, error: { code: 'P0001', message: 'faz_limite_aparelhos' } }; // V40.42.0: o gatilho do limite
         if (this.t === 'financas' && !tb.has(uid + '|' + r.id) && !r.start_month) return { data: null, error: { code: '23502', message: 'null value in column "start_month" violates not-null constraint' } };
         if (this.t === 'metas_dias' && !tb.has(uid + '|' + r.id) && (!r.goal_id || !r.date)) return { data: null, error: { code: '23502', message: 'null value in column "goal_id"/"date" violates not-null constraint' } };
       }
       for (const r of this.payload) {
-        const key = uid + '|' + r.id, prev = tb.get(key);
+        const key = r.user_id + '|' + r.id, prev = tb.get(key);
         const row = { ...clone(DEFAULTS[this.t]), ...(prev || {}), ...clone(r), updated_at: this.s.stamp() };
+        if (this.t === 'listas') this.s.listaQuadroOk(row); // V40.47.0: gatilho
         tb.set(key, row);
         this.s.emit(this.t, prev ? 'UPDATE' : 'INSERT', row);
       }
@@ -206,13 +282,42 @@ class Query {
       return { data: null, error: null };
     }
     if (this.op === 'update') {
+      if (this.t === 'quadros') { // V40.47.0: só o dono renomeia
+        if ('nome' in this.payload && (typeof this.payload.nome !== 'string' || this.payload.nome.trim().length < 1 || this.payload.nome.trim().length > 60)) return { data: null, error: { code: '23514', message: 'violates check constraint quadros_nome_check' } };
+        let n = 0;
+        for (const r of tb.values()) if (r.dono === uid && this.f.every((fn) => fn(r))) { Object.assign(r, clone(this.payload), { updated_at: this.s.stamp() }); n++; this.s.emit('quadros', 'UPDATE', r); }
+        this.s.log.push({ op: 'update', t: this.t, n, fields: Object.keys(this.payload) });
+        return { data: null, error: null };
+      }
+      if (this.t === 'quadros_membros') return { data: null, error: null }; // sem regra de update: não muda nada
       const err = check(this.t, { id: 'x', ...this.payload });
       if (err) return { data: null, error: err };
       let n = 0;
       for (const r of tb.values()) {
-        if (r.user_id === uid && this.f.every((fn) => fn(r))) { Object.assign(r, clone(this.payload), { updated_at: this.s.stamp() }); n++; this.s.emit(this.t, 'UPDATE', r); }
+        const mine = r.user_id === uid, shared = !mine && this.t === 'tarefas' && this.s.tarefaDoQuadro(r, uid); // V40.47.0
+        if ((mine || shared) && this.f.every((fn) => fn(r))) {
+          if (shared && !this.s.tarefaDoQuadro({ ...r, ...this.payload }, uid)) return { data: null, error: { code: '42501', message: 'new row violates row-level security policy for table "tarefas"' } };
+          Object.assign(r, clone(this.payload), { updated_at: this.s.stamp() });
+          if (this.t === 'listas') this.s.listaQuadroOk(r);
+          n++; this.s.emit(this.t, 'UPDATE', r);
+        }
       }
       this.s.log.push({ op: 'update', t: this.t, n, fields: Object.keys(this.payload) });
+      return { data: null, error: null };
+    }
+    if (this.op === 'delete' && this.t === 'quadros') { // V40.47.0: só o dono apaga (o resto vem junto)
+      let n = 0;
+      for (const r of [...tb.values()]) if (r.dono === uid && this.f.every((fn) => fn(r))) { this.s.apagarQuadro(r.id); n++; }
+      this.s.log.push({ op: 'delete', t: this.t, n });
+      return { data: null, error: null };
+    }
+    if (this.op === 'delete' && this.t === 'quadros_membros') { // V40.47.0: o dono tira os outros; cada um sai sozinho; o dono não sai
+      let n = 0;
+      for (const r of [...tb.values()]) {
+        const q = this.s.tables.quadros.get(r.quadro);
+        if (r.papel !== 'dono' && (r.membro === uid || (q && q.dono === uid)) && this.f.every((fn) => fn(r))) { this.s.tirarMembro(r.quadro, r.membro); n++; }
+      }
+      this.s.log.push({ op: 'delete', t: this.t, n });
       return { data: null, error: null };
     }
     if (this.op === 'delete') { // V40.42.0
@@ -268,8 +373,15 @@ function makeCreateClient(s) {
     return {
       auth,
       from: (t) => new Query(s, t, () => session),
+      rpc(name, args) { // V40.47.0
+        const p = new Promise((r) => setTimeout(r, 5)).then(() => {
+          if (s.failNext > 0) { s.failNext--; return { data: null, error: { message: 'Failed to fetch' } }; }
+          return s.rpc(name, clone(args || {}), session && session.user.id);
+        });
+        return p;
+      },
       channel(name) {
-        const ch = { name, handlers: [], on(type, f, cb) { this.handlers.push({ f, cb }); return this; },
+        const ch = { name, uid: session && session.user && session.user.id, handlers: [], on(type, f, cb) { this.handlers.push({ f, cb }); return this; },
           subscribe(cb) { s.channels.push(ch); setTimeout(() => cb && cb('SUBSCRIBED'), 0); return ch; } };
         return ch;
       },
@@ -278,4 +390,4 @@ function makeCreateClient(s) {
   };
 }
 
-module.exports = { makeServer, makeCreateClient, clone };
+module.exports = { makeServer, makeCreateClient, clone, keyOf };

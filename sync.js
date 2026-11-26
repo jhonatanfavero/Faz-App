@@ -61,7 +61,7 @@
     var NEWEST_FIRST = { rotinas: true, notas: true };
     var FIELDS = {
         tarefas: ['column_id', 'title', 'duration', 'tag_id', 'microblocks', 'position', 'color', 'archived', 'goal_id'], // V40.34.0: + goal_id (meta ligada)
-        listas: ['name', 'is_default', 'position', 'created_ms'],
+        listas: ['name', 'is_default', 'position', 'created_ms', 'quadro_id'], // V40.47.0: + quadro_id (a lista está compartilhada com esse quadro)
         tags: ['name', 'color', 'position'],
         blocos: ['date', 'start_min', 'duration', 'title', 'type', 'theme', 'tag_id', 'microblocks', 'completed', 'was_delayed', 'linked_note_ids', 'color', 'archived', 'cards', 'goal_id', 'column_id'],
         rotinas: ['title', 'emoji', 'duration', 'theme', 'tag_id', 'microblocks', 'created_ms', 'goal_id'],
@@ -155,6 +155,8 @@
         });
     }
     function goalRef(v) { return v != null && v !== '' && SAFE_ID.test(String(v)) ? String(v) : null; } // V40.34.0: meta ligada
+    var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    function uuidRef(v) { var s = v == null ? '' : String(v).toLowerCase(); return UUID_RE.test(s) ? s : null; } // V40.47.0: id de quadro / de conta
     function goalNum(v, def) { // alvo/passo de meta: > 0, até 1 bilhão, com 2 casas
         var n = Number(v), r = v != null && v !== '' && Number.isFinite(n) ? Math.min(GOAL_MAX, Math.round(n * 100) / 100) : 0;
         return r > 0 ? r : def;
@@ -218,7 +220,8 @@
                     id: String(c.id),
                     name: str(c.name, 100),
                     is_default: !!c.isDefault,
-                    created_ms: Number.isFinite(ms) ? Math.round(ms) : null
+                    created_ms: Number.isFinite(ms) ? Math.round(ms) : null,
+                    quadro_id: c.isDefault || String(c.id) === DEFAULT_COL ? null : uuidRef(c.quadroId) // V40.47.0 (a Geral não se compartilha)
                 };
             },
             item: function (r, prev) {
@@ -226,6 +229,7 @@
                 c.name = r.name;
                 c.isDefault = !!r.is_default;
                 c.createdAt = r.created_ms != null ? Number(r.created_ms) : (prev && prev.createdAt) || Date.now();
+                if (uuidRef(r.quadro_id)) c.quadroId = uuidRef(r.quadro_id); else delete c.quadroId; // V40.47.0
                 return c;
             }
         },
@@ -466,6 +470,7 @@
             if (kind === 'tags') { if (!HEX.test(String(c.color || ''))) c.color = '#a1a1aa'; }
             else if ('color' in c) c.color = hex6(c.color);
             if (kind === 'tarefas' && !SAFE_ID.test(String(c.column_id))) c.column_id = DEFAULT_COL;
+            if (kind === 'listas') c.quadro_id = uuidRef(c.quadro_id); // V40.47.0
             if (kind === 'blocos') {
                 c.date = String(c.date || '').slice(0, 10);
                 if (!validDate(c.date)) return;
@@ -1004,7 +1009,126 @@
         return dayEnd - sum;
     }
 
+    // V40.47.0 — QUADROS E LISTAS COMPARTILHADAS (escolhas dele em 25/11: entra pelo e-mail, direto; quem é do quadro faz
+    // tudo nas listas dele, igual ao dono; agendar tira da lista). As tarefas de uma lista compartilhada continuam na conta
+    // de quem é dono da lista; quem é de um quadro lê e grava nelas pelas regras do banco (faz_v40_47_0_quadros.sql).
+    // Neste aparelho a lista de outra pessoa vira uma lista "apelido" ('sh_' + 8 letras da conta do dono + '_' + id da
+    // lista): o mesmo apelido no celular e no PC. A tarefa que veio de lá ganha o mesmo prefixo no id (assim ela nunca
+    // esbarra numa tarefa sua com o mesmo id, o que acontece quando alguém começou com o backup do outro); a que foi criada
+    // aqui fica com o id dela. Nada disso vai na sincronização pessoal: tem uma rodada própria (planShared).
+    var SHARED_RE = /^sh_[0-9a-f]{8}_./;
+    function isShared(id) { return SHARED_RE.test(String(id == null ? '' : id)); }
+    function sharedPrefix(dono) { return 'sh_' + (String(dono || '').toLowerCase().replace(/[^0-9a-f]/g, '') + '00000000').slice(0, 8) + '_'; }
+    function hash8(s) { // FNV-1a de 32 bits (só pra encurtar um id comprido demais, sempre igual nos 2 lados)
+        var h = 0x811c9dc5;
+        s = String(s);
+        for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+        return ('0000000' + h.toString(16)).slice(-8);
+    }
+    function sharedAlias(dono, lista) { var p = sharedPrefix(dono), a = p + lista; return a.length <= 64 ? a : p + 'h' + hash8(lista); }
+    function sharedLocalId(dono, rid) { var p = sharedPrefix(dono), a = p + rid; return a.length <= 64 ? a : p + 'h' + hash8(rid); }
+
+    /**
+     * Uma rodada das tarefas das listas de UM dono (outra conta) que estão compartilhadas comigo (função pura).
+     * opts.local  [itens do app já com o id e a lista da nuvem: id = id lá, columnId = id da lista dele; arquivado com __archived]
+     * opts.base   { id: linha } (o que este aparelho sabe que está igual na nuvem) ou null (1ª vez: junta, vale a nuvem)
+     * opts.remote [linhas da nuvem: as tarefas dessas listas, inclusive as apagadas]
+     * opts.lists  { idDaLista: true } (as listas dele compartilhadas comigo agora)
+     * A nuvem aqui é só um pedaço da conta dele: o que estava na base e não veio saiu da vista (foi pra uma lista que não está
+     * compartilhada comigo, ou a lista deixou de ser): some daqui e NADA vai pra nuvem (nunca apaga o que não dá pra ver).
+     * Volta { merged, push, changed, gone, orphans, dups }: gone = ids que saíram daqui; orphans = ids criados aqui numa lista
+     * que não está mais compartilhada (não sobem: o app leva pra uma lista sua).
+     */
+    function planShared(opts) {
+        var first = !opts.base, lists = opts.lists || {}, base = {}, src = opts.base || {};
+        Object.keys(src).forEach(function (id) { base[id] = cleanRow('tarefas', Object.assign({}, src[id], { id: id })); });
+        var remote = indexRows('tarefas', opts.remote);
+        var built = buildLocal('tarefas', opts.local || [], base), L = built.rows;
+        var ids = {}, merged = {}, gone = {}, orphans = [];
+        [L, base, remote].forEach(function (m) { Object.keys(m).forEach(function (id) { ids[id] = true; }); });
+        Object.keys(ids).forEach(function (id) {
+            var l = L[id], b = base[id], r = remote[id], m;
+            if (!r) {
+                if (b) { gone[id] = true; return; }      // saiu da vista
+                if (!has(lists, l.column_id)) { orphans.push(id); return; } // criada aqui numa lista que deixou de ser compartilhada
+                m = l;                                   // criada aqui
+            } else if (!l) {
+                m = (first || !b) ? r : merge3('tarefas', Object.assign({}, b, { deleted: true }), b, r); // apagada aqui (editaram lá → fica)
+            } else {
+                m = (first || !b) ? r : merge3('tarefas', l, b, r);
+            }
+            m = cleanRow('tarefas', Object.assign({}, m, { id: id }));
+            // movida aqui pra uma lista que deixou de ser compartilhada (enquanto isso): fica onde está lá
+            if (!m.deleted && !has(lists, m.column_id)) {
+                if (r && has(lists, r.column_id)) m.column_id = r.column_id; else { gone[id] = true; return; }
+            }
+            merged[id] = m;
+        });
+        fixTies(merged);
+        var push = [], changed = !!built.dups;
+        Object.keys(merged).forEach(function (id) {
+            var m = merged[id], r = remote[id], l = L[id];
+            if (r ? !sameRow('tarefas', m, r) : !m.deleted) push.push(m);
+            if ((!!l) !== (!m.deleted) || (l && !sameRow('tarefas', m, l))) changed = true;
+        });
+        Object.keys(gone).forEach(function (id) { if (L[id]) changed = true; });
+        if (orphans.length) changed = true;
+        return { merged: merged, push: push, changed: changed, gone: gone, orphans: orphans, dups: built.dups };
+    }
+
+    // O que a nuvem devolveu (quadros, quem está em cada um, listas postas neles) → o que as telas mostram (quadros) e o que
+    // cada dono tem compartilhado comigo (donos: { dono: { lists: { lista: { nome, quadro, quadroNome, created, de } } } }).
+    // O mesmo no celular e no PC.
+    function sharedShape(uid, quadros, membros, listas) {
+        uid = uuidRef(uid);
+        var Q = {}, emailOf = {}, donos = {}, cmp = function (a, b) { return String(a).localeCompare(String(b), 'pt-BR', { sensitivity: 'base' }); };
+        (quadros || []).forEach(function (q) {
+            var id = q && uuidRef(q.id);
+            if (id) Q[id] = { id: id, nome: str(q.nome, QUADRO_NOME_MAX) || 'Quadro', dono: uuidRef(q.dono), souDono: uuidRef(q.dono) === uid, membros: [], listas: [] };
+        });
+        (membros || []).forEach(function (m) {
+            var q = m && Q[uuidRef(m.quadro)], who = m && uuidRef(m.membro);
+            if (!q || !who || q.membros.some(function (x) { return x.membro === who; })) return;
+            var email = str(m.email, 320);
+            if (email) emailOf[who] = email;
+            q.membros.push({ membro: who, email: email, papel: m.papel === 'dono' ? 'dono' : 'membro', eu: who === uid });
+        });
+        (listas || []).forEach(function (l) {
+            var q = l && Q[uuidRef(l.quadro_id)], dono = l && uuidRef(l.user_id);
+            if (!q || !dono || l.deleted || !SAFE_ID.test(String(l.id))) return;
+            var lista = String(l.id), nome = str(l.name, 100) || 'Lista';
+            q.listas.push({ dono: dono, lista: lista, nome: nome, minha: dono === uid, alias: dono === uid ? null : sharedAlias(dono, lista) });
+            if (dono === uid) return;
+            (donos[dono] || (donos[dono] = { lists: {} })).lists[lista] = { nome: nome, quadro: q.id, quadroNome: q.nome, created: Number(l.created_ms) || 0 };
+        });
+        var list = Object.keys(Q).map(function (k) { return Q[k]; });
+        list.forEach(function (q) {
+            q.membros.sort(function (a, b) { return (a.papel === 'dono' ? 0 : 1) - (b.papel === 'dono' ? 0 : 1) || cmp(a.email, b.email); });
+            q.listas.sort(function (a, b) { return cmp(a.nome, b.nome); });
+            q.listas.forEach(function (x) { x.de = emailOf[x.dono] || ''; });
+        });
+        list.sort(function (a, b) { return cmp(a.nome, b.nome) || (a.id < b.id ? -1 : 1); });
+        Object.keys(donos).forEach(function (d) { Object.keys(donos[d].lists).forEach(function (l) { donos[d].lists[l].de = emailOf[d] || ''; }); });
+        return { quadros: list, donos: donos };
+    }
+
+    // Mensagem de cada resposta da nuvem ao pôr alguém num quadro (faz_quadro_adicionar), igual no celular e no PC.
+    var QUADRO_MSG = {
+        ok: 'Pronto! A pessoa já está no quadro.',
+        sem_login: 'Entre na sua conta primeiro.',
+        sem_permissao: 'Só quem criou o quadro põe pessoas nele.',
+        email_invalido: 'Esse e-mail não parece certo.',
+        sem_conta: 'Não achei uma conta do Faz com esse e-mail. A pessoa precisa criar a conta dela primeiro (no app: Config → Sincronizar).',
+        voce_mesmo: 'Esse é o seu e-mail: você já está no quadro.',
+        ja_esta: 'Essa pessoa já está no quadro.',
+        limite: 'Esse quadro chegou no limite de 50 pessoas.'
+    };
+    function quadroMsg(code) { return has(QUADRO_MSG, code) ? QUADRO_MSG[code] : 'Não consegui pôr a pessoa no quadro agora. Tente de novo.'; }
+    var QUADRO_NOME_MAX = 60;
+
     return {
+        isShared: isShared, sharedPrefix: sharedPrefix, sharedAlias: sharedAlias, sharedLocalId: sharedLocalId, hash8: hash8, uuidRef: uuidRef, // V40.47.0
+        planShared: planShared, sharedShape: sharedShape, quadroMsg: quadroMsg, QUADRO_NOME_MAX: QUADRO_NOME_MAX,
         periodSlots: periodSlots, periodBand: periodBand, // V40.43.0
         pushPlan: pushPlan, pushRoom: pushRoom, // V40.44.0
         DEFAULT_COL: DEFAULT_COL, STEP: STEP, KINDS: KINDS, ORDERED: ORDERED, FIELDS: FIELDS, DEFAULT_TAGS: DEFAULT_TAGS, MONTH: MONTH, DEFAULT_GOAL_LISTS: DEFAULT_GOAL_LISTS,
@@ -1033,7 +1157,7 @@
     var KINDS = CORE.KINDS;
     var SELECT = {
         tarefas: 'id,column_id,title,duration,tag_id,microblocks,position,color,archived,goal_id,deleted', // V40.34.0: + goal_id
-        listas: 'id,name,is_default,position,created_ms,deleted',
+        listas: 'id,name,is_default,position,created_ms,quadro_id,deleted', // V40.47.0: + quadro_id
         tags: 'id,name,color,position,deleted',
         blocos: 'id,date,start_min,duration,title,type,theme,tag_id,microblocks,completed,was_delayed,linked_note_ids,color,archived,cards,goal_id,column_id,deleted,updated_at', // V40.24.0: + cards (sublista); V40.34.0: + goal_id; V40.38.0: + column_id
         rotinas: 'id,title,emoji,duration,theme,tag_id,microblocks,created_ms,goal_id,deleted',
@@ -1240,6 +1364,23 @@
     function archItems(kind) {
         return archList().filter(function (a) { return a.kind === kind; }).map(function (a) { return Object.assign({}, a.item, { __archived: true }); });
     }
+    // V40.47.0: lista de outra pessoa (compartilhada comigo) e as tarefas dela ficam fora da sincronização pessoal
+    function mineCol(c) { return !(c && CORE.isShared(c.id)); }
+    function mineTask(it) { return !(it && CORE.isShared(it.columnId)); }
+    // As listas compartilhadas voltam pro lugar onde estavam (logo depois da lista que vinha antes delas).
+    function keepSharedCols(prev, next) {
+        var out = next.slice();
+        (prev || []).forEach(function (c, i) {
+            if (!c || mineCol(c) || out.some(function (x) { return x && x.id === c.id; })) return;
+            var at = 0;
+            for (var j = i - 1; j >= 0; j--) {
+                var k = out.findIndex(function (x) { return x && prev[j] && x.id === prev[j].id; });
+                if (k >= 0) { at = k + 1; break; }
+            }
+            out.splice(at, 0, c);
+        });
+        return out;
+    }
     // Quem vem da V40.8.0 pode ter arquivados só na base do sync (arquivados em outro aparelho).
     // Traz pra tb_archive_db uma única vez, antes de planejar, pra não parecerem "apagados aqui".
     function migrateArchived(st) {
@@ -1291,12 +1432,13 @@
                         next.push({ kind: x[0], archivedAt: old ? old.archivedAt : Date.now(), item: it });
                     });
                 });
+                archList().forEach(function (a) { if (a.kind === 'tarefa' && !mineTask(a.item)) next.push(a); }); // V40.47.0: os das listas compartilhadas ficam
                 next.sort(function (a, b) { return b.archivedAt - a.archivedAt; });
                 archiveDb = next;
                 saveArchive();
             }
-            if (p.changed.tarefas) { backlogDb = CORE.materialize('tarefas', p.merged.tarefas, backlogDb, p.localOnly.tarefas); saveBacklog(); }
-            if (p.changed.listas) { backlogColumnsDb = CORE.materialize('listas', p.merged.listas, backlogColumnsDb, p.localOnly.listas); saveBacklogColumns(); }
+            if (p.changed.tarefas) { backlogDb = CORE.materialize('tarefas', p.merged.tarefas, backlogDb.filter(mineTask), p.localOnly.tarefas).concat(backlogDb.filter(function (it) { return !mineTask(it); })); saveBacklog(); }
+            if (p.changed.listas) { backlogColumnsDb = keepSharedCols(backlogColumnsDb, CORE.materialize('listas', p.merged.listas, backlogColumnsDb.filter(mineCol), p.localOnly.listas)); saveBacklogColumns(); }
             if (p.changed.tags) { tagsDb = CORE.materialize('tags', p.merged.tags, tagsDb, p.localOnly.tags); saveTags(); }
             if (p.changed.blocos) { db = CORE.materialize('blocos', p.merged.blocos, db, p.localOnly.blocos); saveDb(); }
             // V40.17.0: rotinas, notas e finanças
@@ -1344,13 +1486,14 @@
             var firstSync = !st || st.userId !== uid || !st.base;
             if (!firstSync) migrateArchived(st);
             var fetched = await fetchAll(uid, firstSync ? null : st);
+            var shF = await shFetchPhase(uid, manual, reason === 'quadros'); // V40.47.0: quadros e listas compartilhadas comigo
             var remote = fetched.remote;
 
             // Daqui até applyLocal é tudo síncrono: nenhuma ação do usuário entra no meio.
-            if (appBusy()) { again = true; return; }
+            if (appBusy()) { again = true; if (shF) shFresh = true; return; }
             var novosTipos = !firstSync && !st.base.rotinas; // V40.17.0: 1ª rodada com rotinas, notas e finanças
             var local = {
-                tarefas: backlogDb.concat(archItems('tarefa')), listas: backlogColumnsDb, tags: tagsDb, blocos: localBlocks().concat(archItems('bloco')),
+                tarefas: backlogDb.concat(archItems('tarefa')).filter(mineTask), listas: backlogColumnsDb.filter(mineCol), tags: tagsDb, blocos: localBlocks().concat(archItems('bloco')), // V40.47.0: sem as listas compartilhadas comigo
                 rotinas: localList('rotinas'), notas: localList('notas'), financas: localList('financas')
             };
             var noGoals = !hasGoals();
@@ -1371,12 +1514,15 @@
                 return;
             }
             if (KINDS.some(function (k) { return p.changed[k]; })) applyLocal(p);
+            var shA = shF ? shApplyPhase(uid, shF) : null; // V40.47.0
 
             await pushAll(uid, p.push);
             writeState({ v: 1, userId: uid, email: session.user.email || '', base: CORE.baseFrom(p.merged), cursorBlocos: fetched.cursors.blocos, cursorMetasDias: fetched.cursors.metas_dias, arch: 1, goalIds: 1, colIds: 1, lastSyncAt: Date.now() }); // goalIds: V40.34.0; colIds: V40.38.0
             lastError = null;
+            updateUI(); // V40.47.0: "Última sincronização" já agora (os quadros ainda vêm depois, nesta mesma rodada)
             if (manual || firstSync) toast('Sincronizado ✅');
             else if (novosTipos) toast('☁️ Rotinas, notas e finanças agora também vão pro computador');
+            if (shA) await shPushPhase(uid, shA); // V40.47.0
             await syncPrefs(manual); // V40.32.0: cor e horário do dia (nos 2 sentidos)
         } catch (e) {
             lastError = e;
@@ -1434,6 +1580,350 @@
             }
         } catch (e) { console.warn('[FazSync] cor/horário', e); }
     }
+
+    // ---------- V40.47.0: QUADROS E LISTAS COMPARTILHADAS ----------
+    // Depois da rodada pessoal: lê os quadros de que esta conta faz parte, quem está neles e as listas postas neles. As
+    // listas das OUTRAS pessoas entram aqui como listas "apelido" (CORE.sharedAlias) e as tarefas delas são sincronizadas
+    // por dono (CORE.planShared), gravando na conta do dono (as regras do banco deixam). Estado em tb__compartilhadas
+    // (base por dono) e tb__quadros (o que a tela de Quadros mostra): internos, fora do backup.
+    // A base de um dono só vale se as listas dele continuam aqui do mesmo jeito (o "gen" de cada lista apelido): se uma
+    // sumiu daqui por fora (restaurar backup, etc.) a rodada volta a ser a primeira (junta, vale a nuvem): nunca apaga
+    // nada de ninguém por causa disso.
+    var SH_KEY = 'tb__compartilhadas', QD_KEY = 'tb__quadros', SAFE = /^[\w.\-]{1,64}$/;
+    var shOff = false; // a nuvem não tem as tabelas dos quadros (ainda): não tenta de novo até abrir o app outra vez
+    // Conta sem quadro nenhum: confere se alguém pôs ela num quadro ao abrir o app, ao voltar pra ele, no "Sincronizar agora"
+    // e a cada 3 minutos (não em toda rodada). Com quadros (ou lista compartilhada aqui): em toda rodada.
+    var shFresh = true, shLastAt = 0, SH_IDLE_MS = 180000;
+    function shWanted(uid, manual) {
+        if (manual || shFresh) return true;
+        var q = qdRead(uid);
+        if (q && q.quadros.length) return true;
+        if (backlogColumnsDb.some(function (c) { return !mineCol(c); })) return true;
+        return Date.now() - shLastAt >= SH_IDLE_MS;
+    }
+    function shRead(uid) { try { var s = JSON.parse(localStorage.getItem(SH_KEY) || 'null'); return s && s.v === 1 && s.userId === uid && s.donos ? s : null; } catch (e) { return null; } }
+    function shWrite(s) { try { localStorage.setItem(SH_KEY, JSON.stringify(s)); } catch (e) {} }
+    function qdRead(uid) { try { var s = JSON.parse(localStorage.getItem(QD_KEY) || 'null'); return s && s.v === 1 && s.userId === uid && Array.isArray(s.quadros) ? s : null; } catch (e) { return null; } }
+    function qdWrite(s) { try { localStorage.setItem(QD_KEY, JSON.stringify(s)); } catch (e) {} }
+    function shMissing(e) {
+        var m = String((e && (e.code + ' ' + e.message)) || '');
+        return /42P01|PGRST205|Could not find the table|relation .* does not exist|column .*quadro_id.* does not exist/i.test(m);
+    }
+    function shRand() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+    async function shPages(build) {
+        var out = [];
+        for (var from = 0; ; from += 1000) {
+            var res = await build().range(from, from + 999);
+            if (res.error) throw res.error;
+            out = out.concat(res.data || []);
+            if (!res.data || res.data.length < 1000) break;
+        }
+        return out;
+    }
+    function shCols() { var m = {}; backlogColumnsDb.forEach(function (c) { if (c && !mineCol(c)) m[c.id] = c; }); return m; }
+    function shFirstMine() { return backlogColumnsDb.find(mineCol) || { id: 'col_geral', name: 'Geral' }; }
+
+    // Lê quadros, pessoas e listas compartilhadas; monta o que a tela mostra e o que cada dono tem compartilhado comigo.
+    async function shFetch(uid) {
+        var mine = await shPages(function () { return sb.from('quadros_membros').select('quadro,membro,email,papel').eq('membro', uid).order('quadro'); });
+        var qids = [];
+        mine.forEach(function (m) { var q = CORE.uuidRef(m.quadro); if (q && qids.indexOf(q) < 0) qids.push(q); });
+        var quadros = [], membros = [], listas = [];
+        if (qids.length) {
+            quadros = await shPages(function () { return sb.from('quadros').select('id,dono,nome').in('id', qids).order('id'); });
+            membros = await shPages(function () { return sb.from('quadros_membros').select('quadro,membro,email,papel').in('quadro', qids).order('quadro'); });
+            listas = await shPages(function () { return sb.from('listas').select('user_id,id,name,created_ms,quadro_id,deleted').in('quadro_id', qids).order('id'); });
+        }
+        return CORE.sharedShape(uid, quadros, membros, listas);
+    }
+
+    // Fase 1 (rede, junto com a leitura da rodada pessoal): quadros, pessoas, listas e as tarefas de cada dono.
+    // null = não roda nesta rodada (ou deu erro: fica pra próxima).
+    async function shFetchPhase(uid, manual, force) {
+        if (shOff || !sb || !session || session.user.id !== uid) return null;
+        if (!shWanted(uid, manual || force)) return null;
+        shFresh = false;
+        shLastAt = Date.now();
+        var F = { got: null, fetched: {}, failed: {} };
+        try {
+            F.got = await shFetch(uid);
+            var ds = Object.keys(F.got.donos);
+            for (var i = 0; i < ds.length; i++) {
+                var d = ds[i], ids = Object.keys(F.got.donos[d].lists);
+                try {
+                    F.fetched[d] = await shPages(function () { return sb.from('tarefas').select(SELECT.tarefas).eq('user_id', d).in('column_id', ids).order('id'); });
+                } catch (e) { F.failed[d] = true; console.warn('[FazSync] lista compartilhada', e); }
+            }
+        } catch (e) {
+            if (shMissing(e)) { shOff = true; return null; } // a nuvem ainda não tem os quadros: o app segue como antes
+            console.warn('[FazSync] quadros', e);
+            if (manual || force) toast('Não consegui atualizar as listas compartilhadas agora.');
+            return null;
+        }
+        return F;
+    }
+
+    // Fase 2 (síncrona, logo depois de aplicar a rodada pessoal): aplica no aparelho. Volta o que subir na fase 3.
+    function shApplyPhase(uid, F) {
+        if (!session || session.user.id !== uid) return null; // saiu da conta no meio
+        var got = F.got, fetched = F.fetched, failed = F.failed;
+        var st = shRead(uid);
+        if (!st) {
+            // Estado de outra conta (trocou de conta sem passar pelo "Sair"): as listas dela saem daqui sem levar nada pra esta.
+            var other = null;
+            try { other = JSON.parse(localStorage.getItem(SH_KEY) || 'null'); } catch (e) {}
+            if (other && other.userId && other.userId !== uid) shClearLocal();
+            st = { v: 1, userId: uid, donos: {} };
+        }
+        qdWrite({ v: 1, userId: uid, at: Date.now(), quadros: got.quadros });
+
+        var plans = {}, rescued = 0;
+        var cols = shCols(), changedCols = false, changedTasks = false, changedArch = false;
+        var want = {}; // apelido -> { dono, lista, ... } (o que tem que existir aqui)
+        Object.keys(got.donos).forEach(function (d) {
+            Object.keys(got.donos[d].lists).forEach(function (l) { want[CORE.sharedAlias(d, l)] = Object.assign({ dono: d, lista: l }, got.donos[d].lists[l]); });
+        });
+        var colDono = {}; // apelido -> dono (os que estão aqui e os que vão estar)
+        Object.keys(cols).forEach(function (a) { var s = cols[a].shared; colDono[a] = s && CORE.uuidRef(s.dono); });
+        Object.keys(want).forEach(function (a) { colDono[a] = want[a].dono; });
+        var donosAqui = {};
+        Object.keys(colDono).forEach(function (a) { if (colDono[a]) donosAqui[colDono[a]] = true; });
+        Object.keys(st.donos).forEach(function (d) { donosAqui[d] = true; });
+        Object.keys(got.donos).forEach(function (d) { donosAqui[d] = true; });
+
+        // Leva pra uma lista sua o que foi criado aqui e nunca chegou na nuvem (a lista deixou de ser compartilhada).
+        function rescue(it, archAt) {
+            var dest = shFirstMine(), o = Object.assign({}, it, { id: 'bl_' + shRand(), columnId: dest.id });
+            delete o.__archived;
+            if (archAt) archiveDb.push({ kind: 'tarefa', archivedAt: archAt, item: o }); else backlogDb.push(o);
+            rescued++;
+        }
+
+        applying = true;
+        try {
+            Object.keys(donosAqui).forEach(function (d) {
+                if (failed[d]) return; // não deu pra ler as tarefas dele agora: fica tudo como está até a próxima
+                var D = got.donos[d] || { lists: {} }, prev = st.donos[d] || null, rows = fetched[d] || [];
+                var listaOf = {}, aliasOf = {}, lists = {};
+                Object.keys(cols).forEach(function (a) { var s = cols[a].shared; if (s && CORE.uuidRef(s.dono) === d && SAFE.test(String(s.lista || ''))) listaOf[a] = String(s.lista); });
+                Object.keys(D.lists).forEach(function (l) { var a = CORE.sharedAlias(d, l); listaOf[a] = l; aliasOf[l] = a; lists[l] = true; });
+                var isD = function (it) { return !!it && has(listaOf, it.columnId); };
+                var rev = {};
+                (prev && prev.base ? Object.keys(prev.base) : []).concat(rows.map(function (r) { return String(r.id); })).forEach(function (rid) { rev[CORE.sharedLocalId(d, rid)] = rid; });
+                var ridOf = function (id) { return has(rev, id) ? rev[id] : String(id); };
+                var items = backlogDb.filter(isD), arch = archList().filter(function (a) { return a.kind === 'tarefa' && isD(a.item); });
+                var localIdOf = {}, archAtOf = {};
+                items.forEach(function (it) { localIdOf[ridOf(it.id)] = it.id; });
+                arch.forEach(function (a) { localIdOf[ridOf(a.item.id)] = a.item.id; archAtOf[ridOf(a.item.id)] = a.archivedAt; });
+                var toR = function (it, isArch) { var o = Object.assign({}, it, { id: ridOf(it.id), columnId: listaOf[it.columnId] }); if (isArch) o.__archived = true; return o; };
+                var rLocal = items.map(function (it) { return toR(it); }), rArch = arch.map(function (a) { return toR(a.item, true); });
+                var trusted = !!(prev && prev.base) && Object.keys(prev.gens || {}).every(function (a) { return cols[a] && cols[a].shared && cols[a].shared.gen === prev.gens[a]; });
+                var p = CORE.planShared({ local: rLocal.concat(rArch), base: trusted ? prev.base : null, remote: rows, lists: lists });
+                plans[d] = p;
+                if (!p.changed && !Object.keys(D.lists).some(function (l) { return !cols[aliasOf[l]]; })) return;
+                var toL = function (it) {
+                    var rid = String(it.id), o = Object.assign({}, it, { id: has(localIdOf, rid) ? localIdOf[rid] : CORE.sharedLocalId(d, rid), columnId: aliasOf[it.columnId] });
+                    delete o.__archived;
+                    return o;
+                };
+                p.orphans.forEach(function (rid) {
+                    if (!(prev && prev.base) || has(prev.base, rid)) return; // sem estado não dá pra saber se foi criada aqui: não copia nada
+                    var it = items.find(function (x) { return ridOf(x.id) === rid; });
+                    if (it) { rescue(it, 0); return; }
+                    var a = arch.find(function (x) { return ridOf(x.item.id) === rid; });
+                    if (a) rescue(a.item, a.archivedAt || Date.now());
+                });
+                var live = CORE.materialize('tarefas', p.merged, rLocal, {}).filter(function (it) { return has(aliasOf, it.columnId); }).map(toL);
+                var archived = CORE.materializeArchived('tarefas', p.merged, rArch).filter(function (it) { return has(aliasOf, it.columnId); }).map(function (it) {
+                    var rid = String(it.id);
+                    return { kind: 'tarefa', archivedAt: archAtOf[rid] || Date.now(), item: toL(it) };
+                });
+                backlogDb = backlogDb.filter(function (it) { return !isD(it); }).concat(live);
+                archiveDb = archiveDb.filter(function (a) { return !(a && a.kind === 'tarefa' && isD(a.item)); }).concat(archived);
+                changedTasks = true;
+                if (arch.length || archived.length) changedArch = true;
+            });
+
+            // As listas apelido: as que chegaram entram no fim; as que mudaram de nome (ou de quadro) se acertam; as que não
+            // estão mais compartilhadas comigo saem (com o que tinha nelas). Dono que não deu pra ler agora: fica como está.
+            var nextCols = [];
+            backlogColumnsDb.forEach(function (c) {
+                if (!c || mineCol(c)) { nextCols.push(c); return; }
+                var w = want[c.id], d = colDono[c.id];
+                if (!w) {
+                    if (d && failed[d]) { nextCols.push(c); return; }
+                    // saiu: o que foi criado aqui e não subiu vai pra uma lista sua (só com estado: sem ele não dá pra saber); o resto sai junto
+                    var prevSt = d && st.donos[d], known = {};
+                    if (prevSt && prevSt.base) {
+                        Object.keys(prevSt.base).forEach(function (rid) { known[CORE.sharedLocalId(d, rid)] = true; known[rid] = true; });
+                        backlogDb.filter(function (it) { return it && it.columnId === c.id; }).forEach(function (it) { if (!known[it.id]) rescue(it, 0); });
+                        archList().filter(function (a) { return a.kind === 'tarefa' && a.item.columnId === c.id; }).forEach(function (a) { if (!known[a.item.id]) rescue(a.item, a.archivedAt || Date.now()); });
+                    }
+                    backlogDb = backlogDb.filter(function (it) { return !(it && it.columnId === c.id); });
+                    archiveDb = archiveDb.filter(function (a) { return !(a && a.kind === 'tarefa' && a.item && a.item.columnId === c.id); });
+                    changedCols = changedTasks = changedArch = true;
+                    return;
+                }
+                var s = c.shared || {}, meta = { dono: w.dono, lista: w.lista, quadro: w.quadro, quadroNome: w.quadroNome, de: w.de, gen: s.gen || shRand() };
+                if (c.name !== w.nome || !CORE.same(s, meta)) { c = Object.assign({}, c, { name: w.nome, shared: meta }); changedCols = true; }
+                nextCols.push(c);
+            });
+            Object.keys(want).forEach(function (a) {
+                if (cols[a]) return;
+                var w = want[a];
+                nextCols.push({ id: a, name: w.nome, isDefault: false, createdAt: w.created || Date.now(), shared: { dono: w.dono, lista: w.lista, quadro: w.quadro, quadroNome: w.quadroNome, de: w.de, gen: shRand() } });
+                changedCols = true;
+            });
+            if (changedCols) {
+                backlogColumnsDb = nextCols;
+                if (typeof activeColumnId !== 'undefined' && !backlogColumnsDb.some(function (c) { return c && c.id === activeColumnId; })) activeColumnId = 'col_geral';
+                saveBacklogColumns();
+            }
+            if (changedTasks || rescued) saveBacklog();
+            if (changedArch || rescued) saveArchive();
+        } finally {
+            applying = false;
+        }
+        if (changedCols || changedTasks || changedArch || rescued) {
+            try { if (typeof renderBacklog === 'function') renderBacklog(); } catch (e) { console.warn('[FazSync] render', e); }
+            try { if (typeof renderArchive === 'function') renderArchive(); } catch (e) {}
+        }
+        if (rescued) toast(rescued === 1 ? 'Uma tarefa que você criou numa lista que deixou de ser compartilhada foi pra ' + shFirstMine().name
+            : rescued + ' tarefas que você criou numa lista que deixou de ser compartilhada foram pra ' + shFirstMine().name);
+        qdRender();
+
+        return { plans: plans, st: st, got: got, failed: failed };
+    }
+
+    // Fase 3 (rede, depois da rodada pessoal subir): sobe o que mudou aqui (na conta de cada dono) e guarda a base de quem deu certo.
+    async function shPushPhase(uid, A) {
+        var plans = A.plans, st = A.st, got = A.got, failed = A.failed, now = shCols();
+        for (var d2 in plans) {
+            var p2 = plans[d2], ok = true;
+            for (var j = 0; j < p2.push.length; j += 500) {
+                var chunk = p2.push.slice(j, j + 500).map(function (r) { return Object.assign({ user_id: d2 }, r); });
+                var res = await sb.from('tarefas').upsert(chunk, { onConflict: 'user_id,id' });
+                if (res.error) { ok = false; console.warn('[FazSync] lista compartilhada (enviar)', res.error); break; }
+            }
+            if (!ok) continue;
+            var base = {}, gens = {};
+            Object.keys(p2.merged).forEach(function (rid) { base[rid] = CORE.cleanRow('tarefas', p2.merged[rid]); });
+            Object.keys(now).forEach(function (a) { var s = now[a].shared; if (s && CORE.uuidRef(s.dono) === d2) gens[a] = s.gen; });
+            st.donos[d2] = { base: base, gens: gens };
+        }
+        Object.keys(st.donos).forEach(function (d) { if (!got.donos[d] && !failed[d]) delete st.donos[d]; }); // não tem mais nada dele comigo
+        if (!session || session.user.id !== uid) return; // saiu da conta enquanto subia
+        st.at = Date.now();
+        shWrite(st);
+    }
+    function has(o, k) { return k != null && Object.prototype.hasOwnProperty.call(o, String(k)); }
+
+    // Sai da conta: as listas dos outros saem deste aparelho (são da conta que está saindo).
+    function shClearLocal() {
+        var any = false;
+        applying = true;
+        try {
+            if (backlogColumnsDb.some(function (c) { return !mineCol(c); })) { backlogColumnsDb = backlogColumnsDb.filter(mineCol); any = true; saveBacklogColumns(); }
+            if (backlogDb.some(function (it) { return !mineTask(it); })) { backlogDb = backlogDb.filter(mineTask); any = true; saveBacklog(); }
+            if (archList().some(function (a) { return a.kind === 'tarefa' && !mineTask(a.item); })) { archiveDb = archiveDb.filter(function (a) { return !(a && a.kind === 'tarefa' && a.item && !mineTask(a.item)); }); any = true; saveArchive(); }
+            if (typeof activeColumnId !== 'undefined' && !backlogColumnsDb.some(function (c) { return c && c.id === activeColumnId; })) activeColumnId = 'col_geral';
+        } finally { applying = false; }
+        try { localStorage.removeItem(SH_KEY); localStorage.removeItem(QD_KEY); } catch (e) {}
+        if (any) { try { renderBacklog(); renderArchive(); } catch (e) {} }
+        qdRender();
+    }
+    function qdRender() { try { if (typeof window.fazQuadrosRender === 'function') window.fazQuadrosRender(); } catch (e) { console.warn('[FazSync] tela de quadros', e); } }
+
+    // Roda uma rodada agora (e espera ela acabar): depois de criar um quadro, pôr alguém, compartilhar uma lista...
+    async function shRefresh() {
+        clearTimeout(debounceT);
+        for (var t = 0; running && t < 150; t++) await new Promise(function (r) { setTimeout(r, 100); });
+        await sync('quadros');
+    }
+    function qdErr(e) {
+        console.warn('[FazSync] quadros', e);
+        var m = String((e && e.message) || e || '');
+        if (/offline|Failed to fetch|NetworkError|network/i.test(m)) return 'Sem conexão com a nuvem agora.';
+        if (shMissing(e)) return 'Os quadros ainda não estão disponíveis.';
+        return 'Não consegui fazer isso agora. Tente de novo.';
+    }
+    async function qdDo(fn) {
+        if (!configured || !session || !sb) return { ok: false, msg: 'Entre na sua conta primeiro (Config → Sincronizar com a nuvem).' };
+        try { return await fn(session.user.id); } catch (e) { return { ok: false, msg: qdErr(e) }; }
+    }
+    function qdName(nome) {
+        nome = String(nome == null ? '' : nome).replace(/\s+/g, ' ').trim();
+        if (!nome) return { msg: 'Dê um nome pro quadro.' };
+        if (nome.length > CORE.QUADRO_NOME_MAX) return { msg: 'Nome muito longo (máx ' + CORE.QUADRO_NOME_MAX + ').' };
+        return { nome: nome };
+    }
+    window.fazQuadros = {
+        estado: function () {
+            var uid = session && session.user && session.user.id, s = uid ? qdRead(uid) : null;
+            return { configurado: configured, logado: !!uid, off: shOff, uid: uid || null, email: (uid && session.user.email) || '', quadros: s ? s.quadros : [], carregado: !!s };
+        },
+        atualizar: function () { return qdDo(async function () { await shRefresh(); return { ok: true }; }); },
+        criar: function (nome) {
+            var n = qdName(nome);
+            if (!n.nome) return Promise.resolve({ ok: false, msg: n.msg });
+            return qdDo(async function () {
+                var r = await sb.rpc('faz_quadro_criar', { p_nome: n.nome });
+                if (r.error) return { ok: false, msg: /faz_limite_quadros/.test(String(r.error.message)) ? 'Você chegou no limite de 20 quadros.' : qdErr(r.error) };
+                await shRefresh();
+                return { ok: true, id: CORE.uuidRef(r.data), msg: 'Quadro criado!' };
+            });
+        },
+        adicionar: function (quadro, email) {
+            email = String(email == null ? '' : email).trim();
+            if (!email) return Promise.resolve({ ok: false, msg: 'Digite o e-mail da pessoa.' });
+            return qdDo(async function () {
+                var r = await sb.rpc('faz_quadro_adicionar', { p_quadro: quadro, p_email: email });
+                if (r.error) return { ok: false, msg: qdErr(r.error) };
+                var code = String(r.data);
+                if (code === 'ok') await shRefresh();
+                return { ok: code === 'ok', code: code, msg: CORE.quadroMsg(code) };
+            });
+        },
+        tirar: function (quadro, membro) {
+            return qdDo(async function (uid) {
+                var r = await sb.from('quadros_membros').delete().eq('quadro', quadro).eq('membro', membro);
+                if (r.error) return { ok: false, msg: qdErr(r.error) };
+                await shRefresh();
+                return { ok: true, msg: membro === uid ? 'Você saiu do quadro.' : 'A pessoa saiu do quadro.' };
+            });
+        },
+        sair: function (quadro) { return window.fazQuadros.tirar(quadro, session && session.user && session.user.id); },
+        renomear: function (quadro, nome) {
+            var n = qdName(nome);
+            if (!n.nome) return Promise.resolve({ ok: false, msg: n.msg });
+            return qdDo(async function () {
+                var r = await sb.from('quadros').update({ nome: n.nome }).eq('id', quadro);
+                if (r.error) return { ok: false, msg: qdErr(r.error) };
+                await shRefresh();
+                return { ok: true, msg: 'Quadro renomeado!' };
+            });
+        },
+        apagar: function (quadro) {
+            return qdDo(async function () {
+                var r = await sb.from('quadros').delete().eq('id', quadro);
+                if (r.error) return { ok: false, msg: qdErr(r.error) };
+                await shRefresh();
+                return { ok: true, msg: 'Quadro apagado.' };
+            });
+        },
+        // Põe uma lista SUA num quadro (ou tira: quadro null). Vai pela sincronização normal (listas.quadro_id).
+        compartilhar: function (colId, quadro) {
+            var col = backlogColumnsDb.find(function (c) { return c && c.id === colId; });
+            if (!col || !mineCol(col)) return Promise.resolve({ ok: false, msg: 'Essa lista não é sua.' });
+            if (col.isDefault || col.id === 'col_geral') return Promise.resolve({ ok: false, msg: 'A lista Geral não pode ser compartilhada.' });
+            quadro = quadro ? CORE.uuidRef(quadro) : null;
+            if (!session) return Promise.resolve({ ok: false, msg: 'Entre na sua conta primeiro (Config → Sincronizar com a nuvem).' });
+            if ((col.quadroId || null) === quadro) return Promise.resolve({ ok: true });
+            if (quadro) col.quadroId = quadro; else delete col.quadroId;
+            saveBacklogColumns();
+            return qdDo(async function () { await shRefresh(); return { ok: true }; });
+        }
+    };
 
     // Chamado pelo app.js depois de salvar Listas/colunas/tags.
     window.fazSyncNotify = function () {
@@ -1571,11 +2061,13 @@
     };
 
     window.fazSyncLogout = async function (silent) {
-        if (silent !== true && !confirm('Sair da conta?\n\nSeus dados continuam neste aparelho, só param de sincronizar.')) return;
+        var temSh = backlogColumnsDb.some(function (c) { return !mineCol(c); }); // V40.47.0
+        if (silent !== true && !confirm('Sair da conta?\n\nSeus dados continuam neste aparelho, só param de sincronizar.' + (temSh ? '\nAs listas que outras pessoas compartilharam com você saem deste aparelho.' : ''))) return;
         clearTimeout(debounceT);
         try { if (window.FazAvisos) await window.FazAvisos.esquecer(); } catch (e) {} // V40.42.0: os avisos deste aparelho eram da conta que está saindo
         try { if (sb) await sb.auth.signOut(); } catch (e) {}
         session = null;
+        shClearLocal(); // V40.47.0
         updateUI();
         if (silent !== true) toast('Você saiu da conta');
     };
@@ -1600,6 +2092,7 @@
             if (!session) return;
             if (document.visibilityState === 'visible') {
                 prefsFresh = true; // V40.32.0: voltou pro app: confere se a cor ou o horário mudaram no PC
+                shFresh = true; // V40.47.0: e se alguém pôs esta conta num quadro
                 if (Date.now() - lastRunAt > 10000) schedule(400);
             } else if (debounceT) { // saindo do app com mudança pendente → sobe já
                 clearTimeout(debounceT);

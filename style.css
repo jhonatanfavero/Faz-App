@@ -673,3 +673,13 @@ mark.bl-hl { background: #fde68a; color: inherit; border-radius: 3px; padding: 0
 .tl-hidden { position: absolute; left: 4px; right: 4px; z-index: 9; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer;
     border: 1.5px dashed rgba(113, 113, 122, 0.45); border-radius: 16px; background: rgba(244, 244, 245, 0.6); color: rgba(113, 113, 122, 0.8); font-size: 15px; }
 .tl-hidden.mini { left: 2px; right: 2px; border-radius: 8px; font-size: 12px; }
+
+/* V40.47.0: Quadros (Config → Quadros): os quadros, as pessoas e as listas de cada um */
+.qd-card { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #fafafa; border: 1px solid #e4e4e7; text-align: left; transition: background-color .15s; }
+.qd-card:active { transform: scale(0.99); }
+.qd-card-ico { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--theme-color, #4f46e5); background: color-mix(in srgb, var(--theme-color, #4f46e5) 12%, #fff); }
+.qd-person { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: #fafafa; border: 1px solid #f4f4f5; }
+.qd-avatar { width: 30px; height: 30px; border-radius: 9999px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #fff; background: var(--theme-color, #4f46e5); }
+.qd-x { width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 9999px; color: #a1a1aa; font-size: 16px; }
+.qd-x:hover, .qd-x:active { background: #fee2e2; color: #dc2626; }
+.qd-list-row { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 12px; background: #fafafa; border: 1px solid #f4f4f5; }

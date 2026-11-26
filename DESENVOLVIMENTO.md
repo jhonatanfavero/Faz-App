@@ -156,6 +156,19 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     guarda rascunho (o + do celular, a nova tag, o novo período do celular) fica sem `data-form`: não há o que
     descartar. Campo de busca dentro de formulário: `data-fg-skip`. Teste em jsdom que abre e digita no mesmo passo
     precisa esperar uns 10 ms entre os dois (o ponto de partida é marcado logo depois de abrir).
+23. **Quadros e listas compartilhadas (V40.47.0).** As tarefas de uma lista compartilhada continuam na conta do DONO
+    da lista (`user_id`); quem está no quadro lê e grava nelas pelas regras de `faz_v40_47_0_quadros.sql`
+    (`tarefas_quadro`, `listas_select_quadro`). Neste aparelho a lista de outra pessoa é um apelido
+    (`FazSyncCore.sharedAlias(dono, lista)` = `sh_` + 8 letras da conta + `_` + id; o mesmo no celular e no PC) e a
+    tarefa que veio de lá tem o prefixo da conta no id (`sharedLocalId`). Nada com coluna `sh_…` entra na sincronização
+    pessoal: o celular tem a rodada própria (`shFetchPhase` → `shApplyPhase` → `shPushPhase`, com `planShared`), e o PC
+    reescreve na hora de gravar (`shCloud`, `shFields`, `shWhere`). Regras que não se quebram: (a) o que saiu da vista
+    (lista que deixou de ser compartilhada) some daqui e NUNCA vira "apagado" na nuvem; (b) sem base confiável
+    (estado perdido, a lista apelido refeita por fora: o `gen` dela mudou) a rodada é a primeira: junta, vale a nuvem;
+    (c) tarefa que muda de conta (sua ↔ compartilhada, ou entre donos) ganha id novo lá e a de cá é apagada; (d) as
+    listas dos outros não vão no backup, e restaurar um backup (ou desfazer) não mexe nelas; (e) quadros e pessoas não
+    vão no "ao vivo" (o aviso de apagado não passa pelas regras): releitura a cada rodada/minuto. A lista Geral não se
+    compartilha. Estado em `tb__compartilhadas` (base por dono) e `tb__quadros` (o que a tela mostra).
 
 ## Publicar uma versão
 

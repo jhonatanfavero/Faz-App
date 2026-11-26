@@ -53,6 +53,8 @@ const SUITES = [
     ['Blocos de baixo abrem espaço: encaixar e esticar descendo os de baixo (celular e PC)', 'test_empurrar.js', [ROOT, DADOS]],
     ['Filtro da agenda no celular: tag e "Ocultar concluídos" pelo botão TAGs', 'test_filtro_celular.js', [ROOT, DADOS]],
     ['"Descartar?" ao fechar um formulário com texto não salvo (celular e PC)', 'test_descartar.js', [ROOT, DADOS]],
+    ['Quadros e listas compartilhadas: as regras, a nuvem e dois celulares (dono e quem está no quadro)', 'test_quadros.js', [ROOT, DADOS]],
+    ['Quadros e listas compartilhadas na tela do PC (quem está no quadro e o dono, ao vivo)', 'test_quadros_pc.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

@@ -324,6 +324,8 @@
                         <!-- V40.33.0: segurar o nome da lista e arrastar pro lado muda ela de lugar -->
                         <div id="backlog-column-head" class="flex items-center gap-2 min-w-0 select-none">
                             <h2 class="text-lg font-bold text-zinc-900 truncate" id="backlog-column-title">Geral</h2>
+                            <!-- V40.47.0: lista compartilhada (sua num quadro, ou de outra pessoa com você) -->
+                            <span id="backlog-column-shared" class="hidden shrink-0 text-app-focus" role="img" aria-label="Lista compartilhada" title="Lista compartilhada"><i class="ph-fill ph-users-three text-base"></i></span>
                             <span class="bg-zinc-100 text-zinc-500 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider shrink-0" id="backlog-count">0</span>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
@@ -1042,6 +1044,57 @@
                     </div>
                     <i class="ph ph-caret-right text-zinc-400 shrink-0"></i>
                 </button>
+
+                <!-- V40.47.0: Quadros (listas compartilhadas com a casa ou a equipe) -->
+                <button onclick="openConfigQuadros()" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-10 h-10 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                            <i class="ph ph-users-three text-xl"></i>
+                        </div>
+                        <div class="flex flex-col min-w-0">
+                            <span class="font-bold text-zinc-800 text-sm">Quadros</span>
+                            <span class="text-[11px] text-zinc-500 font-medium truncate" id="qd-menu-status">Listas compartilhadas com a casa ou a equipe</span>
+                        </div>
+                    </div>
+                    <i class="ph ph-caret-right text-zinc-400 shrink-0"></i>
+                </button>
+            </div>
+
+            <!-- V40.47.0: Quadros. Um quadro junta pessoas; lista posta num quadro aparece pra todo mundo dele (lógica em sync.js) -->
+            <div class="flex-1 overflow-y-auto no-scrollbar hidden" id="config-quadros-view">
+                <div id="qd-need-login" class="hidden bg-zinc-50 border border-zinc-200 rounded-xl p-4 mb-3">
+                    <p class="text-[13px] text-zinc-600 leading-relaxed mb-3">Pra criar quadros e compartilhar listas, entre na sua conta (a mesma do computador).</p>
+                    <button onclick="qdGoLogin()" class="w-full bg-app-focus text-white rounded-lg px-3 py-3 text-sm font-bold shadow-md hover:opacity-90 transition flex items-center justify-center gap-2"><i class="ph ph-sign-in text-lg"></i> Entrar na conta</button>
+                </div>
+                <div id="qd-home" class="hidden">
+                    <p class="text-[13px] text-zinc-600 leading-relaxed mb-4">Um quadro junta pessoas (a casa, a equipe da empresa). Compartilhe uma lista com o quadro pelo menu ⋮ da lista: todo mundo dele vê a lista e mexe nas tarefas dela.</p>
+                    <div id="qd-list" class="flex flex-col gap-2 mb-3"></div>
+                    <button onclick="qdNew()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-app-focus text-white font-bold text-sm shadow-md hover:opacity-90 transition active:scale-[0.98]">
+                        <i class="ph-bold ph-plus text-base"></i> Novo quadro
+                    </button>
+                    <p id="qd-home-note" class="text-[11px] text-zinc-400 text-center leading-relaxed px-4 mt-3"></p>
+                </div>
+                <div id="qd-detail" class="hidden">
+                    <div class="flex items-center gap-2 mb-1">
+                        <h3 id="qd-d-name" class="text-lg font-bold text-zinc-900 break-words min-w-0 flex-1"></h3>
+                        <button id="qd-d-rename" onclick="qdRename()" aria-label="Renomear o quadro" title="Renomear" class="hidden w-9 h-9 shrink-0 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 transition active:scale-90"><i class="ph ph-pencil-simple text-lg"></i></button>
+                    </div>
+                    <p id="qd-d-sub" class="text-[12px] text-zinc-500 mb-4"></p>
+                    <p class="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Pessoas</p>
+                    <div id="qd-d-members" class="flex flex-col gap-1.5 mb-3"></div>
+                    <div id="qd-d-add" class="hidden bg-zinc-50 border border-zinc-200 rounded-xl p-3 mb-4">
+                        <label for="qd-email" class="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-1">Pôr alguém (o e-mail da conta da pessoa no Faz)</label>
+                        <div class="flex gap-2">
+                            <input type="email" id="qd-email" autocomplete="off" inputmode="email" enterkeyhint="send" placeholder="pessoa@email.com" onkeydown="if(event.key==='Enter'){event.preventDefault();qdAdd();}" class="flex-1 min-w-0 bg-white border border-zinc-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-app-focus">
+                            <button id="qd-add-btn" onclick="qdAdd()" class="shrink-0 bg-app-focus text-white rounded-lg px-4 text-sm font-bold hover:opacity-90 transition active:scale-95 disabled:opacity-60">Pôr</button>
+                        </div>
+                        <p id="qd-add-msg" class="hidden text-[12px] leading-snug mt-2" role="status"></p>
+                    </div>
+                    <p class="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Listas neste quadro</p>
+                    <div id="qd-d-lists" class="flex flex-col gap-1.5 mb-5"></div>
+                    <button id="qd-d-leave" onclick="qdLeave()" class="hidden w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-100 text-zinc-700 font-bold text-sm hover:bg-zinc-200 transition mb-2"><i class="ph ph-sign-out text-lg"></i> Sair do quadro</button>
+                    <button id="qd-d-delete" onclick="qdDelete()" class="hidden w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 font-bold text-sm hover:bg-red-100 transition mb-2"><i class="ph ph-trash text-lg"></i> Apagar o quadro</button>
+                </div>
             </div>
 
             <div class="flex-1 overflow-y-auto no-scrollbar hidden" id="config-hours-view">
@@ -1474,7 +1527,17 @@
                     </div>
                     <p class="text-[11px] text-zinc-400 text-center leading-snug">ou segure o nome da lista e arraste pro lado</p>
                 </div>
-                <button onclick="openRenameColumn()" class="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-sm hover:bg-zinc-100 transition">
+                <!-- V40.47.0: compartilhada? (com quem / de quem) e o botão de compartilhar com um quadro -->
+                <div id="column-menu-shared" class="hidden flex items-start gap-2 py-2.5 px-3 rounded-xl bg-app-focus-soft text-[12px] leading-snug text-zinc-700">
+                    <i class="ph-fill ph-users-three text-base text-app-focus shrink-0 mt-px"></i><span id="column-menu-shared-txt" class="min-w-0 break-words"></span>
+                </div>
+                <button id="column-menu-share-btn" onclick="openShareColumn()" class="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-sm hover:bg-zinc-100 transition">
+                    <i class="ph ph-users-three text-lg text-zinc-600"></i> <span id="column-menu-share-txt">Compartilhar com um quadro</span>
+                </button>
+                <button id="column-menu-board-btn" onclick="openColumnBoard()" class="hidden w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-sm hover:bg-zinc-100 transition">
+                    <i class="ph ph-users-three text-lg text-zinc-600"></i> Ver o quadro
+                </button>
+                <button id="column-menu-rename-btn" onclick="openRenameColumn()" class="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-sm hover:bg-zinc-100 transition">
                     <i class="ph ph-pencil-simple text-lg text-zinc-600"></i> Renomear
                 </button>
                 <button id="column-menu-delete-btn" onclick="openDeleteColumn()" class="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-red-50 border border-red-200 text-red-600 font-bold text-sm hover:bg-red-100 transition">
@@ -1482,6 +1545,34 @@
                 </button>
                 <button data-voltar onclick="closeColumnMenu()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
                     Fechar
+                </button>
+            </div>
+        </div>
+
+        <!-- V40.47.0: COMPARTILHAR UMA LISTA SUA COM UM QUADRO (todo mundo do quadro vê e mexe nas tarefas dela) -->
+        <div id="share-list-modal" role="dialog" aria-modal="true" aria-labelledby="share-list-title" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] max-h-[86%] bg-white rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100">
+            <h3 id="share-list-title" class="text-base font-bold text-zinc-900 text-center break-words shrink-0">Compartilhar a lista</h3>
+            <p class="text-[11px] font-semibold text-zinc-400 text-center mt-0.5 mb-3 leading-snug shrink-0">Todo mundo do quadro vê a lista e mexe nas tarefas dela. Só você renomeia ou apaga a lista.</p>
+            <div id="share-list-options" role="radiogroup" aria-label="Com qual quadro" class="flex flex-col gap-1.5 overflow-y-auto no-scrollbar min-h-0"></div>
+            <button type="button" onclick="shareListNewBoard()" class="mt-3 shrink-0 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-zinc-300 text-zinc-600 font-bold text-[13px] hover:bg-zinc-50 transition">
+                <i class="ph ph-plus text-base"></i> Criar um quadro
+            </button>
+            <button data-voltar onclick="closeShareList()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2 shrink-0">
+                Fechar
+            </button>
+        </div>
+
+        <!-- V40.47.0: NOME DO QUADRO (criar/renomear) -->
+        <div data-form="nome-quadro" id="quadro-name-modal" role="dialog" aria-modal="true" aria-labelledby="quadro-name-title" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100">
+            <h3 class="text-lg font-bold text-zinc-900 mb-1 text-center" id="quadro-name-title">Novo quadro</h3>
+            <p class="text-[11px] font-semibold text-zinc-400 text-center mb-4 leading-snug">Ex.: Casa, Família, Empresa. Depois é só pôr as pessoas pelo e-mail.</p>
+            <input type="text" id="quadro-name-input" maxlength="60" placeholder="Nome do quadro" autocomplete="off" enterkeyhint="done" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmQuadroName();}" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition mb-6">
+            <div class="flex flex-col gap-2">
+                <button id="quadro-name-save" onclick="confirmQuadroName()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-app-focus text-white font-bold text-sm transition active:scale-95 disabled:opacity-60">
+                    Salvar
+                </button>
+                <button data-voltar onclick="cancelQuadroName()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2">
+                    Cancelar
                 </button>
             </div>
         </div>
@@ -1641,7 +1732,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.46.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.47.0</div>
 
     </div>
 

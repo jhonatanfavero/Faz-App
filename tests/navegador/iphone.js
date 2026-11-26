@@ -160,6 +160,14 @@ const IPHONES = [
 
     // telas: [nome, como abrir, raiz (o que está por cima), opções]
     const ID = (s) => JSON.stringify(s);
+    // V40.47.0: os quadros "de mentira" (o celular do teste não entra na conta) e uma lista compartilhada só na memória
+    const QD = { id: '11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa', nome: 'Casa', dono: 'aaaaaaaa-1111-4111-8111-111111111111', souDono: true,
+        membros: [{ membro: 'aaaaaaaa-1111-4111-8111-111111111111', email: 'voce@email.com', papel: 'dono', eu: true }, { membro: 'bbbbbbbb-2222-4222-8222-222222222222', email: 'ana.esposa@email.com', papel: 'membro', eu: false }, { membro: 'cccccccc-3333-4333-8333-333333333333', email: 'socio.da.empresa.com.um.email.comprido@email.com', papel: 'membro', eu: false }],
+        listas: [{ dono: 'aaaaaaaa-1111-4111-8111-111111111111', lista: 'col_1', nome: 'Mercado', minha: true, de: 'voce@email.com' }, { dono: 'bbbbbbbb-2222-4222-8222-222222222222', lista: 'col_2', nome: 'Farmácia e casa', minha: false, de: 'ana.esposa@email.com' }] };
+    const QD2 = { id: '22222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb', nome: 'Empresa', dono: 'cccccccc-3333-4333-8333-333333333333', souDono: false, membros: QD.membros.slice(0, 1).concat(QD.membros.slice(2)).map((m) => Object.assign({}, m, { papel: m.eu ? 'membro' : 'dono' })), listas: [] };
+    const QD_FAKE = "window.__qdReal = window.__qdReal || window.fazQuadros; window.fazQuadros = Object.assign({}, window.__qdReal, { estado: () => ({ configurado: true, logado: true, off: false, uid: 'u', email: 'voce@email.com', quadros: " + JSON.stringify([QD, QD2]) + ", carregado: true }), atualizar: () => Promise.resolve({ ok: true }) });";
+    const QD_COL = "backlogColumnsDb.push({ id: 'sh_aaaaaaaa_col_x', name: 'Farmácia e casa', isDefault: false, createdAt: 1, shared: { dono: 'aaaaaaaa-1111-4111-8111-111111111111', lista: 'col_x', quadro: '" + QD.id + "', quadroNome: 'Casa', de: 'ana.esposa@email.com', gen: 'g' } }); ['Remédio de pressão', 'Fralda G', 'Lâmpada da sala'].forEach((t, i) => backlogDb.push({ id: 'sh_aaaaaaaa_t' + i, title: t, duration: 15, tagId: null, microblocks: [], columnId: 'sh_aaaaaaaa_col_x' }));";
+    const QD_UNDO = "backlogColumnsDb = backlogColumnsDb.filter((c) => c.id !== 'sh_aaaaaaaa_col_x'); backlogDb = backlogDb.filter((t) => t.columnId !== 'sh_aaaaaaaa_col_x'); activeColumnId = 'col_geral'; if (window.__qdReal) window.fazQuadros = window.__qdReal;"
     const TELAS = [
         ['Agenda', "closeAllSheets(); activeDateObj = new Date(2026, 10, 16); renderTimeline(); document.getElementById('timeline-scroll').scrollTop = 0;", null], // V40.38.0: do começo do dia (os blocos rolados ficam por baixo do cabeçalho, de propósito)
         ['Agenda (cabeçalho recolhido)', 'toggleHeader();', null, { depois: 'toggleHeader();' }],
@@ -207,6 +215,13 @@ const IPHONES = [
         // V40.46.0: a pergunta "Descartar?" (por cima do formulário da tarefa nova com texto)
         ['Janelinha: descartar?', "closeAllSheets(); openListSheet(); switchListTab('backlog'); openBacklogForm(); setTimeout(() => { document.getElementById('backlog-input').value = 'Comprar pão'; document.querySelector('#backlog-form-view [data-voltar]').click(); }, 80);", '#discard-modal', { espera: 500, depois: 'fgDiscard(); closeAllSheets();' }],
         ['Janelinha: filtrar a agenda', "closeAllSheets(); openAgFilter();", '#ag-filter-modal', { depois: 'closeAgFilter();' }], // V40.45.0: o botão TAGs
+        // V40.47.0: Quadros (sem conta; e com conta, com a tela "de mentira" do sync: o celular do teste não loga)
+        ['Config: Quadros (sem conta)', 'closeAllSheets(); openConfigSheet(); openConfigQuadros();', '#config-sheet', { fim: true }],
+        ['Config: Quadros', QD_FAKE + 'openConfigSheet(); openConfigQuadros();', '#config-sheet', { fim: true }],
+        ['Config: um quadro', "qdOpen('11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa');", '#config-sheet', { fim: true }],
+        ['Janelinha: compartilhar a lista', QD_FAKE + "closeAllSheets(); openListSheet(); switchListTab('backlog'); scrollToColumn(backlogColumnsDb[1].id); activeColumnId = backlogColumnsDb[1].id; openShareColumn();", '#share-list-modal', { depois: 'closeShareList(); closeAllSheets();' }],
+        ['Lista: compartilhada comigo', QD_COL + "closeAllSheets(); openListSheet(); switchListTab('backlog'); activeColumnId = 'sh_aaaaaaaa_col_x'; renderBacklog(); scrollToColumn('sh_aaaaaaaa_col_x');", '#list-sheet', { espera: 600 }],
+        ['Janelinha: menu da lista compartilhada', 'openColumnMenuFromHeader();', '#column-menu-modal', { depois: QD_UNDO + 'closeColumnMenu(); closeAllSheets();' }],
         ['Janelinha: categoria das metas', "closeAllSheets(); openListSheet(); switchListTab('goals'); openGoalListMenu('gl_pessoal');", '#goal-list-menu-modal', { depois: "hideModal('goal-list-menu-modal'); closeAllSheets();" }], // V40.37.0: Pôr na agenda
         ['Tarefa na mão', `closeAllSheets(); scheduleBacklogItem(backlogDb[0].id);`, '#floating-task', { depois: 'cancelPendingTask();' }],
         // V40.43.0: com a tarefa na mão, o espaço livre dividido pelos Períodos (as partes são tocáveis: nada por cima delas)

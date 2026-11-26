@@ -57,6 +57,7 @@ const SUITES = [
     ['Quadros e listas compartilhadas na tela do PC (quem está no quadro e o dono, ao vivo)', 'test_quadros_pc.js', [ROOT, DADOS]],
     ['V40.47.1: sublista curta numa linha (celular e PC), o + sem teclado e o Config só a engrenagem', 'test_v40471.js', [ROOT, DADOS]],
     ['Menu grande e quadros com abas (celular e PC)', 'test_quadros_abas.js', [ROOT, DADOS]],
+    ['V40.49.0: Semana em tira, o ⋯ e o topo que encolhe; a janelinha do quadro; Configurações do PC por tópicos', 'test_v40490.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

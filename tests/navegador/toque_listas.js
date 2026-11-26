@@ -327,7 +327,9 @@ const { abrir } = require('./apoio');
   await m.evaluate(() => { db.push({ id: 'f_vb1', date: '2030-07-12', startMin: 780, duration: 60, title: 'Almoço', type: 'focus', theme: 'focus', microblocks: [], completed: false, linkedNoteIds: [] }); saveDb(); renderTimeline(); });
   await m.waitForTimeout(200);
   const altura0 = await m.evaluate(() => parseFloat(document.getElementById('timeline-container').style.height));
-  await m.tap('#tl-compact-btn'); await m.waitForTimeout(300);
+  await m.tap('#ag-more-btn'); await m.waitForTimeout(200); // V40.49.0: o "Compactar os vagos" fica no ⋯
+  await m.tap('#tl-compact-btn'); await m.waitForTimeout(150);
+  await m.evaluate(() => closeAgMore()); await m.waitForTimeout(250);
   const vg = await m.evaluate(() => {
     const g = [...document.querySelectorAll('#blocks-container .tl-gap')];
     return { n: g.length, alt: parseFloat(document.getElementById('timeline-container').style.height), textos: g.map((x) => x.textContent.trim()), cabem: g.every((x) => { const t = x.querySelector('.tl-gap-txt'); return t.scrollWidth <= t.clientWidth + 1; }), botao: document.getElementById('tl-compact-btn').classList.contains('tl-compact-on') };
@@ -345,7 +347,9 @@ const { abrir } = require('./apoio');
   const n360 = await m.evaluate((s) => { const e = document.querySelector(s), r = e.getBoundingClientRect(); return [...e.querySelectorAll('.sub-card')].every((c) => { const cr = c.getBoundingClientRect(); return cr.right <= r.right + 0.5; }) && [...document.querySelectorAll('.tl-gap-txt')].every((t) => t.scrollWidth <= t.clientWidth + 1); }, subSel);
   ok(n360, 'tela de 360 px: os cartões cabem na sublista e o texto das faixas também');
   await m.setViewportSize({ width: 390, height: 844 }); await m.waitForTimeout(150);
-  await m.tap('#tl-compact-btn'); await m.waitForTimeout(200);
+  await m.tap('#ag-more-btn'); await m.waitForTimeout(200);
+  await m.tap('#tl-compact-btn'); await m.waitForTimeout(150);
+  await m.evaluate(() => closeAgMore()); await m.waitForTimeout(200);
   ok(await m.evaluate(() => !document.querySelector('.tl-gap') && localStorage.getItem('tb__vagos_compactos') === '0'), 'tocar de novo mostra os vagos');
   }
 

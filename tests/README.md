@@ -2,7 +2,7 @@
 
 ```
 npm install     # só na primeira vez (baixa o jsdom e o Tailwind)
-npm test        # confere o CSS pronto e roda as 52 suítes (cerca de 10 minutos)
+npm test        # confere o CSS pronto e roda as 53 suítes (cerca de 10 minutos)
 ```
 
 O `npm test` termina com `✅ TOTAL: N verificações passaram, 0 falharam`. Qualquer `❌` significa que
@@ -64,6 +64,7 @@ alguma coisa que funcionava deixou de funcionar: não publique antes de entender
 | `test_quadros_pc.js` | `kanban.html` de verdade (dois PCs: quem está no quadro e o dono) | V40.47.0: a lista do outro no fim, com as tarefas e de quem é; editar (a tag do dono fica), criar, apagar e Ctrl+Z na conta do dono; mudar de conta pelo cartão (id novo) e Ctrl+Z; ao vivo (editou, criou, renomeou; o que não é compartilhado não chega); tag de mesmo id; menu da lista do outro; Configurações → Quadros; o dono compartilha pelo menu da lista, põe e tira pessoa, cria quadro |
 | `test_v40471.js` | app de verdade + `kanban.html` de verdade | V40.47.1: sublista de 5 e 10 min numa linha só (celular e visão Dia do PC) e a duração nas curtas; "Colocar aqui" na linha do nome; sublista escura com letra clara na agenda afastada; o + abre sem foco no nome (teclado); o Config do + vira só a engrenagem, na linha do Descanso e da Sublista |
 | `test_quadros_abas.js` | app de verdade (sem conta e com conta, nuvem de mentira com as regras) + `kanban.html` de verdade | V40.48.0: o botão dos itens abre o menu grande (a grade, os números, a Config; o voltar volta pro menu só se veio dele); a aba Quadros com uma aba por quadro (Pessoal + os quadros + "+ Quadro"); quadro só seu; quadro vazio ("Nova lista", "Trazer uma lista"); lista nova no quadro aberto; "Mudar de quadro"; abrir uma lista de outro quadro leva o quadro junto; o quadro aberto guardado; o ícone de pessoas só com gente; quadro apagado volta pro Pessoal; o "Mover" separado por quadro; no PC, as mesmas abas, quadro novo, trazer, "Mudar de quadro…" e o campo Lista por quadro |
+| `test_v40490.js` | app de verdade + `kanban.html` de verdade (nuvem de mentira) | V40.49.0: o topo da agenda "Semana em tira" (os 7 dias, o "Hoje", tocar e arrastar a tira), o ⋯ (Ocultar concluídos, Compactar os vagos, Dias na tela, Filtrar por tag, Esconder o topo) e o topo que encolhe rolando; a janelinha do quadro pelo botão de compartilhar; a Config sem os Quadros; a cor da barra de baixo do Android e o pé que sobe (fazNavGap); no PC, as Configurações por tópicos, o período novo só no "Adicionar período", a busca na linha das abas e a janelinha do quadro |
 | `test_injecao.js` | `app.js` de verdade | nome ou título com HTML dentro aparece como texto, nunca vira elemento |
 
 O app roda dentro do [jsdom](https://github.com/jsdom/jsdom) (um navegador de mentira dentro do Node)

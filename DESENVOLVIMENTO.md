@@ -186,6 +186,15 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     lembrado (`tb__quadro_aberto`, fora do backup; no PC, `faz_pc_quadro`). Mudar lista de quadro é o mesmo
     `quadro_id` da V40.47.0: nada novo no banco. O voltar só leva pro menu grande se a tela veio dele (`hubVia`);
     aberta de dentro do app (agendar, "Ver na lista"), fecha como antes.
+26. **Topo da agenda do celular: Semana em tira (V40.49.0).** Os 7 dias (segunda a domingo) são desenhados pelo
+    `renderAgWeek()` dentro do `#header-filters-row` (o `applyHeaderState` esconde junto com o Planejado). O que eram os
+    botões da 2ª linha virou o ⋯ (`#ag-more-modal`), com os mesmos ids (`ag-done-btn`, `tl-compact-btn`, `ag-filter-btn`):
+    quem acende cada um continua sendo o `renderAgDoneBtn`, o `updateTlCompactBtn` e o `renderAgFilterBtn`, e o
+    `renderAgMore()` acende o ⋯. Arrastar a agenda pro lado troca o dia com 1, 2 ou 3 dias (`agSwipeOk`: não na busca nem
+    nas listas de filtro; não a partir da beirada, que é o voltar do Android). Rolando com o dedo, o topo vira uma linha
+    (`header.ag-slim`, `agSlimSet`); o app rolando sozinho até agora não encolhe. Janelinha que precisa da sincronização
+    aberta (a do quadro) leva `data-sync-livre` (o `sync.js` não espera ela fechar). No Android instalado, o
+    `--faz-safe-bottom` soma o `--faz-nav-gap` (`fazNavGap`): a barra de navegação que o Chrome pinta por cima sem avisar.
 
 ## Publicar uma versão
 

@@ -250,6 +250,7 @@ async function waitFor(fn, ms = 4000, step = 30) { const t0 = Date.now(); while 
 
   console.log('\nJ) PC, Configurações e Tags:');
   click(Q('btn-cfg')); await ptick();
+  click(pd.querySelector('[data-cfg-open="periodos"]')); click(Q('cfg-per-new')); await ptick(); // V40.49.0: o tópico e o "Adicionar período"
   ptype(Q('cfg-per-name'), 'Madrugada');
   click(Q('cfg-close')); await ptick();
   ok(dlg() && pvis('modal-cfg'), 'Configurações: o nome de um período novo escrito e "Fechar" → pergunta');

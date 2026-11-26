@@ -266,6 +266,19 @@
     .qd-av { width: 22px; height: 22px; flex: none; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #fff; background: var(--focus); }
     .qd-x { width: 26px; height: 26px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; color: #a1a1aa; }
     .qd-x:hover { background: #fee2e2; color: #dc2626; }
+    /* V40.49.0: Configurações por tópicos (um aberto por vez; o cabeçalho diz como está) */
+    .cfg-sec { border: 1px solid #e4e4e7; border-radius: 12px; background: #fff; }
+    .cfg-sec-h { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 11px; text-align: left; }
+    .cfg-sec-h:hover { background: #fafafa; }
+    .cfg-sec-i { flex: none; font-size: 18px; color: var(--focus); }
+    .cfg-sec-t { flex: none; font-size: 13.5px; font-weight: 600; color: #27272a; }
+    .cfg-sec-s { min-width: 0; flex: 1; text-align: right; font-size: 12px; color: #71717a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cfg-sec-s .cfg-dot { display: inline-block; width: 10px; height: 10px; border-radius: 9999px; margin-right: 6px; vertical-align: -1px; }
+    .cfg-sec-c { flex: none; font-size: 13px; color: #a1a1aa; transition: transform .15s; }
+    .cfg-sec.open .cfg-sec-c { transform: rotate(180deg); }
+    .cfg-sec.open .cfg-sec-h { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    .cfg-sec-b { padding: 2px 12px 12px; }
+    .qb-d-ico { width: 38px; height: 38px; flex: none; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; font-size: 19px; color: var(--focus); background: color-mix(in srgb, var(--focus) 12%, #fff); }
     .col.col-shared { border-style: dashed; border-color: #d4d4d8; }
     #toast { transition: opacity .2s, transform .2s; }
     @media (prefers-reduced-motion: reduce) {
@@ -380,17 +393,20 @@
     </header>
     <!-- V40.48.0: QUADROS COM ABAS (como no celular): "Pessoal" (as listas sem quadro, com a Geral), cada quadro da conta
          e o "+ Novo quadro". Cada aba mostra só as listas dela. Desenhado pelo qbRender(). -->
-    <div id="qb-bar" role="tablist" aria-label="Quadros" class="hidden shrink-0 items-center gap-1.5 px-4 sm:px-5 pt-3 overflow-x-auto thin-scroll"></div>
+    <!-- V40.49.0: as abas e a busca numa linha só (pedido dele: usavam muito espaço); o "achou em" vai embaixo, só buscando -->
+    <div id="lq-row" class="shrink-0 flex items-center gap-3 px-4 sm:px-5">
+    <div id="qb-bar" role="tablist" aria-label="Quadros" class="hidden min-w-0 flex-1 items-center gap-1.5 mt-3 overflow-x-auto thin-scroll"></div>
     <!-- V40.39.0: busca nas Listas. Filtra as próprias listas (nome, checklist e tag, sem acento; as mesmas regras da busca
          da agenda) e diz em quais listas achou (clicar leva até ela). Atalho: / -->
-    <div id="ls-bar" class="hidden shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-4 sm:px-5 pt-3">
+    <div id="ls-bar" class="hidden shrink-0 items-center mt-3 ml-auto">
         <label class="ag-search inline-flex items-center gap-1.5 h-9 w-56 xl:w-72 pl-2.5 pr-1 rounded-lg bg-white border border-zinc-200 text-zinc-400" title="Buscar nas listas: nome, checklist e tag (atalho: /)">
             <i class="ph ph-magnifying-glass text-[15px]"></i>
             <input id="ls-search" type="text" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="80" placeholder="Buscar nas listas" aria-label="Buscar nas listas" aria-describedby="ls-info" class="min-w-0 flex-1 bg-transparent outline-none text-[13px] font-medium text-zinc-800 placeholder-zinc-400">
             <button id="ls-search-x" type="button" class="hidden shrink-0 w-6 h-6 rounded-md items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100" aria-label="Limpar a busca" title="Limpar a busca (Esc)"><i class="ph-bold ph-x text-[12px]"></i></button>
         </label>
-        <div id="ls-info" class="min-w-0 flex-1 flex flex-wrap items-center gap-1.5 text-[12px] text-zinc-500" aria-live="polite"></div>
     </div>
+    </div>
+    <div id="ls-info" class="hidden shrink-0 flex-wrap items-center gap-1.5 px-4 sm:px-5 pt-2 text-[12px] text-zinc-500 empty:!hidden" aria-live="polite"></div>
     <!-- V40.15.0: campo de arquivar. Fica por cima do cabeçalho só enquanto um cartão (ou bloco da Semana) é arrastado. -->
     <div id="drop-archive" class="hidden fixed top-1 left-1/2 -translate-x-1/2 z-30 h-12 w-[min(520px,60vw)] items-center justify-center gap-2.5 rounded-xl border-2 border-dashed text-[13.5px] font-semibold" aria-hidden="true">
         <i class="ph ph-archive text-xl"></i><span>Solte aqui pra arquivar</span>
@@ -975,6 +991,14 @@
     </div>
 </div>
 
+<!-- V40.49.0: JANELINHA DO QUADRO (o botão de compartilhar ao lado do nome do quadro, nas abas; até a V40.48.0 ficava nas Configurações):
+     o nome (o lápis renomeia), as pessoas (pôr pelo e-mail, tirar) e Sair ou Apagar. Desenhada pelo renderQb(). -->
+<div id="modal-qb" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="qb-d-title">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[85vh]">
+        <div id="qb-box" class="p-5 overflow-y-auto thin-scroll"></div>
+    </div>
+</div>
+
 <!-- V40.29.0: Relatórios — o "Produtividade" do celular (Hoje, 7 dias, 30 dias; o total e cada tag) -->
 <div id="modal-rep" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="rep-title">
     <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[85vh]">
@@ -1036,80 +1060,105 @@
             <button id="cfg-close" class="ml-auto text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Fechar</button>
         </div>
         <div class="px-5 pb-5 overflow-y-auto thin-scroll">
-            <p class="mt-1 text-xs font-semibold text-zinc-500">Cor do app</p>
-            <div id="cfg-colors" class="mt-2 flex flex-wrap gap-2.5" role="radiogroup" aria-label="Cor do app"></div>
-            <p class="mt-5 text-xs font-semibold text-zinc-500">Horário do dia</p>
-            <div class="mt-2 flex items-end gap-3">
-                <label class="flex-1 min-w-0">
-                    <span class="text-[11.5px] text-zinc-500">Começa</span>
-                    <select id="cfg-h0" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none tabular-nums"></select>
-                </label>
-                <label class="flex-1 min-w-0">
-                    <span class="text-[11.5px] text-zinc-500">Termina</span>
-                    <select id="cfg-h1" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none tabular-nums"></select>
-                </label>
-            </div>
-            <p id="cfg-h-msg" class="mt-2 text-[12px] text-zinc-500" aria-live="polite"></p>
-            <!-- V40.41.0: períodos (os mesmos do celular, nos 2 sentidos). No Novo bloco, clicar num preenche o horário. -->
-            <p class="mt-5 text-xs font-semibold text-zinc-500">Períodos <span class="font-normal text-zinc-400">· no Novo bloco, preenchem o horário</span></p>
-            <div id="cfg-pers" class="mt-2 flex flex-col gap-1.5"></div>
-            <div id="cfg-per-box" data-form="periodo" class="mt-2 p-3 rounded-xl border border-zinc-200 bg-zinc-50">
-                <input id="cfg-per-name" type="text" maxlength="60" autocomplete="off" placeholder="Nome do período (ex.: Madrugada)" class="w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none">
-                <div class="mt-2 flex items-end gap-3">
-                    <div class="min-w-0 flex-1">
-                        <span class="text-[11.5px] text-zinc-500">Início</span>
-                        <input id="cfg-per-st" type="hidden">
-                        <div class="mt-1 flex items-center gap-1" data-time-for="cfg-per-st">
-                            <select class="time-h min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Hora do início"></select>
-                            <span class="text-zinc-400 font-semibold">:</span>
-                            <select class="time-m min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Minuto do início"></select>
+            <!-- V40.49.0: um tópico por vez (pedido dele em 26/11: "retrair... separar por tópicos"); cada um diz como está -->
+            <div id="cfg-secs" class="flex flex-col gap-2">
+            <section class="cfg-sec" data-cfg-sec="cor">
+                <button type="button" class="cfg-sec-h" data-cfg-open="cor" aria-expanded="false" aria-controls="cfg-sec-cor"><i class="ph ph-palette cfg-sec-i" aria-hidden="true"></i><span class="cfg-sec-t">Cor do app</span><span class="cfg-sec-s" id="cfg-s-cor"></span><i class="ph-bold ph-caret-down cfg-sec-c" aria-hidden="true"></i></button>
+                <div id="cfg-sec-cor" class="cfg-sec-b hidden">
+                <div id="cfg-colors" class="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Cor do app"></div>
+                </div>
+            </section>
+            <section class="cfg-sec" data-cfg-sec="horario">
+                <button type="button" class="cfg-sec-h" data-cfg-open="horario" aria-expanded="false" aria-controls="cfg-sec-horario"><i class="ph ph-sun-horizon cfg-sec-i" aria-hidden="true"></i><span class="cfg-sec-t">Horário do dia</span><span class="cfg-sec-s" id="cfg-s-horario"></span><i class="ph-bold ph-caret-down cfg-sec-c" aria-hidden="true"></i></button>
+                <div id="cfg-sec-horario" class="cfg-sec-b hidden">
+                <div class="flex items-end gap-3">
+                    <label class="flex-1 min-w-0">
+                        <span class="text-[11.5px] text-zinc-500">Começa</span>
+                        <select id="cfg-h0" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none tabular-nums"></select>
+                    </label>
+                    <label class="flex-1 min-w-0">
+                        <span class="text-[11.5px] text-zinc-500">Termina</span>
+                        <select id="cfg-h1" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none tabular-nums"></select>
+                    </label>
+                </div>
+                <p id="cfg-h-msg" class="mt-2 text-[12px] text-zinc-500" aria-live="polite"></p>
+                </div>
+            </section>
+            <section class="cfg-sec" data-cfg-sec="periodos">
+                <button type="button" class="cfg-sec-h" data-cfg-open="periodos" aria-expanded="false" aria-controls="cfg-sec-periodos"><i class="ph ph-clock cfg-sec-i" aria-hidden="true"></i><span class="cfg-sec-t">Períodos</span><span class="cfg-sec-s" id="cfg-s-periodos"></span><i class="ph-bold ph-caret-down cfg-sec-c" aria-hidden="true"></i></button>
+                <div id="cfg-sec-periodos" class="cfg-sec-b hidden">
+                <!-- V40.41.0: períodos (os mesmos do celular, nos 2 sentidos). No Novo bloco, clicar num preenche o horário. -->
+                <p class="text-[12px] text-zinc-500">No Novo bloco, clicar num período preenche o horário.</p>
+                <div id="cfg-pers" class="mt-2 flex flex-col gap-1.5"></div>
+                <!-- V40.49.0: os campos do período novo só aparecem depois do "Adicionar período" (pedido dele em 26/11) -->
+                <button id="cfg-per-new" type="button" class="mt-2 w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-dashed border-zinc-300 text-[13px] font-semibold text-zinc-600 hover:bg-zinc-50"><i class="ph-bold ph-plus"></i>Adicionar período</button>
+                <div id="cfg-per-box" data-form="periodo" class="hidden mt-2 p-3 rounded-xl border border-zinc-200 bg-zinc-50">
+                    <input id="cfg-per-name" type="text" maxlength="60" autocomplete="off" placeholder="Nome do período (ex.: Madrugada)" class="w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none">
+                    <div class="mt-2 flex items-end gap-3">
+                        <div class="min-w-0 flex-1">
+                            <span class="text-[11.5px] text-zinc-500">Início</span>
+                            <input id="cfg-per-st" type="hidden">
+                            <div class="mt-1 flex items-center gap-1" data-time-for="cfg-per-st">
+                                <select class="time-h min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Hora do início"></select>
+                                <span class="text-zinc-400 font-semibold">:</span>
+                                <select class="time-m min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Minuto do início"></select>
+                            </div>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <span class="text-[11.5px] text-zinc-500">Fim</span>
+                            <input id="cfg-per-en" type="hidden">
+                            <div class="mt-1 flex items-center gap-1" data-time-for="cfg-per-en">
+                                <select class="time-h min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Hora do fim"></select>
+                                <span class="text-zinc-400 font-semibold">:</span>
+                                <select class="time-m min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Minuto do fim"></select>
+                            </div>
                         </div>
                     </div>
-                    <div class="min-w-0 flex-1">
-                        <span class="text-[11.5px] text-zinc-500">Fim</span>
-                        <input id="cfg-per-en" type="hidden">
-                        <div class="mt-1 flex items-center gap-1" data-time-for="cfg-per-en">
-                            <select class="time-h min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Hora do fim"></select>
-                            <span class="text-zinc-400 font-semibold">:</span>
-                            <select class="time-m min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Minuto do fim"></select>
-                        </div>
+                    <div class="mt-2.5 flex items-center gap-3">
+                        <p id="cfg-per-msg" class="min-w-0 flex-1 text-[12px] text-zinc-500" aria-live="polite"></p>
+                        <button id="cfg-per-cancel" type="button" class="shrink-0 text-[13px] font-semibold text-zinc-600 hover:bg-zinc-200/60 px-3 py-2 rounded-lg">Cancelar</button>
+                        <button id="cfg-per-add" type="button" class="shrink-0 inline-flex items-center gap-1.5 bg-focus text-white text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-90"><i class="ph-bold ph-plus"></i>Adicionar</button>
                     </div>
                 </div>
-                <div class="mt-2.5 flex items-center gap-3">
-                    <p id="cfg-per-msg" class="min-w-0 flex-1 text-[12px] text-zinc-500" aria-live="polite"></p>
-                    <button id="cfg-per-add" type="button" class="shrink-0 inline-flex items-center gap-1.5 bg-focus text-white text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:opacity-90"><i class="ph-bold ph-plus"></i>Adicionar</button>
                 </div>
-            </div>
-            <!-- V40.42.0: avisos dos compromissos, NESTE computador (cada aparelho liga o seu; a lógica é o avisos.js, a mesma do celular) -->
-            <p class="mt-5 text-xs font-semibold text-zinc-500">Avisos dos compromissos <span class="font-normal text-zinc-400">· neste computador</span></p>
-            <div class="mt-2 p-3 rounded-xl border border-zinc-200 bg-zinc-50">
+            </section>
+            <section class="cfg-sec" data-cfg-sec="avisos">
+                <button type="button" class="cfg-sec-h" data-cfg-open="avisos" aria-expanded="false" aria-controls="cfg-sec-avisos"><i class="ph ph-bell cfg-sec-i" aria-hidden="true"></i><span class="cfg-sec-t">Avisos dos compromissos</span><span class="cfg-sec-s" id="cfg-s-avisos"></span><i class="ph-bold ph-caret-down cfg-sec-c" aria-hidden="true"></i></button>
+                <div id="cfg-sec-avisos" class="cfg-sec-b hidden">
+                <!-- V40.42.0: avisos dos compromissos, NESTE computador (cada aparelho liga o seu; a lógica é o avisos.js, a mesma do celular) -->
+                <div class="p-3 rounded-xl border border-zinc-200 bg-zinc-50">
+                    <div class="flex items-start gap-3">
+                        <i id="cfg-av-ic" class="ph ph-bell-slash text-xl text-zinc-400 mt-0.5 shrink-0" aria-hidden="true"></i>
+                        <div class="min-w-0 flex-1">
+                            <p id="cfg-av-tit" class="text-[13px] font-semibold text-zinc-800">Avisos</p>
+                            <p id="cfg-av-txt" class="mt-0.5 text-[12px] text-zinc-500 leading-snug"></p>
+                        </div>
+                        <button id="cfg-av-btn" type="button" class="hidden shrink-0 text-[13px] font-semibold px-3.5 py-2 rounded-lg disabled:opacity-60"></button>
+                    </div>
+                    <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
+                        <span class="text-[11.5px] text-zinc-500 mr-1">Avisar</span>
+                        <div id="cfg-av-min" class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Quanto tempo antes"></div>
+                    </div>
+                    <div class="mt-2.5 flex items-center gap-3">
+                        <p id="cfg-av-msg" class="min-w-0 flex-1 text-[12px] text-zinc-500" aria-live="polite"></p>
+                        <button id="cfg-av-teste" type="button" disabled class="shrink-0 inline-flex items-center gap-1.5 bg-white border border-zinc-300 text-zinc-800 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg hover:bg-zinc-50 disabled:opacity-50"><i class="ph ph-paper-plane-tilt"></i>Mandar um teste</button>
+                    </div>
+                </div>
+                </div>
+            </section>
+            <section class="cfg-sec" data-cfg-sec="backup">
+                <button type="button" class="cfg-sec-h" data-cfg-open="backup" aria-expanded="false" aria-controls="cfg-sec-backup"><i class="ph ph-download-simple cfg-sec-i" aria-hidden="true"></i><span class="cfg-sec-t">Backup</span><span class="cfg-sec-s" id="cfg-s-backup"></span><i class="ph-bold ph-caret-down cfg-sec-c" aria-hidden="true"></i></button>
+                <div id="cfg-sec-backup" class="cfg-sec-b hidden">
+                <!-- V40.41.0: backup (só salvar: restaurar continua no celular, escolha dele) -->
                 <div class="flex items-start gap-3">
-                    <i id="cfg-av-ic" class="ph ph-bell-slash text-xl text-zinc-400 mt-0.5 shrink-0" aria-hidden="true"></i>
-                    <div class="min-w-0 flex-1">
-                        <p id="cfg-av-tit" class="text-[13px] font-semibold text-zinc-800">Avisos</p>
-                        <p id="cfg-av-txt" class="mt-0.5 text-[12px] text-zinc-500 leading-snug"></p>
-                    </div>
-                    <button id="cfg-av-btn" type="button" class="hidden shrink-0 text-[13px] font-semibold px-3.5 py-2 rounded-lg disabled:opacity-60"></button>
+                    <p class="min-w-0 flex-1 text-[12px] text-zinc-500 leading-snug">Baixa um arquivo com tudo desta conta. É o mesmo do celular: dá pra restaurar lá, em Configurações → Backup e Restauração.</p>
+                    <button id="cfg-backup" type="button" class="shrink-0 inline-flex items-center gap-1.5 bg-white border border-zinc-300 text-zinc-800 text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:bg-zinc-50 disabled:opacity-60"><i class="ph-bold ph-download-simple"></i>Salvar backup</button>
                 </div>
-                <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
-                    <span class="text-[11.5px] text-zinc-500 mr-1">Avisar</span>
-                    <div id="cfg-av-min" class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Quanto tempo antes"></div>
-                </div>
-                <div class="mt-2.5 flex items-center gap-3">
-                    <p id="cfg-av-msg" class="min-w-0 flex-1 text-[12px] text-zinc-500" aria-live="polite"></p>
-                    <button id="cfg-av-teste" type="button" disabled class="shrink-0 inline-flex items-center gap-1.5 bg-white border border-zinc-300 text-zinc-800 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg hover:bg-zinc-50 disabled:opacity-50"><i class="ph ph-paper-plane-tilt"></i>Mandar um teste</button>
-                </div>
+                <p id="cfg-backup-msg" class="mt-1.5 text-[12px] text-zinc-500 break-words" aria-live="polite"></p>
             </div>
-            <!-- V40.47.0: quadros (listas compartilhadas com a casa ou a equipe): os mesmos do celular -->
-            <p id="cfg-qd-title" class="mt-5 text-xs font-semibold text-zinc-500">Quadros <span class="font-normal text-zinc-400">· listas compartilhadas com a casa ou a equipe</span></p>
-            <div id="cfg-qd" class="mt-2 flex flex-col gap-2"></div>
-            <!-- V40.41.0: backup (só salvar: restaurar continua no celular, escolha dele) -->
-            <p class="mt-5 text-xs font-semibold text-zinc-500">Backup</p>
-            <div class="mt-2 flex items-start gap-3">
-                <p class="min-w-0 flex-1 text-[12px] text-zinc-500 leading-snug">Baixa um arquivo com tudo desta conta. É o mesmo do celular: dá pra restaurar lá, em Configurações → Backup e Restauração.</p>
-                <button id="cfg-backup" type="button" class="shrink-0 inline-flex items-center gap-1.5 bg-white border border-zinc-300 text-zinc-800 text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:bg-zinc-50 disabled:opacity-60"><i class="ph-bold ph-download-simple"></i>Salvar backup</button>
+                </div>
+            </section>
             </div>
-            <p id="cfg-backup-msg" class="mt-1.5 text-[12px] text-zinc-500 break-words" aria-live="polite"></p>
         </div>
     </div>
 </div>
@@ -1117,7 +1166,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.48.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.49.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1623,9 +1672,11 @@
     function lsShown(t) { return !LS.words || !!LS.keep[t.id] || lsMatch(t, LS.words); }
     function lsKeep(kind, id) { if (kind === 'tarefas' && LS.words && id) LS.keep[id] = 1; } // insertRow/patchRow: o que foi mexido aqui fica
     function lsBar(show) {
-        var bar = $('ls-bar'), on = !!show && S.tab === 'listas';
+        var bar = $('ls-bar'), on = !!show && S.tab === 'listas', info = $('ls-info');
         bar.classList.toggle('hidden', !on);
         bar.classList.toggle('flex', on);
+        info.classList.toggle('hidden', !on); // V40.49.0: o "achou em" ficou numa linha própria, embaixo
+        info.classList.toggle('flex', on);
     }
     function lsInfo(hit, n) { // embaixo/do lado do campo: quantos achou e em quais listas (clicar leva até a lista)
         var box = $('ls-info');
@@ -5385,6 +5436,32 @@
         p.classList.toggle('text-zinc-500', !bad);
     }
     // full: os horários voltam pro que está valendo (ao abrir, ou quando chega uma mudança do celular)
+    // V40.49.0: Configurações por tópicos. cfgSec(k) abre o tópico k e fecha os outros (de novo no mesmo: fecha; null: todos fechados).
+    function cfgSec(key, open) {
+        document.querySelectorAll('#cfg-secs .cfg-sec').forEach(function (s) {
+            var on = s.dataset.cfgSec === key ? (open == null ? !s.classList.contains('open') : !!open) : false;
+            s.classList.toggle('open', on);
+            s.querySelector('.cfg-sec-h').setAttribute('aria-expanded', on ? 'true' : 'false');
+            s.querySelector('.cfg-sec-b').classList.toggle('hidden', !on);
+        });
+    }
+    function cfgSums() { // o que aparece no cabeçalho de cada tópico fechado
+        if ($('modal-cfg').classList.contains('hidden')) return;
+        var c = THEME_COLORS.filter(function (x) { return x[0] === S.theme; })[0], n = perList().length;
+        var A = window.FazAvisos, st = A && A.estado ? A.estado() : null;
+        $('cfg-s-cor').innerHTML = '<span class="cfg-dot" style="background:' + esc(S.theme) + '"></span>' + esc(c ? c[1] : 'Cor própria');
+        $('cfg-s-horario').textContent = hoursText(S.hours);
+        $('cfg-s-periodos').textContent = n ? (n === 1 ? '1 período' : n + ' períodos') : 'Nenhum';
+        $('cfg-s-avisos').textContent = !st || st.suporte !== 'ok' ? 'Sem avisos neste navegador' : st.on ? 'Ligados · ' + (st.minutos ? st.minutos + ' min antes' : 'na hora') : 'Desligados';
+        $('cfg-s-backup').textContent = 'Baixar um arquivo';
+    }
+    // V40.49.0: os campos do período novo só aparecem no "Adicionar período" (fechar limpa)
+    function cfgPerForm(open) {
+        $('cfg-per-box').classList.toggle('hidden', !open);
+        $('cfg-per-new').classList.toggle('hidden', !!open);
+        if (!open) cfgPerReset();
+        else $('cfg-per-name').focus();
+    }
     function renderCfg(full) {
         if ($('modal-cfg').classList.contains('hidden')) return;
         $('cfg-colors').innerHTML = THEME_COLORS.map(function (c) {
@@ -5397,6 +5474,7 @@
             for (var j = 1; j <= 24; j++) b.add(new Option(pad(j) + ':00', String(j)));
         }
         if (full) { a.value = String(S.hours[0]); b.value = String(S.hours[1]); cfgMsg(CFG_HINT, false); }
+        cfgSums();
     }
     function openCfg() {
         closeColMenu();
@@ -5405,11 +5483,10 @@
         m.classList.add('flex');
         renderCfg(true);
         renderCfgPeriods(); // V40.41.0
-        cfgPerReset();
+        cfgPerForm(false); // V40.49.0: o período novo começa fechado
+        cfgSec(null); // V40.49.0: todos os tópicos fechados
         $('cfg-backup-msg').textContent = '';
         cfgAvOpen(); // V40.42.0
-        SH.msg = {};
-        renderCfgQuadros(); shLoadSoon(0); // V40.47.0
         $('cfg-close').focus();
         refreshPrefs(true); // traz o que mudou no celular desde a última olhada
     }
@@ -5505,6 +5582,7 @@
                 ' class="px-2.5 py-1 rounded-lg border text-[12px] font-semibold disabled:opacity-50 ' + (on ? 'bg-focus border-transparent text-white' : 'bg-white border-zinc-300 text-zinc-700 hover:bg-zinc-100') + '">' + (A ? A.rotulo(m) : m) + '</button>';
         }).join('');
         $('cfg-av-teste').disabled = !(pode && st.on) || AV.busy;
+        cfgSums(); // V40.49.0: o cabeçalho do tópico diz se estão ligados
     }
     function cfgAvOpen() {
         cfgAvMsg('');
@@ -5611,7 +5689,8 @@
                 '<span class="min-w-0 truncate text-[13px] font-semibold text-zinc-800">' + esc(p.name) + '</span>' +
                 '<span class="shrink-0 text-[12px] text-zinc-500 tabular-nums">' + esc(perText(p)) + (next ? ' (dia seguinte)' : '') + '</span>' +
                 '<button type="button" class="ml-auto shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-600 hover:bg-red-50" data-per-del="' + esc(p.id) + '" title="Apagar o período ' + esc(p.name) + '" aria-label="Apagar o período ' + esc(p.name) + '"><i class="ph ph-trash"></i></button></div>';
-        }).join('') : '<p class="text-[12.5px] text-zinc-400 px-1">Nenhum período. Crie um aqui embaixo.</p>';
+        }).join('') : '<p class="text-[12.5px] text-zinc-400 px-1">Nenhum período ainda.</p>';
+        cfgSums(); // V40.49.0
     }
     function cfgPerReset() {
         $('cfg-per-name').value = '';
@@ -5664,6 +5743,7 @@
             var p = { id: id, name: name, start: st, end: en };
             cfgPerReset();
             if (!(await savePeriodsPc(list.concat([p]), 'Período ' + name + ' criado (' + perText(p) + ')'))) { $('cfg-per-name').value = name; setTimeVal('cfg-per-st', st); setTimeVal('cfg-per-en', en); }
+            else cfgPerForm(false); // V40.49.0: criou: os campos fecham (o "Adicionar período" volta)
         } finally { S.perBusy = false; $('cfg-per-add').disabled = false; }
     }
     async function cfgPerDel(id) {
@@ -5950,7 +6030,7 @@
     // ('sh_…', FazSyncCore.sharedAlias), no fim do quadro; as tarefas dela com o prefixo da conta do dono no id (a criada aqui
     // fica com o id dela). Gravar numa delas grava na conta de quem é dono (as regras do banco deixam). Mudar uma tarefa de
     // conta (sua ↔ compartilhada, ou entre donos) = tarefa nova lá e a de cá apagada: o mesmo id nunca vai pra outra conta.
-    var SH = { quadros: [], rid: {}, off: false, loading: false, again: false, t: null, ch: [], donos: '', at: 0, msg: {} };
+    var SH = { quadros: [], rid: {}, off: false, loading: false, again: false, t: null, ch: [], donos: '', at: 0, msg: {}, qbOpen: null }; // V40.49.0: qbOpen = o quadro da janelinha
     var SH_POS = 1e12; // as listas dos outros ficam depois das suas
     function shC() { return window.FazSyncCore; }
     function shIs(id) { var C = shC(); return !!C && typeof C.isShared === 'function' && C.isShared(id); }
@@ -6066,7 +6146,7 @@
         var donos = Object.keys(got.donos).sort().join(',');
         if (donos !== SH.donos) { SH.donos = donos; shSubscribe(Object.keys(got.donos)); }
         scheduleRender();
-        renderCfgQuadros();
+        renderQb(); // V40.49.0: a janelinha do quadro, se estiver aberta
     }
     // Ao vivo: as tarefas e as listas de cada dono (as regras do banco só mandam as das listas compartilhadas comigo). Os
     // quadros e as pessoas não vão ao vivo (o aviso de linha apagada iria pra todo mundo): a cada minuto (e ao voltar pra
@@ -6094,42 +6174,52 @@
         else { var key = SH.rid[d + '|' + r.id]; if (key) delete S.tarefas[key]; } // foi pra uma lista que não está compartilhada comigo
         scheduleRender();
     }
-    function shReset() { shUnsubscribe(); clearTimeout(SH.t); SH.quadros = []; SH.rid = {}; SH.donos = ''; SH.at = 0; SH.msg = {}; SH.again = false; }
+    function shReset() { shUnsubscribe(); clearTimeout(SH.t); SH.quadros = []; SH.rid = {}; SH.donos = ''; SH.at = 0; SH.msg = {}; SH.again = false; if (SH.qbOpen) closeQb(); }
 
-    // ---- a tela: Configurações → Quadros ----
+    // ---- V40.49.0: a janelinha do quadro (o botão de compartilhar ao lado do nome, nas abas; até a V40.48.0 era Configurações → Quadros) ----
     function qdFind(id) { return SH.quadros.find(function (q) { return q.id === id; }) || null; }
     function qdPeople(n) { return n === 1 ? '1 pessoa' : n + ' pessoas'; }
-    function renderCfgQuadros() {
-        var box = $('cfg-qd');
-        if (!box || $('modal-cfg').classList.contains('hidden')) return;
+    function openQb(id) {
+        if (!id) return;
+        closeColMenu();
+        if (SH.qbOpen !== id) delete SH.msg[id];
+        SH.qbOpen = id;
+        var m = $('modal-qb'); m.classList.remove('hidden'); m.classList.add('flex');
+        renderQb();
+        var f = $('qb-close'); if (f) f.focus();
+        shLoadSoon(0); // gente nova que outro aparelho pôs
+    }
+    function closeQb() { SH.qbOpen = null; var m = $('modal-qb'); m.classList.add('hidden'); m.classList.remove('flex'); }
+    function renderQb() {
+        var box = $('qb-box');
+        if (!box || $('modal-qb').classList.contains('hidden')) return;
+        var q = qdFind(SH.qbOpen);
+        if (!q) { if (SH.at) closeQb(); return; } // apagado, você saiu ou te tiraram
         var keep = {}, focus = document.activeElement && box.contains(document.activeElement) ? document.activeElement.id : null;
         box.querySelectorAll('input[data-qd-email]').forEach(function (i) { keep[i.id] = i.value; });
-        if (SH.off) { box.innerHTML = '<p class="text-[12px] text-zinc-500">Os quadros ainda não estão disponíveis na nuvem.</p>'; return; }
-        box.innerHTML = (SH.quadros.length ? SH.quadros.map(function (q) {
-            var dono = q.membros.find(function (m) { return m.papel === 'dono'; }), msg = SH.msg[q.id];
-            return '<div class="qd-box" data-qd="' + esc(q.id) + '">' +
-                '<div class="flex items-start gap-2"><i class="ph-fill ph-users-three text-lg text-focus mt-0.5 shrink-0"></i><div class="min-w-0 flex-1">' +
-                '<p class="text-[13.5px] font-bold text-zinc-800 break-words">' + esc(q.nome) + '</p>' +
-                '<p class="text-[11.5px] text-zinc-500">' + qdPeople(q.membros.length) + ' · ' + (q.listas.length === 1 ? '1 lista' : q.listas.length + ' listas') + ' · ' + (q.souDono ? 'você criou' : 'de ' + esc(dono ? dono.email : 'outra pessoa')) + '</p></div>' +
-                (q.souDono ? '<button type="button" class="qd-act" data-qd-rename="' + esc(q.id) + '" title="Renomear o quadro" aria-label="Renomear o quadro ' + esc(q.nome) + '"><i class="ph ph-pencil-simple"></i></button>' +
-                    '<button type="button" class="qd-act danger" data-qd-del="' + esc(q.id) + '" title="Apagar o quadro" aria-label="Apagar o quadro ' + esc(q.nome) + '"><i class="ph ph-trash"></i></button>'
-                    : '<button type="button" class="qd-act" data-qd-leave="' + esc(q.id) + '" title="Sair do quadro" aria-label="Sair do quadro ' + esc(q.nome) + '"><i class="ph ph-sign-out"></i></button>') +
-                '</div>' +
-                '<div class="mt-2 flex flex-col gap-1">' + q.membros.map(function (m) {
-                    return '<div class="qd-person"><span class="qd-av" aria-hidden="true">' + esc((m.email || '?').charAt(0).toUpperCase()) + '</span>' +
-                        '<span class="min-w-0 flex-1 truncate text-[12.5px] text-zinc-700">' + esc(m.email || 'sem e-mail') + (m.eu ? ' <span class="text-zinc-400">(você)</span>' : '') + (m.papel === 'dono' ? ' <span class="text-zinc-400">· criou</span>' : '') + '</span>' +
-                        (q.souDono && !m.eu ? '<button type="button" class="qd-x" data-qd-rm="' + esc(q.id + '|' + m.membro) + '" title="Tirar do quadro" aria-label="Tirar ' + esc(m.email) + ' do quadro"><i class="ph ph-x"></i></button>' : '') + '</div>';
-                }).join('') + '</div>' +
-                (q.souDono ? '<div class="mt-2 flex gap-2"><input id="cfg-qd-email-' + esc(q.id) + '" data-qd-email="' + esc(q.id) + '" type="email" autocomplete="off" placeholder="E-mail da conta da pessoa no Faz" aria-label="E-mail da pessoa pra pôr no quadro ' + esc(q.nome) + '" class="min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2.5 py-1.5 text-[13px] outline-none">' +
-                    '<button type="button" data-qd-add="' + esc(q.id) + '" class="shrink-0 inline-flex items-center gap-1 bg-focus text-white text-[12.5px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-60"><i class="ph-bold ph-plus"></i>Pôr</button></div>' : '') +
-                (msg ? '<p class="mt-1.5 text-[12px] ' + (msg.ok ? 'text-emerald-600' : 'text-red-600') + '" role="status">' + esc(msg.text) + '</p>' : '') +
-                (q.listas.length ? '<p class="mt-2 text-[11.5px] text-zinc-500 leading-snug"><span class="font-semibold">Listas:</span> ' + q.listas.map(function (l) { return esc(l.nome) + (l.minha ? ' (sua)' : ' (de ' + esc(l.de || 'outra pessoa') + ')'); }).join(', ') + '</p>'
-                    : '<p class="mt-2 text-[11.5px] text-zinc-400 leading-snug">Nenhuma lista ainda. Pra pôr uma lista sua: nos 3 pontinhos da lista → Compartilhar com um quadro.</p>') +
-                '</div>';
-        }).join('') : '<p class="text-[12px] text-zinc-500 leading-snug">Um quadro junta pessoas (a casa, a equipe da empresa). Lista posta num quadro aparece pra todo mundo dele, aqui e no celular.</p>') +
-            '<div class="flex gap-2"><input id="cfg-qd-new" type="text" maxlength="60" autocomplete="off" placeholder="Nome do quadro novo (ex.: Casa, Empresa)" aria-label="Nome do quadro novo" class="min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none">' +
-            '<button type="button" id="cfg-qd-create" class="shrink-0 inline-flex items-center gap-1.5 bg-white border border-zinc-300 text-zinc-800 text-[13px] font-semibold px-3.5 py-2 rounded-lg hover:bg-zinc-50 disabled:opacity-60"><i class="ph-bold ph-plus"></i>Criar quadro</button></div>' +
-            (SH.msg._new ? '<p class="text-[12px] ' + (SH.msg._new.ok ? 'text-emerald-600' : 'text-red-600') + '" role="status">' + esc(SH.msg._new.text) + '</p>' : '');
+        var dono = q.membros.find(function (m) { return m.papel === 'dono'; }), msg = SH.msg[q.id], junto = q.membros.length > 1;
+        box.innerHTML =
+            '<div class="flex items-start gap-3"><span class="qb-d-ico" aria-hidden="true"><i class="' + (junto ? 'ph-fill ph-users-three' : 'ph-bold ph-kanban') + '"></i></span>' +
+            '<div class="min-w-0 flex-1"><h3 id="qb-d-title" class="text-base font-bold text-zinc-900 break-words">' + esc(q.nome) + '</h3>' +
+            '<p class="text-[12px] text-zinc-500" style="overflow-wrap:anywhere">' + qdPeople(q.membros.length) + ' · ' + (q.listas.length === 1 ? '1 lista' : q.listas.length + ' listas') + ' · ' +
+            (q.souDono ? (junto ? 'você criou' : 'só seu (ninguém mais vê)') : 'criado por ' + esc(dono ? dono.email : 'outra pessoa')) + '</p></div>' +
+            (q.souDono ? '<button type="button" class="qd-act" data-qd-rename="' + esc(q.id) + '" title="Renomear o quadro" aria-label="Renomear o quadro ' + esc(q.nome) + '"><i class="ph ph-pencil-simple"></i></button>' : '') + '</div>' +
+            '<p class="mt-4 text-xs font-semibold text-zinc-500">Pessoas</p>' +
+            '<div class="mt-1.5 flex flex-col gap-1">' + q.membros.map(function (m) {
+                return '<div class="qd-person"><span class="qd-av" aria-hidden="true">' + esc((m.email || '?').charAt(0).toUpperCase()) + '</span>' +
+                    '<span class="min-w-0 flex-1 truncate text-[12.5px] text-zinc-700">' + esc(m.email || 'sem e-mail') + (m.eu ? ' <span class="text-zinc-400">(você)</span>' : '') + (m.papel === 'dono' ? ' <span class="text-zinc-400">· criou</span>' : '') + '</span>' +
+                    (q.souDono && !m.eu ? '<button type="button" class="qd-x" data-qd-rm="' + esc(q.id + '|' + m.membro) + '" title="Tirar do quadro" aria-label="Tirar ' + esc(m.email) + ' do quadro"><i class="ph ph-x"></i></button>' : '') + '</div>';
+            }).join('') + '</div>' +
+            (q.souDono ? '<div class="mt-2 flex gap-2"><input id="qb-email-' + esc(q.id) + '" data-qd-email="' + esc(q.id) + '" type="email" autocomplete="off" placeholder="E-mail da conta da pessoa no Faz" aria-label="E-mail da pessoa pra pôr no quadro ' + esc(q.nome) + '" class="min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2.5 py-1.5 text-[13px] outline-none">' +
+                '<button type="button" data-qd-add="' + esc(q.id) + '" class="shrink-0 inline-flex items-center gap-1 bg-focus text-white text-[12.5px] font-semibold px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-60"><i class="ph-bold ph-plus"></i>Pôr</button></div>'
+                : '<p class="mt-2 text-[12px] text-zinc-500">Só quem criou o quadro põe e tira pessoas.</p>') +
+            (msg ? '<p class="mt-1.5 text-[12px] ' + (msg.ok ? 'text-emerald-600' : 'text-red-600') + '" role="status">' + esc(msg.text) + '</p>' : '') +
+            (q.listas.length ? '<p class="mt-3 text-[11.5px] text-zinc-500 leading-snug"><span class="font-semibold">Listas:</span> ' + q.listas.map(function (l) { return esc(l.nome) + (l.minha ? ' (sua)' : ' (de ' + esc(l.de || 'outra pessoa') + ')'); }).join(', ') + '</p>'
+                : '<p class="mt-3 text-[11.5px] text-zinc-400 leading-snug">Nenhuma lista ainda: no quadro, "Trazer uma lista", ou nos 3 pontinhos de uma lista → Mudar de quadro…</p>') +
+            '<div class="mt-5 flex items-center gap-2">' +
+            (q.souDono ? '<button type="button" data-qd-del="' + esc(q.id) + '" class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg"><i class="ph ph-trash"></i>Apagar o quadro</button>'
+                : '<button type="button" data-qd-leave="' + esc(q.id) + '" class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-100 px-3 py-2 rounded-lg"><i class="ph ph-sign-out"></i>Sair do quadro</button>') +
+            '<button type="button" id="qb-close" class="ml-auto text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Fechar</button></div>';
         Object.keys(keep).forEach(function (id) { var i = $(id); if (i) i.value = keep[id]; });
         if (focus && $(focus)) $(focus).focus();
     }
@@ -6137,23 +6227,12 @@
         if (!S.uid) return;
         try { await fn(); } catch (e) { fail(e); }
         await shLoad();
-        renderCfgQuadros();
-    }
-    function qdCreate() {
-        var C = shC(), inp = $('cfg-qd-new'), nome = inp ? inp.value.replace(/\s+/g, ' ').trim() : '';
-        if (!nome) { SH.msg._new = { ok: false, text: 'Dê um nome pro quadro.' }; renderCfgQuadros(); return; }
-        if (nome.length > C.QUADRO_NOME_MAX) { SH.msg._new = { ok: false, text: 'Nome muito longo (máx ' + C.QUADRO_NOME_MAX + ').' }; renderCfgQuadros(); return; }
-        return qdRun(async function () {
-            var r = await S.sb.rpc('faz_quadro_criar', { p_nome: nome });
-            if (r.error) { SH.msg._new = { ok: false, text: /faz_limite_quadros/.test(String(r.error.message)) ? 'Você chegou no limite de 20 quadros.' : 'Não consegui criar o quadro agora. Tente de novo.' }; return; }
-            SH.msg._new = { ok: true, text: 'Quadro "' + nome + '" criado. Agora ponha as pessoas pelo e-mail.' };
-            if (inp) inp.value = '';
-            toast('Quadro criado');
-        });
+        renderQb();
+        qbRender(); // V40.49.0: o nome novo (ou o quadro que saiu) também nas abas
     }
     function qdAdd(q) {
-        var inp = $('cfg-qd-email-' + q), email = inp ? inp.value.trim() : '';
-        if (!email) { SH.msg[q] = { ok: false, text: 'Digite o e-mail da pessoa.' }; renderCfgQuadros(); return; }
+        var inp = $('qb-email-' + q), email = inp ? inp.value.trim() : '';
+        if (!email) { SH.msg[q] = { ok: false, text: 'Digite o e-mail da pessoa.' }; renderQb(); return; }
         return qdRun(async function () {
             var r = await S.sb.rpc('faz_quadro_adicionar', { p_quadro: q, p_email: email });
             var code = r.error ? '' : String(r.data);
@@ -6184,7 +6263,6 @@
         if (!Q || !(await dialog({ title: 'Apagar o quadro "' + Q.nome + '"?', text: 'Todo mundo sai dele e cada lista volta a ser só de quem é dono. Nenhuma tarefa é apagada.', okLabel: 'Apagar quadro', danger: true }))) return;
         return qdRun(async function () { var r = await S.sb.from('quadros').delete().eq('id', q); if (r.error) throw r.error; delete SH.msg[q]; toast('Quadro apagado'); });
     }
-    function openCfgQuadros() { openCfg(); var sec = $('cfg-qd-title'); if (sec && sec.scrollIntoView) sec.scrollIntoView({ block: 'start' }); }
 
     // ===================== V40.48.0: QUADROS COM ABAS (como no celular) =====================
     // A aba Listas virou "Quadros": em cima, uma aba por quadro ("Pessoal" = as listas sem quadro, com a Geral), e cada aba
@@ -6218,7 +6296,7 @@
         var tab = function (id, nome, ico, tip) {
             var act = id === cur;
             return '<span class="qb-tab-wrap' + (act ? ' on' : '') + '" data-board-wrap="' + esc(id) + '"><button type="button" role="tab" aria-selected="' + act + '" class="qb-tab' + (act && id ? ' has-opt' : '') + '" data-board="' + esc(id) + '" title="' + esc(tip) + '"><i class="ph-bold ' + ico + '"></i><span class="qb-name">' + esc(nome) + '</span></button>' +
-                (act && id ? '<button type="button" class="qb-opt" data-qb-opt="' + esc(id) + '" title="Pessoas, nome e apagar" aria-label="Opções do quadro ' + esc(nome) + '"><i class="ph-bold ph-dots-three"></i></button>' : '') + '</span>';
+                (act && id ? '<button type="button" class="qb-opt" data-qb-opt="' + esc(id) + '" title="Compartilhar: pessoas, nome e apagar" aria-label="Compartilhar o quadro ' + esc(nome) + ' (pessoas, nome e apagar)"><i class="ph-bold ph-share-network"></i></button>' : '') + '</span>'; // V40.49.0: era ⋯
         };
         bar.innerHTML = tab('', 'Pessoal', 'ph-user', 'Suas listas sem quadro') +
             SH.quadros.map(function (q) { return tab(q.id, q.nome, qbShared(q) ? 'ph-users-three' : 'ph-kanban', qbShared(q) ? 'Compartilhado: ' + qdPeople(q.membros.length) : 'Só seu'); }).join('') +
@@ -6226,7 +6304,7 @@
             '<button type="button" class="qb-new" data-qb-new title="Novo quadro: só seu, ou com as pessoas pelo e-mail"><i class="ph-bold ph-plus"></i>Novo quadro</button>';
     }
     async function qbNewBoard() {
-        var C = shC(), nome = await dialog({ title: 'Novo quadro', text: 'Ex.: Qualitê, Casa, Empresa. Pode ser só seu (pra organizar as listas) ou com as pessoas: elas entram em Configurações → Quadros.', input: { placeholder: 'Nome do quadro', max: C.QUADRO_NOME_MAX }, okLabel: 'Criar quadro' });
+        var C = shC(), nome = await dialog({ title: 'Novo quadro', text: 'Ex.: Qualitê, Casa, Empresa. Pode ser só seu (pra organizar as listas) ou com as pessoas: elas entram pelo botão de compartilhar, ao lado do nome do quadro.', input: { placeholder: 'Nome do quadro', max: C.QUADRO_NOME_MAX }, okLabel: 'Criar quadro' });
         nome = nome ? String(nome).replace(/\s+/g, ' ').trim() : '';
         if (!nome) return;
         try {
@@ -6312,7 +6390,7 @@
         menuEl.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 248, r.right - 240))) + 'px';
         menuEl.innerHTML = '<p class="px-3 pt-2 pb-1.5 text-[12px] text-zinc-600 leading-snug">' + esc(colShTitle(c)) + '. Você vê e mexe nas tarefas; só quem é dono renomeia ou apaga a lista.</p>' +
             '<button type="button" role="menuitem" data-act="board" class="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100"><i class="ph ph-users-three"></i>Ver o quadro</button>';
-        menuEl.addEventListener('click', function (e) { if (e.target.closest('button')) { closeColMenu(); openCfgQuadros(); } });
+        menuEl.addEventListener('click', function (e) { if (e.target.closest('button')) { closeColMenu(); openQb(c.__sh && c.__sh.quadro); } }); // V40.49.0
         document.body.appendChild(menuEl);
         setTimeout(function () { document.addEventListener('pointerdown', outsideMenu, true); document.addEventListener('scroll', closeColMenu, true); }, 0);
         menuEl.querySelector('button').focus();
@@ -6321,13 +6399,13 @@
     // ---------- eventos ----------
     // Alguma janela, menu ou calendário aberto? (setas do teclado e Desfazer não agem por baixo dela)
     function anyLayerOpen() {
-        return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'modal-goal', 'modal-rep', 'modal-rpt', 'modal-cfg', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
+        return ['dialog', 'modal-task', 'modal-rt', 'modal-archive', 'modal-tags', 'modal-fin', 'fn-scope', 'modal-goal', 'modal-rep', 'modal-rpt', 'modal-cfg', 'modal-qb', 'cal-pop'].some(function (id) { return !$(id).classList.contains('hidden'); }) || !!menuEl;
     }
     function bindEvents() {
         var wrap = $('columns');
         $('qb-bar').addEventListener('click', function (e) { // V40.48.0: as abas dos quadros
             var b;
-            if (e.target.closest('[data-qb-opt]')) return openCfgQuadros();
+            if ((b = e.target.closest('[data-qb-opt]'))) return openQb(b.dataset.qbOpt); // V40.49.0: a janelinha do quadro
             if (e.target.closest('[data-qb-new]')) return qbNewBoard();
             if ((b = e.target.closest('[data-board]'))) return qbSet(b.dataset.board);
         });
@@ -6501,6 +6579,9 @@
         });
         ['f-start', 'f-dur'].forEach(function (id) { $(id).addEventListener('change', function () { if (S.editing && S.editing.isNew && S.editing.kind === 'blocos') perChips(); }); });
         $('cfg-per-add').addEventListener('click', cfgPerAdd);
+        $('cfg-per-new').addEventListener('click', function () { cfgPerForm(true); }); // V40.49.0
+        $('cfg-per-cancel').addEventListener('click', function () { cfgPerForm(false); });
+        $('cfg-secs').addEventListener('click', function (e) { var h = e.target.closest('[data-cfg-open]'); if (h) cfgSec(h.dataset.cfgOpen); });
         $('cfg-backup').addEventListener('click', saveBackup); // V40.41.0
         $('cfg-per-name').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); cfgPerAdd(); } });
         $('cfg-pers').addEventListener('click', function (e) { var b = e.target.closest('[data-per-del]'); if (b) cfgPerDel(b.dataset.perDel); });
@@ -6640,6 +6721,7 @@
             if (S.mtEdit) return fgClose('modal-goal', closeGoal); // V40.21.0
             if (!$('modal-archive').classList.contains('hidden')) return closeArchive();
             if (!$('modal-rep').classList.contains('hidden')) return closeReports(); // V40.29.0
+            if (!$('modal-qb').classList.contains('hidden')) return closeQb(); // V40.49.0
             if (repeatOpen()) return closeRepeat(); // V40.36.0
             if (!$('modal-cfg').classList.contains('hidden')) return fgClose('cfg-per-box', closeCfg); // V40.32.0
             if (S.rtEdit) return fgClose('modal-rt', closeRoutine); // V40.17.0
@@ -7181,23 +7263,23 @@
         // V40.32.0: Configurações
         $('btn-cfg').addEventListener('click', openCfg);
         $('cfg-close').addEventListener('click', function () { fgClose('cfg-per-box', closeCfg); }); // V40.46.0
-        // V40.47.0: Quadros (a lista é redesenhada; os botões são achados pelo data-*)
-        $('cfg-qd').addEventListener('click', function (e) {
+        // V40.47.0: Quadros (V40.49.0: na janelinha do quadro; ela é redesenhada, os botões são achados pelo data-*)
+        $('qb-box').addEventListener('click', function (e) {
             var b = e.target.closest('button');
             if (!b || b.disabled) return;
-            if (b.id === 'cfg-qd-create') return void qdCreate();
+            if (b.id === 'qb-close') return void closeQb();
             if (b.dataset.qdAdd) return void qdAdd(b.dataset.qdAdd);
             if (b.dataset.qdRm) { var x = b.dataset.qdRm.split('|'); return void qdRemove(x[0], x[1]); }
             if (b.dataset.qdLeave) return void qdLeave(b.dataset.qdLeave);
             if (b.dataset.qdRename) return void qdRename(b.dataset.qdRename);
             if (b.dataset.qdDel) return void qdDelete(b.dataset.qdDel);
         });
-        $('cfg-qd').addEventListener('keydown', function (e) {
+        $('qb-box').addEventListener('keydown', function (e) {
             if (e.key !== 'Enter') return;
             var t = e.target;
-            if (t.id === 'cfg-qd-new') { e.preventDefault(); qdCreate(); }
-            else if (t.dataset && t.dataset.qdEmail) { e.preventDefault(); qdAdd(t.dataset.qdEmail); }
+            if (t.dataset && t.dataset.qdEmail) { e.preventDefault(); qdAdd(t.dataset.qdEmail); }
         });
+        $('modal-qb').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) closeQb(); });
         $('modal-cfg').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('cfg-per-box', closeCfg); });
         $('cfg-colors').addEventListener('click', function (e) {
             var b = e.target.closest('[data-cfg-color]');

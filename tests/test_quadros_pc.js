@@ -1,6 +1,6 @@
 // V40.47.0 — QUADROS E LISTAS COMPARTILHADAS na tela do PC (kanban.html): quem está no quadro (a esposa, o sócio que só
 // usa o computador) vê a lista do outro no fim do quadro e faz tudo nas tarefas dela, gravando na conta de quem é dono;
-// o dono compartilha pelo menu da lista e cuida do quadro em Configurações. Ao vivo, Desfazer, tag e conta certa.
+// o dono compartilha pelo menu da lista e cuida do quadro na janelinha do quadro (V40.49.0: o botão de compartilhar, nas abas). Ao vivo, Desfazer, tag e conta certa.
 // Uso: TZ='America/Sao_Paulo' node tests/test_quadros_pc.js <repo> <dados-ficticios.json>
 const fs = require('fs'), path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
@@ -167,14 +167,16 @@ async function pc(uid, email) {
   ok(!!delTag && server.get('tags', MEMBRO, TAG).deleted === true && dono(taggedRid).tag_id === TAG, 'apagou a tag dela: a tarefa do dono continua com a tag dele');
   if (!$('modal-tags').classList.contains('hidden')) click($('tg-close'));
 
-  console.log('\nF) Configurações → Quadros (o da pessoa) e o menu da lista do outro:');
+  console.log('\nF) A janelinha do quadro (o da pessoa) e o menu da lista do outro:');
   click(sec(AL).querySelector('.col-menu-btn'));
   const menuTxt = T(d.querySelector('[role="menu"]'));
   ok(/Lista de dono@teste\.com · quadro Casa/.test(menuTxt) && !/Renomear|Apagar lista/.test(menuTxt) && /Ver o quadro/.test(menuTxt), 'menu da lista do outro: de quem é, sem Renomear nem Apagar, com "Ver o quadro"');
   click([...d.querySelectorAll('[role="menu"] button')].find((b) => /Ver o quadro/.test(b.textContent)));
-  await waitFor(() => !$('modal-cfg').classList.contains('hidden') && /Casa/.test(T($('cfg-qd'))));
-  ok(/Casa/.test(T($('cfg-qd'))) && /de dono@teste\.com/.test(T($('cfg-qd'))) && !!$('cfg-qd').querySelector('[data-qd-leave]') && !$('cfg-qd').querySelector('[data-qd-add]'), 'Configurações → Quadros: o quadro Casa (de quem criou), com "Sair" e sem "Pôr pessoa" (ela não criou)');
-  click($('cfg-close'));
+  await waitFor(() => !$('modal-qb').classList.contains('hidden') && /Casa/.test(T($('qb-box'))));
+  ok(/Casa/.test(T($('qb-box'))) && /criado por dono@teste\.com/.test(T($('qb-box'))) && !!$('qb-box').querySelector('[data-qd-leave]') && !$('qb-box').querySelector('[data-qd-add]') && /Só quem criou/.test(T($('qb-box'))), '"Ver o quadro" abre a janelinha do quadro Casa (de quem criou), com "Sair" e sem "Pôr" (ela não criou)');
+  ok(!$('modal-cfg').querySelector('#cfg-qd') && !/Quadros/.test(T($('modal-cfg'))), 'as Configurações não têm mais os Quadros');
+  click($('qb-close'));
+  ok($('modal-qb').classList.contains('hidden'), 'Fechar fecha a janelinha');
 
   console.log('\nG) O PC do dono: compartilha pelo menu da lista e cuida do quadro:');
   const A = await pc(DONO, 'dono@teste.com');
@@ -196,15 +198,19 @@ async function pc(uid, email) {
   const AG = CORE.sharedAlias(DONO, GAMA);
   await waitFor(() => sec(AG) && cards(AG).length >= 6, 6000);
   ok(sec(AG) && cards(AG).length >= 6 && T(sec(AG)).includes('Privada do dono'), 'no PC dela a GAMA apareceu sozinha (ao vivo), com as tarefas');
-  // Configurações do dono: pôr alguém que não tem conta, depois tirar a pessoa
-  aclick(a$('btn-cfg'));
-  await waitFor(() => /Casa/.test(T(a$('cfg-qd'))) && a$('cfg-qd').querySelector('[data-qd-add]'));
-  const em = a$('cfg-qd').querySelector('input[data-qd-email]');
+  // a janelinha do quadro, pelo botão de compartilhar ao lado do nome (aba aberta): pôr alguém que não tem conta, depois tirar a pessoa
+  await atab(CASA);
+  const share = ad.querySelector('#qb-bar [data-qb-opt]');
+  ok(!!share && share.dataset.qbOpt === CASA && !!share.querySelector('.ph-share-network') && /Compartilhar/.test(share.getAttribute('title')), 'a aba aberta tem o botão de compartilhar');
+  aclick(share);
+  await waitFor(() => /Casa/.test(T(a$('qb-box'))) && a$('qb-box').querySelector('[data-qd-add]'));
+  ok(!a$('modal-qb').classList.contains('hidden') && /você criou/.test(T(a$('qb-box'))) && !!a$('qb-box').querySelector('[data-qd-rename]') && !!a$('qb-box').querySelector('[data-qd-del]'), 'a janelinha do quadro: o nome com o lápis, as pessoas, o "Pôr" e o Apagar (você criou)');
+  const em = a$('qb-box').querySelector('input[data-qd-email]');
   em.value = 'ninguem@teste.com';
-  aclick(a$('cfg-qd').querySelector('[data-qd-add]'));
-  await waitFor(() => /criar a conta/.test(T(a$('cfg-qd'))));
-  ok(/criar a conta/.test(T(a$('cfg-qd'))) && a$('cfg-qd').querySelector('input[data-qd-email]').value === 'ninguem@teste.com', 'pôr um e-mail sem conta: avisa (e o e-mail continua no campo)');
-  aclick(a$('cfg-qd').querySelector(`[data-qd-rm="${CASA}|${MEMBRO}"]`));
+  aclick(a$('qb-box').querySelector('[data-qd-add]'));
+  await waitFor(() => /criar a conta/.test(T(a$('qb-box'))));
+  ok(/criar a conta/.test(T(a$('qb-box'))) && a$('qb-box').querySelector('input[data-qd-email]').value === 'ninguem@teste.com', 'pôr um e-mail sem conta: avisa (e o e-mail continua no campo)');
+  aclick(a$('qb-box').querySelector(`[data-qd-rm="${CASA}|${MEMBRO}"]`));
   await waitFor(() => !a$('dialog').classList.contains('hidden'));
   aclick(a$('dlg-ok'));
   await waitFor(() => !server.tables.quadros_membros.has(CASA + '|' + MEMBRO));
@@ -213,17 +219,32 @@ async function pc(uid, email) {
   await waitFor(() => !sec(AL) && !sec(AG), 6000);
   ok(!sec(AL) && !sec(AG), 'no PC dela as listas dele saíram (na próxima releitura: a cada minuto ou no Atualizar)');
   ok(server.alive('tarefas', DONO).filter((t) => t.column_id === BETA).length >= betaIds.length, '(e nada foi apagado na conta dele)');
-  aclick(a$('cfg-qd-create'));
-  ok(/Dê um nome/.test(T(a$('cfg-qd'))), 'criar quadro sem nome: pede o nome');
-  a$('cfg-qd-new').value = 'Empresa';
-  aclick(a$('cfg-qd-create'));
+  // renomear pelo lápis da janelinha
+  await waitFor(() => a$('qb-box').querySelector('[data-qd-rename]'));
+  aclick(a$('qb-box').querySelector('[data-qd-rename]'));
+  await waitFor(() => !a$('dialog').classList.contains('hidden'));
+  a$('dlg-input').value = 'Casa nova';
+  aclick(a$('dlg-ok'));
+  await waitFor(() => [...server.tables.quadros.values()].some((q) => q.nome === 'Casa nova') && /Casa nova/.test(T(a$('qb-box'))));
+  ok(/Casa nova/.test(T(a$('qb-box'))) && /Casa nova/.test(T(ad.querySelector('#qb-bar'))), 'o lápis renomeia o quadro (a janelinha e a aba mudam)');
+  aclick(a$('qb-close'));
+  // quadro novo pelo "+ Novo quadro" das abas
+  aclick(ad.querySelector('#qb-bar [data-qb-new]'));
+  await waitFor(() => !a$('dialog').classList.contains('hidden'));
+  ok(/botão de compartilhar/.test(T(a$('dlg-text'))), 'o "Novo quadro" diz que as pessoas entram pelo botão de compartilhar');
+  a$('dlg-input').value = 'Empresa';
+  aclick(a$('dlg-ok'));
   await waitFor(() => [...server.tables.quadros.values()].some((q) => q.nome === 'Empresa'));
-  await waitFor(() => /Empresa/.test(T(a$('cfg-qd'))));
-  ok(/Empresa/.test(T(a$('cfg-qd'))) && /Quadro "Empresa" criado/.test(T(a$('cfg-qd'))), 'criou o quadro "Empresa" pela tela');
-  a$('cfg-qd-new').value = '<img src=x onerror="window.__xss=1">';
-  aclick(a$('cfg-qd-create'));
-  await waitFor(() => /img src=x/.test(T(a$('cfg-qd'))));
-  ok(/img src=x/.test(T(a$('cfg-qd'))) && !a$('cfg-qd').querySelector('img') && !A.w.__xss, 'nome de quadro com HTML aparece como texto (não vira HTML)');
+  await waitFor(() => /Empresa/.test(T(ad.querySelector('#qb-bar .qb-tab-wrap.on'))), 15000); // (com o npm test rodando tudo junto, demora mais)
+  ok(/Empresa/.test(T(ad.querySelector('#qb-bar .qb-tab-wrap.on'))), 'criou o quadro "Empresa" pelas abas (e ele abre)');
+  aclick(ad.querySelector('#qb-bar [data-qb-new]'));
+  await waitFor(() => !a$('dialog').classList.contains('hidden'));
+  a$('dlg-input').value = '<img src=x onerror="window.__xss=1">';
+  aclick(a$('dlg-ok'));
+  await waitFor(() => /img src=x/.test(T(ad.querySelector('#qb-bar'))));
+  aclick(ad.querySelector('#qb-bar [data-qb-opt]'));
+  await waitFor(() => /img src=x/.test(T(a$('qb-box'))));
+  ok(/img src=x/.test(T(a$('qb-box'))) && !a$('qb-box').querySelector('img') && !ad.querySelector('#qb-bar img') && !A.w.__xss, 'nome de quadro com HTML aparece como texto (não vira HTML)');
 
   const errs = B.errors.concat(A.errors);
   ok(errs.length === 0, 'nenhum erro de página nos dois PCs' + (errs.length ? ': ' + errs[0].slice(0, 300) : ''));

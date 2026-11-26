@@ -34,7 +34,9 @@ const DS = '2026-12-08', DS2 = '2026-12-09';
   const hidden = () => [...d.querySelectorAll('#blocks-container .tl-hidden')].map((e) => e.dataset.hiddenId).sort();
   const empties = () => [...d.querySelectorAll('#blocks-container .block-item[data-block-id^="e_"]')].map((e) => Number(e.dataset.blockId.slice(2)));
   const modalOpen = () => !$('ag-filter-modal').classList.contains('hidden');
-  const btn = () => $('ag-filter-btn');
+  const btn = () => $('ag-filter-btn'); // V40.49.0: a linha "Filtrar por tag" do ⋯ (abre a janelinha)
+  const val = () => $('ag-filter-now').textContent.trim(); // o que ela diz: "Todas", o nome da tag ou "Sem tag"
+  const more = () => $('ag-more-btn').classList.contains('on'); // o ⋯ aceso (algum filtro ligado)
   const rows = () => [...d.querySelectorAll('#ag-filter-list .agf-row')];
   const pick = (name) => rows().find((r) => r.textContent.trim() === name).click();
   const prog = () => $('progress-text').textContent;
@@ -44,16 +46,16 @@ const DS = '2026-12-08', DS2 = '2026-12-09';
 
   // ======================================================================================================
   console.log('A) Botão e janelinha:');
-  ok(btn() && btn().textContent.trim() === 'TAGs' && btn().getAttribute('aria-pressed') === 'false' && !btn().classList.contains('agf-on'), 'sem filtro: o botão continua "TAGs", sem destaque');
+  ok(btn() && val() === 'Todas' && btn().getAttribute('aria-pressed') === 'false' && !btn().classList.contains('agf-on') && !more(), 'sem filtro: a linha do ⋯ diz "Todas" e o ⋯ fica apagado');
   ok(JSON.stringify(shown()) === JSON.stringify(['fA', 'fB', 'fC', 'fD', 'fE', 'fF']) && !hidden().length, 'sem filtro: todos os blocos do dia aparecem, nenhum contorno');
   ok(prog() === 'Planejado (' + ev('Math.round(270 / TOTAL_MINS * 100)') + '%)', 'e o "Planejado" de sempre: "' + prog() + '"');
   btn().click();
-  ok(modalOpen() && !$('overlay').classList.contains('pointer-events-none'), 'tocar em TAGs abre "Filtrar a agenda" (com o fundo escuro)');
+  ok(modalOpen() && !$('overlay').classList.contains('pointer-events-none'), 'tocar em "Filtrar por tag" abre a janelinha (com o fundo escuro)');
   const names = rows().map((r) => r.textContent.trim());
   ok(JSON.stringify(names) === JSON.stringify(['Todas as tags'].concat(T.map((t) => t.name), ['Sem tag'])), 'a lista: "Todas as tags", cada tag e "Sem tag" (' + names.length + ' linhas)');
   ok(rows()[0].getAttribute('aria-checked') === 'true' && rows().slice(1).every((r) => r.getAttribute('aria-checked') === 'false'), '"Todas as tags" marcada');
   ok(rows()[1].querySelector('.agf-dot') && rows()[1].querySelector('.agf-dot').style.background !== '', 'cada tag com a bolinha na cor dela');
-  ok($('ag-filter-done').getAttribute('role') === 'switch' && $('ag-filter-done').getAttribute('aria-checked') === 'false', '"Ocultar concluídos" desligado');
+  ok(!$('ag-filter-done') && $('ag-done-btn').getAttribute('role') === 'switch' && $('ag-done-btn').getAttribute('aria-checked') === 'false', '"Ocultar concluídos" (V40.49.0: no ⋯, fora da janelinha da tag) desligado');
   ok(d.querySelector('#ag-filter-modal [data-voltar]') && d.querySelector('#ag-filter-modal [data-voltar]').textContent.trim() === 'Fechar', 'o Fechar é o que o voltar do celular toca (data-voltar)');
   d.querySelector('#ag-filter-modal button[onclick="agFilterManageTags()"]').click();
   ok(!modalOpen() && !$('tags-sheet').classList.contains('translate-y-full'), '"Gerenciar tags" fecha a janelinha e abre a tela das tags de antes');
@@ -66,7 +68,7 @@ const DS = '2026-12-08', DS2 = '2026-12-09';
   await sleep(10);
   ok(!modalOpen() && JSON.stringify(fil()) === JSON.stringify([t1.id, false]), 'tocar na tag escolhe e fecha a janelinha');
   ok(L('tb__filtro_tag') === t1.id && L('tb__ocultar_concluidos') === '0', 'guardado no aparelho: tb__filtro_tag e tb__ocultar_concluidos');
-  ok(btn().classList.contains('agf-on') && btn().getAttribute('aria-pressed') === 'true' && btn().textContent.trim() === t1.name, `o botão fica cheio na cor do app e mostra "${btn().textContent.trim()}"`);
+  ok(btn().classList.contains('agf-on') && btn().getAttribute('aria-pressed') === 'true' && val() === t1.name && more(), `a linha mostra "${val()}" e o ⋯ acende`);
   ok(btn().querySelector('.agf-dot') && /rgb|#/.test(btn().querySelector('.agf-dot').style.background) && /só /.test(btn().getAttribute('aria-label')), 'com a bolinha da tag e o leitor de tela ouvindo "' + btn().getAttribute('aria-label') + '"');
   ok(JSON.stringify(shown()) === JSON.stringify(['fA', 'fD']), 'aparecem só os blocos da tag (o concluído também): ' + shown().join(', '));
   ok(JSON.stringify(hidden()) === JSON.stringify(['fB', 'fC', 'fE', 'fF']), 'os outros viram contorno no horário deles: ' + hidden().join(', '));
@@ -85,27 +87,27 @@ const DS = '2026-12-08', DS2 = '2026-12-09';
   console.log('\nC) "Sem tag":');
   btn().click(); pick('Sem tag'); await sleep(10);
   ok(JSON.stringify(shown()) === JSON.stringify(['fC', 'fE']), '"Sem tag": o sem tag e o de tag que não existe mais (como o PC): ' + shown().join(', '));
-  ok(btn().textContent.trim() === 'Sem tag' && btn().classList.contains('agf-on'), 'o botão mostra "Sem tag"');
+  ok(val() === 'Sem tag' && btn().classList.contains('agf-on'), 'a linha mostra "Sem tag"');
   ok(prog().endsWith('· 4 escondidos'), '"' + prog() + '"');
 
   // ======================================================================================================
   console.log('\nD) Ocultar concluídos:');
   btn().click(); pick('Todas as tags'); await sleep(10);
-  ok(!btn().classList.contains('agf-on') && btn().textContent.trim() === 'TAGs' && JSON.stringify(fil()) === JSON.stringify(['', false]), '"Todas as tags" desliga o filtro de tag (o botão volta a ser "TAGs")');
-  btn().click();
-  $('ag-filter-done').click();
+  ok(!btn().classList.contains('agf-on') && val() === 'Todas' && !more() && JSON.stringify(fil()) === JSON.stringify(['', false]), '"Todas as tags" desliga o filtro de tag (a linha volta a "Todas"; o ⋯ apaga)');
+  ev('openAgMore()');
+  $('ag-done-btn').click();
   await sleep(10);
-  ok(modalOpen() && $('ag-filter-done').getAttribute('aria-checked') === 'true', 'a chave liga com a janelinha aberta (dá pra escolher a tag junto)');
+  ok(!$('ag-more-modal').classList.contains('hidden') && $('ag-done-btn').getAttribute('aria-checked') === 'true', 'no ⋯, a chave "Ocultar concluídos" liga (o ⋯ continua aberto)');
   ok(L('tb__ocultar_concluidos') === '1' && JSON.stringify(hidden()) === JSON.stringify(['fD']) && !shown().includes('fD'), 'o concluído vira contorno; o resto aparece');
-  ev('closeAgFilter()');
-  ok(btn().classList.contains('agf-on') && btn().querySelector('.ph-eye-slash') && btn().textContent.trim() === 'TAGs', 'o botão fica cheio, com o olho riscado e "TAGs"');
+  ev('closeAgMore()');
+  ok(more() && !btn().classList.contains('agf-on') && val() === 'Todas', 'o ⋯ fica aceso (a linha da tag continua "Todas")');
   ok(prog().endsWith('· 1 escondido'), 'no singular: "' + prog() + '"');
 
   // ======================================================================================================
   console.log('\nE) Tag + concluídos:');
   btn().click(); pick(t1.name); await sleep(10);
   ok(JSON.stringify(shown()) === JSON.stringify(['fA']) && JSON.stringify(hidden()) === JSON.stringify(['fB', 'fC', 'fD', 'fE', 'fF']), 'Tag 1 sem os concluídos: só o A');
-  ok(btn().querySelector('.ph-eye-slash') && btn().querySelector('.agf-dot') && btn().textContent.trim() === t1.name && /só .*sem os concluídos/.test(btn().getAttribute('aria-label')), 'o botão mostra o olho, a bolinha e o nome ("' + btn().getAttribute('aria-label') + '")');
+  ok(btn().querySelector('.agf-dot') && val() === t1.name && $('ag-done-btn').getAttribute('aria-checked') === 'true' && more(), 'a linha mostra a bolinha e o nome; a chave dos concluídos continua ligada');
 
   // ======================================================================================================
   console.log('\nF) Nos filtros de lista (atrasados e concluídos):');
@@ -171,21 +173,21 @@ const DS = '2026-12-08', DS2 = '2026-12-09';
   // ======================================================================================================
   console.log('\nJ) Tag apagada:');
   btn().click(); pick(t3.name); await sleep(10);
-  ok(btn().textContent.trim() === t3.name, 'filtro na ' + t3.name);
+  ok(val() === t3.name, 'filtro na ' + t3.name);
   ev(`deleteTag(${JSON.stringify(t3.id)})`);
   await sleep(10);
-  ok(JSON.stringify(fil()) === JSON.stringify(['', false]) && btn().textContent.trim() === 'TAGs' && !hidden().length, 'apagar a tag do filtro volta pra "Todas as tags" (nada escondido)');
+  ok(JSON.stringify(fil()) === JSON.stringify(['', false]) && val() === 'Todas' && !hidden().length, 'apagar a tag do filtro volta pra "Todas as tags" (nada escondido)');
   ev(`tagsDb.push(${JSON.stringify(t3)}); saveTags();`);
   // a tag sumiu por outro caminho (veio do PC): o próximo desenho conserta
   ev("agTagFilter = 'tag_sumiu'; renderTimeline();");
-  ok(J('agTagFilter') === '' && btn().textContent.trim() === 'TAGs' && !hidden().length, 'tag do filtro que não existe mais (apagada no PC): volta pra "Todas" no próximo desenho');
+  ok(J('agTagFilter') === '' && val() === 'Todas' && !hidden().length, 'tag do filtro que não existe mais (apagada no PC): volta pra "Todas" no próximo desenho');
 
   // ======================================================================================================
   console.log('\nK) Guardado no aparelho, fora do backup e do Desfazer:');
   await sleep(30); // o passo do Desfazer do saveTags de cima fecha depois de um instante
   const und0 = J('undoStack.length');
   btn().click(); pick(t2.name); await sleep(10);
-  btn().click(); $('ag-filter-done').click(); ev('closeAgFilter()'); await sleep(30);
+  ev('openAgMore()'); $('ag-done-btn').click(); ev('closeAgMore()'); await sleep(30);
   ok(J('undoStack.length') === und0, 'mexer no filtro não vira passo do Desfazer');
   ok(!ev("isFazDataKey('tb__filtro_tag')") && !ev("isFazDataKey('tb__ocultar_concluidos')"), 'as duas chaves ficam fora do backup (tb__)');
   const store = {};
@@ -193,7 +195,7 @@ const DS = '2026-12-08', DS2 = '2026-12-09';
   const B2 = await boot(REPO, store), w2 = B2.w;
   w2.eval('activeDateObj = new Date(2026, 11, 8); renderTimeline();');
   const b2 = w2.document.getElementById('ag-filter-btn');
-  ok(JSON.stringify(JSON.parse(w2.eval('JSON.stringify([agTagFilter, agHideDone])'))) === JSON.stringify([t2.id, true]) && b2.textContent.trim() === t2.name && b2.classList.contains('agf-on'), 'abrindo o app de novo, o filtro continua (o botão já mostra "' + b2.textContent.trim() + '")');
+  ok(JSON.stringify(JSON.parse(w2.eval('JSON.stringify([agTagFilter, agHideDone])'))) === JSON.stringify([t2.id, true]) && w2.document.getElementById('ag-filter-now').textContent.trim() === t2.name && b2.classList.contains('agf-on'), 'abrindo o app de novo, o filtro continua (o botão já mostra "' + b2.textContent.trim() + '")');
   ok([...w2.document.querySelectorAll('#blocks-container .block-item[data-block-id^="f"]')].map((e) => e.dataset.blockId).sort().join(',') === 'fB,fF', 'e a agenda já abre filtrada');
   const B3 = await boot(REPO, Object.assign({}, store, { tb__filtro_tag: 'tag_lixo', tb__ocultar_concluidos: '0' })), w3 = B3.w;
   w3.eval('activeDateObj = new Date(2026, 11, 8); renderTimeline();');

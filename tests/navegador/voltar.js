@@ -86,8 +86,10 @@ const ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KH
 
   console.log('\nE) Dias lado a lado:');
   await m.evaluate(() => { activeDateObj = new Date(2026, 10, 15); renderTimeline(); document.getElementById('timeline-scroll').scrollTop = 0; });
-  await tap('#tl-days-btn'); await tap('#tl-days-btn');
-  ok(await m.evaluate(() => tlDays) === 3, 'botão de colunas duas vezes: 3 dias');
+  await tap('#ag-more-btn'); await tap('#ag-days-seg [data-ag-days="3"]'); // V40.49.0: o 1 / 2 / 3 do ⋯
+  ok(await m.evaluate(() => tlDays) === 3, 'o "3" do ⋯: 3 dias');
+  await voltar();
+  ok(!(await visivel('ag-more-modal')), 'voltar: fecha o ⋯');
   const alvo = await m.evaluate(() => { const e = document.querySelector('#blocks-container .tl-col[data-date="2026-11-16"] .tl-mini'), r = e.getBoundingClientRect(); return { id: e.dataset.miniId, x: r.left + r.width / 2, y: r.top + Math.min(r.height / 2, 20) }; });
   await m.touchscreen.tap(alvo.x, alvo.y); await m.waitForTimeout(500);
   ok(await m.evaluate(() => tlDays === 1 && getActiveDateStr() === '2026-11-16'), 'tocou num bloco do dia 16: abriu o dia');

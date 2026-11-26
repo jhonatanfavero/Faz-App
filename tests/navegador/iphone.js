@@ -117,7 +117,9 @@ const IPHONES = [
                 v = inter(v, clip);
                 if (v.r - v.l < 2 || v.b - v.t < 2) return; // fora da área visível agora (rolado pra longe)
                 const quem = name(el), rect = [Math.round(r0.left), Math.round(r0.top), Math.round(r0.width), Math.round(r0.height)];
-                if (v.t < ip.top - 0.5) out.push({ tipo: 'atrás da barra de status', quem, rect });
+                // V40.49.0: rolando, a agenda passa por baixo do topo encolhido (e ele cobre a barra de status): é de propósito
+                const soTopo = !!(document.querySelector('header.ag-slim') && el.closest('#timeline-scroll'));
+                if (v.t < ip.top - 0.5 && !soTopo) out.push({ tipo: 'atrás da barra de status', quem, rect });
                 if (v.b > H - ip.bot + 0.5) {
                     // numa lista que ainda rola pra cima, dá pra tirar de cima do risco: só conta quando não rola mais
                     let rola = false;
@@ -141,7 +143,9 @@ const IPHONES = [
                     // faixa da tarefa na mão também (a agenda tem folga embaixo pra rolar o que ficou atrás dela)
                     !!(hit && hit.closest('#fab-btn, #list-btn, #floating-task') && el.closest('#timeline-scroll')) ||
                     // com a tarefa na mão, a faixa dela fica por cima do + e da Lista (é assim desde sempre: o X dela desiste)
-                    !!(hit && hit.closest('#floating-task') && el.closest('#fab-btn, #list-btn'));
+                    !!(hit && hit.closest('#floating-task') && el.closest('#fab-btn, #list-btn')) ||
+                    // V40.49.0: rolando, a agenda passa por baixo do topo encolhido
+                    !!(soTopo && hit && hit.closest('header'));
                 // V40.34.0: numa lista que ainda rola pra baixo, o que está embaixo do rodapé fixo (ex.: "Salvar meta", fora da
                 // lista) sai de baixo dele rolando: só conta quando a lista não rola mais (as telas com fim: true)
                 let sc = null;
@@ -182,6 +186,9 @@ const IPHONES = [
     const TELAS = [
         ['Agenda', "closeAllSheets(); activeDateObj = new Date(2026, 10, 16); renderTimeline(); document.getElementById('timeline-scroll').scrollTop = 0;", null], // V40.38.0: do começo do dia (os blocos rolados ficam por baixo do cabeçalho, de propósito)
         ['Agenda (cabeçalho recolhido)', 'toggleHeader();', null, { depois: 'toggleHeader();' }],
+        // V40.49.0: Semana em tira: o ⋯ aberto e o topo encolhido (rolando a agenda)
+        ['Agenda: o ⋯ aberto', 'closeAllSheets(); openAgMore();', '#ag-more-modal', { depois: 'closeAgMore();' }],
+        ['Agenda: rolando (topo encolhido)', "closeAllSheets(); agSlimSet(true); document.getElementById('timeline-scroll').scrollTop = 400;", null, { depois: "agSlimSet(false); document.getElementById('timeline-scroll').scrollTop = 0;" }],
         ['Agenda com busca', 'openSearchBar();', null, { depois: 'closeSearchBar();' }],
         ['Bloco aberto', `(() => { const b = db.find((x) => x.date === '2026-11-16' && !Array.isArray(x.cards)); toggleExpandBlock(b.id, { stopPropagation() {} }); setTimeout(() => { const el = document.querySelector('[data-block-id="' + b.id + '"]'); if (el) el.scrollIntoView({ block: 'center' }); }, 50); })();`, null, { depois: 'db.forEach((b) => { b.expanded = false; }); renderTimeline();' }],
         ['+ (novo bloco)', 'openSheet();', '#bottom-sheet', { fim: true }],
@@ -225,16 +232,18 @@ const IPHONES = [
         ['Janelinha: repetir', `closeAllSheets(); duplicateTask(db.find((x) => x.date === '2026-11-16').id, { stopPropagation() {} }); promptCloneQtd('daily');`, '#clone-qtd-modal', { depois: 'cancelCloneQtd();' }], // V40.36.1: −/+ e o resumo
         // V40.46.0: a pergunta "Descartar?" (por cima do formulário da tarefa nova com texto)
         ['Janelinha: descartar?', "closeAllSheets(); openListSheet(); switchListTab('backlog'); openBacklogForm(); setTimeout(() => { document.getElementById('backlog-input').value = 'Comprar pão'; document.querySelector('#backlog-form-view [data-voltar]').click(); }, 80);", '#discard-modal', { espera: 500, depois: 'fgDiscard(); closeAllSheets();' }],
-        ['Janelinha: filtrar a agenda', "closeAllSheets(); openAgFilter();", '#ag-filter-modal', { depois: 'closeAgFilter();' }], // V40.45.0: o botão TAGs
+        ['Janelinha: filtrar por tag', "closeAllSheets(); openAgFilter();", '#ag-filter-modal', { depois: 'closeAgFilter();' }], // V40.45.0 (V40.49.0: o funil, só a tag)
         // V40.47.0: Quadros (sem conta; e com conta, com a tela "de mentira" do sync: o celular do teste não loga)
-        ['Config: Quadros (sem conta)', 'closeAllSheets(); openConfigSheet(); openConfigQuadros();', '#config-sheet', { fim: true }],
-        ['Config: Quadros', QD_FAKE + 'openConfigSheet(); openConfigQuadros();', '#config-sheet', { fim: true }],
-        ['Config: um quadro', "qdOpen('11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa');", '#config-sheet', { fim: true }],
+        // V40.49.0: a janelinha do quadro (o ⋯ ao lado do nome, nas abas; era a Config → Quadros): o seu (com o e-mail) e o de outra pessoa
+        ['Janelinha: o quadro', QD_FAKE + "closeAllSheets(); openListSheet(); blSetBoard('" + QD.id + "'); blBoardOptions('" + QD.id + "');", '#board-modal', { depois: "closeBoardModal(); blSetBoard(''); if (window.__qdReal) window.fazQuadros = window.__qdReal; closeAllSheets();" }],
+        ['Janelinha: o quadro de outra pessoa', QD_FAKE + "closeAllSheets(); openListSheet(); blSetBoard('" + QD2.id + "'); blBoardOptions('" + QD2.id + "');", '#board-modal', { depois: "closeBoardModal(); blSetBoard(''); if (window.__qdReal) window.fazQuadros = window.__qdReal; closeAllSheets();" }],
         ['Janelinha: mudar de quadro', QD_FAKE + "closeAllSheets(); openListSheet(); switchListTab('backlog'); scrollToColumn(backlogColumnsDb[1].id); activeColumnId = backlogColumnsDb[1].id; openShareColumn();", '#share-list-modal', { depois: 'closeShareList(); closeAllSheets();' }],
         ['Lista: compartilhada comigo', QD_COL + "closeAllSheets(); openListSheet(); switchListTab('backlog'); activeColumnId = 'sh_aaaaaaaa_col_x'; renderBacklog(); scrollToColumn('sh_aaaaaaaa_col_x');", '#list-sheet', { espera: 600 }],
         ['Janelinha: menu da lista compartilhada', 'openColumnMenuFromHeader();', '#column-menu-modal', { depois: QD_UNDO + 'closeColumnMenu(); closeAllSheets();' }],
         // V40.48.0: o menu grande (botão dos itens) e os quadros com abas (com os quadros de mentira: Casa com gente, Empresa vazio)
         ['Menu grande', 'closeAllSheets(); openHub();', '#list-sheet'],
+        ['Relatórios pelo menu', "closeAllSheets(); openHub(); hubOpen('reports');", '#reports-sheet', { fim: true }], // V40.49.0: com o "Menu" no topo
+        ['Tags pelo menu', "closeAllSheets(); openHub(); hubOpen('tags');", '#tags-sheet', { fim: true }],
         ['Quadros: aba de um quadro', QD_FAKE + QD_COL + "closeAllSheets(); openListSheet(); blSetBoard('" + QD.id + "');", '#list-sheet', { espera: 600, depois: QD_UNDO + "blSetBoard(''); closeAllSheets();" }],
         ['Quadros: quadro vazio', QD_FAKE + "closeAllSheets(); openListSheet(); blSetBoard('" + QD2.id + "');", '#list-sheet', { depois: "blSetBoard(''); if (window.__qdReal) window.fazQuadros = window.__qdReal; closeAllSheets();" }],
         ['Janelinha: trazer uma lista', QD_FAKE + "closeAllSheets(); openListSheet(); blSetBoard('" + QD2.id + "'); blBringList();", '#share-list-modal', { depois: "closeShareList(); blSetBoard(''); if (window.__qdReal) window.fazQuadros = window.__qdReal; closeAllSheets();" }],

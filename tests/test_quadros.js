@@ -245,24 +245,25 @@ const AUTH = 'sb-zlwocojndrjnuvoowzzu-auth-token';
   ok(res.ok && !server.tables.quadros.size && server.get('listas', DONO, BETA).quadro_id === null && !EA(`backlogColumnsDb.find(c => c.id === '${BETA}').quadroId`), 'você apagou o quadro: a BETA voltou a ser só sua (nenhuma tarefa apagada)');
   ok(betaA().length > 0 && server.alive('tarefas', DONO).filter((t) => t.column_id === BETA).length === betaA().length, '(as tarefas da BETA continuam todas aí)');
 
-  console.log('\nK) Telas do celular (Config → Quadros, menu da lista, compartilhar):');
+  console.log('\nK) Telas do celular (a janelinha do quadro, menu da lista, compartilhar):');
   res = await QA.criar('Empresa'); const EMP = res.id; await QA.adicionar(EMP, 'membro@teste.com'); await QA.compartilhar(DELTA, EMP); await QB.atualizar();
   const AL3 = CORE.sharedAlias(DONO, DELTA);
   ok(JSON.parse(B.L('tb_backlog_columns')).some((c) => c.id === AL3), '(quadro Empresa com a DELTA)');
-  A.w.openConfigSheet(); A.w.openConfigQuadros();
-  await sleep(150);
-  ok(!A.$('config-quadros-view').classList.contains('hidden') && A.$('config-title').innerText === 'Quadros' && A.$('qd-list').textContent.includes('Empresa') && A.$('qd-list').textContent.includes('você criou'), 'Config → Quadros mostra seus quadros');
-  A.w.qdOpen(EMP);
-  ok(!A.$('qd-detail').classList.contains('hidden') && A.$('qd-d-name').textContent === 'Empresa' && A.$('qd-d-members').textContent.includes('membro@teste.com') && !A.$('qd-d-add').classList.contains('hidden') && A.$('qd-d-lists').textContent.includes('DELTA'), 'o quadro: pessoas, "pôr alguém" (você criou) e as listas');
-  ok(A.$('config-back-btn').getAttribute('onclick') === 'qdBack()', 'o voltar volta pra lista de quadros');
+  // V40.49.0: pessoas, nome e apagar ficam na janelinha do quadro (o ⋯ ao lado do nome, nas abas); a Config não tem mais Quadros
+  ok(!A.$('config-sheet').textContent.includes('Listas compartilhadas com a casa') && !A.w.document.querySelector('[onclick^="openConfigQuadros"]'), 'a Config não tem mais a tela de Quadros');
+  A.w.openBoardModal(EMP);
+  await waitFor(() => /1 lista/.test(A.$('qd-d-sub').textContent), 4000).catch(() => {}); // a janelinha relê os quadros ao abrir
+  ok(!A.$('board-modal').classList.contains('hidden') && A.$('qd-d-name').textContent === 'Empresa' && A.$('qd-d-members').textContent.includes('membro@teste.com') && !A.$('qd-d-add').classList.contains('hidden') && /2 pessoas · 1 lista · você criou/.test(A.$('qd-d-sub').textContent), 'a janelinha do quadro: pessoas, "pôr alguém" (você criou) e quantas listas');
   A.$('qd-email').value = 'outro@teste.com';
   A.w.qdAdd();
-  await waitFor(() => !A.$('qd-add-msg').classList.contains('hidden'));
-  ok(/Pronto/.test(A.$('qd-add-msg').textContent) && A.$('qd-email').value === '' && A.$('qd-d-members').textContent.includes('outro@teste.com'), 'pôs mais uma pessoa pela tela');
-  // nome de quadro com HTML: aparece como texto (nunca vira HTML)
+  await waitFor(() => !A.$('qd-add-msg').classList.contains('hidden') && A.$('qd-d-members').textContent.includes('outro@teste.com'));
+  ok(/Pronto/.test(A.$('qd-add-msg').textContent) && A.$('qd-email').value === '' && A.$('qd-d-members').textContent.includes('outro@teste.com'), 'pôs mais uma pessoa pela janelinha');
+  A.w.closeBoardModal();
+  // nome de quadro com HTML: aparece como texto (nunca vira HTML), na janelinha e na aba
   res = await QA.criar('<img src=x onerror="window.__xss=1">');
-  A.w.qdBack(); await sleep(50);
-  ok(res.ok && !A.$('qd-list').querySelector('img') && A.$('qd-list').textContent.includes('<img src=x') && !A.w.__xss, 'nome de quadro com HTML aparece como texto (não vira HTML)');
+  A.w.openBoardModal(res.id); await sleep(50);
+  ok(res.ok && !A.$('board-modal').querySelector('img') && A.$('qd-d-name').textContent.includes('<img src=x') && !A.w.__xss, 'nome de quadro com HTML aparece como texto (não vira HTML)');
+  A.w.closeBoardModal();
   await QA.apagar(res.id);
   A.w.closeAllSheets();
   EA(`activeColumnId = '${DELTA}'; renderBacklog(); openColumnMenuFromHeader();`);

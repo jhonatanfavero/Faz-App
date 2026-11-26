@@ -769,6 +769,11 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(alturas.every((a) => a === alturas[0]), 'o topo tem a mesma altura em todas as larguras (' + alturas.join(', ') + ' px)');
   await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(200);
   await p.locator('#btn-cfg').click(); await p.waitForTimeout(250);
+  // V40.49.0: Configurações por tópicos (todos fechados; cada um diz como está). Abre a Cor.
+  const tops = await p.evaluate(() => [...document.querySelectorAll('#cfg-secs .cfg-sec')].map((s) => s.dataset.cfgSec + (s.classList.contains('open') ? '*' : '') + ':' + s.querySelector('.cfg-sec-s').textContent.trim()));
+  ok(tops.length === 5 && tops.every((x) => !/\*/.test(x)) && /^cor:Verde$/.test(tops[0]) && /^horario:07:00 às 24:00$/.test(tops[1]), 'Configurações por tópicos, todos fechados, cada um dizendo como está: ' + tops.join(' · '));
+  await foto(p, 'pc-configuracoes-topicos.png');
+  await p.locator('[data-cfg-open="cor"]').click(); await p.waitForTimeout(150);
   const jan = await p.evaluate(() => {
     const m = document.querySelector('#modal-cfg > div').getBoundingClientRect(), on = document.querySelector('#cfg-colors .on');
     return { vis: m.width > 0, w: Math.round(m.width), h: Math.round(m.height), dentro: m.top >= 0 && m.bottom <= innerHeight, on: on && on.dataset.cfgColor, n: document.querySelectorAll('#cfg-colors [data-cfg-color]').length, h0: document.getElementById('cfg-h0').value, h1: document.getElementById('cfg-h1').value };
@@ -782,6 +787,8 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(c1.focus === '#8b5cf6' && c0.aba === 'rgb(16, 185, 129)' && c1.aba === 'rgb(139, 92, 246)' && m1.faz_theme === '#8b5cf6' && m1.faz_prefs_at > 0, `clicou no roxo: a tela muda na hora (botões ${c0.aba} → ${c1.aba}) e grava na conta`);
   ok(/Cor do app atualizada/.test(await p.evaluate(() => document.getElementById('toast').textContent)), 'aviso: "' + await p.evaluate(() => document.getElementById('toast').textContent) + '"');
   await foto(p, 'pc-configuracoes-roxo.png');
+  await p.locator('[data-cfg-open="horario"]').click(); await p.waitForTimeout(150); // abrir o Horário fecha a Cor
+  ok(await p.evaluate(() => document.getElementById('cfg-sec-cor').classList.contains('hidden') && !document.getElementById('cfg-sec-horario').classList.contains('hidden')), 'abrir o Horário fecha a Cor (um tópico por vez)');
   await p.selectOption('#cfg-h0', '9'); await p.waitForTimeout(400);
   const m2 = await p.evaluate(() => window.__nuvem.users.get('pessoa@teste.com').meta);
   ok(JSON.stringify(m2.faz_hours) === '[9,24]', 'Começa 09:00: grava 09:00 às 24:00');
@@ -792,6 +799,7 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   // volta como estava (verde, 07:00 às 24:00)
   await p.selectOption('#cfg-h1', '24'); await p.waitForTimeout(250);
   await p.selectOption('#cfg-h0', '7'); await p.waitForTimeout(250);
+  await p.locator('[data-cfg-open="cor"]').click(); await p.waitForTimeout(150);
   await p.locator('#cfg-colors [data-cfg-color="#10b981"]').click(); await p.waitForTimeout(300);
   const m3 = await p.evaluate(() => window.__nuvem.users.get('pessoa@teste.com').meta);
   ok(m3.faz_theme === '#10b981' && JSON.stringify(m3.faz_hours) === '[7,24]', 'voltou pro verde, 07:00 às 24:00');
@@ -1024,13 +1032,19 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(150);
   await p.locator('#btn-cfg').click(); await p.waitForTimeout(250);
   const perRows = () => p.evaluate(() => [...document.querySelectorAll('#cfg-pers > div')].map((d) => [...d.querySelectorAll('span')].map((x) => x.textContent.trim()).join(' ')));
+  await p.locator('[data-cfg-open="periodos"]').click(); await p.waitForTimeout(150); // V40.49.0: o tópico Períodos
   ok(JSON.stringify(await perRows()) === JSON.stringify(['Manhã 08:00 às 12:00', 'Meio-dia 12:00 às 13:00', 'Tarde 13:00 às 18:00', 'Noite 18:00 às 22:00']), 'conta sem períodos ainda: os 4 padrão do celular');
+  ok(await p.evaluate(() => document.getElementById('cfg-per-box').classList.contains('hidden') && !document.getElementById('cfg-per-new').classList.contains('hidden')), 'V40.49.0: os campos do período novo escondidos até o "Adicionar período"');
+  await foto(p, 'pc-periodos-lista.png');
+  await p.locator('#cfg-per-new').click(); await p.waitForTimeout(150);
   await p.locator('#cfg-per-name').click(); await p.keyboard.type('Madrugada');
   await p.selectOption('[data-time-for="cfg-per-st"] .time-h', '0'); await p.selectOption('[data-time-for="cfg-per-en"] .time-h', '6');
   await p.selectOption('[data-time-for="cfg-per-en"] .time-m', '30');
   await p.locator('#cfg-per-add').click(); await p.waitForTimeout(400);
   const mp = await p.evaluate(() => window.__nuvem.users.get('pessoa@teste.com').meta);
   ok((mp.faz_periods || []).map((x) => x.name).join(',') === 'Manhã,Meio-dia,Tarde,Noite,Madrugada' && mp.faz_periods[4].end === '06:30', 'mouse e teclado de verdade: "Madrugada" 00:00 às 06:30 vai pra conta, junto com os 4');
+  ok(await p.evaluate(() => document.getElementById('cfg-per-box').classList.contains('hidden') && document.getElementById('cfg-s-periodos').textContent === '5 períodos'), 'criou: os campos fecham e o tópico diz "5 períodos"');
+  await p.locator('#cfg-per-new').click(); await p.waitForTimeout(150); // a caixa aberta, pra conferir que cabe
   const caixa = await p.evaluate(() => {
     const m = document.querySelector('#modal-cfg > div').getBoundingClientRect(), add = document.getElementById('cfg-per-add').getBoundingClientRect(), sc = document.querySelector('#modal-cfg .overflow-y-auto');
     sc.scrollTop = sc.scrollHeight;
@@ -1040,7 +1054,9 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(caixa.dentro && caixa.botao, `a janela (${caixa.w}×${caixa.h}) cabe na tela e rola até o "Adicionar"`);
   await p.waitForTimeout(150);
   await foto(p, 'pc-periodos-config.png');
-  // V40.41.0: Salvar backup (o download de verdade do navegador)
+  // V40.41.0: Salvar backup (o download de verdade do navegador). V40.49.0: no tópico Backup
+  await p.locator('#cfg-per-cancel').click();
+  await p.locator('[data-cfg-open="backup"]').click(); await p.waitForTimeout(150);
   const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 15000 }), p.locator('#cfg-backup').click()]);
   const bk = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
   const bkMsg = await p.evaluate(() => document.getElementById('cfg-backup-msg').textContent);
@@ -1064,6 +1080,8 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   {
   console.log('\nAB) Avisos dos compromissos em Configurações (V40.42.0):');
   await p.locator('#btn-cfg').click(); await p.waitForTimeout(400);
+  ok(await p.evaluate(() => document.getElementById('cfg-s-avisos').textContent === 'Desligados'), 'V40.49.0: o tópico fechado diz "Desligados"');
+  await p.locator('[data-cfg-open="avisos"]').click(); await p.waitForTimeout(150);
   const av = () => p.evaluate(() => {
     const m = document.querySelector('#modal-cfg > div').getBoundingClientRect(), sc = document.querySelector('#modal-cfg .overflow-y-auto');
     document.getElementById('cfg-av-min').scrollIntoView({ block: 'center' });
@@ -1081,6 +1099,8 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await p.evaluate(() => { window.__av = FazAvisos.estado; FazAvisos.estado = () => ({ suporte: 'ok', permissao: 'granted', on: true, minutos: 15 }); document.getElementById('btn-cfg').click(); });
   await p.locator('#cfg-close').click(); await p.waitForTimeout(150);
   await p.locator('#btn-cfg').click(); await p.waitForTimeout(400);
+  ok(await p.evaluate(() => document.getElementById('cfg-s-avisos').textContent === 'Ligados · 15 min antes'), 'ligados: o tópico fechado diz "Ligados · 15 min antes"');
+  await p.locator('[data-cfg-open="avisos"]').click(); await p.waitForTimeout(150);
   a = await av();
   ok(a.tit === 'Ligados neste computador' && /15 min antes de cada compromisso/.test(a.txt) && a.btn === 'Desligar' && !a.teste && a.ch.find((c) => c.on).t === '15 min', 'ligados: "' + a.tit + '", "Avisa 15 min antes…", "Desligar" e o teste liberado');
   await p.evaluate(() => { document.getElementById('cfg-av-msg').textContent = 'Enviado! O aviso chega em alguns segundos.'; });
@@ -1226,13 +1246,21 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await foto(p, 'pc-menu-lista-compartilhada.png');
   await p.locator('body > div.fixed[role="menu"] button').click(); await p.waitForTimeout(500);
   const cq = await p.evaluate(() => {
-    const box = document.getElementById('cfg-qd'), m = document.querySelector('#modal-cfg > div'), r = m.getBoundingClientRect();
+    const box = document.getElementById('qb-box'), m = document.querySelector('#modal-qb > div'), r = m.getBoundingClientRect();
     const fora = [...box.querySelectorAll('*')].filter((el) => { const q = el.getBoundingClientRect(); return q.width && (q.left < r.left - 1 || q.right > r.right + 1); }).length;
-    return { vis: !document.getElementById('modal-cfg').classList.contains('hidden'), t: box.textContent.replace(/\s+/g, ' ').trim(), fora };
+    return { vis: !document.getElementById('modal-qb').classList.contains('hidden'), t: box.textContent.replace(/\s+/g, ' ').trim(), fora, cfg: !document.getElementById('modal-cfg').classList.contains('hidden') };
   });
-  ok(cq.vis && /Casa/.test(cq.t) && /de ana@teste\.com/.test(cq.t) && /Mercado da casa \(de ana@teste\.com\)/.test(cq.t) && cq.fora === 0, '"Ver o quadro" abre Configurações → Quadros: o quadro Casa, as pessoas e as listas, tudo dentro da janela');
-  await foto(p, 'pc-configuracoes-quadros.png');
-  await p.locator('#cfg-close').click(); await p.waitForTimeout(200);
+  ok(cq.vis && !cq.cfg && /Casa/.test(cq.t) && /criado por ana@teste\.com/.test(cq.t) && /Mercado da casa \(de ana@teste\.com\)/.test(cq.t) && /Sair do quadro/.test(cq.t) && cq.fora === 0, 'V40.49.0: "Ver o quadro" abre a janelinha do quadro (não as Configurações): o quadro Casa, as pessoas e as listas, tudo dentro dela');
+  await foto(p, 'pc-janelinha-do-quadro.png');
+  await p.locator('#qb-close').click(); await p.waitForTimeout(200);
+  // o botão de compartilhar ao lado do nome da aba aberta abre a mesma janelinha
+  await p.locator('#qb-bar [data-qb-opt]').click(); await p.waitForTimeout(400);
+  ok(await p.evaluate(() => !document.getElementById('modal-qb').classList.contains('hidden') && /Casa/.test(document.getElementById('qb-box').textContent)), 'o botão de compartilhar, ao lado do nome do quadro, abre a janelinha');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(200);
+  ok(await p.evaluate(() => document.getElementById('modal-qb').classList.contains('hidden')), 'Esc fecha');
+  // V40.49.0: as abas e a busca na mesma linha
+  const linha = await p.evaluate(() => { const a = document.getElementById('qb-bar').getBoundingClientRect(), b = document.querySelector('#ls-bar label').getBoundingClientRect(); return { mesma: Math.abs((a.top + a.bottom) / 2 - (b.top + b.bottom) / 2) < 8, dir: b.left > a.left }; });
+  ok(linha.mesma && linha.dir, 'as abas dos quadros e a busca na mesma linha (a busca à direita)');
   // compartilhar uma lista sua (o submenu; V40.48.0: "Mudar de quadro…", na aba Pessoal)
   await p.locator('#qb-bar [data-board=""]').click(); await p.waitForTimeout(300);
   await p.locator('section.col:nth-of-type(2) .col-menu-btn').click(); await p.waitForTimeout(200);

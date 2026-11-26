@@ -28,13 +28,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const sc = $('timeline-scroll');
 
   // ======================================================================================================
-  console.log('A) O botão de colunas e o que aparece:');
+  console.log('A) Dias na tela (V40.49.0: o 1 / 2 / 3 do ⋯) e o que aparece:');
+  const seg = (n) => d.querySelector('#ag-days-seg [data-ag-days="' + n + '"]');
   go(2026, 10, 15);
-  ok(cols().length === 0 && !d.querySelector('#tl-days-btn').classList.contains('tl-days-on') && $('tl-days-badge').classList.contains('hidden'), 'começa com 1 dia (como sempre)');
-  $('tl-days-btn').click();
-  ok(cols().length === 2 && ev('tlDays') === 2 && L('tb__agenda_dias') === '2', 'o botão mostra 2 dias lado a lado e guarda no aparelho (tb__agenda_dias)');
-  ok($('tl-days-btn').classList.contains('tl-days-on') && $('tl-days-badge').textContent === '2' && $('tl-days-btn').getAttribute('aria-pressed') === 'true', 'o botão fica aceso com o "2"');
-  $('tl-days-btn').click();
+  ok(cols().length === 0 && !$('tl-days-btn') && seg(1).classList.contains('on') && !$('ag-more-btn').classList.contains('on'), 'começa com 1 dia (como sempre); o "1" do ⋯ marcado');
+  seg(2).click();
+  ok(cols().length === 2 && ev('tlDays') === 2 && L('tb__agenda_dias') === '2', 'o "2" mostra 2 dias lado a lado e guarda no aparelho (tb__agenda_dias)');
+  ok(seg(2).classList.contains('on') && seg(2).getAttribute('aria-pressed') === 'true' && !seg(1).classList.contains('on') && $('ag-more-btn').classList.contains('on'), 'o "2" fica marcado e o ⋯ acende');
+  seg(3).click();
   ok(cols().length === 3 && cols().map((c) => c.dataset.date).join() === '2026-11-15,2026-11-16,2026-11-17', '3 dias: 15, 16 e 17 (o primeiro é o dia que estava na tela)');
   ok(cols().every((c) => c.style.width && c.style.width === cols()[0].style.width) && new Set(cols().map((c) => c.style.left)).size === 3, 'colunas iguais, uma do lado da outra (' + cols()[0].style.width + ')');
   ok(!$('tl-dayhead').classList.contains('hidden') && [...$('tl-dayhead').children].map((b) => b.textContent).join('|') === 'Dom 15|Seg 16|Ter 17', 'nomes dos dias no topo: Dom 15 | Seg 16 | Ter 17');
@@ -42,8 +43,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(/15–17 nov/.test($('header-date').textContent), 'o topo mostra o intervalo: "' + $('header-date').textContent.trim() + '"');
   ok($('header-progress-row').classList.contains('hidden'), 'a barra de "planejado" sai (os nomes dos dias ficam no lugar)');
   ok($('now-line').style.display === 'none' && cols()[0].querySelector('.tl-now-mini') && !cols()[1].querySelector('.tl-now-mini'), 'a linha do agora fica só na coluna de hoje');
-  $('tl-days-btn').click();
-  ok(cols().length === 0 && ev('tlDays') === 1 && $('tl-dayhead').classList.contains('hidden') && !$('header-progress-row').classList.contains('hidden') && L('tb__agenda_dias') === '1', 'o 4º toque volta pra 1 dia (nomes somem, barra volta)');
+  seg(1).click();
+  ok(cols().length === 0 && ev('tlDays') === 1 && $('tl-dayhead').classList.contains('hidden') && !$('header-progress-row').classList.contains('hidden') && L('tb__agenda_dias') === '1', 'o "1" volta pra 1 dia (nomes somem, barra volta)');
   ok(d.querySelectorAll('#blocks-container .block-item').length > 10, 'e a agenda de 1 dia é a de sempre');
 
   // ======================================================================================================
@@ -133,7 +134,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(ev('getActiveDateStr()') === '2026-11-16', 'rolar pra baixo (mais vertical que horizontal) não troca o dia');
   ev('setTlDays(1)');
   fire(sc, 'touchstart', [[300, 400]]); fire(sc, 'touchmove', [[150, 400]]); fire(sc, 'touchend', []);
-  ok(ev('getActiveDateStr()') === '2026-11-16', 'com 1 dia, arrastar pro lado não troca o dia (como sempre)');
+  ok(ev('getActiveDateStr()') === '2026-11-17', 'V40.49.0: com 1 dia também, arrastar pro lado troca o dia (pedido dele em 26/11)');
+  fire(sc, 'touchstart', [[150, 400]]); fire(sc, 'touchmove', [[300, 400]]); fire(sc, 'touchend', []);
+  ok(ev('getActiveDateStr()') === '2026-11-16', 'e pra direita volta');
+  fire(sc, 'touchstart', [[8, 400]]); fire(sc, 'touchmove', [[200, 400]]); fire(sc, 'touchend', []);
+  ok(ev('getActiveDateStr()') === '2026-11-16', 'começando na beirada da tela (o voltar do Android), não troca');
+  ev("searchQuery = 'bloco'"); fire(sc, 'touchstart', [[300, 400]]); fire(sc, 'touchmove', [[150, 400]]); fire(sc, 'touchend', []); ev("searchQuery = ''");
+  ok(ev('getActiveDateStr()') === '2026-11-16', 'na busca, não troca');
 
   // ======================================================================================================
   console.log('\nG) Filtros, busca, ocultar vagos e a escolha guardada:');
@@ -159,7 +166,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // abrir o app de novo com a escolha guardada
   const B2 = await boot(REPO, Object.assign({}, backup.data, { tb__agenda_dias: '3' }));
   const d2 = B2.w.document;
-  ok(d2.querySelectorAll('#blocks-container .tl-col').length === 3 && d2.getElementById('tl-days-badge').textContent === '3', 'abrindo o app de novo: volta com os 3 dias');
+  ok(d2.querySelectorAll('#blocks-container .tl-col').length === 3 && d2.querySelector('#ag-days-seg [data-ag-days="3"]').classList.contains('on'), 'abrindo o app de novo: volta com os 3 dias (o "3" do ⋯ marcado)');
   ok(B2.errors.length === 0, 'sem erro ao abrir');
   try { B2.w.close(); } catch (e) {}
 

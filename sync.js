@@ -1238,13 +1238,14 @@
             var modals = document.querySelectorAll('[id$="-modal"]');
             for (var i = 0; i < modals.length; i++) {
                 var m = modals[i];
+                if (m.hasAttribute('data-sync-livre')) continue; // V40.49.0: a janelinha do quadro precisa da rodada (pessoas, nome)
                 if (!m.classList.contains('hidden') && (m.classList.contains('flex') || (window.getComputedStyle && getComputedStyle(m).display !== 'none' && m.offsetParent !== null))) return true;
             }
             // V40.8.0: digitando em algum campo do app (ex.: item de checklist)? Não redesenha por baixo.
             var a = document.activeElement;
             // V40.34.0: campo de uma tela já fechada (translate-y-full) não conta: ninguém está digitando nele.
             // V40.36.1: nem campo de janelinha (ou parte da tela) escondida com .hidden.
-            if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !(a.closest && (a.closest('#config-sheet') || a.closest('.translate-y-full') || a.closest('.hidden')))) return true;
+            if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && !(a.closest && (a.closest('#config-sheet') || a.closest('.translate-y-full') || a.closest('.hidden') || a.closest('[data-sync-livre]')))) return true;
         } catch (e) {}
         return false;
     }

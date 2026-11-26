@@ -56,34 +56,34 @@
              da câmera e usa 16px mínimo em telas sem notch. -->
         <header class="compact-header-padding absolute top-0 w-full z-30 pb-4 px-6 bg-app-bg/90 backdrop-blur-xl border-b border-black/5 pointer-events-none">
             <div class="flex flex-col gap-4 mb-4 pointer-events-auto">
+                <!-- V40.49.0: SEMANA EM TIRA (escolha dele em 26/11): em cima a data (com o "Hoje"), o pensamento do dia (só quando
+                     ainda não lido), a busca e o ⋯ (Ocultar concluídos, Compactar os vagos, Dias na tela, Filtrar por tag,
+                     Pensamento do dia, Esconder o topo). Embaixo, os 7 dias da semana (segunda a domingo, como a Semana do PC):
+                     tocar vai pro dia, arrastar a tira troca a semana; arrastar a agenda pro lado troca o dia. Sem as setas. -->
                 <div class="flex justify-between items-center gap-2">
-                    <div class="min-w-0 flex-1">
-                        <p class="text-zinc-700 text-[15px] font-semibold flex items-center gap-1.5 mt-0.5 truncate" id="header-date">
+                    <div class="min-w-0 flex-1 flex items-center gap-2">
+                        <p class="text-zinc-700 text-[15px] font-semibold flex items-center gap-1.5 mt-0.5 truncate min-w-0" id="header-date">
                             Carregando...
                         </p>
+                        <button id="ag-today-chip" type="button" onclick="goToToday()" class="ag-today shrink-0" aria-label="Voltar pra hoje">Hoje</button>
                     </div>
-                    <div class="flex gap-1 shrink-0" id="header-btns-cluster">
-                        <button id="thought-btn-wrap" onclick="showThoughtOfDay()" class="w-9 h-9 flex items-center justify-center bg-white border-2 border-app-focus text-app-focus rounded-xl hover:bg-zinc-50 active:scale-95 transition shrink-0" title="Pensamento do dia">
+                    <!-- V40.49.0: rolando a agenda pra baixo, o topo vira esta linha só (a data e o Planejado); tocar abre de novo -->
+                    <button id="ag-slim-bar" type="button" onclick="agSlimSet(false)" class="ag-slim-bar" aria-label="Mostrar o topo da agenda">
+                        <span class="ag-slim-track"><i id="ag-slim-fill"></i></span><span id="ag-slim-pct" class="ag-slim-pct">0%</span><i class="ph-bold ph-caret-down ag-slim-c"></i>
+                    </button>
+                    <div class="flex gap-1 shrink-0 items-center" id="header-btns-cluster">
+                        <button id="thought-btn-wrap" onclick="showThoughtOfDay()" class="ag-hb shrink-0" title="Pensamento do dia">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="w-[18px] h-[18px]">
                                 <path d="M16.5 13C18.4 13 20 11.4 20 9.5C20 7.8 18.7 6.4 17.1 6.1C17.1 4.4 15.6 3 13.8 3C12.7 3 11.7 3.5 11.1 4.3C10.4 3.5 9.3 3 8.2 3C6.3 3 4.7 4.5 4.7 6.4C4.7 6.6 4.7 6.8 4.8 7C3.5 7.5 2.5 8.7 2.5 10.2C2.5 11.7 3.5 13 5 13H16.5Z"/>
                                 <circle cx="6" cy="16" r="1.3" fill="currentColor"/>
                                 <circle cx="3.5" cy="19" r="0.9" fill="currentColor"/>
                             </svg>
                         </button>
-                        <button onclick="debugPreviousDay()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Dia Anterior">
-                            <i class="ph ph-rewind text-base text-app-focus"></i>
+                        <button type="button" onclick="openSearchBar()" class="ag-hb shrink-0" title="Buscar cartão" aria-label="Buscar cartão">
+                            <i class="ph ph-magnifying-glass"></i>
                         </button>
-                        <button onclick="goToToday()" class="w-9 h-9 flex items-center justify-center bg-app-focus rounded-xl hover:opacity-90 transition border border-app-focus shadow-sm" title="Voltar para Hoje">
-                            <i class="ph ph-calendar-star text-base text-white"></i>
-                        </button>
-                        <button onclick="debugAdvanceDay()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Avançar Dia">
-                            <i class="ph ph-fast-forward text-base text-app-focus"></i>
-                        </button>
-                        <button onclick="openSearchBar()" class="w-9 h-9 flex items-center justify-center bg-white rounded-xl hover:bg-zinc-50 transition border border-app-focus shadow-sm" title="Buscar cartão">
-                            <i class="ph ph-magnifying-glass text-base text-app-focus"></i>
-                        </button>
-                        <button onclick="toggleHeader()" class="w-9 h-9 flex items-center justify-center bg-app-focus rounded-xl hover:opacity-90 transition border border-app-focus shadow-sm" title="Ocultar Menu">
-                            <i class="ph ph-caret-up text-base text-white"></i>
+                        <button id="ag-more-btn" type="button" onclick="openAgMore()" class="ag-hb ag-more shrink-0" aria-haspopup="dialog" aria-label="Mais opções da agenda" title="Concluídos, vagos, dias na tela, tag…">
+                            <i class="ph-bold ph-dots-three"></i><span class="ag-more-dot" aria-hidden="true"></span>
                         </button>
                     </div>
                 </div>
@@ -100,31 +100,7 @@
                 </div>
                 <p id="search-counter" class="hidden text-[12px] font-semibold text-app-focus -mt-2"></p>
                 
-                <div id="header-filters-row" class="flex gap-2">
-                    <button id="filter-delayed-btn" onclick="toggleFilterDelayed()" class="bg-app-focus-soft border border-app-focus-soft p-2 rounded-xl hover:bg-app-focus-soft-strong transition flex items-center justify-center shrink-0" title="Filtrar Atrasados">
-                        <i class="ph-bold ph-info text-lg text-app-focus"></i>
-                    </button>
-                    <!-- V2.0 - BLOCO 2 -->
-                    <button id="filter-completed-btn" onclick="toggleFilterCompleted()" class="bg-emerald-50 border border-emerald-200 p-2 rounded-xl hover:bg-emerald-100 transition flex items-center justify-center shrink-0" title="Filtrar Concluídos">
-                        <i class="ph-bold ph-check-circle text-lg text-emerald-500"></i>
-                    </button>
-                    <!-- V40.24.0: ocultar os vagos (vago de 30 min ou mais vira uma faixa fininha; igual ao "Compactar vagos" do PC) -->
-                    <button id="tl-compact-btn" onclick="toggleTlCompact()" aria-pressed="false" class="bg-white border border-app-focus p-2 rounded-xl hover:bg-zinc-50 transition flex items-center justify-center shrink-0 shadow-sm" title="Ocultar os vagos">
-                        <i class="ph-bold ph-arrows-in-line-vertical text-lg text-app-focus"></i>
-                    </button>
-                    <!-- V40.26.0: agenda afastada (1, 2 ou 3 dias lado a lado; também pela pinça) -->
-                    <button id="tl-days-btn" onclick="cycleTlDays()" aria-pressed="false" class="relative bg-white border border-app-focus p-2 rounded-xl hover:bg-zinc-50 transition flex items-center justify-center shrink-0 shadow-sm" title="Ver 2 dias lado a lado (ou feche os dedos na agenda)" aria-label="Dias na tela">
-                        <i class="ph-bold ph-columns text-lg text-app-focus"></i>
-                        <span id="tl-days-badge" class="tl-days-badge hidden"></span>
-                    </button>
-                    <!-- V40.45.0: o TAGs é o filtro da agenda (uma tag ou "Sem tag", e "Ocultar concluídos"); "Gerenciar tags" fica dentro dele -->
-                    <button id="ag-filter-btn" onclick="openAgFilter()" aria-haspopup="dialog" aria-pressed="false" aria-label="Filtrar a agenda" title="Filtrar a agenda por tag (ou ocultar os concluídos)" class="bg-white border border-app-focus px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 min-w-0 flex justify-center items-center gap-1">
-                        <i class="ph ph-tag text-sm text-app-focus"></i> <span class="agf-txt">TAGs</span>
-                    </button>
-                    <button onclick="openReportsSheet()" aria-label="Relatórios" title="Relatórios" class="bg-white border border-app-focus px-2 py-1.5 rounded-xl text-[11px] font-bold text-zinc-700 hover:bg-zinc-50 transition shadow-sm flex-1 flex justify-center items-center gap-1 truncate">
-                        <i class="ph ph-chart-bar text-sm text-app-focus"></i> <span class="rel-txt">Relatórios</span>
-                    </button>
-                </div>
+                <div id="header-filters-row" class="ag-week" role="group" aria-label="Dias da semana (arraste pro lado pra trocar de semana)"></div>
             </div>
             <div id="header-progress-row" class="w-full pointer-events-auto">
                 <div class="flex justify-between text-[10px] text-zinc-500 mb-1.5 font-bold uppercase tracking-wider">
@@ -278,10 +254,8 @@
             <!-- V40.48.0: MENU GRANDE. O botão dos itens ("60 itens") abre aqui: uma grade com Quadros, Rotinas, Notas,
                  Finanças, Metas e Assistente (cada um com um número) e a Config no pé. Desenhado pelo renderHub() (app.js). -->
             <div id="view-hub" class="hidden flex-1 flex-col min-h-0 overflow-y-auto no-scrollbar pb-2">
-                <div id="hub-grid" class="grid grid-cols-2 gap-3"></div>
-                <button onclick="openConfigSheet()" class="hub-cfg mt-4 mx-auto shrink-0 flex items-center gap-2 h-11 px-5 rounded-full border border-zinc-200 text-zinc-600 text-sm font-bold hover:bg-zinc-50 transition active:scale-95">
-                    <i class="ph ph-gear text-lg"></i> Config
-                </button>
+                <!-- V40.49.0: 9 botões, 3 por linha, no meio da tela (Relatórios, Tags e Config entraram aqui) -->
+                <div id="hub-grid" class="grid grid-cols-3 gap-2.5 my-auto"></div>
             </div>
 
             <!-- V40.1: Super Gabinete - Pills de navegação entre abas -->
@@ -1066,56 +1040,6 @@
                     <i class="ph ph-caret-right text-zinc-400 shrink-0"></i>
                 </button>
 
-                <!-- V40.47.0: Quadros (listas compartilhadas com a casa ou a equipe) -->
-                <button onclick="openConfigQuadros()" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-zinc-100 transition text-left">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <div class="w-10 h-10 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                            <i class="ph ph-users-three text-xl"></i>
-                        </div>
-                        <div class="flex flex-col min-w-0">
-                            <span class="font-bold text-zinc-800 text-sm">Quadros</span>
-                            <span class="text-[11px] text-zinc-500 font-medium truncate" id="qd-menu-status">Listas compartilhadas com a casa ou a equipe</span>
-                        </div>
-                    </div>
-                    <i class="ph ph-caret-right text-zinc-400 shrink-0"></i>
-                </button>
-            </div>
-
-            <!-- V40.47.0: Quadros. Um quadro junta pessoas; lista posta num quadro aparece pra todo mundo dele (lógica em sync.js) -->
-            <div class="flex-1 overflow-y-auto no-scrollbar hidden" id="config-quadros-view">
-                <div id="qd-need-login" class="hidden bg-zinc-50 border border-zinc-200 rounded-xl p-4 mb-3">
-                    <p class="text-[13px] text-zinc-600 leading-relaxed mb-3">Pra criar quadros e compartilhar listas, entre na sua conta (a mesma do computador).</p>
-                    <button onclick="qdGoLogin()" class="w-full bg-app-focus text-white rounded-lg px-3 py-3 text-sm font-bold shadow-md hover:opacity-90 transition flex items-center justify-center gap-2"><i class="ph ph-sign-in text-lg"></i> Entrar na conta</button>
-                </div>
-                <div id="qd-home" class="hidden">
-                    <p class="text-[13px] text-zinc-600 leading-relaxed mb-4">Um quadro junta pessoas (a casa, a equipe da empresa). Compartilhe uma lista com o quadro pelo menu ⋮ da lista: todo mundo dele vê a lista e mexe nas tarefas dela.</p>
-                    <div id="qd-list" class="flex flex-col gap-2 mb-3"></div>
-                    <button onclick="qdNew()" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-app-focus text-white font-bold text-sm shadow-md hover:opacity-90 transition active:scale-[0.98]">
-                        <i class="ph-bold ph-plus text-base"></i> Novo quadro
-                    </button>
-                    <p id="qd-home-note" class="text-[11px] text-zinc-400 text-center leading-relaxed px-4 mt-3"></p>
-                </div>
-                <div id="qd-detail" class="hidden">
-                    <div class="flex items-center gap-2 mb-1">
-                        <h3 id="qd-d-name" class="text-lg font-bold text-zinc-900 break-words min-w-0 flex-1"></h3>
-                        <button id="qd-d-rename" onclick="qdRename()" aria-label="Renomear o quadro" title="Renomear" class="hidden w-9 h-9 shrink-0 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 transition active:scale-90"><i class="ph ph-pencil-simple text-lg"></i></button>
-                    </div>
-                    <p id="qd-d-sub" class="text-[12px] text-zinc-500 mb-4"></p>
-                    <p class="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Pessoas</p>
-                    <div id="qd-d-members" class="flex flex-col gap-1.5 mb-3"></div>
-                    <div id="qd-d-add" class="hidden bg-zinc-50 border border-zinc-200 rounded-xl p-3 mb-4">
-                        <label for="qd-email" class="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-1">Pôr alguém (o e-mail da conta da pessoa no Faz)</label>
-                        <div class="flex gap-2">
-                            <input type="email" id="qd-email" autocomplete="off" inputmode="email" enterkeyhint="send" placeholder="pessoa@email.com" onkeydown="if(event.key==='Enter'){event.preventDefault();qdAdd();}" class="flex-1 min-w-0 bg-white border border-zinc-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-app-focus">
-                            <button id="qd-add-btn" onclick="qdAdd()" class="shrink-0 bg-app-focus text-white rounded-lg px-4 text-sm font-bold hover:opacity-90 transition active:scale-95 disabled:opacity-60">Pôr</button>
-                        </div>
-                        <p id="qd-add-msg" class="hidden text-[12px] leading-snug mt-2" role="status"></p>
-                    </div>
-                    <p class="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Listas neste quadro</p>
-                    <div id="qd-d-lists" class="flex flex-col gap-1.5 mb-5"></div>
-                    <button id="qd-d-leave" onclick="qdLeave()" class="hidden w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-100 text-zinc-700 font-bold text-sm hover:bg-zinc-200 transition mb-2"><i class="ph ph-sign-out text-lg"></i> Sair do quadro</button>
-                    <button id="qd-d-delete" onclick="qdDelete()" class="hidden w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 font-bold text-sm hover:bg-red-100 transition mb-2"><i class="ph ph-trash text-lg"></i> Apagar o quadro</button>
-                </div>
             </div>
 
             <div class="flex-1 overflow-y-auto no-scrollbar hidden" id="config-hours-view">
@@ -1320,7 +1244,8 @@
         <div id="tags-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
             <!-- V40.3.7-fix: header fundido com X colorido (Gemini fix #1) — removido X cinza antigo da esquerda -->
             <div class="flex items-center justify-between mb-4 shrink-0">
-                <h2 class="text-lg font-bold text-zinc-900">Gerenciar Tags</h2>
+                <!-- V40.49.0: aberta pelo menu grande, ganha o "Menu" (o voltar volta pra ele) -->
+                <div class="flex items-center gap-2 min-w-0"><button data-voltar="menu" data-hub-back onclick="hubBack()" aria-label="Voltar pro menu" title="Menu" class="hidden h-9 pl-2 pr-3 -ml-2 items-center gap-1.5 rounded-full text-zinc-700 text-sm font-bold hover:bg-zinc-100 transition active:scale-95"><i class="ph-bold ph-squares-four text-lg text-app-focus"></i> Menu</button><h2 class="text-lg font-bold text-zinc-900 truncate">Gerenciar Tags</h2></div>
                 <button data-voltar="fechar" onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
                     <i class="ph-bold ph-x text-lg"></i>
                 </button>
@@ -1584,6 +1509,36 @@
             </button>
         </div>
 
+        <!-- V40.49.0: JANELINHA DO QUADRO (o botão de compartilhar ao lado do nome do quadro, nas abas; até a V40.48.0 era a Config → Quadros):
+             o nome (o lápis renomeia), as pessoas (pôr pelo e-mail, tirar) e Sair ou Apagar. Desenhada pelo fazQuadrosRender.
+             data-sync-livre: com ela aberta a sincronização continua (o sync.js não espera ela fechar; o e-mail digitado fica). -->
+        <div id="board-modal" data-sync-livre role="dialog" aria-modal="true" aria-labelledby="qd-d-name" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[88%] max-w-[360px] max-h-[86%] bg-white rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100">
+            <div class="flex items-center gap-3 shrink-0">
+                <span id="qd-d-ico" class="qd-card-ico" aria-hidden="true"><i class="ph-fill ph-users-three"></i></span>
+                <div class="flex-1 min-w-0">
+                    <h3 id="qd-d-name" class="text-lg font-bold text-zinc-900 leading-tight break-words"></h3>
+                    <p id="qd-d-sub" class="text-[12px] text-zinc-500 font-medium leading-snug mt-0.5" style="overflow-wrap:anywhere"></p>
+                </div>
+                <button id="qd-d-rename" type="button" onclick="qdRename()" aria-label="Renomear o quadro" title="Renomear" class="hidden w-9 h-9 shrink-0 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-lg hover:bg-zinc-200 transition active:scale-90"><i class="ph ph-pencil-simple text-lg"></i></button>
+            </div>
+            <div class="flex-1 min-h-0 overflow-y-auto no-scrollbar mt-4">
+                <p class="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-2">Pessoas</p>
+                <div id="qd-d-members" class="flex flex-col gap-1.5 mb-3"></div>
+                <div id="qd-d-add" class="hidden bg-zinc-50 border border-zinc-200 rounded-xl p-3">
+                    <label for="qd-email" class="text-[10px] font-bold text-zinc-500 uppercase ml-1 block mb-1">Pôr alguém (o e-mail da conta da pessoa no Faz)</label>
+                    <div class="flex gap-2">
+                        <input type="email" id="qd-email" autocomplete="off" inputmode="email" enterkeyhint="send" placeholder="pessoa@email.com" onkeydown="if(event.key==='Enter'){event.preventDefault();qdAdd();}" class="flex-1 min-w-0 bg-white border border-zinc-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-app-focus">
+                        <button id="qd-add-btn" type="button" onclick="qdAdd()" class="shrink-0 bg-app-focus text-white rounded-lg px-4 text-sm font-bold hover:opacity-90 transition active:scale-95 disabled:opacity-60">Pôr</button>
+                    </div>
+                    <p id="qd-add-msg" class="hidden text-[12px] leading-snug mt-2" role="status"></p>
+                </div>
+                <p id="qd-d-note" class="hidden text-[12px] text-zinc-500 leading-snug"></p>
+            </div>
+            <button id="qd-d-leave" type="button" onclick="qdLeave()" class="hidden w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-100 text-zinc-700 font-bold text-sm hover:bg-zinc-200 transition mt-4 shrink-0"><i class="ph ph-sign-out text-lg"></i> Sair do quadro</button>
+            <button id="qd-d-delete" type="button" onclick="qdDelete()" class="hidden w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 font-bold text-sm hover:bg-red-100 transition mt-4 shrink-0"><i class="ph ph-trash text-lg"></i> Apagar o quadro</button>
+            <button type="button" data-voltar onclick="closeBoardModal()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2 shrink-0">Fechar</button>
+        </div>
+
         <!-- V40.47.0: NOME DO QUADRO (criar/renomear) -->
         <div data-form="nome-quadro" id="quadro-name-modal" role="dialog" aria-modal="true" aria-labelledby="quadro-name-title" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100">
             <h3 class="text-lg font-bold text-zinc-900 mb-1 text-center" id="quadro-name-title">Novo quadro</h3>
@@ -1599,15 +1554,26 @@
             </div>
         </div>
 
-        <!-- V40.45.0: FILTRO DA AGENDA (o botão TAGs): uma tag (ou "Sem tag") e "Ocultar concluídos". Só esconde da tela. -->
+        <!-- V40.49.0: O ⋯ DA AGENDA (Semana em tira): o que ficava nos botões da 2ª linha. Os ids continuam (ag-done-btn,
+             tl-compact-btn, ag-filter-btn): os renderAgDoneBtn, updateTlCompactBtn e renderAgFilterBtn acendem cada um. -->
+        <div id="ag-more-modal" role="dialog" aria-modal="true" aria-label="Opções da agenda" class="absolute right-3 w-[264px] max-w-[calc(100%-24px)] bg-white rounded-2xl p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100" style="top: calc(max(env(safe-area-inset-top), 20px) + 46px)">
+            <button id="ag-done-btn" type="button" role="switch" aria-checked="false" onclick="toggleAgHideDone()" class="agm-row"><i class="ph-bold ph-eye-slash agm-ic"></i><span class="flex-1 min-w-0">Ocultar concluídos</span><span class="agm-sw" aria-hidden="true"></span></button>
+            <button id="tl-compact-btn" type="button" role="switch" aria-checked="false" aria-pressed="false" onclick="toggleTlCompact()" class="agm-row"><i class="ph-bold ph-arrows-in-line-vertical agm-ic"></i><span class="flex-1 min-w-0">Compactar os vagos</span><span class="agm-sw" aria-hidden="true"></span></button>
+            <div class="agm-row" role="group" aria-label="Dias na tela"><i class="ph-bold ph-columns agm-ic"></i><span class="flex-1 min-w-0">Dias na tela</span>
+                <span class="agm-n3" id="ag-days-seg"><button type="button" data-ag-days="1" onclick="setTlDays(1)">1</button><button type="button" data-ag-days="2" onclick="setTlDays(2)">2</button><button type="button" data-ag-days="3" onclick="setTlDays(3)">3</button></span></div>
+            <button id="ag-filter-btn" type="button" onclick="closeAgMore(); openAgFilter();" aria-haspopup="dialog" aria-pressed="false" class="agm-row"><i class="ph-bold ph-funnel agm-ic"></i><span class="flex-1 min-w-0">Filtrar por tag</span><span id="ag-filter-now" class="agm-val">Todas</span><i class="ph-bold ph-caret-right text-zinc-300 text-sm"></i></button>
+            <button type="button" onclick="closeAgMore(); showThoughtOfDay();" class="agm-row"><i class="ph ph-cloud agm-ic"></i><span class="flex-1 min-w-0">Pensamento do dia</span></button>
+            <button id="ag-head-btn" type="button" onclick="closeAgMore(); toggleHeader();" class="agm-row"><i class="ph-bold ph-caret-up agm-ic"></i><span class="flex-1 min-w-0" id="ag-head-txt">Esconder o topo</span></button>
+            <button type="button" data-voltar onclick="closeAgMore()" class="sr-only">Fechar</button>
+        </div>
+
+        <!-- V40.45.0: FILTRO DA AGENDA (V40.49.0: o funil): uma tag (ou "Sem tag"). Só esconde da tela. O "Ocultar concluídos"
+             saiu daqui na V40.49.0: virou o botão da agenda, igual ao PC. -->
         <div id="ag-filter-modal" role="dialog" aria-modal="true" aria-labelledby="ag-filter-title" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[340px] max-h-[86%] bg-white rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100">
-            <h3 id="ag-filter-title" class="text-base font-bold text-zinc-900 text-center shrink-0">Filtrar a agenda</h3>
-            <p class="text-[11px] font-semibold text-zinc-400 text-center mt-0.5 mb-3 leading-snug shrink-0">Só esconde da tela: o horário continua ocupado.</p>
+            <h3 id="ag-filter-title" class="text-base font-bold text-zinc-900 text-center shrink-0">Filtrar por tag</h3>
+            <p class="text-[11px] font-semibold text-zinc-400 text-center mt-0.5 mb-3 leading-snug shrink-0">Mostra só os blocos da tag. Os outros viram contorno: o horário continua ocupado.</p>
             <div id="ag-filter-list" role="radiogroup" aria-label="Mostrar os blocos de qual tag" class="flex flex-col gap-1.5 overflow-y-auto no-scrollbar min-h-0"></div>
-            <button id="ag-filter-done" type="button" role="switch" aria-checked="false" onclick="toggleAgHideDone()" class="agf-row mt-3 shrink-0">
-                <i class="ph ph-eye-slash text-lg text-zinc-500"></i><span class="flex-1 min-w-0">Ocultar concluídos</span><span class="agf-switch" aria-hidden="true"></span>
-            </button>
-            <button type="button" onclick="agFilterManageTags()" class="w-full flex items-center gap-3 py-3 px-4 mt-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-sm hover:bg-zinc-100 transition shrink-0">
+            <button type="button" onclick="agFilterManageTags()" class="w-full flex items-center gap-3 py-3 px-4 mt-3 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-sm hover:bg-zinc-100 transition shrink-0">
                 <i class="ph ph-tag text-lg text-zinc-600"></i><span class="flex-1 text-left">Gerenciar tags</span><i class="ph-bold ph-caret-right text-zinc-400"></i>
             </button>
             <button type="button" data-voltar onclick="closeAgFilter()" class="w-full py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition mt-2 shrink-0">
@@ -1735,7 +1701,8 @@
         <div id="reports-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
             <!-- V40.3.7-fix: header fundido com X colorido (Gemini fix #1) — removido X cinza antigo da esquerda -->
             <div class="flex items-center justify-between mb-6 shrink-0">
-                <h2 class="text-lg font-bold text-zinc-900">Produtividade</h2>
+                <!-- V40.49.0: aberta pelo menu grande, ganha o "Menu" (o voltar volta pra ele) -->
+                <div class="flex items-center gap-2 min-w-0"><button data-voltar="menu" data-hub-back onclick="hubBack()" aria-label="Voltar pro menu" title="Menu" class="hidden h-9 pl-2 pr-3 -ml-2 items-center gap-1.5 rounded-full text-zinc-700 text-sm font-bold hover:bg-zinc-100 transition active:scale-95"><i class="ph-bold ph-squares-four text-lg text-app-focus"></i> Menu</button><h2 class="text-lg font-bold text-zinc-900 truncate">Produtividade</h2></div>
                 <button data-voltar="fechar" onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
                     <i class="ph-bold ph-x text-lg"></i>
                 </button>
@@ -1754,7 +1721,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.48.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.49.0</div>
 
     </div>
 

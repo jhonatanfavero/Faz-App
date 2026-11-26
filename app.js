@@ -406,6 +406,7 @@ let selectedNewTagColor = '#ef4444'; // Vermelho padrão
 window.openTagsSheet = () => {
     clearFilters(); // V40.2.1: limpa filtros pra não confundir
     closeAllSheets();
+    hubBackHide('tags-sheet'); // V40.49.0: o "Menu" só aparece quando vem do menu grande (hubOpen)
     renderTagsList();
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('tags-sheet').classList.remove('translate-y-full');
@@ -503,6 +504,8 @@ window.debugAdvanceDay = function() {
     renderTimeline();
 }
 
+// V40.49.0: o ⓘ ("só atrasados") e o ✓ ("só concluídos") saíram da agenda (pedido dele em 26/11: o ✓ virou o "Ocultar /
+// Mostrar concluídos" do PC, o toggleAgHideDone). As duas funções ficam sem botão; o clearFilters segue desligando.
 window.toggleFilterDelayed = function() {
     showOnlyDelayed = !showOnlyDelayed;
     showOnlyCompleted = false; 
@@ -722,6 +725,7 @@ function runRealTimeEngine() {
     const hasToday = isToday || mDays.includes(getTodayStr());
     
     const hd = document.getElementById('header-date');
+    agTodayChip(hasToday); // V40.49.0: antes de medir a data (o "Hoje" ocupa lugar do lado dela)
     const putDate = (t) => {
         hd.innerHTML = (hasToday ? `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span> ` : `<i class="ph ph-calendar text-zinc-400 text-lg"></i> `) +
             `<span class="font-bold text-zinc-800">${t}</span>`;
@@ -743,6 +747,7 @@ function runRealTimeEngine() {
         const a = tlDateObj(mDays[0]), z = tlDateObj(mDays[mDays.length - 1]);
         putDate(`${a.getDate()}–${z.getDate()}`);
     }
+    renderAgWeek(); // V40.49.0: a tira da semana acompanha o dia aberto
 
     const nowLine = document.getElementById('now-line');
     const nowMini = document.querySelector('#blocks-container .tl-now-mini');
@@ -895,6 +900,8 @@ function updateTlCompactBtn() {
     if (!b) return;
     b.classList.toggle('tl-compact-on', tlCompact);
     b.setAttribute('aria-pressed', tlCompact ? 'true' : 'false');
+    b.setAttribute('aria-checked', tlCompact ? 'true' : 'false'); // V40.49.0: virou a chave do ⋯
+    renderAgMore();
     b.title = tlCompact ? 'Mostrar os vagos' : 'Ocultar os vagos';
 }
 window.toggleTlCompact = function() {
@@ -907,7 +914,8 @@ window.toggleTlCompact = function() {
 // V40.45.0 — FILTRO DA AGENDA NO CELULAR (o "Todas as tags" e o "Ocultar concluídos" do PC)
 // =====================================================
 // O botão TAGs da linha dos filtros abre "Filtrar a agenda": uma tag (ou "Sem tag", que vale também pra tag que não
-// existe mais, como no PC) e "Ocultar concluídos". Fica guardado neste aparelho (tb__filtro_tag e
+// existe mais, como no PC) e "Ocultar concluídos". V40.49.0: o TAGs virou um funil (só a tag) e o "Ocultar concluídos"
+// ganhou botão próprio na agenda, que vira "Mostrar concluídos" (igual ao PC). Fica guardado neste aparelho (tb__filtro_tag e
 // tb__ocultar_concluidos, fora do backup), como o "Ocultar vagos". Só esconde da tela, igual ao PC: o bloco escondido
 // vira um contorno tracejado no horário dele (o espaço livre, o conflito, o "↓" e o Planejado contam todos os blocos).
 // Na busca não vale (ela acha tudo); nos filtros de atrasados e concluídos, quem ele esconde sai da lista (o "Ocultar
@@ -939,28 +947,36 @@ function tlHiddenEl(b, mini) {
     el.style.height = h + 'px';
     el.dataset.hiddenId = b.id;
     el.setAttribute('role', 'button');
-    el.setAttribute('aria-label', `${formatClock(b.startMin)}–${formatClock(b.startMin + b.duration)}: escondido pelo filtro (toque pra mudar o filtro)`);
+    const done = agHideDone && b.completed; // V40.49.0: escondido por estar concluído: tocar mostra os concluídos
+    el.setAttribute('aria-label', `${formatClock(b.startMin)}–${formatClock(b.startMin + b.duration)}: ` + (done ? 'concluído, escondido (toque pra mostrar os concluídos)' : 'escondido pelo filtro (toque pra mudar o filtro)'));
     if (h >= 22) el.innerHTML = '<i class="ph ph-eye-slash"></i>';
-    el.onclick = (e) => { e.stopPropagation(); if (!pendingIntent) openAgFilter(); };
+    el.onclick = (e) => { e.stopPropagation(); if (pendingIntent) return; if (done) toggleAgHideDone(); else openAgFilter(); };
     return el;
 }
-// O botão TAGs mostra o filtro ligado: cheio na cor do app, com a bolinha e o nome da tag (e o olho riscado).
+// V40.49.0: o funil fica aceso com uma tag escolhida (com a bolinha da cor dela); o "Ocultar concluídos" vira
+// "Mostrar concluídos" (e fica aceso) quando os concluídos estão escondidos, igual ao PC.
+// V40.49.0 (Semana em tira): o filtro por tag e o "Ocultar concluídos" viraram linhas do ⋯; a linha da tag diz qual
+// está escolhida (com a bolinha da cor) e o ⋯ fica aceso enquanto algum filtro estiver ligado.
 function renderAgFilterBtn() {
-    const btn = document.getElementById('ag-filter-btn');
-    if (!btn) return;
+    renderAgDoneBtn();
+    renderAgMore();
+    const btn = document.getElementById('ag-filter-btn'), now = document.getElementById('ag-filter-now');
+    if (!btn || !now) return;
     agTagOk();
-    const tag = agTagFilter === '__none__' ? null : agTagFind(agTagFilter), on = !!agTagFilter || agHideDone;
-    const key = [agTagFilter, agHideDone ? 1 : 0, tag ? tag.name + '|' + tag.color : ''].join('|');
-    if (btn.dataset.agf === key) return;
-    btn.dataset.agf = key;
+    const tag = agTagFilter === '__none__' ? null : agTagFind(agTagFilter), on = !!agTagFilter;
     btn.classList.toggle('agf-on', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    const name = tag ? (tag.name || 'Sem nome') : agTagFilter === '__none__' ? 'Sem tag' : 'TAGs';
-    btn.innerHTML = (agHideDone ? '<i class="ph-bold ph-eye-slash text-sm text-app-focus"></i>' : '') +
-        (tag ? `<span class="agf-dot" style="background:${agSafeHex(tag.color)}"></span>` : agHideDone ? '' : '<i class="ph ph-tag text-sm text-app-focus"></i>') +
-        ` <span class="agf-txt">${escapeHtml(name)}</span>`;
-    const what = [tag ? 'só ' + name : agTagFilter === '__none__' ? 'só os sem tag' : '', agHideDone ? 'sem os concluídos' : ''].filter(Boolean).join(', ');
-    btn.setAttribute('aria-label', 'Filtrar a agenda' + (what ? ' (agora: ' + what + ')' : ''));
+    const name = tag ? (tag.name || 'Sem nome') : on ? 'Sem tag' : 'Todas';
+    now.innerHTML = (tag ? `<span class="agf-dot" style="background:${agSafeHex(tag.color)}"></span>` : '') + escapeHtml(name);
+    btn.setAttribute('aria-label', 'Filtrar por tag' + (on ? ' (agora: só ' + (tag ? name : 'os sem tag') + ')' : ' (agora: todas)'));
+}
+function renderAgDoneBtn() {
+    const btn = document.getElementById('ag-done-btn');
+    if (!btn) return;
+    const on = !!agHideDone;
+    btn.classList.toggle('agf-on', on);
+    btn.setAttribute('aria-checked', on ? 'true' : 'false');
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
 }
 function renderAgFilterList() {
     const box = document.getElementById('ag-filter-list');
@@ -976,8 +992,6 @@ function renderAgFilterList() {
             `<span class="flex-1 min-w-0 truncate">${escapeHtml(r.name)}</span></button>`;
     }).join('');
     box.querySelectorAll('[data-agf-tag]').forEach(b => { b.onclick = () => setAgTagFilter(b.dataset.agfTag); });
-    const sw = document.getElementById('ag-filter-done');
-    if (sw) sw.setAttribute('aria-checked', agHideDone ? 'true' : 'false');
 }
 window.openAgFilter = function() {
     agTagOk();
@@ -987,7 +1001,7 @@ window.openAgFilter = function() {
     if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' }); // muitas tags: a escolhida fica à vista
 };
 window.closeAgFilter = function() { hideModal('ag-filter-modal'); };
-// Escolher a tag fecha a janelinha (é o que se quer ver); o "Ocultar concluídos" liga e desliga com ela aberta.
+// Escolher a tag fecha a janelinha (é o que se quer ver). O "Ocultar concluídos" é o botão da agenda (V40.49.0).
 function setAgTagFilter(id) {
     agTagFilter = id === '__none__' || agTagFind(id) ? id : '';
     agFilterSave();
@@ -997,10 +1011,122 @@ function setAgTagFilter(id) {
 window.toggleAgHideDone = function() {
     agHideDone = !agHideDone;
     agFilterSave();
-    renderAgFilterList();
-    renderTimeline();
+    renderTimeline(); // redesenha os dois botões (renderAgFilterBtn)
 };
 window.agFilterManageTags = function() { closeAgFilter(); openTagsSheet(); };
+
+// =====================================================
+// V40.49.0 — SEMANA EM TIRA (escolha dele em 26/11) e o ⋯ da agenda
+// =====================================================
+// Embaixo da data, os 7 dias da semana do dia aberto (segunda a domingo, como a Semana do PC): tocar vai pro dia;
+// arrastar a tira pro lado troca a semana. A bolinha diz que o dia tem bloco. Com 2 ou 3 dias na tela, os dias que
+// aparecem ficam acesos. O "Hoje" do lado da data é um selo (já é hoje) ou um botão (volta pra hoje).
+function agWeekStart(d) { const s = new Date(d.getFullYear(), d.getMonth(), d.getDate()); s.setDate(s.getDate() - ((s.getDay() + 6) % 7)); return s; }
+function agDs(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function renderAgWeek() {
+    const box = document.getElementById('header-filters-row');
+    if (!box) return;
+    const ini = agWeekStart(activeDateObj), hoje = getTodayStr(), abertos = tlMultiDays();
+    const sel = abertos.length ? abertos : [getActiveDateStr()];
+    const comBloco = new Set((db || []).filter(b => b && b.date && b.type !== 'empty').map(b => b.date));
+    let html = '';
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(ini); d.setDate(ini.getDate() + i);
+        const ds = agDs(d), on = sel.includes(ds);
+        html += `<button type="button" class="agw-d${on ? ' on' : ''}${ds === hoje ? ' hj' : ''}" data-agw="${ds}" aria-pressed="${on}" aria-label="${d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}${ds === hoje ? ' (hoje)' : ''}">` +
+            `<span class="agw-l">${'DSTQQSS'.charAt(d.getDay())}</span><span class="agw-n">${d.getDate()}</span><span class="agw-b${comBloco.has(ds) ? ' tem' : ''}"></span></button>`;
+    }
+    if (box.dataset.agw === html) return;
+    box.dataset.agw = html;
+    box.innerHTML = html;
+}
+window.agGoDate = function(ds) {
+    if (!ds) return;
+    if (searchQuery) closeSearchBar();
+    if (tlMulti()) { setTlDays(tlDays, ds); return; } // com vários dias, o tocado passa a ser o primeiro
+    activeDateObj = tlDateObj(ds);
+    runRealTimeEngine();
+    renderTimeline();
+};
+function agShiftDays(n) { // anda n dias (a tira: 7; a agenda: 1), com o deslizar de leve na agenda
+    if (searchQuery) closeSearchBar();
+    activeDateObj.setDate(activeDateObj.getDate() + n);
+    runRealTimeEngine();
+    renderTimeline();
+    const c = document.getElementById('blocks-container');
+    if (c) { c.classList.remove('tl-slide-l', 'tl-slide-r'); void c.offsetWidth; c.classList.add(n > 0 ? 'tl-slide-l' : 'tl-slide-r'); }
+}
+function agTodayChip(isToday) {
+    const c = document.getElementById('ag-today-chip');
+    if (!c) return;
+    c.classList.toggle('is-today', !!isToday);
+    c.disabled = !!isToday;
+    c.innerHTML = isToday ? 'Hoje' : '<i class="ph-bold ph-arrow-u-up-left"></i> Hoje';
+    c.setAttribute('aria-label', isToday ? 'Hoje' : 'Voltar pra hoje');
+}
+(function () { // tocar num dia da tira; arrastar a tira pro lado: a semana anterior ou a próxima
+    const box = document.getElementById('header-filters-row');
+    if (!box) return;
+    let s = null, moved = false;
+    box.addEventListener('click', (e) => { const b = e.target.closest('[data-agw]'); if (b && !moved) agGoDate(b.dataset.agw); moved = false; });
+    box.addEventListener('touchstart', (e) => { const t = e.touches; s = t.length === 1 ? { x: t[0].clientX, y: t[0].clientY, t: Date.now() } : null; moved = false; }, { passive: true });
+    box.addEventListener('touchend', (e) => {
+        const a = s; s = null;
+        if (!a || e.changedTouches.length !== 1) return;
+        const dx = e.changedTouches[0].clientX - a.x, dy = e.changedTouches[0].clientY - a.y;
+        if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5 || Date.now() - a.t > 800) return;
+        moved = true; // o "clique" que vem depois do arrasto não abre o dia
+        setTimeout(() => { moved = false; }, 400);
+        agShiftDays(dx < 0 ? 7 : -7);
+    }, { passive: true });
+})();
+// Rolando a agenda pra baixo (com o dedo ou a rodinha, não quando o app rola sozinho até agora), o topo vira uma linha
+// só: a data e o Planejado (pedido dele em 26/11, "e rolando a em tira fica assim"). Volta no alto da agenda ou tocando.
+var agSlim = false;
+function agSlimSync(pct) {
+    const f = document.getElementById('ag-slim-fill'), p = document.getElementById('ag-slim-pct');
+    if (!f || !p) return;
+    if (pct == null) { const m = /\((\d+)%\)/.exec((document.getElementById('progress-text') || {}).textContent || ''); pct = m ? Number(m[1]) : 0; }
+    f.style.width = Math.max(0, Math.min(100, pct)) + '%';
+    p.textContent = pct + '%';
+}
+window.agSlimSet = function(on) {
+    on = !!on && !headerHidden; // o topo já recolhido (Esconder o topo) não muda
+    if (on === agSlim) return;
+    agSlim = on;
+    const h = document.querySelector('header');
+    if (h) h.classList.toggle('ag-slim', on);
+    if (on) agSlimSync();
+};
+(function () {
+    const sc = document.getElementById('timeline-scroll');
+    if (!sc) return;
+    let dedo = 0, last = 0;
+    const mexeu = () => { dedo = Date.now() + 900; }; // rolagem do dedo (e o embalo dela) ou da rodinha
+    sc.addEventListener('touchstart', mexeu, { passive: true });
+    sc.addEventListener('touchmove', mexeu, { passive: true });
+    sc.addEventListener('wheel', mexeu, { passive: true });
+    sc.addEventListener('scroll', () => {
+        const st = sc.scrollTop, d = st - last;
+        last = st;
+        if (st < 24) return agSlimSet(false);
+        if (Date.now() > dedo || isPhysicsBusy || blkDrag || subDrag) return;
+        if (d > 6 && st > 60) agSlimSet(true);
+    }, { passive: true });
+})();
+// O ⋯: abre as opções que eram os botões da 2ª linha. Aceso (com a bolinha) quando alguma está ligada.
+window.openAgMore = function() { renderAgMore(); showModal('ag-more-modal'); };
+window.closeAgMore = function() { hideModal('ag-more-modal'); };
+function renderAgMore() {
+    const on = !!agHideDone || !!tlCompact || !!agTagFilter || tlDays > 1;
+    const b = document.getElementById('ag-more-btn');
+    if (b) { b.classList.toggle('on', on); b.title = on ? 'Opções da agenda (tem coisa ligada)' : 'Concluídos, vagos, dias na tela, tag…'; }
+    document.querySelectorAll('#ag-days-seg [data-ag-days]').forEach(x => { const sel = Number(x.dataset.agDays) === tlDays; x.classList.toggle('on', sel); x.setAttribute('aria-pressed', sel ? 'true' : 'false'); });
+    const h = document.getElementById('ag-head-txt');
+    if (h) h.textContent = headerHidden ? 'Mostrar o topo' : 'Esconder o topo';
+    const hi = document.querySelector('#ag-head-btn .agm-ic');
+    if (hi) hi.className = 'ph-bold ' + (headerHidden ? 'ph-caret-down' : 'ph-caret-up') + ' agm-ic';
+}
 
 // Tocar 2 vezes numa faixa ou no Tempo Livre (sem tarefa na mão) abre o + já mirando ali: o que for criado entra direto lá (V40.25.1: eram 1 toque, só na faixa).
 let sheetSlot = null; // { date, start, dur }
@@ -1076,6 +1202,7 @@ function tlFixTop() {
     }, 50);
 }
 function updateTlDaysBtn() {
+    renderAgMore(); // V40.49.0: o 1 / 2 / 3 do ⋯ (o botão de antes saiu)
     const b = document.getElementById('tl-days-btn');
     if (!b) return;
     const on = tlDays > 1;
@@ -1233,12 +1360,15 @@ function tlRenderMulti() {
     const pct = Math.round((occupied / (TOTAL_MINS * n)) * 100) || 0;
     document.getElementById('progress-bar').style.width = `${pct}%`;
     document.getElementById('progress-text').textContent = `Planejado (${pct}%)` + agHiddenTxt(hidden); // V40.45.0
+    agSlimSync(pct); // V40.49.0
     tlDayhead(days);
     const hint = document.getElementById('floating-hint');
     if (hint) hint.textContent = pendingIntent && container.querySelector('.tl-push') ? 'Toque num espaço livre (ou num ↓) de um dos dias' : 'Toque num espaço livre de um dos dias'; // V40.44.0
     blkDragSetup(); // V40.31.0: segurar um bloco e arrastar pra outro dia
 }
 
+// V40.49.0: arrastar pro lado troca o dia com 1, 2 ou 3 dias na tela; não na busca nem nas listas de filtro.
+function agSwipeOk() { return !showOnlyDelayed && !showOnlyCompleted && !(searchQuery && searchQuery.trim()); }
 // Pinça e arrastar pro lado na agenda. Dois dedos: um nível por gesto (só vale se os DOIS dedos se mexeram). Um dedo
 // pro lado (bem mais pro lado do que pra cima/baixo, rapidinho): anda um dia, só com vários dias na tela.
 (function () {
@@ -1257,7 +1387,10 @@ function tlRenderMulti() {
             return;
         }
         pinch = null;
-        swipe = t.length === 1 && tlMulti() ? { x: t[0].clientX, y: t[0].clientY, lx: t[0].clientX, ly: t[0].clientY, t: Date.now() } : null; // com a tarefa na mão também (pra achar o dia)
+        // V40.49.0: com 1 dia também (pedido dele em 26/11; era só com 2 ou 3), menos na busca e nas listas de filtro, e
+        // não a partir da beirada da tela (lá é o voltar do Android). Com a tarefa na mão também (pra achar o dia).
+        const x0 = t.length === 1 ? t[0].clientX : 0, beira = x0 < 24 || x0 > window.innerWidth - 24;
+        swipe = t.length === 1 && !beira && agSwipeOk() ? { x: t[0].clientX, y: t[0].clientY, lx: t[0].clientX, ly: t[0].clientY, t: Date.now() } : null;
     }, { passive: true });
     sc.addEventListener('touchmove', (e) => {
         const t = e.touches || [];
@@ -1273,10 +1406,10 @@ function tlRenderMulti() {
     sc.addEventListener('touchend', (e) => {
         const s = swipe;
         if ((e.touches || []).length === 0) { pinch = null; swipe = null; }
-        if (!s || !tlMulti() || blkDrag || isPhysicsBusy) return; // V40.31.0: soltar um bloco arrastado não anda o dia
+        if (!s || !agSwipeOk() || blkDrag || isPhysicsBusy || subDrag || mbDragActive) return; // V40.31.0: soltar um bloco arrastado não anda o dia
         const dx = s.lx - s.x, dy = s.ly - s.y;
         if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.6 || Date.now() - s.t > 700) return;
-        if (dx < 0) debugAdvanceDay(); else debugPreviousDay();
+        agShiftDays(dx < 0 ? 1 : -1);
     }, { passive: true });
 })();
 function tlTakeSlot() { const sl = sheetSlot; sheetSlot = null; tlSlotLabel(); return sl; }
@@ -1450,6 +1583,7 @@ function renderTimeline() {
     
     const pct = Math.round((occupied / TOTAL_MINS) * 100) || 0;
     document.getElementById('progress-bar').style.width = `${pct}%`;
+    agSlimSync(pct); // V40.49.0: a linha do topo encolhido também mostra o Planejado
     document.getElementById('progress-text').textContent = `Planejado (${pct}%)` + agHiddenTxt(agHidden); // V40.45.0: "· 2 escondidos" (textContent: o jsdom não tem innerText)
 
     // V40.45.0: o bloco escondido pelo filtro vira só o contorno no horário dele
@@ -3892,6 +4026,8 @@ window.openPeriodSelectSheet = () => {
     pushNavState(); // V40.5.0-fix7
 }
 
+var cfgFromHub = false; // V40.49.0: a Config veio do menu grande? (o ← volta pra ele em vez de abrir o +)
+function cfgBackFn() { return cfgFromHub ? 'hubBack()' : 'openSheet()'; }
 window.openConfigSheet = () => {
     clearFilters(); // V40.2.1: limpa filtros pra não confundir
     sheet.classList.add('translate-y-full'); 
@@ -3903,13 +4039,11 @@ window.openConfigSheet = () => {
     document.getElementById('config-sync-view').classList.add('hidden'); // V40.7.0: nova sub-view Sincronizar
     document.getElementById('config-archive-view').classList.add('hidden'); // V40.9.0: nova sub-view Arquivados
     document.getElementById('config-avisos-view').classList.add('hidden'); // V40.42.0: nova sub-view Avisos
-    document.getElementById('config-quadros-view').classList.add('hidden'); // V40.47.0: Quadros
-    qdOpenId = null;
+    cfgFromHub = false; // V40.49.0: o hubOpen('config') liga depois (o voltar vai pro menu grande)
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
-    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+    document.getElementById('config-back-btn').setAttribute('onclick', cfgBackFn());
     avisosMenuStatus(); // V40.42.0
-    qdMenuStatus(); // V40.47.0
 
     document.getElementById('config-sheet').classList.remove('translate-y-full');
     pushNavState(); // V40.5.0-fix7
@@ -3929,7 +4063,7 @@ window.closeConfigHours = () => {
     document.getElementById('config-hours-view').classList.add('hidden');
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
-    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+    document.getElementById('config-back-btn').setAttribute('onclick', cfgBackFn());
 }
 
 window.saveConfigHours = () => {
@@ -3967,7 +4101,7 @@ window.closeConfigPeriods = () => {
     document.getElementById('config-periods-view').classList.add('hidden');
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
-    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+    document.getElementById('config-back-btn').setAttribute('onclick', cfgBackFn());
 }
 
 // ============================================================================
@@ -4085,7 +4219,7 @@ window.closeConfigBackup = function() {
     document.getElementById('config-backup-view').classList.add('hidden');
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
-    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+    document.getElementById('config-back-btn').setAttribute('onclick', cfgBackFn());
 };
 
 // ----- EXPORTAR (salvar backup) -----
@@ -4096,7 +4230,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.48.0',
+            version: 'v40.49.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -6790,6 +6924,7 @@ window.applyThemeColor = function() {
 window.openReportsSheet = function() {
     clearFilters(); // V40.2.1: limpa filtros pra não confundir
     closeAllSheets();
+    hubBackHide('reports-sheet'); // V40.49.0: o "Menu" só aparece quando vem do menu grande (hubOpen)
     renderReports('today');
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('reports-sheet').classList.remove('translate-y-full');
@@ -6958,6 +7093,32 @@ window.addEventListener('beforeinstallprompt', (e) => {
   setTimeout(() => installBanner.remove(), 10000);
 });
 
+// V40.49.0 — Android, app instalado (foto dele de 26/11): o Chrome pinta a barra de navegação (os 3 botões do Android)
+// por cima do pé do app sem avisar: o env(safe-area-inset-bottom) vem 0 e o "60 itens" e o + ficavam pela metade atrás
+// dela. Quando a tela do app vai até o fim da tela do aparelho (só a barra de cima ficou de fora) e o env() é 0, o pé
+// sobe 48 px (--faz-nav-gap, que entra no --faz-safe-bottom do style.css). Fora disso (iPhone, navegador, PC), 0.
+function fazNavGap() {
+    let gap = 0;
+    try {
+        const android = /Android/i.test(navigator.userAgent || '');
+        const instalado = !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+        if (android && instalado && document.body) {
+            const probe = document.createElement('div');
+            probe.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:env(safe-area-inset-bottom, 0px);visibility:hidden;pointer-events:none';
+            document.body.appendChild(probe);
+            const env = probe.getBoundingClientRect().height;
+            probe.remove();
+            const fora = (window.screen && screen.height ? screen.height : 0) - window.innerHeight;
+            if (env < 1 && fora >= 0 && fora < 56) gap = 48;
+        }
+    } catch (e) {}
+    document.documentElement.style.setProperty('--faz-nav-gap', gap + 'px');
+    return gap;
+}
+window.fazNavGap = fazNavGap;
+fazNavGap();
+window.addEventListener('resize', () => { clearTimeout(fazNavGap._t); fazNavGap._t = setTimeout(fazNavGap, 150); });
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
@@ -7042,6 +7203,7 @@ function applyHeaderState() {
         // V40.3.6: idem
         if (btn) btn.innerHTML = '<i class="ph ph-caret-up text-base text-white"></i>';
     }
+    renderAgMore(); // V40.49.0: "Esconder o topo" / "Mostrar o topo" no ⋯
 
     // Recalcula paddingTop da timeline AGORA que a altura real do header mudou.
     // setTimeout 50ms dá tempo do browser aplicar o display:none e recalcular offsetHeight.
@@ -7053,6 +7215,7 @@ function applyHeaderState() {
 }
 
 window.toggleHeader = function() {
+    agSlimSet(false); // V40.49.0
     headerHidden = !headerHidden;
     localStorage.setItem('tb_header_collapsed', headerHidden ? 'true' : 'false');
     applyHeaderState();
@@ -7296,7 +7459,7 @@ window.closeConfigAppearance = function() {
     document.getElementById('config-appearance-view').classList.add('hidden');
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
-    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+    document.getElementById('config-back-btn').setAttribute('onclick', cfgBackFn());
 }
 
 window.selectThemeColor = function(btn) {
@@ -7680,7 +7843,7 @@ window.closeConfigArchive = function() {
     document.getElementById('config-archive-view').classList.add('hidden');
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
-    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+    document.getElementById('config-back-btn').setAttribute('onclick', cfgBackFn());
 };
 
 // ---------- V40.42.0: AVISOS DOS COMPROMISSOS (a tela; a lógica fica no avisos.js, igual no PC) ----------
@@ -7759,7 +7922,7 @@ window.closeConfigAvisos = function() {
     document.getElementById('config-avisos-view').classList.add('hidden');
     document.getElementById('config-main-menu').classList.remove('hidden');
     document.getElementById('config-title').innerText = 'Configurações';
-    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
+    document.getElementById('config-back-btn').setAttribute('onclick', cfgBackFn());
     avisosMenuStatus();
 };
 // Ligar / Desligar / Entrar na conta. Ligar chama o FazAvisos.ligar() direto do toque, sem esperar nada antes.
@@ -8611,72 +8774,42 @@ window.openColumnBoard = function() {
     const qid = col && (fazSharedColId(col.id) ? (col.shared && col.shared.quadro) : col.quadroId);
     hideModal('column-menu-modal');
     if (!qid) return;
-    closeAllSheets();
-    openConfigSheet();
-    openConfigQuadros(qid);
+    openBoardModal(qid); // V40.49.0: a janelinha do quadro, ali mesmo (era a Config → Quadros)
 };
 
-// ---- Config → Quadros ----
-let qdOpenId = null; // quadro aberto (detalhe) ou null (a lista de quadros)
+// ---- V40.49.0: a janelinha do quadro (o botão de compartilhar ao lado do nome, nas abas; até a V40.48.0 era a Config → Quadros) ----
+let qdOpenId = null; // o quadro da janelinha aberta
 let _qdNameMode = null; // 'create' | 'rename'
-window.openConfigQuadros = function(id) {
-    document.getElementById('config-main-menu').classList.add('hidden');
-    document.getElementById('config-quadros-view').classList.remove('hidden');
-    qdOpenId = id || null;
-    qdHeader();
+window.openBoardModal = function(id) {
+    if (!id) return;
+    if (qdOpenId !== id) { const i = document.getElementById('qd-email'); if (i) i.value = ''; qdMsg('', true); }
+    qdOpenId = id;
+    showModal('board-modal');
     fazQuadrosRender();
     const a = qdApi();
-    if (a && qdState().logado) a.atualizar().then(fazQuadrosRender);
+    if (a && qdState().logado) a.atualizar().then(fazQuadrosRender); // gente nova que outro aparelho pôs
 };
-window.closeConfigQuadros = function() {
-    qdOpenId = null;
-    document.getElementById('config-quadros-view').classList.add('hidden');
-    document.getElementById('config-main-menu').classList.remove('hidden');
-    document.getElementById('config-title').innerText = 'Configurações';
-    document.getElementById('config-back-btn').setAttribute('onclick', 'openSheet()');
-    qdMenuStatus();
-};
-window.qdBack = function() { qdOpenId = null; qdHeader(); fazQuadrosRender(); };
-function qdHeader() {
-    document.getElementById('config-title').innerText = 'Quadros';
-    document.getElementById('config-back-btn').setAttribute('onclick', qdOpenId ? 'qdBack()' : 'closeConfigQuadros()');
+window.closeBoardModal = function() { qdOpenId = null; hideModal('board-modal'); };
+function qdBoardOpen() { const m = document.getElementById('board-modal'); return !!m && !m.classList.contains('hidden'); }
+// A janelinha do nome abre por cima da do quadro: ao fechar a do nome, o fundo escuro volta pra do quadro.
+function qdBoardOverlay() {
+    if (!qdBoardOpen()) return;
+    const ov = document.getElementById('overlay');
+    ov.classList.remove('opacity-0', 'pointer-events-none');
+    ov.style.zIndex = '55';
 }
-window.qdOpen = function(id) { qdOpenId = id; qdHeader(); fazQuadrosRender(); const v = document.getElementById('config-quadros-view'); if (v) v.scrollTop = 0; };
-window.qdGoLogin = function() { closeConfigQuadros(); if (typeof openConfigSync === 'function') openConfigSync(); };
-function qdMenuStatus() {
-    const el = document.getElementById('qd-menu-status');
-    if (!el) return;
-    const st = qdState();
-    el.textContent = st.logado && st.quadros.length ? (st.quadros.length === 1 ? '1 quadro: ' + st.quadros[0].nome : st.quadros.length + ' quadros') : 'Listas compartilhadas com a casa ou a equipe';
-}
-// Desenha a tela (chamada também pelo sync.js quando chega coisa nova). Os campos de digitar não são redesenhados.
+// Desenha a janelinha (chamada também pelo sync.js quando chega coisa nova) e as abas. O campo do e-mail não é redesenhado.
 window.fazQuadrosRender = function() {
-    qdMenuStatus();
     blBoardsChanged(); // V40.48.0: as abas dos quadros (e as listas, se o quadro aberto mudou)
-    const view = document.getElementById('config-quadros-view');
-    if (!view || view.classList.contains('hidden')) return;
+    if (!qdBoardOpen()) return;
     const st = qdState(), $q = (id) => document.getElementById(id);
-    $q('qd-need-login').classList.toggle('hidden', st.logado);
-    let q = qdOpenId ? st.quadros.find(x => x.id === qdOpenId) : null;
-    if (qdOpenId && !q && st.carregado) { qdOpenId = null; qdHeader(); } // apagado ou você saiu
-    $q('qd-home').classList.toggle('hidden', !st.logado || !!q);
-    $q('qd-detail').classList.toggle('hidden', !st.logado || !q);
-    if (!st.logado) return;
-    if (!q) {
-        $q('qd-list').innerHTML = st.quadros.length ? st.quadros.map(x => `
-            <button type="button" class="qd-card" onclick="qdOpen('${x.id}')">
-                <span class="qd-card-ico"><i class="ph-fill ph-users-three"></i></span>
-                <span class="flex-1 min-w-0"><span class="block font-bold text-sm text-zinc-800 truncate">${escapeHtml(x.nome)}</span>
-                <span class="block text-[11px] text-zinc-500 font-medium truncate">${qdPeople(x.membros.length)} · ${qdListsN(x.listas.length)}${x.souDono ? ' · você criou' : ''}</span></span>
-                <i class="ph ph-caret-right text-zinc-400 shrink-0"></i>
-            </button>`).join('') : `<p class="text-[13px] text-zinc-500 text-center py-6">${st.carregado ? 'Nenhum quadro ainda.' : 'Carregando…'}</p>`;
-        $q('qd-home-note').textContent = st.off ? 'Os quadros ainda não estão disponíveis na nuvem.' : 'Pra entrar num quadro, peça pra quem criou pôr o seu e-mail.';
-        return;
-    }
+    const q = qdOpenId ? st.quadros.find(x => x.id === qdOpenId) : null;
+    if (!q) { if (st.carregado || !st.logado) closeBoardModal(); return; } // apagado, você saiu ou te tiraram
+    const dono = q.membros.find(m => m.papel === 'dono'), junto = q.membros.length > 1;
+    $q('qd-d-ico').innerHTML = `<i class="${junto ? 'ph-fill ph-users-three' : 'ph-bold ph-kanban'}"></i>`;
     $q('qd-d-name').textContent = q.nome;
     $q('qd-d-rename').classList.toggle('hidden', !q.souDono);
-    const dono = q.membros.find(m => m.papel === 'dono');
-    $q('qd-d-sub').textContent = q.souDono ? 'Você criou este quadro: só você põe e tira pessoas.' : `Criado por ${dono ? dono.email : 'outra pessoa'}.`;
+    $q('qd-d-sub').textContent = `${qdPeople(q.membros.length)} · ${qdListsN(q.listas.length)} · ` + (q.souDono ? (junto ? 'você criou' : 'só seu (ninguém mais vê)') : `criado por ${dono ? dono.email : 'outra pessoa'}`);
     $q('qd-d-members').innerHTML = q.membros.map(m => `
         <div class="qd-person">
             <span class="qd-avatar" aria-hidden="true">${escapeHtml((m.email || '?').charAt(0).toUpperCase())}</span>
@@ -8685,11 +8818,9 @@ window.fazQuadrosRender = function() {
             ${q.souDono && !m.eu ? `<button type="button" onclick="qdRemove('${m.membro}')" class="qd-x" aria-label="Tirar ${escapeHtml(m.email)} do quadro" title="Tirar do quadro"><i class="ph ph-x"></i></button>` : ''}
         </div>`).join('');
     $q('qd-d-add').classList.toggle('hidden', !q.souDono);
-    $q('qd-d-lists').innerHTML = q.listas.length ? q.listas.map(l => `
-        <div class="qd-list-row"><i class="ph ph-list-dashes text-app-focus text-base shrink-0"></i>
-            <span class="flex-1 min-w-0 truncate font-bold text-[13px] text-zinc-800">${escapeHtml(l.nome)}</span>
-            <span class="text-[11px] text-zinc-500 shrink-0 max-w-[45%] truncate">${l.minha ? 'sua' : 'de ' + escapeHtml(l.de || 'outra pessoa')}</span></div>`).join('')
-        : `<p class="text-[12px] text-zinc-500 leading-snug">Nenhuma lista ainda. Pra pôr uma lista sua aqui: na Lista, menu ⋮ → Compartilhar com um quadro.</p>`;
+    const note = $q('qd-d-note');
+    note.textContent = q.souDono ? '' : 'Só quem criou o quadro põe e tira pessoas.';
+    note.classList.toggle('hidden', q.souDono);
     $q('qd-d-leave').classList.toggle('hidden', q.souDono);
     $q('qd-d-delete').classList.toggle('hidden', !q.souDono);
 };
@@ -8723,14 +8854,13 @@ window.qdRemove = function(membro) {
 window.qdLeave = function() {
     const a = qdApi(), q = qdFind(qdOpenId);
     if (!a || !q || !confirm(`Sair do quadro "${q.nome}"?\n\nAs listas dos outros saem daqui. As suas que estavam no quadro voltam a ser só suas.`)) return;
-    a.sair(q.id).then(r => { showToast(r.msg); if (r.ok) qdOpenId = null; qdHeader(); fazQuadrosRender(); });
+    a.sair(q.id).then(r => { showToast(r.msg); if (r.ok) closeBoardModal(); fazQuadrosRender(); });
 };
 window.qdDelete = function() {
     const a = qdApi(), q = qdFind(qdOpenId);
     if (!a || !q || !confirm(`Apagar o quadro "${q.nome}"?\n\nTodo mundo sai dele e cada lista volta a ser só de quem é dono. Nenhuma tarefa é apagada.`)) return;
-    a.apagar(q.id).then(r => { showToast(r.msg); if (r.ok) qdOpenId = null; qdHeader(); fazQuadrosRender(); });
+    a.apagar(q.id).then(r => { showToast(r.msg); if (r.ok) closeBoardModal(); fazQuadrosRender(); });
 };
-window.qdNew = function() { openQuadroName('create'); };
 window.qdRename = function() { openQuadroName('rename'); };
 function openQuadroName(mode) {
     if (!qdState().logado) return showToast('Entre na sua conta (Config → Sincronizar com a nuvem) pra criar quadros.');
@@ -8743,7 +8873,7 @@ function openQuadroName(mode) {
     showModal('quadro-name-modal');
     setTimeout(() => { try { input.focus({ preventScroll: true }); } catch (e) {} }, 100);
 }
-window.cancelQuadroName = function() { _qdNameMode = null; _shareColAfterNew = null; _boardAfterNew = false; hideModal('quadro-name-modal'); };
+window.cancelQuadroName = function() { _qdNameMode = null; _shareColAfterNew = null; _boardAfterNew = false; hideModal('quadro-name-modal'); qdBoardOverlay(); };
 window.confirmQuadroName = function() {
     const a = qdApi(), input = document.getElementById('quadro-name-input'), btn = document.getElementById('quadro-name-save');
     if (!a || !_qdNameMode) return;
@@ -8757,14 +8887,14 @@ window.confirmQuadroName = function() {
         if (!r.ok) return showToast(r.msg);
         _qdNameMode = null;
         hideModal('quadro-name-modal');
+        qdBoardOverlay(); // V40.49.0: renomeou pela janelinha do quadro: ela continua aberta, com o nome novo
+        if (mode === 'rename') a.atualizar().then(fazQuadrosRender); // com a janelinha do nome aberta a rodada esperou
         const fromTabs = _boardAfterNew; // V40.48.0: veio do "+ Quadro" das abas (o quadro novo, aberto, já diz que deu certo)
         if (!fromTabs) showToast(r.msg);
         _boardAfterNew = false;
         if (mode === 'create' && r.id) {
-            const view = document.getElementById('config-quadros-view');
             const go = () => {
                 if (fromTabs) blSetBoard(r.id); // abre o quadro novo (vazio: "Nova lista" ou "Trazer uma lista")
-                else if (view && !view.classList.contains('hidden')) qdOpen(r.id);
                 else if (col) { _shareColId = col; _shareMode = 'mover'; renderShareList(); showModal('share-list-modal'); } // veio do Mudar de quadro: volta pra escolher
             };
             // V40.48.0: com a janelinha (e o campo com foco) aberta, a releitura dos quadros que o criar pede fica pra depois;
@@ -8832,7 +8962,8 @@ function renderBoardTabs(st) {
     const cur = blCur(st.Q), Q = st.Q || [];
     const tab = (id, nome, ico, sub) => {
         const on = id === cur;
-        const opt = on && id ? `<button type="button" class="qb-opt" onclick="blBoardOptions('${id}')" aria-label="Opções do quadro ${escapeHtml(nome)}" title="Pessoas, nome e apagar"><i class="ph-bold ph-dots-three"></i></button>` : '';
+        // V40.49.0: o botão de compartilhar (era ⋯): abre a janelinha do quadro (pessoas, nome, sair/apagar)
+        const opt = on && id ? `<button type="button" class="qb-opt" onclick="blBoardOptions('${id}')" aria-label="Compartilhar o quadro ${escapeHtml(nome)} (pessoas, nome e apagar)" title="Compartilhar: pessoas, nome e apagar"><i class="ph-bold ph-share-network"></i></button>` : '';
         return `<span class="qb-tab-wrap${on ? ' on' : ''}" data-board="${id}"><button type="button" role="tab" aria-selected="${on}" class="qb-tab" onclick="blSetBoard('${id}')" title="${escapeHtml(sub)}"><i class="ph-bold ${ico}"></i><span class="qb-name">${escapeHtml(nome)}</span></button>${opt}</span>`;
     };
     let html = tab('', 'Pessoal', 'ph-user', 'Suas listas sem quadro');
@@ -8892,12 +9023,7 @@ function blBoardsChanged() {
     if (sheet && !sheet.classList.contains('translate-y-full') && activeListTab === 'backlog') renderBacklog();
     else renderBoardTabs(st);
 }
-window.blBoardOptions = function(id) { // pessoas, nome, apagar/sair: a tela do quadro na Config (a mesma da V40.47.0)
-    if (!id) return;
-    closeAllSheets();
-    openConfigSheet();
-    openConfigQuadros(id);
-};
+window.blBoardOptions = function(id) { openBoardModal(id); }; // V40.49.0: pessoas, nome, sair/apagar, ali mesmo
 let _boardAfterNew = false;
 window.blNewBoard = function() {
     if (!qdState().logado) return showToast('Entre na sua conta (Config → Sincronizar com a nuvem) pra criar quadros.');
@@ -8962,6 +9088,21 @@ function hideHub() {
     document.getElementById('hub-title').classList.add('hidden');
 }
 window.hubGo = function(tab) { hideHub(); switchListTab(tab); };
+// V40.49.0: Relatórios, Tags e Config (telas cheias à parte) também saem do menu; o voltar delas volta pra ele.
+window.hubOpen = function(kind) {
+    if (kind === 'config') {
+        openConfigSheet(); // abre por cima do menu (ele continua aberto embaixo)
+        cfgFromHub = true;
+        document.getElementById('config-back-btn').setAttribute('onclick', cfgBackFn());
+    } else if (kind === 'tags') openTagsSheet();
+    else if (kind === 'reports') openReportsSheet();
+    else return;
+    hubVia = true;
+    const sh = document.getElementById(kind + '-sheet');
+    if (sh) sh.querySelectorAll('[data-hub-back]').forEach(b => { b.classList.remove('hidden'); b.classList.add('flex'); });
+};
+window.hubBack = function() { closeAllSheets(); openHub(); };
+function hubBackHide(sheetId) { document.querySelectorAll(`#${sheetId} [data-hub-back]`).forEach(b => { b.classList.add('hidden'); b.classList.remove('flex'); }); }
 function renderHub() {
     const box = document.getElementById('hub-grid');
     if (!box) return;
@@ -8969,16 +9110,22 @@ function renderHub() {
     const mes = getLocalMonthStr(), doMes = financialDb.filter(i => isItemInMonth(i, mes));
     const aPagar = doMes.filter(i => !isPaidInMonth(i, mes)).reduce((a, i) => a + getAmountInMonth(i, mes), 0);
     const Q = blState().Q || [];
+    // V40.49.0: 9 botões, 3 por linha (com textos curtos); os 3 últimos abrem as telas cheias pelo hubOpen
     const tiles = [
         ['backlog', 'ph-kanban', 'Quadros', n(backlogDb.length, 'tarefa', 'tarefas') + (Q.length ? ' · ' + n(Q.length + 1, 'quadro', 'quadros') : '')],
         ['routines', 'ph-arrows-clockwise', 'Rotinas', n(routinesDb.length, 'rotina', 'rotinas')],
         ['notes', 'ph-note', 'Notas', n(notesDb.length, 'nota', 'notas')],
-        ['financial', 'ph-currency-circle-dollar', 'Finanças', !doMes.length ? 'Nada neste mês' : aPagar > 0 ? formatBRL(aPagar) + ' a pagar' : 'Tudo pago neste mês'],
+        ['financial', 'ph-currency-circle-dollar', 'Finanças', !doMes.length ? 'Nada neste mês' : aPagar > 0 ? formatBRL(aPagar) + ' a pagar' : 'Tudo pago'],
         ['goals', 'ph-target', 'Metas', n(goalsDb.length, 'meta', 'metas')],
         ['assistant', 'ph-sparkle', 'Assistente', 'Pergunte do seu dia'],
+        ['@reports', 'ph-chart-bar', 'Relatórios', 'Hoje, 7 e 30 dias'],
+        ['@tags', 'ph-tag', 'Tags', n(tagsDb.length, 'tag', 'tags')],
+        ['@config', 'ph-gear', 'Config', 'Cor, horários, conta'],
     ];
-    box.innerHTML = tiles.map(([tab, ico, nome, sub]) =>
-        `<button type="button" class="hub-tile" data-hub="${tab}" onclick="hubGo('${tab}')"><span class="hub-ico bg-app-focus-soft text-app-focus"><i class="ph-bold ${ico}"></i></span><span class="hub-name">${nome}</span><span class="hub-sub">${escapeHtml(sub)}</span></button>`).join('');
+    box.innerHTML = tiles.map(([tab, ico, nome, sub]) => {
+        const go = tab.charAt(0) === '@' ? `hubOpen('${tab.slice(1)}')` : `hubGo('${tab}')`;
+        return `<button type="button" class="hub-tile" data-hub="${tab.replace('@', '')}" onclick="${go}"><span class="hub-ico bg-app-focus-soft text-app-focus"><i class="ph-bold ${ico}"></i></span><span class="hub-name">${nome}</span><span class="hub-sub">${escapeHtml(sub)}</span></button>`;
+    }).join('');
 }
 
 // Helpers de modal (centraliza show/hide com overlay)

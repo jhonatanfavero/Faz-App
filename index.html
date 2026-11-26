@@ -62,9 +62,10 @@
                      tocar vai pro dia, arrastar a tira troca a semana; arrastar a agenda pro lado troca o dia. Sem as setas. -->
                 <div class="flex justify-between items-center gap-2">
                     <div class="min-w-0 flex-1 flex items-center gap-2">
-                        <p class="text-zinc-700 text-[15px] font-semibold flex items-center gap-1.5 mt-0.5 truncate min-w-0" id="header-date">
+                        <!-- V40.50.0: tocar na data abre o calendário do mês (pedido dele em 26/11); vale também no topo encolhido -->
+                        <button type="button" id="header-date" onclick="openAgCal()" aria-haspopup="dialog" title="Escolher o dia no calendário" class="hd-date text-zinc-700 text-[15px] font-semibold flex items-center gap-1.5 truncate min-w-0 text-left">
                             Carregando...
-                        </p>
+                        </button>
                         <button id="ag-today-chip" type="button" onclick="goToToday()" class="ag-today shrink-0" aria-label="Voltar pra hoje">Hoje</button>
                     </div>
                     <!-- V40.49.0: rolando a agenda pra baixo, o topo vira esta linha só (a data e o Planejado); tocar abre de novo -->
@@ -1554,6 +1555,23 @@
             </div>
         </div>
 
+        <!-- V40.50.0: CALENDÁRIO DA AGENDA: tocar na data do topo abre o mês do dia aberto (segunda a domingo, como a tira).
+             O dia aberto (ou os 2–3 da tela) cheio, hoje com contorno, a bolinha nos dias com bloco; os dias dos meses
+             vizinhos apagados (dá pra tocar). ‹ › ou arrastar pro lado troca o mês; tocar num dia vai pra ele e fecha. -->
+        <div id="ag-cal-modal" role="dialog" aria-modal="true" aria-labelledby="ag-cal-title" class="absolute left-3 right-3 max-w-[400px] bg-white rounded-2xl px-3 pt-2 pb-2 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100">
+            <div class="flex items-center gap-0.5 pl-2">
+                <h3 id="ag-cal-title" class="flex-1 min-w-0 text-[16px] font-extrabold text-zinc-900 truncate">Mês</h3>
+                <button type="button" onclick="agCalMonth(-1)" class="agc-nav" aria-label="Mês anterior"><i class="ph-bold ph-caret-left"></i></button>
+                <button type="button" onclick="agCalMonth(1)" class="agc-nav" aria-label="Mês seguinte"><i class="ph-bold ph-caret-right"></i></button>
+            </div>
+            <div class="agc-wk" aria-hidden="true"><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span><span>D</span></div>
+            <div id="ag-cal-grid" class="agc-grid" role="group" aria-label="Dias do mês (arraste pro lado pra trocar o mês)"></div>
+            <div class="flex items-center justify-between mt-1.5 pt-1.5 border-t border-zinc-100">
+                <button type="button" id="ag-cal-today" onclick="agCalPick(getTodayStr())" class="agc-act agc-hoje"><i class="ph-bold ph-arrow-u-up-left"></i>Hoje</button>
+                <button type="button" data-voltar onclick="closeAgCal()" class="agc-act">Fechar</button>
+            </div>
+        </div>
+
         <!-- V40.49.0: O ⋯ DA AGENDA (Semana em tira): o que ficava nos botões da 2ª linha. Os ids continuam (ag-done-btn,
              tl-compact-btn, ag-filter-btn): os renderAgDoneBtn, updateTlCompactBtn e renderAgFilterBtn acendem cada um. -->
         <div id="ag-more-modal" role="dialog" aria-modal="true" aria-label="Opções da agenda" class="absolute right-3 w-[264px] max-w-[calc(100%-24px)] bg-white rounded-2xl p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100" style="top: calc(max(env(safe-area-inset-top), 20px) + 46px)">
@@ -1721,7 +1739,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.49.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.50.0</div>
 
     </div>
 

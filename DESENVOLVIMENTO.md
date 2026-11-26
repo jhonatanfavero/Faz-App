@@ -195,6 +195,13 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     (`header.ag-slim`, `agSlimSet`); o app rolando sozinho até agora não encolhe. Janelinha que precisa da sincronização
     aberta (a do quadro) leva `data-sync-livre` (o `sync.js` não espera ela fechar). No Android instalado, o
     `--faz-safe-bottom` soma o `--faz-nav-gap` (`fazNavGap`): a barra de navegação que o Chrome pinta por cima sem avisar.
+27. **Calendário: segunda a domingo em todo lugar (V40.50.0).** A data do topo da agenda do celular é um botão
+    (`#header-date`, com o ⌄) que abre o `#ag-cal-modal` (`openAgCal`/`renderAgCal`; escolher passa pelo `agGoDate`, que
+    já cuida dos 2–3 dias na tela). Ele abre logo abaixo da data (`agCalPlace` mede; sem medida vale o `top` do CSS) e
+    sempre com 6 linhas. No PC, o nome da semana/dia (`#ag-label`, dentro do `#ag-cal-btn`) abre o mesmo `#cal-pop` dos
+    campos de data, no modo Agenda (`CAL.ag`; `agPickDay`). Os dois começam na segunda, como a tira e a Semana: não voltar
+    pro domingo só num deles. A data do topo não pode mudar a altura da linha (o ícone em `leading-none` e o padding de
+    5 + 3 px cabem nos 36 px dos botões do lado, em hoje e nos outros dias).
 
 ## Publicar uma versão
 

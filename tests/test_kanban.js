@@ -396,10 +396,10 @@ server.storedSession = { access_token: 'tok', user: { id: UID, email: 'pessoa@te
     ok(lbl('f-sched-date') === 'Seg, 16/11/2026 (hoje)' && sel('f-sched-time', 'time-h').options.length === 24 && sel('f-sched-time', 'time-m').options.length >= 12 && sel('f-sched-time', 'time-h').value !== '', 'o dia aparece como "Seg, 16/11/2026 (hoje)" e a hora em dois seletores (00 a 23; de 5 em 5 min)');
     click(d.querySelector('[data-date-for="f-sched-date"]'));
     const pop = $('cal-pop'), grids = () => pop.querySelectorAll('.grid');
-    ok(visible('cal-pop') && $('cal-title').textContent === 'Novembro de 2026' && [...grids()[0].children].map((x) => x.textContent).join('') === 'DSTQQSS' && grids()[1].querySelectorAll('[data-cal-day]').length === 30 && /Hoje/.test(pop.textContent) && /Fechar/.test(pop.textContent), 'calendário próprio em português: "Novembro de 2026", D S T Q Q S S, Hoje e Fechar');
-    ok(pop.querySelector('[aria-current="date"]').textContent === '16' && grids()[1].querySelectorAll('span').length === 0, 'dia escolhido destacado; novembro de 2026 começa num domingo');
+    ok(visible('cal-pop') && $('cal-title').textContent === 'Novembro de 2026' && [...grids()[0].children].map((x) => x.textContent).join('') === 'STQQSSD' && grids()[1].querySelectorAll('[data-cal-day]').length === 30 && /Hoje/.test(pop.textContent) && /Fechar/.test(pop.textContent), 'calendário próprio em português: "Novembro de 2026", S T Q Q S S D (V40.50.0: começa na segunda, como a Semana), Hoje e Fechar');
+    ok(pop.querySelector('[aria-current="date"]').textContent === '16' && grids()[1].querySelectorAll('span').length === 6, 'dia escolhido destacado; novembro de 2026 começa num domingo (6 vazios antes: a semana começa na segunda)');
     click(pop.querySelector('[data-cal-nav="1"]'));
-    ok($('cal-title').textContent === 'Dezembro de 2026' && grids()[1].querySelectorAll('span').length === 2 && grids()[1].querySelectorAll('[data-cal-day]').length === 31, 'seta vai pro mês seguinte (dezembro: 31 dias, começa numa terça)');
+    ok($('cal-title').textContent === 'Dezembro de 2026' && grids()[1].querySelectorAll('span').length === 1 && grids()[1].querySelectorAll('[data-cal-day]').length === 31, 'seta vai pro mês seguinte (dezembro: 31 dias, começa numa terça: 1 vazio, a segunda)');
     click(pop.querySelector('[data-cal-nav="1"]'));
     ok($('cal-title').textContent === 'Janeiro de 2027', 'e vira o ano: Janeiro de 2027');
     click(pop.querySelector('[data-cal-nav="-1"]')); click(pop.querySelector('[data-cal-nav="-1"]'));

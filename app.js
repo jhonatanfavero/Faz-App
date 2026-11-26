@@ -726,9 +726,9 @@ function runRealTimeEngine() {
     
     const hd = document.getElementById('header-date');
     agTodayChip(hasToday); // V40.49.0: antes de medir a data (o "Hoje" ocupa lugar do lado dela)
-    const putDate = (t) => {
-        hd.innerHTML = (hasToday ? `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span> ` : `<i class="ph ph-calendar text-zinc-400 text-lg"></i> `) +
-            `<span class="font-bold text-zinc-800">${t}</span>`;
+    const putDate = (t) => { // V40.50.0: o ⌄ do fim diz que tocar abre o calendário (entra na conta do encurtar)
+        hd.innerHTML = (hasToday ? `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span> ` : `<i class="ph ph-calendar text-zinc-400 text-lg leading-none"></i> `) +
+            `<span class="font-bold text-zinc-800">${t}</span><i class="ph-bold ph-caret-down hd-caret" aria-hidden="true"></i>`;
     };
     putDate(dateStr);
     // V40.32.2: em tela estreita (iPhone 13/mini, 375–390 px, com os 6 botões do lado) o nome do dia ficava cortado
@@ -1127,6 +1127,74 @@ function renderAgMore() {
     const hi = document.querySelector('#ag-head-btn .agm-ic');
     if (hi) hi.className = 'ph-bold ' + (headerHidden ? 'ph-caret-down' : 'ph-caret-up') + ' agm-ic';
 }
+
+// =====================================================
+// V40.50.0 — CALENDÁRIO DA AGENDA (pedido dele em 26/11: "se clicar em cima do dia quero que apareça o calendário pra
+// selecionar o dia no celular")
+// =====================================================
+// Tocar na data do topo (também no topo encolhido) abre o mês do dia aberto, de segunda a domingo como a tira: 6 linhas
+// sempre (a janelinha não muda de altura trocando o mês), os dias dos meses vizinhos apagados (dá pra tocar). O dia
+// aberto (ou os 2–3 dias da tela) fica cheio como na tira, hoje com contorno, a bolinha nos dias com bloco. ‹ › ou
+// arrastar pro lado troca o mês; tocar num dia vai pra ele (agGoDate) e fecha. "Hoje" vai pra hoje. Sem
+// <input type="date"> (regra 9) e sem focus() ao abrir (Regra de Ouro #2). O PC tem o mesmo no nome da semana/dia.
+const AGC_MES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+var agCal = { y: 0, m: 0 };
+window.openAgCal = function() {
+    agCal = { y: activeDateObj.getFullYear(), m: activeDateObj.getMonth() };
+    renderAgCal('');
+    showModal('ag-cal-modal');
+    agCalPlace();
+};
+function agCalPlace() { // logo abaixo da data, onde ela estiver (topo inteiro, encolhido ou recolhido); sem medida, o top do CSS
+    const hd = document.getElementById('header-date'), m = document.getElementById('ag-cal-modal'), par = m && m.offsetParent;
+    if (!hd || !par) return;
+    const r = hd.getBoundingClientRect(), p = par.getBoundingClientRect();
+    if (r.bottom > 0) m.style.top = Math.round(r.bottom - p.top + 8) + 'px';
+}
+window.closeAgCal = function() { hideModal('ag-cal-modal'); };
+window.agCalMonth = function(n) {
+    const t = new Date(agCal.y, agCal.m + n, 1);
+    agCal = { y: t.getFullYear(), m: t.getMonth() };
+    renderAgCal(n > 0 ? 'l' : 'r');
+};
+window.agCalPick = function(ds) {
+    closeAgCal();
+    agGoDate(ds);
+};
+function renderAgCal(slide) {
+    const grid = document.getElementById('ag-cal-grid'), title = document.getElementById('ag-cal-title');
+    if (!grid || !title) return;
+    title.textContent = `${AGC_MES[agCal.m]} de ${agCal.y}`;
+    const hoje = getTodayStr(), abertos = tlMultiDays(), sel = abertos.length ? abertos : [getActiveDateStr()];
+    const comBloco = new Set((db || []).filter(b => b && b.date && b.type !== 'empty').map(b => b.date));
+    const ini = agWeekStart(new Date(agCal.y, agCal.m, 1)); // a segunda da semana do dia 1
+    let html = '';
+    for (let i = 0; i < 42; i++) {
+        const d = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate() + i);
+        const ds = agDs(d), on = sel.includes(ds), tem = comBloco.has(ds);
+        html += `<button type="button" class="agc-d${on ? ' on' : ''}${ds === hoje ? ' hj' : ''}${d.getMonth() !== agCal.m ? ' fora' : ''}" data-agc="${ds}" aria-pressed="${on}"` +
+            ` aria-label="${d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${ds === hoje ? ' (hoje)' : ''}${tem ? ', tem bloco' : ''}">` +
+            `<span class="agc-n">${d.getDate()}</span><span class="agc-b${tem ? ' tem' : ''}"></span></button>`;
+    }
+    grid.innerHTML = html;
+    if (slide) { grid.classList.remove('agc-sl', 'agc-sr'); void grid.offsetWidth; grid.classList.add(slide === 'l' ? 'agc-sl' : 'agc-sr'); }
+}
+(function () { // tocar num dia vai pra ele; arrastar pro lado (em qualquer lugar da janelinha) troca o mês
+    const m = document.getElementById('ag-cal-modal');
+    if (!m) return;
+    let s = null, moved = false;
+    m.addEventListener('click', (e) => { const b = e.target.closest('[data-agc]'); if (b && !moved) agCalPick(b.dataset.agc); moved = false; });
+    m.addEventListener('touchstart', (e) => { const t = e.touches; s = t.length === 1 ? { x: t[0].clientX, y: t[0].clientY, t: Date.now() } : null; moved = false; }, { passive: true });
+    m.addEventListener('touchend', (e) => {
+        const a = s; s = null;
+        if (!a || e.changedTouches.length !== 1) return;
+        const dx = e.changedTouches[0].clientX - a.x, dy = e.changedTouches[0].clientY - a.y;
+        if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5 || Date.now() - a.t > 800) return;
+        moved = true; // o "clique" que vem depois do arrasto não escolhe o dia
+        setTimeout(() => { moved = false; }, 400);
+        agCalMonth(dx < 0 ? 1 : -1);
+    }, { passive: true });
+})();
 
 // Tocar 2 vezes numa faixa ou no Tempo Livre (sem tarefa na mão) abre o + já mirando ali: o que for criado entra direto lá (V40.25.1: eram 1 toque, só na faixa).
 let sheetSlot = null; // { date, start, dur }
@@ -4230,7 +4298,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.49.0',
+            version: 'v40.50.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data

@@ -1298,6 +1298,30 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await foto(p, 'pc-dia-sublista-curta.png');
   }
 
+  { // V40.50.0: o calendário da Agenda, pelo nome da semana (ou do dia), como a data do topo do celular
+  console.log('\nAG) Calendário da Agenda pelo nome da semana/dia (V40.50.0):');
+  for (let i = 0; i < 3 && await p.evaluate(() => !!document.querySelector('[role="dialog"]:not(.hidden)')); i++) { await p.keyboard.press('Escape'); await p.waitForTimeout(200); }
+  await p.locator('#tab-agenda').click(); await p.waitForTimeout(250);
+  await p.evaluate(() => { document.querySelector('.ag-view[data-view="week"]').click(); document.getElementById('ag-today').click(); }); await p.waitForTimeout(300);
+  await p.locator('#ag-cal-btn').click(); await p.waitForTimeout(250);
+  const c1 = await p.evaluate(() => {
+    const pop = document.getElementById('cal-pop'), r = pop.getBoundingClientRect(), b = document.getElementById('ag-cal-btn').getBoundingClientRect();
+    return { vis: !pop.classList.contains('hidden'), band: pop.querySelectorAll('.cal-band').length, dots: pop.querySelectorAll('.cal-dot').length, dentro: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight, abaixo: r.top >= b.bottom && r.top - b.bottom < 16, t: document.getElementById('cal-title').textContent };
+  });
+  ok(c1.vis && c1.band === 7 && c1.dots > 0 && c1.dentro && c1.abaixo, 'Semana: clicar no nome abre o calendário logo abaixo, a semana na tela em faixa e a bolinha nos dias com bloco (' + c1.t + ', ' + c1.dots + ' bolinhas)');
+  await foto(p, 'pc-agenda-calendario-semana.png');
+  await p.locator('#cal-pop [data-cal-nav="1"]').click(); await p.waitForTimeout(150);
+  await p.locator('#cal-pop [data-cal-day="2026-12-10"]').click(); await p.waitForTimeout(300);
+  ok(await p.evaluate(() => document.getElementById('cal-pop').classList.contains('hidden') && document.getElementById('ag-label').textContent === '7 a 13 de dez'), 'escolher o 10/12: a Agenda vai pra semana dele (7 a 13 de dez)');
+  await p.evaluate(() => document.querySelector('.ag-view[data-view="day"]').click()); await p.waitForTimeout(300);
+  await p.locator('#ag-cal-btn').click(); await p.waitForTimeout(250);
+  ok(await p.evaluate(() => { const c = document.querySelector('#cal-pop [aria-current="date"]'); return !!c && c.dataset.calDay === '2026-12-10' && !document.querySelector('#cal-pop .cal-band'); }), 'Dia: o dia aberto cheio no calendário (sem faixa)');
+  await foto(p, 'pc-agenda-calendario-dia.png');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(150);
+  ok(await p.evaluate(() => document.getElementById('cal-pop').classList.contains('hidden')), 'Esc fecha');
+  await p.evaluate(() => { document.querySelector('.ag-view[data-view="week"]').click(); document.getElementById('ag-today').click(); }); await p.waitForTimeout(200);
+  }
+
   ok(errs.length === 0, 'nenhum erro de página' + (errs.length ? ': ' + errs[0].slice(0, 160) : ''));
   await fim();
 })().catch((e) => { console.error('ERRO', e); process.exit(2); });

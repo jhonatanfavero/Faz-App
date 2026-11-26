@@ -737,6 +737,39 @@ header.ag-slim { padding-bottom: 8px !important; padding-top: max(env(safe-area-
 #blocks-container.tl-slide-l { animation: tlSlideL 0.22s ease-out; }
 #blocks-container.tl-slide-r { animation: tlSlideR 0.22s ease-out; }
 
+/* ========================================================================
+   V40.50.0 — CALENDÁRIO DA AGENDA (tocar na data do topo). Segunda a domingo, como a tira. O dia aberto cheio (igual à
+   tira), hoje com contorno, a bolinha nos dias com bloco, os dias dos meses vizinhos apagados. A data do topo ganha o ⌄
+   e uma área de toque mais alta: 5 + 3 px (o mt-0.5 de antes virou o 1 px a mais em cima; com o ícone do calendário em
+   leading-none a altura é a mesma em hoje e nos outros dias, e cabe nos 36 px dos botões do lado: a linha não muda).
+   ======================================================================== */
+.hd-date { padding-top: 5px; padding-bottom: 3px; border-radius: 10px; -webkit-tap-highlight-color: transparent; transition: opacity .15s; }
+.hd-date:active { opacity: .55; }
+.hd-caret { flex: none; font-size: 12px; color: #a1a1aa; margin-left: -2px; }
+/* abre logo abaixo da data (o openAgCal mede onde ela está: topo inteiro, encolhido ou recolhido); este é o lugar sem medida */
+#ag-cal-modal { top: calc(max(env(safe-area-inset-top), 20px) + 46px); }
+.agc-nav { width: 40px; height: 40px; border-radius: 9999px; flex: none; display: inline-flex; align-items: center; justify-content: center; color: #52525b; font-size: 17px; }
+.agc-nav:active { background: #f4f4f5; }
+.agc-wk { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; font-size: 10.5px; font-weight: 700; color: #a1a1aa; padding: 2px 0 4px; }
+.agc-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px 4px; touch-action: pan-y; }
+.agc-d { height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 12px; transition: background-color .15s; }
+.agc-d:active { background: #f4f4f5; }
+.agc-n { font-size: 15px; font-weight: 700; color: #3f3f46; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.agc-b { width: 5px; height: 5px; border-radius: 9999px; }
+.agc-b.tem { background: color-mix(in srgb, var(--theme-color, #4f46e5) 45%, #fff); }
+.agc-d.fora .agc-n { color: #d4d4d8; font-weight: 600; }
+.agc-d.fora .agc-b.tem { background: #e4e4e7; }
+.agc-d.hj { box-shadow: inset 0 0 0 1.5px var(--theme-color, #4f46e5); }
+.agc-d.hj .agc-n { color: var(--theme-color, #4f46e5); font-weight: 800; }
+.agc-d.on { background: var(--theme-color, #4f46e5); box-shadow: none; }
+.agc-d.on .agc-n { color: #fff; font-weight: 800; }
+.agc-d.on .agc-b.tem { background: #fff; }
+.agc-act { height: 36px; padding: 0 14px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: #52525b; }
+.agc-act:active { background: #f4f4f5; }
+.agc-hoje { color: var(--theme-color, #4f46e5); }
+.agc-grid.agc-sl { animation: tlSlideL 0.2s ease-out; }
+.agc-grid.agc-sr { animation: tlSlideR 0.2s ease-out; }
+
 .agf-dot { width: 9px; height: 9px; border-radius: 9999px; flex-shrink: 0; display: inline-block; }
 .agf-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #fafafa; border: 1px solid #e4e4e7; color: #27272a; font-weight: 700; font-size: 14px; text-align: left; flex-shrink: 0; transition: background-color .15s, border-color .15s; }
 .agf-row:active { transform: scale(0.98); }

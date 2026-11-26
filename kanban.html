@@ -29,6 +29,13 @@
     .tab.on { background: #fff; color: #18181b; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
     .ag-view.on { background: var(--focus); color: #fff; }
     .ag-now { box-shadow: 0 0 0 2px var(--focus); }
+    /* V40.50.0: calendário da Agenda (o nome da semana/dia): a semana na tela vira uma faixa; a bolinha = dia com bloco */
+    #cal-pop .cal-band { border-radius: 0; background-color: #f4f4f5; background-color: color-mix(in srgb, var(--focus) 12%, white); }
+    #cal-pop .cal-band:hover { background-color: color-mix(in srgb, var(--focus) 22%, white); }
+    #cal-pop .cal-band.cal-b0 { border-top-left-radius: .5rem; border-bottom-left-radius: .5rem; }
+    #cal-pop .cal-band.cal-b6 { border-top-right-radius: .5rem; border-bottom-right-radius: .5rem; }
+    #cal-pop .cal-dot { position: absolute; left: 50%; bottom: 3px; width: 4px; height: 4px; margin-left: -2px; border-radius: 9999px; background: #a1a1aa; background: color-mix(in srgb, var(--focus) 55%, white); pointer-events: none; }
+    #cal-pop [aria-current="date"] .cal-dot { background: #fff; }
     .ag-over { border-color: var(--focus) !important; background-color: #fff !important; }
     .ag-card.dragging { opacity: .35; }
     /* V40.9.0: cartão pintado com cor livre; .dark = cor escura → texto claro */
@@ -431,7 +438,8 @@
             <button id="ag-prev" class="w-9 h-9 rounded-lg flex items-center justify-center bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50" aria-label="Anterior"><i class="ph-bold ph-caret-left"></i></button>
             <button id="ag-today" class="h-9 px-3 rounded-lg bg-white border border-zinc-200 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50">Hoje</button>
             <button id="ag-next" class="w-9 h-9 rounded-lg flex items-center justify-center bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50" aria-label="Próximo"><i class="ph-bold ph-caret-right"></i></button>
-            <h2 id="ag-label" class="ml-1 text-[15px] font-bold text-zinc-900"></h2>
+            <!-- V40.50.0: o nome da semana (ou do dia) abre o calendário pra escolher o dia, como a data do topo do celular -->
+            <h2 class="text-[15px] font-bold text-zinc-900"><button id="ag-cal-btn" type="button" class="inline-flex items-center gap-1.5 h-9 px-2 rounded-lg hover:bg-zinc-100" aria-haspopup="dialog" aria-expanded="false" title="Escolher o dia no calendário"><span id="ag-label"></span><i class="ph-bold ph-caret-down text-[12px] text-zinc-400" aria-hidden="true"></i></button></h2>
             <button id="ag-new" class="ml-2 inline-flex items-center gap-1.5 bg-focus text-white text-[13px] font-semibold pl-2.5 pr-3 py-1.5 rounded-lg hover:opacity-90" title="Criar um bloco novo na agenda"><i class="ph-bold ph-plus"></i>Novo bloco</button>
             <!-- V40.17.0: filtro por tag e ocultar concluídos (só muda o que aparece; os horários ocupados continuam contando) -->
             <label id="ag-tag-wrap" class="inline-flex items-center gap-1.5 h-9 pl-2.5 pr-1 rounded-lg bg-white border border-zinc-200 text-zinc-500" title="Mostrar só os blocos de uma tag">
@@ -1166,7 +1174,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.49.0</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.50.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -5259,7 +5267,7 @@
 
     // ---------- V40.12.0: calendário e hora próprios, sempre em português e em 24h ----------
     // (os campos nativos do navegador seguem o idioma do navegador: num Chrome em inglês saía "November" e "AM")
-    var CAL = { input: null, y: 0, m: 0 };
+    var CAL = { input: null, y: 0, m: 0, ag: false }; // V40.50.0: ag = o calendário da Agenda (sem campo)
     function fireChange(el) { el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
     function fmtDateBtn(v) {
         if (!isYmd(v)) return 'Escolher o dia';
@@ -5281,27 +5289,35 @@
         ms.value = v === null ? '' : String(v % 60);
     }
     function setTimeVal(id, v) { $(id).value = v; fillTime(id); }
+    // V40.50.0: o mesmo calendário escolhe o dia da Agenda (CAL.ag: aberto pelo nome da semana ou do dia, no topo; o
+    // celular ganhou o dele na data do topo). Na Semana, os 7 dias na tela viram uma faixa; no Dia, o dia aberto fica
+    // cheio; a bolinha diz que o dia tem bloco. E começa na segunda, como a Semana e o calendário do celular (os campos
+    // de data também: antes era domingo).
+    function agBlockDays() { var o = {}; alive('blocos').forEach(function (b) { if (b.type !== 'empty' && b.date) o[String(b.date).slice(0, 10)] = 1; }); return o; }
     function renderCal() {
-        var sel = CAL.input ? $(CAL.input).value : '', today = todayStr();
-        var dow = new Date(CAL.y, CAL.m, 1, 12).getDay(), days = new Date(CAL.y, CAL.m + 1, 0, 12).getDate();
+        var ag = CAL.ag, today = todayStr(), anchor = S.agAnchor || today;
+        var sel = ag ? (S.agView === 'day' ? anchor : '') : (CAL.input ? $(CAL.input).value : '');
+        var w0 = ag && S.agView !== 'day' ? weekStart(anchor) : '', w6 = w0 ? addDays(w0, 6) : '', dots = ag ? agBlockDays() : null;
+        var dow = (new Date(CAL.y, CAL.m, 1, 12).getDay() + 6) % 7, days = new Date(CAL.y, CAL.m + 1, 0, 12).getDate();
         var nav = function (dir, icon, label) { return '<button type="button" data-cal-nav="' + dir + '" class="w-8 h-8 rounded-lg hover:bg-zinc-100 flex items-center justify-center text-zinc-600" aria-label="' + label + '"><i class="ph ' + icon + '"></i></button>'; };
         var html = '<div class="flex items-center gap-1 mb-2">' + nav(-1, 'ph-caret-left', 'Mês anterior') +
             '<p id="cal-title" class="flex-1 text-center text-[13.5px] font-bold text-zinc-800">' + MES[CAL.m].charAt(0).toUpperCase() + MES[CAL.m].slice(1) + ' de ' + CAL.y + '</p>' + nav(1, 'ph-caret-right', 'Mês seguinte') + '</div>' +
-            '<div class="grid grid-cols-7 text-center text-[11px] font-semibold text-zinc-400 mb-1">' + ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(function (x, i) { return '<span title="' + WD[i] + '">' + x + '</span>'; }).join('') + '</div>' +
+            '<div class="grid grid-cols-7 text-center text-[11px] font-semibold text-zinc-400 mb-1">' + ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'].map(function (x, i) { return '<span title="' + WD[(i + 1) % 7] + '">' + x + '</span>'; }).join('') + '</div>' +
             '<div class="grid grid-cols-7 gap-y-0.5">';
         for (var i = 0; i < dow; i++) html += '<span></span>';
         for (var d = 1; d <= days; d++) {
-            var v = CAL.y + '-' + pad(CAL.m + 1) + '-' + pad(d);
-            html += '<button type="button" data-cal-day="' + v + '" class="h-8 rounded-lg text-[13px] tabular-nums ' +
-                (v === sel ? 'bg-focus text-white font-bold' : (v === today ? 'font-bold text-focus ring-1 ring-inset ring-zinc-300 hover:bg-zinc-100' : 'text-zinc-700 hover:bg-zinc-100')) + '"' + (v === sel ? ' aria-current="date"' : '') + '>' + d + '</button>';
+            var v = CAL.y + '-' + pad(CAL.m + 1) + '-' + pad(d), band = !!w0 && v >= w0 && v <= w6;
+            var cls = v === sel ? 'bg-focus text-white font-bold' : (v === today ? 'font-bold text-focus ring-1 ring-inset ring-zinc-300' : 'text-zinc-700') + (band ? '' : ' hover:bg-zinc-100');
+            if (band) cls += ' cal-band' + (v === w0 || d === 1 ? ' cal-b0' : '') + (v === w6 || d === days ? ' cal-b6' : '');
+            html += '<button type="button" data-cal-day="' + v + '" class="relative h-8 rounded-lg text-[13px] tabular-nums ' + cls + '"' + (v === sel ? ' aria-current="date"' : '') + '>' + d +
+                (dots && dots[v] ? '<span class="cal-dot" aria-hidden="true"></span>' : '') + '</button>';
         }
         $('cal-pop').innerHTML = html + '</div><div class="mt-2 pt-2 border-t border-zinc-100 flex justify-between">' +
             '<button type="button" data-cal-day="' + today + '" class="text-[12.5px] font-semibold text-focus hover:bg-zinc-100 px-2 py-1 rounded-md">Hoje</button>' +
             '<button type="button" data-cal-close class="text-[12.5px] font-semibold text-zinc-600 hover:bg-zinc-100 px-2 py-1 rounded-md">Fechar</button></div>';
     }
-    function openCal(id, btn) {
-        var v = $(id).value, d = isYmd(v) ? parseYmd(v) : new Date(), pop = $('cal-pop');
-        CAL.input = id; CAL.y = d.getFullYear(); CAL.m = d.getMonth();
+    function calShow(btn) {
+        var pop = $('cal-pop');
         renderCal();
         pop.classList.remove('hidden');
         var r = btn.getBoundingClientRect(), h = pop.offsetHeight || 320, top = r.bottom + 6;
@@ -5309,7 +5325,28 @@
         pop.style.top = top + 'px';
         pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 264)) + 'px';
     }
-    function closeCal() { var pop = $('cal-pop'); if (pop) pop.classList.add('hidden'); CAL.input = null; }
+    function openCal(id, btn) {
+        var v = $(id).value, d = isYmd(v) ? parseYmd(v) : new Date();
+        CAL.input = id; CAL.ag = false; CAL.y = d.getFullYear(); CAL.m = d.getMonth();
+        calShow(btn);
+    }
+    function openAgCal(btn) { // V40.50.0: o mês do dia aberto na Agenda (na Semana, o da quinta: o mês que tem mais dias dela)
+        var d = parseYmd(S.agView === 'day' ? (S.agAnchor || todayStr()) : addDays(weekStart(S.agAnchor || todayStr()), 3));
+        CAL.input = null; CAL.ag = true; CAL.y = d.getFullYear(); CAL.m = d.getMonth();
+        calShow(btn);
+        btn.setAttribute('aria-expanded', 'true');
+    }
+    function agPickDay(v) { // V40.50.0: na Semana, a semana do dia (com ele à vista); no Dia, o dia
+        if (!isYmd(v)) return;
+        S.agAnchor = v; S.agScrolled = null; S.agWeekShown = null;
+        renderAgenda();
+    }
+    function closeCal() {
+        var pop = $('cal-pop'), b = $('ag-cal-btn');
+        if (pop) pop.classList.add('hidden');
+        CAL.input = null; CAL.ag = false;
+        if (b) b.setAttribute('aria-expanded', 'false');
+    }
     async function blockToList() {
         var ed = S.editing;
         if (ed && ed.kind === 'card') return subCardToListUi(); // V40.24.0
@@ -6653,9 +6690,11 @@
         document.addEventListener('click', function (e) {
             var pop = $('cal-pop'), b;
             if ((b = e.target.closest('.date-btn'))) { var id = b.dataset.dateFor; if (CAL.input === id && !pop.classList.contains('hidden')) closeCal(); else openCal(id, b); return; }
+            if ((b = e.target.closest('#ag-cal-btn'))) { if (CAL.ag && !pop.classList.contains('hidden')) closeCal(); else openAgCal(b); return; } // V40.50.0
             if (pop.contains(e.target)) {
                 if ((b = e.target.closest('[data-cal-nav]'))) { var mm = CAL.m + Number(b.dataset.calNav); CAL.y += Math.floor(mm / 12); CAL.m = ((mm % 12) + 12) % 12; renderCal(); }
-                else if ((b = e.target.closest('[data-cal-day]'))) { var inp = $(CAL.input); if (inp) { setDateVal(inp.id, b.dataset.calDay); closeCal(); fireChange(inp); document.querySelector('[data-date-for="' + inp.id + '"]').focus(); } }
+                else if ((b = e.target.closest('[data-cal-day]')) && CAL.ag) { var day = b.dataset.calDay; closeCal(); agPickDay(day); $('ag-cal-btn').focus(); } // V40.50.0
+                else if (b) { var inp = $(CAL.input); if (inp) { setDateVal(inp.id, b.dataset.calDay); closeCal(); fireChange(inp); document.querySelector('[data-date-for="' + inp.id + '"]').focus(); } }
                 else if (e.target.closest('[data-cal-close]')) closeCal();
                 return;
             }

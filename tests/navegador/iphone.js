@@ -183,12 +183,18 @@ const IPHONES = [
     const QD_FAKE = "window.__qdReal = window.__qdReal || window.fazQuadros; window.fazQuadros = Object.assign({}, window.__qdReal, { estado: () => ({ configurado: true, logado: true, off: false, uid: 'u', email: 'voce@email.com', quadros: " + JSON.stringify([QD, QD2]) + ", carregado: true }), atualizar: () => Promise.resolve({ ok: true }) });";
     const QD_COL = "backlogColumnsDb.push({ id: 'sh_aaaaaaaa_col_x', name: 'Farmácia e casa', isDefault: false, createdAt: 1, shared: { dono: 'aaaaaaaa-1111-4111-8111-111111111111', lista: 'col_x', quadro: '" + QD.id + "', quadroNome: 'Casa', de: 'ana.esposa@email.com', gen: 'g' } }); ['Remédio de pressão', 'Fralda G', 'Lâmpada da sala'].forEach((t, i) => backlogDb.push({ id: 'sh_aaaaaaaa_t' + i, title: t, duration: 15, tagId: null, microblocks: [], columnId: 'sh_aaaaaaaa_col_x' }));";
     const QD_UNDO = "backlogColumnsDb = backlogColumnsDb.filter((c) => c.id !== 'sh_aaaaaaaa_col_x'); backlogDb = backlogDb.filter((t) => t.columnId !== 'sh_aaaaaaaa_col_x'); activeColumnId = 'col_geral'; if (window.__qdReal) window.fazQuadros = window.__qdReal;"
+    // V40.50.0: o calendário abre logo abaixo da data (não cobre o que foi tocado)
+    const CAL_ABAIXO = "(() => { const a = document.getElementById('header-date').getBoundingClientRect(), b = document.getElementById('ag-cal-modal').getBoundingClientRect(); return b.top >= a.bottom && b.top - a.bottom < 24 ? '' : 'o calendário não abre logo abaixo da data (' + Math.round(b.top) + ' x ' + Math.round(a.bottom) + ')'; })()";
     const TELAS = [
         ['Agenda', "closeAllSheets(); activeDateObj = new Date(2026, 10, 16); renderTimeline(); document.getElementById('timeline-scroll').scrollTop = 0;", null], // V40.38.0: do começo do dia (os blocos rolados ficam por baixo do cabeçalho, de propósito)
         ['Agenda (cabeçalho recolhido)', 'toggleHeader();', null, { depois: 'toggleHeader();' }],
         // V40.49.0: Semana em tira: o ⋯ aberto e o topo encolhido (rolando a agenda)
         ['Agenda: o ⋯ aberto', 'closeAllSheets(); openAgMore();', '#ag-more-modal', { depois: 'closeAgMore();' }],
         ['Agenda: rolando (topo encolhido)', "closeAllSheets(); agSlimSet(true); document.getElementById('timeline-scroll').scrollTop = 400;", null, { depois: "agSlimSet(false); document.getElementById('timeline-scroll').scrollTop = 0;" }],
+        // V40.50.0: tocar na data abre o calendário (aberto também com o topo encolhido e com 3 dias na tela)
+        ['Agenda: o calendário', "closeAllSheets(); activeDateObj = new Date(2026, 10, 16); runRealTimeEngine(); renderTimeline(); document.getElementById('header-date').click();", '#ag-cal-modal', { confere: CAL_ABAIXO, depois: 'closeAgCal();' }],
+        ['Agenda: o calendário (topo encolhido)', "closeAllSheets(); agSlimSet(true); document.getElementById('timeline-scroll').scrollTop = 400; document.getElementById('header-date').click();", '#ag-cal-modal', { confere: CAL_ABAIXO, depois: "closeAgCal(); agSlimSet(false); document.getElementById('timeline-scroll').scrollTop = 0;" }],
+        ['Agenda: o calendário com 3 dias', "closeAllSheets(); setTlDays(3); document.getElementById('toast').classList.add('opacity-0'); openAgCal();", '#ag-cal-modal', { confere: CAL_ABAIXO, depois: 'closeAgCal(); setTlDays(1); renderTimeline();' }],
         ['Agenda com busca', 'openSearchBar();', null, { depois: 'closeSearchBar();' }],
         ['Bloco aberto', `(() => { const b = db.find((x) => x.date === '2026-11-16' && !Array.isArray(x.cards)); toggleExpandBlock(b.id, { stopPropagation() {} }); setTimeout(() => { const el = document.querySelector('[data-block-id="' + b.id + '"]'); if (el) el.scrollIntoView({ block: 'center' }); }, 50); })();`, null, { depois: 'db.forEach((b) => { b.expanded = false; }); renderTimeline();' }],
         ['+ (novo bloco)', 'openSheet();', '#bottom-sheet', { fim: true }],
@@ -267,6 +273,7 @@ const IPHONES = [
             try { if (abre) await m.evaluate(abre); } catch (e) { ok(false, `${nome}: não abriu (${String(e.message || e).slice(0, 120)})`); continue; }
             await m.waitForTimeout((opts && opts.espera) || 450);
             const probs = await conferir(m, ip, raiz, opts);
+            if (opts && opts.confere) { const msg = await m.evaluate(opts.confere); if (msg) probs.push({ tipo: msg, quem: '', rect: '' }); } // V40.50.0: conferência própria da tela
             const lista = probs.map((p) => `${p.tipo}: ${p.quem} [${p.rect}]`);
             ok(!probs.length, `${nome}` + (probs.length ? ':\n        - ' + lista.slice(0, 8).join('\n        - ') + (lista.length > 8 ? `\n        (+${lista.length - 8})` : '') : ''));
             if (ip.w === 390 || ip.android) await foto(m, (ip.foto || 'iphone-') + nome.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png');

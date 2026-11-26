@@ -59,6 +59,7 @@ const SUITES = [
     ['Menu grande e quadros com abas (celular e PC)', 'test_quadros_abas.js', [ROOT, DADOS]],
     ['V40.49.0: Semana em tira, o ⋯ e o topo que encolhe; a janelinha do quadro; Configurações do PC por tópicos', 'test_v40490.js', [ROOT, DADOS]],
     ['V40.50.0: o calendário da agenda (a data do topo no celular, o nome da semana/dia no PC)', 'test_v40500.js', [ROOT, DADOS]],
+    ['V40.50.1: o topo do iPhone instalado fora da faixa que o iOS 26 embaça', 'test_v40501.js', [ROOT]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

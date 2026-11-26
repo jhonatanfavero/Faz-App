@@ -39,7 +39,8 @@ const IPHONES = [
             css = css.replace(/env\(\s*safe-area-inset-top[^)]*\)/g, ip.top + 'px')
                 .replace(/env\(\s*safe-area-inset-bottom[^)]*\)/g, ip.bot + 'px')
                 .replace(/env\(\s*safe-area-inset-(left|right)[^)]*\)/g, '0px');
-            if (!ip.android) css = css.replace(/@supports\s*\(-webkit-touch-callout:\s*none\)/g, '@supports (display: block)'); // só no iPhone
+            if (!ip.android) css = css.replace(/@supports\s*\(-webkit-touch-callout:\s*none\)/g, '@supports (display: block)') // só no iPhone
+                .replace(/\(display-mode:\s*standalone\)/g, '(min-width: 0px)'); // V40.50.1: e como app instalado (a folga da faixa embaçada do iOS 26+)
             await route.fulfill({ response: r, body: css, headers: Object.assign({}, r.headers(), { 'content-type': 'text/css; charset=utf-8' }) });
         });
         const m = await ctx.newPage();
@@ -120,6 +121,9 @@ const IPHONES = [
                 // V40.49.0: rolando, a agenda passa por baixo do topo encolhido (e ele cobre a barra de status): é de propósito
                 const soTopo = !!(document.querySelector('header.ag-slim') && el.closest('#timeline-scroll'));
                 if (v.t < ip.top - 0.5 && !soTopo) out.push({ tipo: 'atrás da barra de status', quem, rect });
+                // V40.50.1: no iPhone instalado (iOS 26+), o sistema embaça uns 38–40 px abaixo da barra de status (foto dele de
+                // 26/11, 18h28: a linha da data embaçada). Nada de tocar ou ler pode começar nessa faixa.
+                else if (!ip.android && v.t < ip.top + 38 && !soTopo) out.push({ tipo: 'na faixa que o iOS 26 embaça (até ' + (ip.top + 38) + ' px)', quem, rect });
                 if (v.b > H - ip.bot + 0.5) {
                     // numa lista que ainda rola pra cima, dá pra tirar de cima do risco: só conta quando não rola mais
                     let rola = false;

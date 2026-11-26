@@ -202,6 +202,13 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     campos de data, no modo Agenda (`CAL.ag`; `agPickDay`). Os dois começam na segunda, como a tira e a Semana: não voltar
     pro domingo só num deles. A data do topo não pode mudar a altura da linha (o ícone em `leading-none` e o padding de
     5 + 3 px cabem nos 36 px dos botões do lado, em hoje e nos outros dias).
+28. **iPhone instalado: nada no topo dentro da faixa que o iOS 26+ embaça (V40.50.1).** Com `black-translucent` +
+    `viewport-fit=cover`, o iOS 26+ desenha o "Liquid Glass" (efeito de borda da rolagem) uns 38–40 pt abaixo da barra
+    de status, por cima da página, e nenhum CSS ou meta desliga. Tudo que fica no topo soma `var(--faz-top-clear, 0px)`
+    à área segura de cima (o topo da agenda inteiro, recolhido e encolhido, as telas cheias, o ⋯ e o calendário). A
+    variável só vale no iOS instalado (o `@supports (-webkit-touch-callout: none)` + `display-mode: standalone` do
+    `style.css`) e vira 0 com a área segura 0 (iPhone deitado). Elemento novo preso ao topo usa a mesma soma; o
+    `tests/navegador/iphone.js` reprova botão que comece na faixa ("na faixa que o iOS 26 embaça").
 
 ## Publicar uma versão
 

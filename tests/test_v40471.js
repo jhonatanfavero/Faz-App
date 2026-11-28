@@ -5,6 +5,7 @@
 //      na agenda afastada (3 dias), a sublista pintada de cor escura ganha letra clara;
 //   B) CELULAR: o + abre SEM o teclado (nada de foco no "Nome da tarefa"), pelo botão e pelos 2 toques no vazio;
 //   C) CELULAR: o Config do + vira só a engrenagem, na linha do Descanso e da Sublista (o X sozinho em cima);
+//      (V40.51.1: o + virou Ficha: a engrenagem foi pro canto de cima, Descanso e Sublista viraram o Tipo)
 //   D) PC, visão Dia: a sublista de 5 e 10 min também numa linha só (.ag-sub-tiny/.ag-sub-5).
 // Uso: TZ='America/Sao_Paulo' node test_v40471.js <repo> <dados-ficticios.json>
 const fs = require('fs'), path = require('path'), boot = require('./boot_app');
@@ -84,11 +85,11 @@ const T = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : '');
   ok(d.activeElement === $('task-input'), 'tocar no campo continua focando normal');
   $('task-input').blur();
 
-  console.log('C) O Config do + vira só a engrenagem, na linha do Descanso e da Sublista:');
-  const bar = $('bottom-sheet').firstElementChild, row = bar && bar.nextElementSibling;
-  ok(bar && bar.querySelector('[data-voltar="fechar"]') && bar.querySelectorAll('button').length === 1, 'a barra de cima só tem o X (como antes)');
-  const btns = row ? [...row.querySelectorAll('button')] : [], cfg = btns[2];
-  ok(btns.length === 3 && T(btns[0]) === 'Descanso' && T(btns[1]) === 'Sublista' && cfg && cfg.getAttribute('onclick') === 'openConfigSheet()' && T(cfg) === '' && cfg.getAttribute('aria-label') === 'Configurações' && cfg.querySelector('.ph-gear'), 'na linha: Descanso, Sublista e a engrenagem (sem texto, com o nome pra leitor de tela)');
+  console.log('C) O Config do + vira só a engrenagem (V40.51.1: na Ficha, no canto de cima, no lugar do ⋯):');
+  const bar = $('bottom-sheet').querySelector('.fx-head'), hbs = bar ? [...bar.querySelectorAll('button')] : [];
+  ok(hbs.length === 2 && hbs[0].getAttribute('data-voltar') === 'fechar' && !!hbs[0].querySelector('.ph-x'), 'em cima: o X (V40.51.1: com o "Novo bloco" no meio)');
+  const cfg = hbs[1];
+  ok(T($('bottom-sheet').querySelector('[data-plus-kind="rest"]')) === 'Descanso' && T($('bottom-sheet').querySelector('[data-plus-kind="sub"]')) === 'Sublista' && cfg && cfg.getAttribute('onclick') === 'openConfigSheet()' && T(cfg) === '' && cfg.getAttribute('aria-label') === 'Configurações' && cfg.querySelector('.ph-gear'), 'a engrenagem (sem texto, com o nome pra leitor de tela); Descanso e Sublista viraram o Tipo da ficha');
   ok($('bottom-sheet').querySelectorAll('button[onclick="openConfigSheet()"]').length === 1, 'o Config aparece uma vez só no +');
   cfg.click(); await sleep(60);
   ok(!$('config-sheet').classList.contains('translate-y-full'), 'tocar no Config abre as Configurações');

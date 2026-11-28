@@ -219,6 +219,11 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     na lista do `fxSync` e o voltar dele é o ← com `data-voltar`. Linha que some (Meta sem metas, Parcelas) liga e
     desliga só com `.hidden` (o CSS dá `display` em `:not(.hidden)`). Texto de rótulo muda com `textContent`, não com
     `innerText` (o jsdom dos testes não tem `innerText`). O `tests/test_v40510.js` confere tudo isso.
+    Tela cheia inteira na Ficha (o + da agenda e o Período inteiro, V40.51.1): a tela ganha `.fx-sheet` (o fundo e sem o
+    respiro dos lados) e tem `.fx-head` (o X com `data-voltar="fechar"` ou o ← com `data-voltar`), `.fx-body` e `.fx-foot`
+    dentro dela. Nada de fileira que rola pro lado (`overflow-x-auto`) num formulário: a 384 px ela cortava os botões
+    (foto dele de 28/11); poucas opções viram `.fx-seg.full` numa `.fx-row.stack`, muitas viram linha que abre a folha.
+    O `tests/test_v40511.js` confere o +.
 
 ## Publicar uma versão
 

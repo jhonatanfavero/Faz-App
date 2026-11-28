@@ -276,7 +276,7 @@ const { abrir } = require('./apoio');
   await m.tap('#fab-btn'); await m.waitForTimeout(450);
   await m.fill('#task-input', 'Pendências rápidas');
   await m.tap('.sheet-dur-btn[data-time="60"]');
-  await m.tap('#bottom-sheet button:has-text("Sublista")'); await m.waitForTimeout(450);
+  await m.tap('#bottom-sheet [data-plus-kind="sub"]'); await m.tap('#commit-intent-btn'); await m.waitForTimeout(450); // V40.51.1: Tipo → Sublista, depois o botão do pé
   await m.tap('#blocks-container .block-item.bg-hatched'); await m.waitForTimeout(350);
   const S1 = await m.evaluate(() => (db.find((b) => b.date === '2030-07-12' && Array.isArray(b.cards)) || {}).id);
   ok(!!S1 && await m.evaluate(() => pendingIntent === null), 'pelo + → "Sublista" → tocar no Tempo Livre: a sublista nasce no dia (com toques de verdade)');

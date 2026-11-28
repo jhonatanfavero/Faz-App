@@ -202,6 +202,9 @@ const IPHONES = [
         ['Agenda com busca', 'openSearchBar();', null, { depois: 'closeSearchBar();' }],
         ['Bloco aberto', `(() => { const b = db.find((x) => x.date === '2026-11-16' && !Array.isArray(x.cards)); toggleExpandBlock(b.id, { stopPropagation() {} }); setTimeout(() => { const el = document.querySelector('[data-block-id="' + b.id + '"]'); if (el) el.scrollIntoView({ block: 'center' }); }, 50); })();`, null, { depois: 'db.forEach((b) => { b.expanded = false; }); renderTimeline();' }],
         ['+ (novo bloco)', 'openSheet();', '#bottom-sheet', { fim: true }],
+        // V40.51.1: o + na Ficha: o Descanso (sem Meta e sem Período) e a folha da Tag por cima dele
+        ['+: Descanso', "plusKindSet('rest');", '#bottom-sheet', { fim: true, depois: "plusKindSet('task');" }],
+        ['+: folha da tag', 'plusPickTag();', '#fx-pick-modal', { depois: 'fxPickClose();' }],
         ['Lista: Assistente', "openListSheet(); switchListTab('assistant');", '#list-sheet'],
         ['Lista: Listas', "switchListTab('backlog');", '#list-sheet'],
         ['Lista: Listas (fim)', '', '#list-sheet', { fim: true }],

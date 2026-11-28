@@ -75,7 +75,7 @@ const AUTH = 'sb-zlwocojndrjnuvoowzzu-auth-token';
   ev('closeAllSheets(); openTagsSheet()'); await sleep(30);
   ok(!vis('#tags-sheet [data-hub-back]'), 'Tags aberta por fora do menu: sem o "Menu"');
   ev('closeAllSheets(); openConfigSheet()'); await sleep(30);
-  ok($('config-back-btn').getAttribute('onclick') === 'openSheet()', 'Config aberta pelo + (engrenagem): a seta volta pro + como antes');
+  ok($('config-back-btn').getAttribute('onclick') === 'openSheet(true)', 'Config aberta pelo + (engrenagem): a seta volta pro + como antes (V40.51.1: com o que estava escolhido)');
   ev('closeAllSheets()');
   $('list-btn').click(); await sleep(40);
   d.querySelector('#hub-grid [data-hub="notes"]').click(); await sleep(40);

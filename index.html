@@ -182,61 +182,63 @@
 
         <div id="overlay" onclick="onOverlayClick()" class="absolute inset-0 bg-black/40 backdrop-blur-sm z-40 opacity-0 pointer-events-none transition-opacity duration-300"></div>
 
-        <div id="bottom-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col overflow-y-auto no-scrollbar">
-            <!-- V40.3.7: barra superior com botão X pra fechar. Cor do tema, sem fundo. -->
-            <div class="flex justify-end -mt-2 mb-4">
-                <button data-voltar="fechar" onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
-                    <i class="ph-bold ph-x text-lg"></i>
-                </button>
+        <!-- V40.51.1: o + na FICHA (igual aos formulários das Listas, V40.51.0). Foto dele de 28/11 (12h58): "esqueceu de
+             atualizar pra ficha quando entra pelo + na agenda" e os botões cortados (a 384 px, o 1h e o Período ficavam fora
+             da tela, à direita, e as tags e metas cortadas no meio). Agora: X / "Novo bloco" / engrenagem em cima; o nome
+             grande; uma ficha com Tipo (Tarefa, Descanso ou Sublista: eram os 2 botões de cima), Duração, Tag e Meta (pela folha
+             de baixo, #fx-pick-modal) e o Período inteiro; o Inserir no pé. O + continua guardando o rascunho (o nome e a
+             duração) e sem foco automático (V40.47.1). Código: app.js, seção "V40.51.1 — O + NA FICHA". -->
+        <div id="bottom-sheet" class="absolute bottom-0 left-0 w-full border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col fx-sheet">
+            <div class="fx-head">
+                <button type="button" data-voltar="fechar" onclick="closeAllSheets()" aria-label="Fechar" class="fx-back"><i class="ph-bold ph-x"></i></button>
+                <h3 id="plus-title" class="fx-title">Novo bloco</h3>
+                <!-- V40.47.1: a engrenagem (Config) continua aqui; o ← de lá volta pro + -->
+                <button type="button" onclick="openConfigSheet()" aria-label="Configurações" title="Configurações" class="fx-more"><i class="ph ph-gear"></i></button>
             </div>
-            
-            <div class="flex gap-1.5 min-[360px]:gap-2 overflow-x-auto no-scrollbar mb-5">
-                <button onclick="commitSpecialIntent('Descanso', 'rest')" class="flex items-center gap-1.5 px-3 min-[360px]:px-4 py-2 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 text-sm font-medium hover:bg-emerald-100 transition whitespace-nowrap">
-                    <i class="ph ph-tree text-lg"></i> Descanso
-                </button>
-                <!-- V40.24.0: sublista = um horário com vários cartões dentro (o nome e o tempo vêm do formulário abaixo) -->
-                <button onclick="commitSublistIntent()" class="flex items-center gap-1.5 px-3 min-[360px]:px-4 py-2 rounded-full border border-dashed border-amber-400 text-amber-800 bg-amber-50 text-sm font-medium hover:bg-amber-100 transition whitespace-nowrap">
-                    <i class="ph ph-list-checks text-lg"></i> Sublista
-                </button>
-                <!-- V40.22.0: o chip "Metas (em breve)" saiu daqui: as Metas moram na aba 🎯, junto das outras abas -->
-                <!-- V40.47.1: o Config virou só a engrenagem, no fim da linha (escrito, ele cortava na direita em celular
-                     estreito: foto dele de 26/11; escolha dele: "só a engrenagem, aí usa uma linha só"). Abaixo de 360 px os dois de
-                     antes ficam um pouco mais estreitos pra engrenagem caber inteira (320 px). -->
-                <button onclick="openConfigSheet()" aria-label="Configurações" title="Configurações" class="ml-auto shrink-0 self-center w-9 h-9 min-[360px]:w-10 min-[360px]:h-10 flex items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition">
-                    <i class="ph ph-gear text-lg"></i>
-                </button>
-            </div>
-            
-            <input type="text" id="task-input" placeholder="Nome da tarefa" autocomplete="off" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-app-focus focus:bg-white transition-colors mb-6 text-sm">
-            
-            <div class="mb-8">
-                <p class="text-xs text-zinc-500 font-medium mb-3 uppercase tracking-wider">Volume de Tempo</p>
-                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+
+            <div class="fx-body no-scrollbar">
+                <input type="text" id="task-input" class="fx-name" placeholder="Nome da tarefa" autocomplete="off" enterkeyhint="done" aria-label="Nome">
+
+                <p class="fx-sec">Detalhes</p>
+                <div class="fx-card">
+                    <!-- V40.24.0: sublista = um horário com vários cartões dentro (o nome e o tempo vêm daqui) -->
+                    <div class="fx-row stack">
+                        <div class="fx-rowtop"><i class="ph ph-shapes fx-ic" aria-hidden="true"></i><span class="fx-lb">Tipo</span></div>
+                        <div class="fx-seg full" role="group" aria-label="Tipo do bloco">
+                            <button type="button" data-plus-kind="task" onclick="plusKindSet('task')" class="on" aria-pressed="true">Tarefa</button>
+                            <button type="button" data-plus-kind="rest" onclick="plusKindSet('rest')" aria-pressed="false">Descanso</button>
+                            <button type="button" data-plus-kind="sub" onclick="plusKindSet('sub')" aria-pressed="false">Sublista</button>
+                        </div>
+                    </div>
                     <!-- V40.8.0: 5 e 10 min -->
-                    <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="5">5m</button>
-                    <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="10">10m</button>
-                    <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="15">15m</button>
-                    <button class="sheet-dur-btn px-4 py-2 rounded-full bg-app-focus border border-app-focus text-white text-sm font-medium shadow-md transition active-chip" data-time="30">30m</button>
-                    <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="45">45m</button>
-                    <button class="sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition" data-time="60">1h</button>
-                    <button onclick="openPeriodSelectSheet()" class="px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm hover:bg-zinc-50 transition whitespace-nowrap flex items-center gap-1"><i class="ph ph-calendar-blank"></i> Período</button>
+                    <div class="fx-row stack">
+                        <div class="fx-rowtop"><i class="ph ph-timer fx-ic" aria-hidden="true"></i><span class="fx-lb">Duração</span></div>
+                        <div class="fx-seg full" role="group" aria-label="Duração">
+                            <button type="button" class="sheet-dur-btn" data-time="5" aria-pressed="false">5m</button>
+                            <button type="button" class="sheet-dur-btn" data-time="10" aria-pressed="false">10m</button>
+                            <button type="button" class="sheet-dur-btn" data-time="15" aria-pressed="false">15m</button>
+                            <button type="button" class="sheet-dur-btn on" data-time="30" aria-pressed="true">30m</button>
+                            <button type="button" class="sheet-dur-btn" data-time="45" aria-pressed="false">45m</button>
+                            <button type="button" class="sheet-dur-btn" data-time="60" aria-pressed="false">1h</button>
+                        </div>
+                    </div>
+                    <button type="button" onclick="plusPickTag()" aria-haspopup="dialog" class="fx-row">
+                        <i class="ph ph-tag fx-ic" aria-hidden="true"></i><span class="fx-lb">Tag</span><span id="plus-tag-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                    </button>
+                    <!-- V40.34.0: meta ligada (concluir o bloco conta na meta). Some quando não tem meta nenhuma (e no Descanso e na Sublista). -->
+                    <button type="button" id="goal-pick-new-wrap" onclick="plusPickGoal()" aria-haspopup="dialog" class="fx-row hidden">
+                        <i class="ph ph-target fx-ic" aria-hidden="true"></i><span class="fx-lb">Meta</span><span id="goal-pick-new" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                    </button>
+                    <!-- era o "Período" no fim da linha do tempo: o bloco ocupa um período inteiro (Manhã, Tarde...) -->
+                    <button type="button" id="plus-per-row" onclick="openPeriodSelectSheet()" class="fx-row">
+                        <i class="ph ph-sun-horizon fx-ic" aria-hidden="true"></i><span class="fx-lb">Período inteiro<span id="plus-per-sub" class="fx-sub one">Manhã, Tarde…</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                    </button>
                 </div>
             </div>
 
-            <div class="mb-8">
-                <p class="text-xs text-zinc-500 font-medium mb-3 uppercase tracking-wider">Etiqueta (Opcional)</p>
-                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2" id="tag-selector-container">
-                </div>
+            <div class="fx-foot">
+                <button type="button" id="commit-intent-btn" onclick="commitPlus()" class="fx-save"><i class="ph-bold ph-calendar-plus" aria-hidden="true"></i><span>Inserir na Agenda</span></button>
             </div>
-            <!-- V40.34.0: meta ligada (concluir o bloco conta na meta). Some quando não tem meta nenhuma. -->
-            <div class="mb-8 -mt-4 hidden" id="goal-pick-new-wrap">
-                <p class="text-xs text-zinc-500 font-medium mb-3 uppercase tracking-wider">Meta (Opcional)</p>
-                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2" id="goal-pick-new"></div>
-            </div>
-
-            <button id="commit-intent-btn" onclick="commitIntent()" class="w-full bg-app-focus text-white font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition flex items-center justify-center gap-1.5 text-sm">
-                <i class="ph ph-calendar-plus text-base"></i> Inserir na Agenda
-            </button>
         </div>
 
         <div id="list-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
@@ -843,18 +845,16 @@
             <p id="thought-text" class="text-base font-medium text-zinc-800 leading-relaxed text-center px-2 py-4 break-words">…</p>
         </div>
 
-        <div id="period-select-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
-            <!-- V40.3.7-fix: header fundido com X (Gemini fix #2) -->
-            <div class="flex items-center justify-between mb-4 shrink-0">
-                <div class="flex items-center gap-3">
-                    <button data-voltar onclick="openSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
-                    <h2 class="text-lg font-bold text-zinc-900">Selecionar Período</h2>
-                </div>
-                <button data-voltar="fechar" onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
-                    <i class="ph-bold ph-x text-lg"></i>
-                </button>
+        <!-- V40.51.1: na Ficha, como o + (de onde ela abre): ← volta pro + (com o que já estava escolhido), X fecha tudo -->
+        <div id="period-select-sheet" class="absolute bottom-0 left-0 w-full border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col fx-sheet">
+            <div class="fx-head">
+                <button type="button" data-voltar onclick="openSheet(true)" aria-label="Voltar" class="fx-back"><i class="ph-bold ph-arrow-left"></i></button>
+                <h3 class="fx-title">Período inteiro</h3>
+                <button type="button" data-voltar="fechar" onclick="closeAllSheets()" aria-label="Fechar" class="fx-more"><i class="ph-bold ph-x"></i></button>
             </div>
-            <div class="flex-1 overflow-y-auto no-scrollbar" id="period-select-container">
+            <div class="fx-body no-scrollbar">
+                <p class="fx-hint fx-hint-top">O bloco ocupa o período todo, no dia aberto na agenda, com o nome que você escreveu (ou o do período).</p>
+                <div id="period-select-container"></div>
             </div>
         </div>
 
@@ -862,7 +862,7 @@
             <!-- V40.3.7-fix: header fundido com X (Gemini fix #2) — botão voltar à esquerda, título, X à direita -->
             <div class="flex items-center justify-between mb-4 shrink-0">
                 <div class="flex items-center gap-3">
-                    <button data-voltar id="config-back-btn" onclick="openSheet()" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
+                    <button data-voltar id="config-back-btn" onclick="openSheet(true)" class="w-8 h-8 flex items-center justify-center bg-zinc-50 text-zinc-600 rounded-full hover:bg-zinc-100 transition"><i class="ph ph-arrow-left text-lg"></i></button>
                     <h2 class="text-lg font-bold text-zinc-900" id="config-title">Configurações</h2>
                 </div>
                 <button data-voltar="fechar" onclick="closeAllSheets()" aria-label="Fechar" class="w-9 h-9 flex items-center justify-center text-app-focus hover:bg-zinc-100 rounded-full transition active:scale-90">
@@ -1675,7 +1675,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.51.0</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.51.1</div>
 
     </div>
 

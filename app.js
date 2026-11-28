@@ -458,28 +458,17 @@ window.selectTag = function(id) {
     selectedTagId = selectedTagId === id ? null : id;
     renderTagSelector();
 }
-window.selectNewGoal = function(id) { selectedGoalId = goalKeep(id || null); goalPickFill('goal-pick-new-wrap', 'goal-pick-new', selectedGoalId, 'selectNewGoal'); goalNamePlaceholder('task-input', selectedGoalId, 'Nome da tarefa'); }; // V40.34.0
+window.selectNewGoal = function(id) { selectedGoalId = goalKeep(id || null); plusSync(); }; // V40.34.0; V40.51.1: a linha Meta da Ficha do +
 // V40.36.1: escolheu uma meta: o campo do nome mostra o nome dela (clarinho). Deixar vazio = fica com o nome da meta.
 function goalNamePlaceholder(inputId, goalId, normal) {
     const el = document.getElementById(inputId), g = goalById(goalKeep(goalId));
     if (el) el.placeholder = g && g.title ? String(g.title) : normal;
 }
+// V40.51.1: o + na Ficha: a linha "Tag" mostra a escolhida (a folha de baixo escolhe: plusPickTag). Era a fileira de
+// chips, que a 384 px cortava as tags na direita. Tag apagada (aqui, no PC ou no Desfazer) volta pra Nenhuma.
 function renderTagSelector() {
-    const container = document.getElementById('tag-selector-container');
-    if(!container) return;
-    container.className = 'flex gap-2 overflow-x-auto no-scrollbar pb-2 w-full';
-    let html = `<button onclick="selectTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${selectedTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem Tag</button>`;
-    tagsDb.forEach(t => {
-        const isActive = selectedTagId === t.id;
-        const activeClass = isActive ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100';
-        html += `
-            <button onclick="selectTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeClass}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}">
-                <div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>
-                ${escapeHtml(t.name)}
-            </button>
-        `;
-    });
-    container.innerHTML = html;
+    if (selectedTagId && !tagsDb.some(t => t.id === selectedTagId)) selectedTagId = null;
+    fxTagVal('plus-tag-val', selectedTagId);
 }
 
 // --- 3. AUTOMAÇÃO: O TEMPO E DIAS ---
@@ -1198,10 +1187,7 @@ function renderAgCal(slide) {
 
 // Tocar 2 vezes numa faixa ou no Tempo Livre (sem tarefa na mão) abre o + já mirando ali: o que for criado entra direto lá (V40.25.1: eram 1 toque, só na faixa).
 let sheetSlot = null; // { date, start, dur }
-function tlSlotLabel() {
-    const btn = document.getElementById('commit-intent-btn');
-    if (btn) btn.innerHTML = `<i class="ph ph-calendar-plus text-base"></i> ${sheetSlot ? 'Inserir às ' + formatClock(sheetSlot.start) : 'Inserir na Agenda'}`;
-}
+function tlSlotLabel() { plusBtnLabel(); } // V40.51.1: o texto do botão depende também do Tipo (seção "O + NA FICHA")
 // V40.25.1: gap = o vago inteiro { a, b } (pra encostar no fim quando a hora tocada não dá); exact = hora escolhida
 // pelo toque (não muda pra "agora" mesmo se o vago tiver o agora).
 window.openSheetAt = function(start, dur, gap, exact, date) { // V40.26.0: date = coluna tocada na agenda afastada
@@ -3670,9 +3656,10 @@ const fab = document.getElementById('fab-btn'),
       listBtn = document.getElementById('list-btn');
 
 function syncDurButtons(mins) {
-    document.querySelectorAll('.sheet-dur-btn').forEach(b => {
-        b.className = 'sheet-dur-btn px-4 py-2 rounded-full border border-zinc-200 text-zinc-600 text-sm whitespace-nowrap hover:bg-zinc-50 transition';
-        if(parseInt(b.dataset.time) === mins) b.className = 'sheet-dur-btn px-4 py-2 rounded-full bg-app-focus border border-transparent text-white text-sm font-medium whitespace-nowrap shadow-[0_0_15px_rgba(0,0,0,0.15)] transition';
+    document.querySelectorAll('.sheet-dur-btn').forEach(b => { // V40.51.1: a Duração da Ficha do + (.on, como os outros botões de escolha)
+        const on = parseInt(b.dataset.time) === mins;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
     document.querySelectorAll('.float-dur-btn').forEach(b => {
         b.className = 'float-dur-btn flex-1 py-1.5 rounded bg-zinc-100 text-zinc-500 hover:bg-zinc-200 text-xs font-bold transition';
@@ -3688,7 +3675,7 @@ function syncBacklogDurButtons(mins) {
 }
 
 document.querySelectorAll('.sheet-dur-btn').forEach(btn => btn.onclick = (e) => {
-    selectedDur = parseInt(e.target.dataset.time);
+    selectedDur = parseInt(e.currentTarget.dataset.time);
     syncDurButtons(selectedDur);
 });
 
@@ -3706,17 +3693,25 @@ window.changeFloatDuration = function(mins) {
     }
 }
 
-window.openSheet = () => {
+window.openSheet = (keep) => {
     if (sheetSlot) { sheetSlot = null; tlSlotLabel(); } // V40.24.0: o + aberto pelo botão não mira vago nenhum (openSheetAt marca depois)
     clearFilters();
     document.getElementById('config-sheet').classList.add('translate-y-full');
     document.getElementById('period-select-sheet').classList.add('translate-y-full');
     
-    selectedTagId = null;
+    // V40.51.1: voltando do Período inteiro ou da Config (o ← de lá chama openSheet(true)), fica o que já estava escolhido.
+    // Aberto de novo (o +, os 2 toques), começa sem tag, sem meta e como Tarefa; o nome e a duração ficam (o rascunho).
+    if (keep !== true) {
+        selectedTagId = null;
+        selectedGoalId = null; // V40.34.0
+        plusKind = 'task';
+    }
+    const durs = [...sheet.querySelectorAll('.sheet-dur-btn')].map(b => parseInt(b.dataset.time));
+    if (durs.length && !durs.includes(selectedDur)) selectedDur = 30; // veio de outro lugar (tarefa da Lista, rotina...): o + mostra o que vai usar
     renderTagSelector();
-    selectedGoalId = null; // V40.34.0
-    goalPickFill('goal-pick-new-wrap', 'goal-pick-new', null, 'selectNewGoal');
-    goalNamePlaceholder('task-input', null, 'Nome da tarefa'); // V40.36.1
+    syncDurButtons(selectedDur);
+    plusSync();
+    const fb = sheet.querySelector('.fx-body'); if (fb) fb.scrollTop = 0;
 
     overlay.classList.remove('opacity-0', 'pointer-events-none');
     sheet.classList.remove('translate-y-full');
@@ -4095,7 +4090,7 @@ window.openPeriodSelectSheet = () => {
 }
 
 var cfgFromHub = false; // V40.49.0: a Config veio do menu grande? (o ← volta pra ele em vez de abrir o +)
-function cfgBackFn() { return cfgFromHub ? 'hubBack()' : 'openSheet()'; }
+function cfgBackFn() { return cfgFromHub ? 'hubBack()' : 'openSheet(true)'; } // V40.51.1: (true) = o + volta com o que estava escolhido
 window.openConfigSheet = () => {
     clearFilters(); // V40.2.1: limpa filtros pra não confundir
     sheet.classList.add('translate-y-full'); 
@@ -4298,7 +4293,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.51.0',
+            version: 'v40.51.1',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -4546,16 +4541,23 @@ window.commitPeriodBlock = (periodId) => {
     showToast(`${period.name} Agendado!`);
 };
 
+// V40.51.1: na Ficha (uma linha por período, o horário na direita); tocar cria o bloco (commitPeriodBlock, pelo data-per).
 function renderPeriodSelect() {
     const container = document.getElementById('period-select-container');
-    if (!periodsDb.length) { container.innerHTML = '<p class="text-sm text-zinc-400 text-center mt-8 px-4">Nenhum período. Crie em Configurações → Períodos de Tempo.</p>'; return; } // V40.41.0
-    container.innerHTML = periodsDb.map(p => `
-        <button onclick="commitPeriodBlock('${p.id}')" class="w-full flex items-center justify-between p-4 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl hover:bg-app-focus hover:text-white transition text-left group">
-            <span class="font-bold text-zinc-800 group-hover:text-white">${escapeHtml(p.name)}</span>
-            <span class="text-[11px] font-bold text-zinc-500 bg-white border border-zinc-200 px-2 py-1 rounded group-hover:text-zinc-800">${p.start} às ${p.end}</span>
-        </button>
-    `).join('');
+    if (container) {
+        if (!periodsDb.length) container.innerHTML = '<p class="fx-hint">Nenhum período. Crie em Configurações → Períodos de Tempo.</p><button type="button" class="fx-mini mt-3 ml-1" onclick="openConfigSheet(); openConfigPeriods();"><i class="ph-bold ph-plus"></i> Criar um período</button>'; // V40.41.0
+        else container.innerHTML = '<div class="fx-card">' + periodsDb.map(p => `
+            <button type="button" class="fx-row" data-per="${escapeHtml(p.id)}">
+                <i class="ph ph-sun-horizon fx-ic" aria-hidden="true"></i><span class="fx-lb">${escapeHtml(p.name)}</span>
+                <span class="fx-val on">${escapeHtml(p.start)} às ${escapeHtml(p.end)}</span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+            </button>`).join('') + '</div>';
+    }
+    plusPerSub();
 }
+(function () {
+    const box = document.getElementById('period-select-container');
+    if (box) box.addEventListener('click', (e) => { const b = e.target && e.target.closest ? e.target.closest('[data-per]') : null; if (b && box.contains(b)) commitPeriodBlock(b.getAttribute('data-per')); });
+})();
 
 function renderConfigPeriods() {
     const container = document.getElementById('config-periods-list');
@@ -6945,7 +6947,7 @@ window.cancelPendingTask = () => {
     renderTimeline();
 }
 
-input.addEventListener('keypress', e => { if (e.key === 'Enter') commitIntent(); });
+input.addEventListener('keypress', e => { if (e.key === 'Enter') commitPlus(); }); // V40.51.1: o Enter faz o mesmo que o botão (Tarefa, Descanso ou Sublista)
 // V40.3.8: Enter no título da Lista NÃO salva mais — pula pro primeiro check (ou cria um).
 // Regra de Ouro #2: usar preventScroll pra evitar buraco branco no PWA Android.
 backlogInput.addEventListener('keypress', e => {
@@ -9401,6 +9403,75 @@ function fxSync() {
 })();
 // Abre do topo (o mesmo formulário serve pra todos os itens: sem isto, abria rolado onde o anterior ficou).
 function fxTop(formId) { const b = document.querySelector('#' + formId + ' .fx-body'); if (b) b.scrollTop = 0; }
+
+
+// =====================================================
+// V40.51.1 — O + NA FICHA
+// =====================================================
+// Foto dele de 28/11 (12h58): "esqueceu de atualizar pra ficha quando entra pelo + na agenda" e os botões cortados (a
+// 384 px, o 1h e o Período ficavam fora da tela, à direita, e as tags e as metas pela metade). O + virou uma Ficha como
+// as das Listas: o nome grande, Tipo (Tarefa, Descanso ou Sublista, que eram os 2 botões de cima e iam direto pra mão),
+// Duração, Tag e Meta (pela folha de baixo) e o Período inteiro; o botão do pé faz o que o Tipo diz. A tag, a meta e o
+// tipo voltam pro começo a cada vez que o + abre (como antes); o nome e a duração ficam (o rascunho, V40.46.0).
+// (var e nada de let/const de fora no corpo: estas funções podem ser chamadas antes desta linha rodar)
+var plusKind = 'task'; // task | rest | sub
+window.plusKindSet = function (k) {
+    plusKind = k === 'rest' || k === 'sub' ? k : 'task';
+    plusSync();
+};
+// Tudo o que a Ficha do + mostra: o tipo, o texto do nome, a tag, a meta, o período e o botão do pé.
+function plusSync() {
+    const k = plusKind || 'task';
+    document.querySelectorAll('#bottom-sheet [data-plus-kind]').forEach(b => {
+        const on = b.getAttribute('data-plus-kind') === k;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    // o nome: Descanso e Sublista têm nome pronto (vale o escrito, se tiver); a tarefa mostra o da meta (V40.36.1)
+    if (k === 'rest' || k === 'sub') { const el = document.getElementById('task-input'); if (el) el.placeholder = k === 'rest' ? 'Descanso' : 'Sublista'; }
+    else goalNamePlaceholder('task-input', selectedGoalId, 'Nome da tarefa');
+    fxTagVal('plus-tag-val', selectedTagId);
+    fxGoalVal('goal-pick-new-wrap', 'goal-pick-new', selectedGoalId);
+    const gw = document.getElementById('goal-pick-new-wrap'), per = document.getElementById('plus-per-row');
+    if (gw && k !== 'task') gw.classList.add('hidden'); // como antes: o Descanso e a Sublista não levam meta
+    if (per) per.classList.toggle('hidden', k !== 'task'); // o período inteiro é sempre uma tarefa (commitPeriodBlock)
+    plusPerSub();
+    plusBtnLabel();
+}
+// O texto do botão do pé: o tipo e, aberto por 2 toques num vago, a hora.
+function plusBtnLabel() {
+    const btn = document.getElementById('commit-intent-btn');
+    if (!btn) return;
+    let at = '';
+    try { at = sheetSlot ? formatClock(sheetSlot.start) : ''; } catch (e) {}
+    const k = plusKind || 'task';
+    const txt = k === 'rest' ? (at ? 'Descanso às ' + at : 'Inserir descanso')
+        : k === 'sub' ? (at ? 'Sublista às ' + at : 'Inserir sublista')
+        : (at ? 'Inserir às ' + at : 'Inserir na Agenda');
+    btn.innerHTML = '<i class="ph-bold ph-calendar-plus" aria-hidden="true"></i><span>' + txt + '</span>';
+}
+// Embaixo de "Período inteiro": os nomes dos períodos (ou que não tem nenhum).
+function plusPerSub() {
+    const el = document.getElementById('plus-per-sub');
+    if (!el) return;
+    let names = [];
+    try { names = periodsDb.map(p => String(p.name || '').trim()).filter(Boolean); } catch (e) {}
+    el.textContent = names.length ? names.join(', ') : 'Nenhum criado ainda';
+}
+window.plusPickTag = function () {
+    fxPick({ title: 'Tag', items: fxTagItems(selectedTagId), onPick: (k) => { selectedTagId = k || null; plusSync(); } });
+};
+window.plusPickGoal = function () {
+    fxPick({ title: 'Meta', items: fxGoalItems(selectedGoalId), onPick: (k) => { selectedGoalId = goalKeep(k || null); plusSync(); } });
+};
+// O botão do pé (e o Enter no nome).
+window.commitPlus = function () {
+    const k = plusKind || 'task';
+    if (k === 'rest') return commitSpecialIntent(String(input.value || '').trim() || 'Descanso', 'rest');
+    if (k === 'sub') return commitSublistIntent();
+    if (!input.value.trim() && !goalById(goalKeep(selectedGoalId))) { showToast('Escreva o nome da tarefa ✏️'); return; }
+    return commitIntent();
+};
 
 
 // =====================================================

@@ -28,8 +28,10 @@ const UID = '11111111-1111-1111-1111-111111111111';
   // ======================================================================================================
   console.log('A) Criar a sublista pelo botão + (chip "Sublista", do lado do Descanso):');
   w.openSheet();
-  const chip = [...d.querySelectorAll('#bottom-sheet button')].find((b) => /Sublista/.test(b.textContent));
-  ok(!!chip && /Descanso/.test(chip.previousElementSibling.textContent), 'o chip "Sublista" está no + logo depois do "Descanso"');
+  // V40.51.1: o + virou Ficha: "Sublista" é uma escolha do Tipo (logo depois do Descanso) e o botão do pé coloca
+  const kind = [...d.querySelectorAll('#bottom-sheet button')].find((b) => /Sublista/.test(b.textContent));
+  const chip = { click() { kind.click(); $('commit-intent-btn').click(); } };
+  ok(!!kind && /Descanso/.test(kind.previousElementSibling.textContent), 'o "Sublista" está no + logo depois do "Descanso" (V40.51.1: no Tipo da ficha)');
   $('task-input').value = 'Pendências rápidas';
   d.querySelector('.sheet-dur-btn[data-time="60"]').click();
   chip.click();

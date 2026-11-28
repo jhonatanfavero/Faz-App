@@ -84,6 +84,8 @@ const waitFor = async (fn, ms = 9000) => { const t0 = Date.now(); while (Date.no
   const blockEl = (id) => d.querySelector(`#blocks-container .block-item[data-block-id="${id}"]`);
   const emptyEl = () => [...d.querySelectorAll('#blocks-container .block-item')].find((e) => e.classList.contains('bg-hatched'));
   const chips = (box) => [...$(box).querySelectorAll('[data-goal-pick]')].map((b) => b.dataset.goalPick + (b.className.includes('bg-app-focus') ? '*' : ''));
+  // V40.51.1: o + na Ficha: a meta se escolhe na folha de baixo (as mesmas opções, "Nenhuma" = sem meta)
+  const plusGoals = () => { w.plusPickGoal(); const r = [...d.querySelectorAll('#fx-pick-list [data-fx-k]')].map((b) => b.getAttribute('data-fx-k') + (b.getAttribute('aria-checked') === 'true' ? '*' : '')); w.fxPickClose(); return r; };
   const status = (id) => J(`FazMetas.status(goalsDb.find((g) => g.id === ${JSON.stringify(id)}), goalAllDays(), new Date())`);
   ev('renderTimeline()');
 
@@ -107,9 +109,9 @@ const waitFor = async (fn, ms = 9000) => { const t0 = Date.now(); while (Date.no
 
   console.log('\nB1) Pelo +:');
   w.openSheet();
-  ok(!$('goal-pick-new-wrap').classList.contains('hidden') && chips('goal-pick-new').join() === ['*', G_LER, G_CORRER, G_AGUA].join(), 'o + mostra "Sem meta" (marcado) e as 3 metas');
+  ok(!$('goal-pick-new-wrap').classList.contains('hidden') && plusGoals().join() === ['*', G_LER, G_CORRER, G_AGUA].join(), 'o + mostra "Nenhuma" (marcada) e as 3 metas (na folha da linha Meta)');
   w.selectNewGoal(G_LER);
-  ok(chips('goal-pick-new').join() === ['', G_LER + '*', G_CORRER, G_AGUA].join() && $('goal-pick-new').textContent.includes('📚'), 'tocar em "📚 Ler" marca ela');
+  ok(plusGoals().join() === ['', G_LER + '*', G_CORRER, G_AGUA].join() && $('goal-pick-new').textContent.includes('📚'), 'tocar em "📚 Ler" marca ela (a linha mostra o 📚)');
   $('task-input').value = 'Leitura do livro';
   d.querySelector('.sheet-dur-btn[data-time="30"]').click();
   w.commitIntent();
@@ -119,7 +121,7 @@ const waitFor = async (fn, ms = 9000) => { const t0 = Date.now(); while (Date.no
   ok(B1 && B1.goalId === G_LER && B1.duration === 30 && !B1.completed, 'soltou: o bloco nasce ligado à meta');
   ok(blockEl(B1.id).querySelector('.block-title .goal-badge') && blockEl(B1.id).querySelector('.block-title .goal-badge').textContent === '📚', 'o bloco mostra o 📚 antes do nome');
   w.openSheet();
-  ok(chips('goal-pick-new')[0] === '*', 'abrir o + de novo começa em "Sem meta"');
+  ok(plusGoals()[0] === '*', 'abrir o + de novo começa em "Nenhuma"');
   w.closeAllSheets();
 
   console.log('\nB2) Concluir conta:');

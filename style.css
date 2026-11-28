@@ -970,3 +970,18 @@ button.fx-row:active { background: #f7f7f9; }
 .fx-save > i { font-size: 18px; margin-right: 8px; }
 .fx-sub.one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fx-hint-top { margin: 0 4px 12px; }
+
+/* ========================================================================
+   V40.51.2 — O EDITAR DA AGENDA E O CARTÃO DA SUBLISTA NA FICHA. Eram janelinhas no meio da tela, com as fileiras de
+   tag e meta que cortavam na direita (a 384 px). Agora sobem de baixo (.fx-modal), no desenho da Ficha; a folha de
+   escolher (#fx-pick-modal) abre por cima delas, com o fundo escuro entre as duas (app.js, fxPick).
+   ======================================================================== */
+.fx-modal { max-height: 92%; border-radius: 22px 22px 0 0; background: #f8fafc; padding: 8px 0 max(14px, calc(var(--faz-safe-bottom) + 8px)); box-shadow: 0 -12px 30px -12px rgba(0, 0, 0, .3); }
+.fx-modal:not(.hidden) { animation: fxUp .24s cubic-bezier(.16, 1, .3, 1); }
+.fx-modal .fx-head { margin-top: 0; }
+.fx-modal .fx-body { padding-bottom: 14px; }
+.fx-from { margin: 2px 2px 0; font-size: 12.5px; font-weight: 700; color: #b45309; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fx-from:empty { display: none; }
+.fx-addic { color: var(--theme-color, #4f46e5); }
+.fx-cktx { flex: 1; min-width: 0; padding: 14px 0; font-size: 15px; line-height: 1.35; color: #27272a; overflow-wrap: anywhere; }
+.fx-cktx.done { color: #a1a1aa; text-decoration: line-through; }

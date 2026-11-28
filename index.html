@@ -1249,49 +1249,75 @@
         </div>
 
         <!-- MODAL 1: EDIÇÃO (COMBO A) -->
-        <div data-form="nome-bloco" id="edit-task-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100 transition-all duration-300">
-            <h3 id="edit-task-heading" class="text-lg font-bold text-zinc-900 mb-4 text-center">Editar Tarefa</h3>
-            <input type="text" id="edit-task-title" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-4 text-sm text-center">
-            <p class="text-xs text-zinc-500 font-medium mb-2 uppercase tracking-wider text-center">Etiqueta</p>
-            <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-2" id="edit-tag-selector-container"></div>
-            <!-- V40.34.0: meta ligada -->
-            <div id="edit-goal-wrap" class="hidden">
-                <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Meta</p>
-                <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-2" id="edit-goal-pick"></div>
+        <!-- V40.51.2: EDITAR NA AGENDA na FICHA (como o + e os formulários das Listas). Era a janelinha do meio, com as
+             fileiras de tag e meta que cortavam na direita a 384 px. Agora sobe de baixo: X / "Editar tarefa" em cima, o nome
+             grande, a ficha (Tag, Meta, Cor do cartão: a folha de baixo escolhe) e o Salvar no pé. O X fecha sem salvar
+             (como o Cancelar de antes; o voltar do celular pergunta "Descartar?" se mudou o nome). -->
+        <div data-form="nome-bloco" id="edit-task-modal" role="dialog" aria-modal="true" aria-labelledby="edit-task-heading" class="absolute inset-x-0 bottom-0 z-[60] hidden flex-col fx-modal">
+            <div class="fx-grab" aria-hidden="true"></div>
+            <div class="fx-head">
+                <button type="button" data-voltar onclick="cancelEdit()" aria-label="Fechar sem salvar" class="fx-back"><i class="ph-bold ph-x"></i></button>
+                <h3 id="edit-task-heading" class="fx-title">Editar tarefa</h3>
             </div>
-            <!-- V40.9.0: cor livre do cartão -->
-            <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Cor do cartão</p>
-            <div class="flex flex-wrap items-center gap-2 mb-6" id="edit-color-picker"></div>
-            <div class="flex gap-2">
-                <button data-voltar onclick="cancelEdit()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
-                <button onclick="saveEditTask()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:opacity-90 shadow-md transition">Salvar</button>
+            <div class="fx-body no-scrollbar">
+                <input type="text" id="edit-task-title" class="fx-name" placeholder="Nome" autocomplete="off" enterkeyhint="done" aria-label="Nome">
+                <p class="fx-sec">Detalhes</p>
+                <div class="fx-card">
+                    <button type="button" onclick="editPickTag()" aria-haspopup="dialog" class="fx-row">
+                        <i class="ph ph-tag fx-ic" aria-hidden="true"></i><span class="fx-lb">Tag</span><span id="edit-tag-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                    </button>
+                    <!-- V40.34.0: meta ligada (some sem metas e na sublista: quem liga é cada cartão dela) -->
+                    <button type="button" id="edit-goal-wrap" onclick="editPickGoal()" aria-haspopup="dialog" class="fx-row hidden">
+                        <i class="ph ph-target fx-ic" aria-hidden="true"></i><span class="fx-lb">Meta</span><span id="edit-goal-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                    </button>
+                    <!-- V40.9.0: cor livre do cartão -->
+                    <button type="button" onclick="editPickColor()" aria-haspopup="dialog" class="fx-row">
+                        <i class="ph ph-palette fx-ic" aria-hidden="true"></i><span class="fx-lb">Cor do cartão</span><span id="edit-color-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="fx-foot">
+                <button type="button" onclick="saveEditTask()" class="fx-save">Salvar</button>
             </div>
         </div>
 
-        <!-- V40.24.0: CARTÃO DA SUBLISTA (os mesmos campos do formulário da Lista: nome, etiqueta, cor e checklist) -->
-        <div data-form="cartao" id="sub-card-modal" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[88%] max-w-[340px] max-h-[86%] overflow-y-auto no-scrollbar bg-white rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[60] hidden flex-col border border-zinc-100">
-            <p id="sub-card-from" class="text-[11px] font-bold text-amber-700 uppercase tracking-wider text-center mb-1 truncate"></p>
-            <h3 class="text-lg font-bold text-zinc-900 mb-3 text-center">Cartão da sublista</h3>
-            <input type="text" id="sub-card-title" maxlength="200" autocomplete="off" class="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 font-bold focus:outline-none focus:border-app-focus transition-colors mb-4 text-sm text-center">
-            <p class="text-xs text-zinc-500 font-medium mb-2 uppercase tracking-wider text-center">Etiqueta</p>
-            <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-2" id="sub-card-tags"></div>
-            <!-- V40.34.0: meta ligada (o cartão feito conta nela) -->
-            <div id="sub-card-goal-wrap" class="hidden">
-                <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Meta</p>
-                <div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-2" id="sub-card-goals"></div>
+        <!-- V40.24.0: CARTÃO DA SUBLISTA (os mesmos campos do formulário da Lista: nome, etiqueta, cor e checklist).
+             V40.51.2: na FICHA, subindo de baixo como o Editar: o nome grande, a ficha (Tag, Meta, Cor), o checklist e o
+             Salvar no pé; "Voltar pra lista" e "Apagar cartão" foram pro ⋯ -->
+        <div data-form="cartao" id="sub-card-modal" role="dialog" aria-modal="true" aria-labelledby="sub-card-heading" class="absolute inset-x-0 bottom-0 z-[60] hidden flex-col fx-modal">
+            <div class="fx-grab" aria-hidden="true"></div>
+            <div class="fx-head">
+                <button type="button" data-voltar onclick="closeSubCard()" aria-label="Fechar sem salvar" class="fx-back"><i class="ph-bold ph-x"></i></button>
+                <h3 id="sub-card-heading" class="fx-title">Cartão da sublista</h3>
+                <button type="button" id="sub-card-more" onclick="subCardMore()" aria-label="Mais opções do cartão" aria-haspopup="dialog" class="fx-more"><i class="ph-bold ph-dots-three"></i></button>
             </div>
-            <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Cor do cartão</p>
-            <div class="flex flex-wrap items-center gap-2 mb-4" id="sub-card-colors"></div>
-            <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Checklist</p>
-            <div id="sub-card-mbs" class="flex flex-col gap-0.5 mb-2"></div>
-            <input type="text" id="sub-card-mb-new" maxlength="200" autocomplete="off" placeholder="+ Adicionar check" class="w-full rounded-lg px-3 py-2 text-[12px] bg-zinc-50 border border-zinc-200 outline-none focus:border-app-focus mb-4" onkeypress="if(event.key==='Enter'){event.preventDefault();addSubCardMb();}">
-            <div class="flex gap-2 mb-2">
-                <button onclick="subCardToListFromModal()" class="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-[12px] border border-emerald-200 hover:bg-emerald-100 transition"><i class="ph ph-list-bullets text-base"></i>Voltar pra lista</button>
-                <button id="sub-card-del" onclick="deleteSubCardFromModal()" class="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-zinc-100 text-red-600 font-bold text-[12px] hover:bg-red-50 transition"><i class="ph ph-trash text-base"></i>Apagar cartão</button>
+            <div class="fx-body no-scrollbar">
+                <p id="sub-card-from" class="fx-from"></p>
+                <input type="text" id="sub-card-title" maxlength="200" autocomplete="off" enterkeyhint="done" class="fx-name" aria-label="Nome do cartão">
+                <p class="fx-sec">Detalhes</p>
+                <div class="fx-card">
+                    <button type="button" onclick="subCardPickTag()" aria-haspopup="dialog" class="fx-row">
+                        <i class="ph ph-tag fx-ic" aria-hidden="true"></i><span class="fx-lb">Tag</span><span id="sub-card-tag-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                    </button>
+                    <!-- V40.34.0: meta ligada (o cartão feito conta nela) -->
+                    <button type="button" id="sub-card-goal-wrap" onclick="subCardPickGoal()" aria-haspopup="dialog" class="fx-row hidden">
+                        <i class="ph ph-target fx-ic" aria-hidden="true"></i><span class="fx-lb">Meta</span><span id="sub-card-goal-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" onclick="subCardPickColor()" aria-haspopup="dialog" class="fx-row">
+                        <i class="ph ph-palette fx-ic" aria-hidden="true"></i><span class="fx-lb">Cor do cartão</span><span id="sub-card-color-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <p id="sub-card-ck-sec" class="fx-sec">Checklist</p>
+                <div class="fx-card">
+                    <div id="sub-card-mbs"></div>
+                    <label class="fx-row fx-ckrow">
+                        <i class="ph-bold ph-plus fx-ic fx-addic" aria-hidden="true"></i>
+                        <input type="text" id="sub-card-mb-new" maxlength="200" autocomplete="off" enterkeyhint="enter" placeholder="Adicionar item" aria-label="Adicionar item ao checklist" class="fx-ckin" onkeypress="if(event.key==='Enter'){event.preventDefault();addSubCardMb();}">
+                    </label>
+                </div>
             </div>
-            <div class="flex gap-2">
-                <button data-voltar onclick="closeSubCard()" class="flex-1 py-3 rounded-xl bg-zinc-100 text-zinc-600 font-bold text-sm hover:bg-zinc-200 transition">Cancelar</button>
-                <button onclick="saveSubCard()" class="flex-1 py-3 rounded-xl bg-app-focus text-white font-bold text-sm hover:opacity-90 shadow-md transition">Salvar</button>
+            <div class="fx-foot">
+                <button type="button" onclick="saveSubCard()" class="fx-save">Salvar</button>
             </div>
         </div>
 
@@ -1675,7 +1701,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.51.1</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.51.2</div>
 
     </div>
 

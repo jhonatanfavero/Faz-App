@@ -223,7 +223,9 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     respiro dos lados) e tem `.fx-head` (o X com `data-voltar="fechar"` ou o ← com `data-voltar`), `.fx-body` e `.fx-foot`
     dentro dela. Nada de fileira que rola pro lado (`overflow-x-auto`) num formulário: a 384 px ela cortava os botões
     (foto dele de 28/11); poucas opções viram `.fx-seg.full` numa `.fx-row.stack`, muitas viram linha que abre a folha.
-    O `tests/test_v40511.js` confere o +.
+    O `tests/test_v40511.js` confere o +. Janelinha com formulário na Ficha (o Editar da agenda e o Cartão da sublista,
+    V40.51.2): sobe de baixo com `.fx-modal` (X com `data-voltar` + título, `.fx-body`, `.fx-foot`); a folha do `fxPick`
+    por cima dela vai pra z 70 com o fundo escuro em 65 e, ao fechar, o fundo volta pra onde estava (`test_v40512.js`).
 
 ## Publicar uma versão
 

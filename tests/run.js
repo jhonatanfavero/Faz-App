@@ -62,6 +62,7 @@ const SUITES = [
     ['V40.50.1: o topo do iPhone instalado fora da faixa que o iOS 26 embaça', 'test_v40501.js', [ROOT]],
     ['V40.51.0: a Ficha (tarefa, rotina, nota, despesa e meta no celular; o cartão e as janelas no PC)', 'test_v40510.js', [ROOT, DADOS]],
     ['V40.51.1: o + da agenda na Ficha (Tipo, Duração, Tag, Meta, Período inteiro)', 'test_v40511.js', [ROOT, DADOS]],
+    ['V40.51.2: o Editar da agenda e o Cartão da sublista na Ficha (sobem de baixo; a folha por cima)', 'test_v40512.js', [ROOT, DADOS]],
     ['Texto digitado nunca vira HTML', 'test_injecao.js', [ROOT]],
 ];
 // A versão tem que ser a mesma no selo do celular, no selo do PC, no cache do service worker, no backup e no package.json.

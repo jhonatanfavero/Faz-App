@@ -316,7 +316,7 @@ const { abrir } = require('./apoio');
   const md = await m.evaluate(() => { const e = document.getElementById('sub-card-modal'), r = e.getBoundingClientRect(); return { aberto: !e.classList.contains('hidden'), cabe: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, nome: document.getElementById('sub-card-title').value }; });
   ok(md.aberto && md.cabe && md.nome === 'Responder o Anderson', 'tocar no nome abre o cartão, inteiro na tela');
   await foto(m, 'cel-sublista-cartao.png');
-  await m.tap('#sub-card-modal button:has-text("Cancelar")'); await m.waitForTimeout(250);
+  await m.tap('#sub-card-modal .fx-back'); await m.waitForTimeout(250); // V40.51.2: o X da Ficha (era o Cancelar)
   // arrastar a sublista com o dedo (meia hora pra baixo = 90 px)
   const st0 = await m.evaluate((id) => db.find((b) => b.id === id).startMin, S1);
   const h = await rect(`${subSel} .drag-handle`);

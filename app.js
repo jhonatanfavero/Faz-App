@@ -2327,36 +2327,48 @@ window.openSublistCard = function(bid, cid, e) {
     m.classList.add('flex');
     pushNavState();
 };
+// V40.51.2 (Ficha): cada linha mostra o escolhido (Tag, Meta e Cor abrem a folha de baixo); o checklist com a
+// bolinha de feito, como o da tarefa; "Voltar pra lista" e "Apagar cartão" no ⋯ (subCardMore)
 function renderSubCardForm() {
     const ed = subCardEdit;
     if (!ed) return;
-    let html = `<button onclick="selectSubCardTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${ed.tagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
-    tagsDb.forEach(t => {
-        const on = ed.tagId === t.id;
-        html += `<button onclick="selectSubCardTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${on ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100'}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>${escapeHtml(t.name)}</button>`;
-    });
-    document.getElementById('sub-card-tags').innerHTML = html;
-    goalPickFill('sub-card-goal-wrap', 'sub-card-goals', ed.goalId, 'selectSubCardGoal'); // V40.34.0
+    fxTagVal('sub-card-tag-val', ed.tagId);
+    fxGoalVal('sub-card-goal-wrap', 'sub-card-goal-val', ed.goalId); // V40.34.0
     goalNamePlaceholder('sub-card-title', ed.goalId, ''); // V40.36.1
-    fazRenderColorPicker('sub-card-colors', ed.color, 'fazPickSubCardColor');
+    fxColorVal('sub-card-color-val', ed.color);
     renderSubCardMbs();
-    const del = document.getElementById('sub-card-del');
-    del.innerHTML = ed.delArmed ? '<i class="ph ph-warning text-base"></i>Toque de novo pra apagar' : '<i class="ph ph-trash text-base"></i>Apagar cartão';
-    del.classList.toggle('sub-armed', !!ed.delArmed);
 }
 function renderSubCardMbs() {
     const ed = subCardEdit;
     if (!ed) return;
-    document.getElementById('sub-card-mbs').innerHTML = ed.mbs.length ? ed.mbs.map((m, i) => `
-        <div class="flex items-center gap-2 px-1 py-0.5">
-            <button type="button" onclick="toggleSubCardMb(${i})" class="shrink-0 w-4 h-4 rounded-[4px] border flex items-center justify-center ${m.done ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-300 bg-white'}" aria-label="${m.done ? 'Desmarcar' : 'Marcar'}">${m.done ? '<i class="ph-bold ph-check text-[10px] text-white"></i>' : ''}</button>
-            <span class="flex-1 min-w-0 text-[12px] break-words ${m.done ? 'line-through text-zinc-400' : 'text-zinc-700'}">${escapeHtml(m.title)}</span>
-            <button type="button" onclick="removeSubCardMb(${i})" class="shrink-0 w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-red-500" aria-label="Remover item"><i class="ph ph-x text-[12px]"></i></button>
-        </div>`).join('') : '<p class="text-[11px] text-zinc-400 px-1">Sem checklist.</p>';
+    document.getElementById('sub-card-mbs').innerHTML = ed.mbs.map((m, i) => `
+        <div class="fx-row fx-ckrow">
+            <button type="button" onclick="toggleSubCardMb(${i})" class="fx-ck${m.done ? ' on' : ''}" aria-pressed="${m.done ? 'true' : 'false'}" aria-label="${m.done ? 'Desmarcar o item' : 'Marcar o item como feito'}"><i class="ph-bold ph-check"></i></button>
+            <span class="fx-cktx${m.done ? ' done' : ''}">${escapeHtml(m.title)}</span>
+            <button type="button" onclick="removeSubCardMb(${i})" class="fx-x" aria-label="Tirar o item"><i class="ph ph-x"></i></button>
+        </div>`).join('');
+    const sec = document.getElementById('sub-card-ck-sec'), done = ed.mbs.filter(m => m.done).length;
+    if (sec) sec.textContent = done ? `Checklist · ${done} de ${ed.mbs.length}` : 'Checklist';
 }
 window.selectSubCardTag = function(id) { if (!subCardEdit) return; subCardEdit.tagId = subCardEdit.tagId === id ? null : id; renderSubCardForm(); };
-window.selectSubCardGoal = function(id) { if (!subCardEdit) return; subCardEdit.goalId = goalKeep(id || null); goalPickFill('sub-card-goal-wrap', 'sub-card-goals', subCardEdit.goalId, 'selectSubCardGoal'); goalNamePlaceholder('sub-card-title', subCardEdit.goalId, ''); }; // V40.34.0; V40.36.1: nome da meta clarinho
-window.fazPickSubCardColor = function(c) { if (!subCardEdit) return; subCardEdit.color = fazCardColor(c); fazRenderColorPicker('sub-card-colors', subCardEdit.color, 'fazPickSubCardColor'); };
+window.selectSubCardGoal = function(id) { if (!subCardEdit) return; subCardEdit.goalId = goalKeep(id || null); renderSubCardForm(); }; // V40.34.0; V40.36.1: nome da meta clarinho
+window.fazPickSubCardColor = function(c) { if (!subCardEdit) return; subCardEdit.color = fazCardColor(c); renderSubCardForm(); };
+window.subCardPickTag = function() { if (subCardEdit) fxPick({ title: 'Tag', items: fxTagItems(subCardEdit.tagId), onPick: (k) => { if (subCardEdit) { subCardEdit.tagId = k || null; renderSubCardForm(); } } }); };
+window.subCardPickGoal = function() { if (subCardEdit) fxPick({ title: 'Meta', items: fxGoalItems(subCardEdit.goalId), onPick: (k) => selectSubCardGoal(k || null) }); };
+window.subCardPickColor = function() { if (subCardEdit) fxPick({ title: 'Cor do cartão', colors: true, cur: subCardEdit.color, onPick: (k) => fazPickSubCardColor(k || null) }); };
+// O ⋯: Voltar pra lista e Apagar cartão (o ⋯ e a escolha já são os 2 toques do apagar de antes)
+window.subCardMore = function() {
+    const ed = subCardEdit, f = ed ? subFindCard(ed.bid, ed.cid) : null;
+    if (!f) return;
+    fxPick({ title: f.card.title || 'Cartão', items: [
+        { k: 'lista', label: 'Voltar pra lista', ic: 'ph ph-list-bullets' },
+        { k: 'apagar', label: 'Apagar cartão', ic: 'ph ph-trash', danger: true }
+    ], onPick: (k) => {
+        if (!subCardEdit) return;
+        if (k === 'lista') subCardToListFromModal();
+        else if (k === 'apagar') { subCardEdit.delArmed = true; deleteSubCardFromModal(); }
+    } });
+};
 window.toggleSubCardMb = function(i) { const m = subCardEdit && subCardEdit.mbs[i]; if (m) { m.done = !m.done; renderSubCardMbs(); } };
 window.removeSubCardMb = function(i) { if (!subCardEdit) return; subCardEdit.mbs.splice(i, 1); renderSubCardMbs(); };
 window.addSubCardMb = function() {
@@ -2404,7 +2416,7 @@ window.subCardToListFromModal = function() {
 window.deleteSubCardFromModal = function() {
     const ed = subCardEdit;
     if (!ed) return;
-    if (!ed.delArmed) { ed.delArmed = true; renderSubCardForm(); return; } // 2 toques: não apaga sem querer
+    if (!ed.delArmed) { ed.delArmed = true; return; } // 2 toques: não apaga sem querer (V40.51.2: o ⋯ já chama armado)
     const f = subFindCard(ed.bid, ed.cid);
     if (f) {
         f.b.cards = f.b.cards.filter(c => c.id !== ed.cid);
@@ -4293,7 +4305,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.51.1',
+            version: 'v40.51.2',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -7317,7 +7329,7 @@ let editingTaskId = null;
 let editingTagId = null;
 let editingColor = null; // V40.9.0
 let editingGoalId = null; // V40.34.0
-window.fazPickEditColor = function(c) { editingColor = fazCardColor(c); fazRenderColorPicker('edit-color-picker', editingColor, 'fazPickEditColor'); };
+window.fazPickEditColor = function(c) { editingColor = fazCardColor(c); editSync(); }; // V40.51.2: a linha "Cor do cartão" da Ficha
 
 window.openEditModal = function(id, e) {
     if(e) e.stopPropagation();
@@ -7329,14 +7341,12 @@ window.openEditModal = function(id, e) {
     editingTaskId = id;
     editingTagId = b.tagId;
     editingColor = fazCardColor(b.color);
-    fazRenderColorPicker('edit-color-picker', editingColor, 'fazPickEditColor');
     
     document.getElementById('edit-task-title').value = b.title;
-    document.getElementById('edit-task-heading').textContent = isSublist(b) ? 'Editar sublista' : 'Editar Tarefa'; // V40.24.0
-    renderEditTagSelector();
+    document.getElementById('edit-task-heading').textContent = isSublist(b) ? 'Editar sublista' : 'Editar tarefa'; // V40.24.0; V40.51.2: Ficha (só a 1ª maiúscula)
     editingGoalId = goalKeep(b.goalId); // V40.34.0: a sublista não liga (cada cartão dela liga)
-    if (isSublist(b)) document.getElementById('edit-goal-wrap').classList.add('hidden');
-    else goalPickFill('edit-goal-wrap', 'edit-goal-pick', editingGoalId, 'selectEditGoal');
+    editSync();
+    const eb = document.querySelector('#edit-task-modal .fx-body'); if (eb) eb.scrollTop = 0;
     
     document.getElementById('overlay').classList.remove('opacity-0', 'pointer-events-none');
     document.getElementById('edit-task-modal').classList.remove('hidden');
@@ -7346,22 +7356,21 @@ window.openEditModal = function(id, e) {
 
 window.selectEditTag = function(id) {
     editingTagId = editingTagId === id ? null : id;
-    renderEditTagSelector();
+    editSync();
 }
-window.selectEditGoal = function(id) { editingGoalId = goalKeep(id || null); goalPickFill('edit-goal-wrap', 'edit-goal-pick', editingGoalId, 'selectEditGoal'); }; // V40.34.0
-
-window.renderEditTagSelector = function() {
-    const container = document.getElementById('edit-tag-selector-container');
-    if(!container) return;
-    container.className = 'flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2 w-full';
-    let html = `<button onclick="selectEditTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-sm font-medium transition whitespace-nowrap ${editingTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50'}">Sem</button>`;
-    tagsDb.forEach(t => {
-        const isActive = editingTagId === t.id;
-        const activeClass = isActive ? 'shadow-md ring-2 ring-offset-1' : 'opacity-70 hover:opacity-100';
-        html += `<button onclick="selectEditTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition whitespace-nowrap ${activeClass}" style="background-color: ${t.color}15; color: ${t.color}; border: 1px solid ${t.color}40; outline-color: ${t.color}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${t.color};"></div>${escapeHtml(t.name)}</button>`;
-    });
-    container.innerHTML = html;
+window.selectEditGoal = function(id) { editingGoalId = goalKeep(id || null); editSync(); }; // V40.34.0
+// V40.51.2 (Ficha): cada linha mostra o escolhido; Tag, Meta e Cor abrem a folha de baixo por cima da janela
+function editSync() {
+    const b = editingTaskId ? db.find(x => x.id === editingTaskId) : null;
+    fxTagVal('edit-tag-val', editingTagId);
+    if (b && isSublist(b)) document.getElementById('edit-goal-wrap').classList.add('hidden');
+    else fxGoalVal('edit-goal-wrap', 'edit-goal-val', editingGoalId);
+    fxColorVal('edit-color-val', editingColor);
 }
+window.renderEditTagSelector = editSync; // (o nome de antes: era a fileira de chips da tag)
+window.editPickTag = function() { fxPick({ title: 'Tag', items: fxTagItems(editingTagId), onPick: (k) => { editingTagId = k || null; editSync(); } }); };
+window.editPickGoal = function() { fxPick({ title: 'Meta', items: fxGoalItems(editingGoalId), onPick: (k) => { editingGoalId = goalKeep(k || null); editSync(); } }); };
+window.editPickColor = function() { fxPick({ title: 'Cor do cartão', colors: true, cur: editingColor, onPick: (k) => fazPickEditColor(k || null) }); };
 
 window.saveEditTask = function() {
     if(!editingTaskId) return;
@@ -9354,8 +9363,16 @@ function fxPick(o) {
     box.innerHTML = o.colors ? fxColorGridHtml(o.cur) : items.map(fxOptHtml).join('');
     box.scrollTop = 0;
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); // baixa o teclado: a folha fica inteira à vista
+    // V40.51.2: por cima de outra janelinha (o Editar da agenda, o cartão da sublista), a folha e o fundo escuro sobem
+    // (70 e 65, como o "Descartar?"): a de baixo fica escurecida; ao fechar, o fundo volta pra onde estava.
+    const ov = document.getElementById('overlay'), pm = document.getElementById('fx-pick-modal');
+    const under = navOpenModals().some(x => x.id !== 'fx-pick-modal');
+    fxPickUnderZ = under && ov ? ov.style.zIndex : null;
     showModal('fx-pick-modal');
+    if (pm) pm.style.zIndex = under ? '70' : '';
+    if (under && ov) ov.style.zIndex = '65';
 }
+var fxPickUnderZ = null;
 function fxPickDo(k) { const cb = fxPickCb; fxPickClose(); if (cb) cb(k); }
 // Fecha sem escolher (o "Fechar" escondido, que o voltar do celular e o fundo escuro tocam).
 window.fxPickClose = function() {
@@ -9364,8 +9381,11 @@ window.fxPickClose = function() {
     if (!m || m.classList.contains('hidden')) return;
     m.classList.add('hidden');
     m.classList.remove('flex');
-    const ov = document.getElementById('overlay');
-    if (!ov || getOpenModal()) return; // outra janelinha embaixo dela: o fundo escuro fica
+    m.style.zIndex = '';
+    const ov = document.getElementById('overlay'), was = fxPickUnderZ;
+    fxPickUnderZ = null;
+    if (!ov) return;
+    if (getOpenModal()) { if (was !== null) ov.style.zIndex = was; return; } // outra janelinha embaixo dela: o fundo escuro fica (V40.51.2: atrás dela de novo)
     ov.style.zIndex = '';
     if (!navOpenSheets().length) ov.classList.add('opacity-0', 'pointer-events-none'); // com a tela aberta, o fundo volta pra trás dela
 };

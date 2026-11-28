@@ -103,7 +103,9 @@ const UID = '11111111-1111-1111-1111-111111111111';
   subEl(S1).querySelectorAll('.sub-card .sub-card-title')[1].click();
   const modal = $('sub-card-modal');
   ok(!modal.classList.contains('hidden') && $('sub-card-title').value === 'Tarefa 1' && $('sub-card-from').textContent === 'Sublista: Pendências rápidas', 'tocar no nome abre o cartão');
-  ok($('sub-card-tags').querySelectorAll('button').length === 1 + JSON.parse(L('tb_tags_db')).length && $('sub-card-mbs').querySelectorAll('button[onclick^="toggleSubCardMb"]').length === 3, 'mostra as etiquetas e a checklist (3 itens)');
+  w.subCardPickTag(); // V40.51.2: a Tag abre a folha de baixo
+  const tagOpts = d.querySelectorAll('#fx-pick-list [data-fx-k]').length; w.fxPickClose();
+  ok(tagOpts === 1 + JSON.parse(L('tb_tags_db')).length && $('sub-card-mbs').querySelectorAll('button[onclick^="toggleSubCardMb"]').length === 3, 'mostra as etiquetas (na folha) e a checklist (3 itens)');
   w.toggleSubCardMb(0);
   $('sub-card-mb-new').value = 'Conferir a data'; w.addSubCardMb();
   w.fazPickSubCardColor('#3b82f6');
@@ -134,7 +136,7 @@ const UID = '11111111-1111-1111-1111-111111111111';
   const c0 = get(S1).cards[0];
   w.openSublistCard(S1, c0.id, {});
   w.deleteSubCardFromModal();
-  ok(get(S1).cards.length === 1 && /Toque de novo/.test($('sub-card-del').textContent) && !modal.classList.contains('hidden'), '1º toque em "Apagar cartão" só pede confirmação');
+  ok(get(S1).cards.length === 1 && ev('subCardEdit && subCardEdit.delArmed') === true && !modal.classList.contains('hidden'), '1º toque em "Apagar cartão" só arma (V40.51.2: pelo ⋯ já vem armado)');
   w.deleteSubCardFromModal();
   ok(get(S1).cards.length === 0 && lastToast() === 'Cartão apagado.' && modal.classList.contains('hidden'), '2º toque apaga');
   w.openSublistCard(S1, 'cd_nao_existe', {});
@@ -174,7 +176,7 @@ const UID = '11111111-1111-1111-1111-111111111111';
   ok($('edit-task-heading').textContent === 'Editar sublista', 'Editar mostra "Editar sublista"');
   w.cancelEdit();
   w.openEditModal(ev("db.find((b) => !Array.isArray(b.cards)).id"), { stopPropagation() {} });
-  ok($('edit-task-heading').textContent === 'Editar Tarefa', 'bloco normal continua "Editar Tarefa"');
+  ok($('edit-task-heading').textContent === 'Editar tarefa', 'bloco normal continua "Editar tarefa" (V40.51.2: Ficha, só a 1ª maiúscula)');
   w.cancelEdit();
   // apagar com cartões não feitos: devolve e apaga
   w.openDeleteModal(S2, { stopPropagation() {} });

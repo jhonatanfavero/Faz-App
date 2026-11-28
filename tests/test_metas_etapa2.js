@@ -85,6 +85,8 @@ const waitFor = async (fn, ms = 9000) => { const t0 = Date.now(); while (Date.no
   const emptyEl = () => [...d.querySelectorAll('#blocks-container .block-item')].find((e) => e.classList.contains('bg-hatched'));
   const chips = (box) => [...$(box).querySelectorAll('[data-goal-pick]')].map((b) => b.dataset.goalPick + (b.className.includes('bg-app-focus') ? '*' : ''));
   // V40.51.1: o + na Ficha: a meta se escolhe na folha de baixo (as mesmas opções, "Nenhuma" = sem meta)
+  // V40.51.2: o Editar da agenda e o cartão da sublista também (pickGoals('editPickGoal'), pickGoals('subCardPickGoal'))
+  const pickGoals = (fn) => { w[fn](); const r = [...d.querySelectorAll('#fx-pick-list [data-fx-k]')].map((b) => b.getAttribute('data-fx-k') + (b.getAttribute('aria-checked') === 'true' ? '*' : '')); w.fxPickClose(); return r; };
   const plusGoals = () => { w.plusPickGoal(); const r = [...d.querySelectorAll('#fx-pick-list [data-fx-k]')].map((b) => b.getAttribute('data-fx-k') + (b.getAttribute('aria-checked') === 'true' ? '*' : '')); w.fxPickClose(); return r; };
   const status = (id) => J(`FazMetas.status(goalsDb.find((g) => g.id === ${JSON.stringify(id)}), goalAllDays(), new Date())`);
   ev('renderTimeline()');
@@ -146,7 +148,7 @@ const waitFor = async (fn, ms = 9000) => { const t0 = Date.now(); while (Date.no
 
   console.log('\nB3) Pela edição do bloco:');
   w.openEditModal(b0.id, stop);
-  ok(!$('edit-goal-wrap').classList.contains('hidden') && chips('edit-goal-pick')[0] === '*', 'a edição do bloco mostra a linha "Meta" (em "Sem meta")');
+  ok(!$('edit-goal-wrap').classList.contains('hidden') && pickGoals('editPickGoal')[0] === '*' && $('edit-goal-val').textContent.trim() === 'Nenhuma', 'a edição do bloco mostra a linha "Meta" (em "Nenhuma"; V40.51.2: a folha)');
   w.selectEditGoal(G_CORRER);
   w.saveEditTask(); await sleep(20);
   ok(blk(b0.id).goalId === G_CORRER && blockEl(b0.id).querySelector('.goal-badge').textContent === '🏃', 'salvou: o bloco fica ligado a 🏃 Correr (com o selo)');
@@ -199,7 +201,7 @@ const waitFor = async (fn, ms = 9000) => { const t0 = Date.now(); while (Date.no
   ok($('edit-goal-wrap').classList.contains('hidden'), 'a sublista em si não liga (quem liga é cada cartão)');
   w.cancelEdit();
   w.openSublistCard('f_sub_meta', 'cd_a1', stop);
-  ok(!$('sub-card-goal-wrap').classList.contains('hidden') && chips('sub-card-goals')[0] === '*', 'o cartão da sublista mostra a linha "Meta"');
+  ok(!$('sub-card-goal-wrap').classList.contains('hidden') && pickGoals('subCardPickGoal')[0] === '*', 'o cartão da sublista mostra a linha "Meta"');
   w.selectSubCardGoal(G_AGUA); w.saveSubCard(); await sleep(20);
   ok(J(`db.find((b) => b.id === 'f_sub_meta').cards[0]`).goalId === G_AGUA, 'salvou: o cartão fica ligado');
   ev(`db.find((b) => b.id === 'f_sub_meta').expanded = true; renderTimeline();`);
@@ -245,7 +247,7 @@ const waitFor = async (fn, ms = 9000) => { const t0 = Date.now(); while (Date.no
   ev('renderTimeline(); renderBacklog();');
   ok(!ev(`goalsDb.some((g) => g.id === ${JSON.stringify(G_AGUA)})`) && !d.querySelector('[data-card-id="cd_a1"] .goal-badge') && !d.querySelector(`[data-bl-card="${T1b.id}"] .goal-badge`), 'apagou 💧 Beber água: os selos somem (cartão da sublista e tarefa)');
   w.openSublistCard('f_sub_meta', 'cd_a1', stop);
-  ok(chips('sub-card-goals')[0] === '*', 'o cartão abre em "Sem meta"');
+  ok(pickGoals('subCardPickGoal')[0] === '*', 'o cartão abre em "Nenhuma"');
   w.closeSubCard && w.closeSubCard();
   w.fazUndo(); await sleep(40);
   ok(ev(`goalsDb.some((g) => g.id === ${JSON.stringify(G_AGUA)})`) && !!d.querySelector(`[data-bl-card="${T1b.id}"] .goal-badge`), 'Desfazer: a meta volta e os selos também');

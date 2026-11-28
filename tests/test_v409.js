@@ -43,7 +43,9 @@ const ev = { stopPropagation() {}, preventDefault() {} };
 
   console.log('\nB) Cor livre na agenda:');
   w.eval("openEditModal('f_c1', __ev)");
-  ok($('edit-color-picker').querySelectorAll('button').length === 13, 'editar bloco mostra as cores');
+  w.editPickColor(); // V40.51.2: a Cor do cartão abre a folha de baixo (a grade com os nomes)
+  ok(w.document.querySelectorAll('#fx-pick-list [data-fx-k]').length === 13 && !!w.document.querySelector('#fx-pick-list input[type=color]'), 'editar bloco mostra as cores (na folha)');
+  w.fxPickClose();
   w.fazPickEditColor('#3b82f6'); w.saveEditTask();
   const el = w.document.querySelector('[data-block-id="f_c1"]');
   ok(w.eval("db.find(x => x.id === 'f_c1').color") === '#3b82f6' && el.style.backgroundColor === 'rgb(59, 130, 246)' && !el.classList.contains('bg-app-focus'), 'bloco pintado de azul (no lugar da cor do tema)');

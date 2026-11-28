@@ -821,3 +821,141 @@ header.ag-slim { padding-bottom: 8px !important; padding-top: max(calc(env(safe-
 .qb-opt:active { background: rgba(0, 0, 0, 0.15); }
 .qb-new { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 12px; border-radius: 9999px; border: 1px dashed #d4d4d8; color: #71717a; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
 .qb-new:active { background: #f4f4f5; }
+
+/* ========================================================================
+   V40.51.0 — FICHA: os formulários das Listas (Tarefa, Rotina, Nota, Despesa e Meta). Escolhida pelo Jhonatan em
+   28/11/2026 ("1. Ficha", em todos): o nome grande em cima, uma ficha branca com uma linha por ajuste (o que está
+   escolhido na direita) e o "Salvar" no pé. Tag, Meta, Cor e Categoria abrem a folha de baixo (#fx-pick-modal);
+   Arquivar e Apagar ficam no ⋯. Com um formulário aberto, a tela das Listas ganha .fx-open (app.js, fxSync): somem o
+   "Menu", o X e as abas, e o formulário vai de ponta a ponta.
+   REGRA: nada aqui põe display em elemento que liga/desliga com .hidden (o .hidden do Tailwind vem depois e perderia);
+   esses usam :not(.hidden).
+   ======================================================================== */
+#list-sheet.fx-open { background-color: #f8fafc; padding-left: 0 !important; padding-right: 0 !important; }
+#list-sheet.fx-open #list-topbar, #list-sheet.fx-open #list-tabs { display: none !important; }
+.fx-view { background: #f8fafc; color: #18181b; }
+.fx-head { flex: none; display: flex; align-items: center; gap: 10px; margin-top: -0.5rem; padding: 0 12px 6px; }
+.fx-back, .fx-more:not(.hidden) { display: inline-flex; }
+.fx-back, .fx-more { width: 40px; height: 40px; flex: none; border-radius: 9999px; align-items: center; justify-content: center; font-size: 19px; color: #3f3f46; transition: transform .12s, background-color .12s; }
+.fx-back { background: #eef0f3; }
+.fx-back:active, .fx-more:active { transform: scale(.92); background: #e4e6ea; }
+.fx-title { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; color: #18181b; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fx-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 18px 20px; }
+.fx-body.col { display: flex; flex-direction: column; }
+/* o nome grande (e, na rotina e na meta, o emoji ao lado) */
+.fx-name { display: block; width: 100%; min-width: 0; padding: 8px 2px 12px; font-size: 24px; line-height: 1.25; font-weight: 700; letter-spacing: -.02em; color: #18181b; background: transparent; border: 0; border-bottom: 1px solid #ececf0; border-radius: 0; outline: none; caret-color: var(--theme-color, #4f46e5); transition: border-color .15s; }
+.fx-name::placeholder { color: #c4c4cc; font-weight: 600; }
+.fx-name:focus { border-bottom-color: var(--theme-color, #4f46e5); }
+.fx-namerow { display: flex; align-items: center; gap: 12px; padding: 6px 0 12px; border-bottom: 1px solid #ececf0; transition: border-color .15s; }
+.fx-namerow:focus-within { border-bottom-color: var(--theme-color, #4f46e5); }
+.fx-namerow .fx-name { flex: 1; padding: 0 2px; border-bottom: 0; }
+.fx-emoji { width: 52px; height: 52px; flex: none; padding: 0; border-radius: 14px; background: #fff; border: 1px solid #ececf0; text-align: center; font-size: 26px; line-height: 1; outline: none; transition: border-color .15s; }
+.fx-emoji:focus { border-color: var(--theme-color, #4f46e5); }
+.fx-emoji::placeholder { opacity: .5; }
+.fx-sec { margin: 20px 2px 8px; font-size: 12.5px; font-weight: 600; color: #8b8b94; }
+/* a ficha: cartão branco com uma linha por ajuste. A linha de cima de cada uma fica 1 px pra fora (margin-top -1px)
+   e o cartão corta (overflow): assim a primeira linha À VISTA nunca mostra o traço, mesmo com uma escondida antes dela. */
+.fx-card { background: #fff; border: 1px solid #ececf0; border-radius: 16px; overflow: hidden; }
+.fx-row:not(.hidden) { display: flex; }
+.fx-row { width: 100%; align-items: center; gap: 12px; min-height: 54px; padding: 0 14px; margin-top: -1px; border-top: 1px solid #f2f2f5; text-align: left; color: #27272a; background: transparent; -webkit-tap-highlight-color: transparent; }
+button.fx-row, label.fx-row { cursor: pointer; }
+button.fx-row:active { background: #f7f7f9; }
+.fx-row.stack { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px; }
+.fx-rowtop { display: flex; align-items: center; gap: 12px; }
+.fx-ic { width: 22px; flex: none; text-align: center; font-size: 20px; color: #71717a; }
+.fx-lb { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; color: #27272a; line-height: 1.25; }
+.fx-sub { display: block; margin-top: 2px; font-size: 12px; font-weight: 500; color: #a1a1aa; }
+.fx-val { min-width: 0; max-width: 60%; display: inline-flex; align-items: center; gap: 7px; font-size: 14.5px; font-weight: 500; color: #a1a1aa; white-space: nowrap; }
+.fx-val.on { color: #27272a; }
+.fx-vt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fx-ve { flex: none; font-size: 16px; line-height: 1; }
+.fx-car { flex: none; margin-left: -4px; font-size: 15px; color: #c4c4cc; }
+.fx-dot { width: 12px; height: 12px; flex: none; border-radius: 9999px; display: inline-block; }
+.fx-dot.lg { width: 16px; height: 16px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08); }
+.fx-row.fx-add .fx-ic, .fx-row.fx-add .fx-lb { color: var(--theme-color, #4f46e5); font-weight: 600; }
+/* duração: − 30 min + */
+.fx-stp { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.fx-stp > button { width: 34px; height: 34px; border-radius: 9999px; background: #f1f2f5; color: #3f3f46; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; transition: transform .12s, background-color .12s; }
+.fx-stp > button:active { transform: scale(.9); background: #e4e6ea; }
+.fx-stv { min-width: 64px; text-align: center; font-size: 15px; font-weight: 700; color: #18181b; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* escolha entre poucas opções (Foco/Descanso, Avulsa/Recorrente/Parcelada, Diária/Semanal/Mensal…) */
+.fx-seg { display: inline-flex; flex: none; gap: 2px; padding: 3px; border-radius: 11px; background: #f1f2f5; }
+.fx-seg.full { display: flex; }
+.fx-seg > button { height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: #52525b; white-space: nowrap; transition: background-color .15s, color .15s, box-shadow .15s; }
+.fx-seg.full > button { flex: 1; min-width: 0; padding: 0 6px; }
+.fx-seg > button.on { background: #fff; color: #18181b; font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 0 0 1px rgba(0, 0, 0, .03); }
+/* campos curtos na própria linha (valor, dia, parcelas, meta) */
+.fx-field { display: inline-flex; align-items: center; gap: 6px; flex: none; height: 38px; padding: 0 12px; border-radius: 10px; background: #f1f2f5; cursor: text; transition: box-shadow .15s, background-color .15s; }
+.fx-field:focus-within { background: #fff; box-shadow: 0 0 0 1.5px var(--theme-color, #4f46e5); }
+.fx-pre, .fx-suf { font-size: 14px; font-weight: 600; color: #a1a1aa; white-space: nowrap; }
+.fx-inp { width: 96px; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; outline: none; text-align: right; font-size: 15px; font-weight: 700; color: #18181b; font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield; }
+.fx-inp.sm { width: 42px; }
+.fx-inp::placeholder { color: #c4c4cc; font-weight: 600; }
+.fx-inp::-webkit-outer-spin-button, .fx-inp::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+/* liga/desliga (despesa paga) */
+.fx-sw { width: 44px; height: 26px; flex: none; border-radius: 9999px; background: #d4d4d8; position: relative; transition: background-color .15s; }
+.fx-sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 9999px; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform .15s; }
+[aria-checked="true"] > .fx-sw { background: var(--theme-color, #4f46e5); }
+[aria-checked="true"] > .fx-sw::after { transform: translateX(18px); }
+/* checklist */
+.fx-ckrow { min-height: 52px; padding-right: 6px; }
+.fx-ck { width: 22px; height: 22px; flex: none; border-radius: 9999px; border: 1.8px solid #d4d4d8; display: inline-flex; align-items: center; justify-content: center; color: transparent; font-size: 12px; transition: background-color .15s, border-color .15s; }
+.fx-ck.on { background: var(--theme-color, #4f46e5); border-color: var(--theme-color, #4f46e5); color: #fff; }
+.fx-bul { width: 22px; height: 22px; flex: none; display: inline-flex; align-items: center; justify-content: center; }
+.fx-bul::before { content: ''; width: 6px; height: 6px; border-radius: 9999px; background: #c4c4cc; }
+.fx-ckin { flex: 1; min-width: 0; height: 50px; padding: 0; border: 0; background: transparent; outline: none; font-size: 15px; color: #27272a; }
+.fx-ckin::placeholder { color: #c4c4cc; }
+.fx-ckin.done { color: #a1a1aa; text-decoration: line-through; }
+.fx-x { width: 36px; height: 36px; flex: none; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; color: #c4c4cc; font-size: 16px; }
+.fx-x:active { background: #f4f4f5; color: #ef4444; }
+/* nota: o texto ocupa o resto da tela */
+.fx-notecard { flex: 1 0 auto; min-height: 200px; margin-top: 16px; display: flex; transition: border-color .15s; }
+.fx-notecard:focus-within { border-color: color-mix(in srgb, var(--theme-color, #4f46e5) 55%, #ececf0); }
+.fx-area { flex: 1; width: 100%; min-height: 180px; padding: 14px; border: 0; outline: none; resize: none; background: transparent; font-size: 15px; line-height: 1.55; color: #27272a; }
+.fx-area::placeholder { color: #a1a1aa; }
+/* sugestões da meta, explicações e o gráfico */
+.fx-chips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -18px; padding: 0 18px 2px; scrollbar-width: none; }
+.fx-chips::-webkit-scrollbar { display: none; }
+.fx-chip { flex: none; height: 38px; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px 0 11px; border-radius: 9999px; background: #fff; border: 1px solid #e4e4e9; font-size: 14px; font-weight: 600; color: #3f3f46; white-space: nowrap; transition: transform .12s; }
+.fx-chip:active { transform: scale(.97); background: #fafafa; }
+.fx-chip .e { font-size: 17px; line-height: 1; }
+.fx-hint { margin: 10px 4px 0; font-size: 12px; line-height: 1.5; color: #8b8b94; }
+.fx-info { font-size: 12.5px; line-height: 1.45; color: #71717a; }
+.fx-mini:not(.hidden) { display: inline-flex; }
+.fx-mini { align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 10px; background: #f1f2f5; font-size: 13px; font-weight: 600; color: #3f3f46; }
+.fx-mini:active { background: #e4e6ea; }
+.fx-chart { padding: 14px; margin-top: 16px; }
+/* o pé com o Salvar */
+.fx-foot { flex: none; padding: 10px 18px 0; background: #f8fafc; }
+.fx-save { width: 100%; height: 50px; border-radius: 14px; background: var(--theme-color, #4f46e5); color: #fff; font-size: 15.5px; font-weight: 700; letter-spacing: .01em; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--theme-color, #4f46e5) 90%, transparent); transition: transform .12s, filter .12s; }
+.fx-save:active { transform: scale(.98); filter: brightness(.95); }
+/* a folha de baixo: escolher (tag, meta, cor, categoria) e o ⋯ */
+#fx-pick-modal { max-height: 82%; border-radius: 22px 22px 0 0; background: #fff; padding: 8px 16px max(14px, calc(var(--faz-safe-bottom) + 8px)); box-shadow: 0 -12px 30px -12px rgba(0, 0, 0, .3); }
+#fx-pick-modal:not(.hidden) { animation: fxUp .24s cubic-bezier(.16, 1, .3, 1); }
+@keyframes fxUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.fx-grab { width: 38px; height: 4px; flex: none; border-radius: 9999px; background: #d9dbe0; margin: 0 auto 10px; }
+.fx-ph { flex: none; padding: 0 4px 8px; font-size: 17px; font-weight: 700; color: #18181b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fx-opts { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.fx-opt { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 6px; border-top: 1px solid #f2f2f5; font-size: 15px; font-weight: 500; color: #27272a; text-align: left; }
+.fx-opt:first-child { border-top: 0; }
+.fx-opt:active { background: #f7f7f9; }
+.fx-ot { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-tk { flex: none; font-size: 18px; color: var(--theme-color, #4f46e5); }
+.fx-no { width: 16px; flex: none; display: inline-flex; justify-content: center; font-size: 17px; color: #a1a1aa; }
+.fx-oe { width: 18px; flex: none; text-align: center; font-size: 17px; line-height: 1; }
+.fx-oi { width: 20px; flex: none; text-align: center; font-size: 19px; color: #71717a; }
+.fx-opt.danger, .fx-opt.danger .fx-oi { color: #dc2626; }
+.fx-opt.add, .fx-opt.add .fx-oi { color: var(--theme-color, #4f46e5); font-weight: 600; }
+.fx-cgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px 6px; padding: 2px 0 6px; min-height: 0; overflow-y: auto; }
+.fx-copt { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 2px; border-radius: 14px; font-size: 12px; font-weight: 600; color: #52525b; cursor: pointer; white-space: nowrap; }
+.fx-copt:active { background: #f4f4f5; }
+.fx-cdot { width: 36px; height: 36px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; color: #fff; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .06); }
+.fx-cdot.lt { color: #27272a; }
+.fx-cdot > i { opacity: 0; }
+.fx-copt.on .fx-cdot { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #27272a; }
+.fx-copt.on .fx-cdot > i { opacity: 1; }
+.fx-cdot.none { background: #fff; border: 1.8px dashed #c4c4cc; color: #a1a1aa; box-shadow: none; }
+.fx-cdot.none > i { opacity: 1; }
+.fx-copt.on .fx-cdot.none { border: 2px solid #3f3f46; color: #3f3f46; box-shadow: none; }
+.fx-cdot.rb { background: conic-gradient(#ef4444, #f59e0b, #84cc16, #10b981, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444); }
+.fx-copt input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }

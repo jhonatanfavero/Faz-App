@@ -120,7 +120,7 @@ const UID = '11111111-1111-1111-1111-111111111111';
   w.openFinancialForm(C);
   ok($('fin-end-label').textContent === 'Encerrar depois de dezembro', 'botão "Encerrar depois de dezembro"');
   w.endRecurringFromForm(); w.confirmGoalAction();
-  ok(fin(C).durationMonths === 1 && $('fin-type-oneshot').className.includes('bg-app-focus') && !shown('fin-recurring-info'), 'encerrou no mês em que começou: 1 mês só e o formulário passa pra "Avulsa"');
+  ok(fin(C).durationMonths === 1 && $('fin-type-oneshot').classList.contains('on') && !shown('fin-recurring-info'), 'encerrou no mês em que começou: 1 mês só e o formulário passa pra "Avulsa"');
   w.saveFinancialForm();
   ok(fin(C).durationMonths === 1 && !inMonth(C, '2027-01'), 'salvar mantém (avulsa de dezembro)');
 

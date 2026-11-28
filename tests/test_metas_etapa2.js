@@ -157,8 +157,13 @@ const waitFor = async (fn, ms = 9000) => { const t0 = Date.now(); while (Date.no
   console.log('\nB4) Pela Lista (tarefa) e pela rotina:');
   const T1 = J(`backlogDb.find((x) => (x.columnId || 'col_geral') === 'col_geral')`);
   w.openBacklogForm(T1.id);
-  ok(!$('bl-form-goal-wrap').classList.contains('hidden') && chips('bl-form-goal-container')[0] === '*', 'a tarefa mostra a linha "Meta"');
-  w.selectBacklogFormGoal(G_AGUA);
+  ok(!$('bl-form-goal-wrap').classList.contains('hidden') && $('bl-form-goal-val').textContent === 'Nenhuma', 'a tarefa mostra a linha "Meta" (em "Nenhuma")');
+  // V40.51.0 (Ficha): a linha abre a folha de baixo; "Nenhuma" marcada e as 3 metas
+  w.blPickGoal();
+  const fxOpts = () => [...$('fx-pick-list').querySelectorAll('[data-fx-k]')];
+  ok(fxOpts().map((b) => b.getAttribute('data-fx-k') + (b.getAttribute('aria-checked') === 'true' ? '*' : '')).join() === ['*', G_LER, G_CORRER, G_AGUA].join() && fxOpts()[3].textContent.includes('💧'), 'a folha mostra "Nenhuma" (marcada) e as 3 metas');
+  fxOpts().find((b) => b.getAttribute('data-fx-k') === G_AGUA).click();
+  ok($('fx-pick-modal').classList.contains('hidden') && $('bl-form-goal-val').textContent.includes('Beber água'), 'tocar em "💧 Beber água" escolhe e fecha');
   w.saveBacklogForm(); await sleep(20);
   ok(J(`backlogDb.find((x) => x.id === ${JSON.stringify(T1.id)})`).goalId === G_AGUA, 'salvou: a tarefa fica ligada a 💧 Beber água');
   w.renderBacklog();

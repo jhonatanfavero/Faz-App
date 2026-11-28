@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <title>Time-Blocking: O Santo Graal</title>
     
-    <meta name="theme-color" content="#4f46e5">
+    <meta name="theme-color" content="#f8fafc">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="TimeBlock">
@@ -241,8 +241,9 @@
 
         <div id="list-sheet" class="absolute bottom-0 left-0 w-full bg-white border-t border-zinc-200 rounded-t-[32px] p-6 z-50 transform translate-y-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] h-full flex flex-col">
             <!-- V40.3.7: barra superior com botão X pra fechar. Cor do tema, sem fundo. Conteúdo abaixo, sem sobreposição.
-                 V40.48.0: à esquerda, o "Menu" (volta pro menu grande; o voltar do celular faz o mesmo) ou, no menu, o título -->
-            <div class="flex items-center gap-2 -mt-2 mb-2 shrink-0">
+                 V40.48.0: à esquerda, o "Menu" (volta pro menu grande; o voltar do celular faz o mesmo) ou, no menu, o título
+                 V40.51.0: some (junto com as abas) enquanto um formulário está aberto: a Ficha tem o ← dela (style.css, .fx-open) -->
+            <div id="list-topbar" class="flex items-center gap-2 -mt-2 mb-2 shrink-0">
                 <button id="list-menu-btn" data-voltar="menu" onclick="showHub()" aria-label="Voltar pro menu" title="Menu" class="h-9 pl-2 pr-3 flex items-center gap-1.5 rounded-full text-zinc-700 text-sm font-bold hover:bg-zinc-100 transition active:scale-95">
                     <i class="ph-bold ph-squares-four text-lg text-app-focus"></i> Menu
                 </button>
@@ -379,76 +380,52 @@
                     </button>
                 </div>
 
-                <!-- Sub-view 2: Formulário criar/editar (igual padrão Rotinas) -->
-                <div data-form="tarefa" id="backlog-form-view" class="hidden flex-1 flex-col min-h-0 bg-white">
-                    <div class="shrink-0 px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <button data-voltar onclick="closeBacklogForm()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-full hover:bg-zinc-200 transition active:scale-90">
-                                <i class="ph ph-arrow-left text-sm"></i>
-                            </button>
-                            <h3 id="bl-form-title-label" class="font-bold text-zinc-800 text-sm">Nova Tarefa</h3>
-                        </div>
-                        <button id="bl-form-archive-btn" onclick="fazArchiveTask(currentBlId)" class="hidden w-8 h-8 items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 rounded-lg transition" title="Arquivar"><i class="ph ph-archive"></i></button>
-                        <button id="bl-form-delete-btn" onclick="deleteBacklogFromForm()" class="hidden w-8 h-8 items-center justify-center text-zinc-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition">
-                            <i class="ph ph-trash"></i>
-                        </button>
+                <!-- Sub-view 2: Formulário criar/editar (igual padrão Rotinas)
+                     V40.51.0: FICHA (escolha dele em 28/11): o nome grande, a ficha com Duração, Tag, Meta e Cor (o escolhido
+                     na direita; Tag, Meta e Cor abrem a folha de baixo), o checklist (marcar feito aqui também, como no PC) e o
+                     Salvar no pé. Arquivar e Apagar foram pro ⋯ (só ao editar). -->
+                <div data-form="tarefa" id="backlog-form-view" class="hidden flex-1 flex-col min-h-0 fx-view">
+                    <div class="fx-head">
+                        <button type="button" data-voltar onclick="closeBacklogForm()" aria-label="Voltar" class="fx-back"><i class="ph-bold ph-arrow-left"></i></button>
+                        <h3 id="bl-form-title-label" class="fx-title">Nova tarefa</h3>
+                        <button type="button" id="bl-form-more-btn" onclick="blFormMore()" aria-label="Mais opções da tarefa" aria-haspopup="dialog" class="fx-more hidden"><i class="ph-bold ph-dots-three"></i></button>
                     </div>
 
-                    <div class="flex-1 overflow-y-auto no-scrollbar p-4 pb-4">
-                        
+                    <div class="fx-body no-scrollbar">
                         <!-- Nome (sem emoji — decisão 1=c) -->
-                        <div class="mb-5">
-                            <input type="text" id="backlog-input" class="w-full h-12 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Nome da tarefa" maxlength="60" autocomplete="off">
-                        </div>
+                        <input type="text" id="backlog-input" class="fx-name" placeholder="Nome da tarefa" maxlength="60" autocomplete="off" aria-label="Nome da tarefa">
 
-                        <!-- Duração total (stepper igual rotinas — C13) -->
-                        <div class="mb-5">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Duração</label>
-                            <div class="flex items-center gap-3">
-                                <button onclick="changeBacklogFormDuration(-15)" class="w-12 h-12 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition active:scale-95"><i class="ph ph-minus font-bold text-lg"></i></button>
-                                <div class="flex-1 h-12 flex items-center justify-center bg-zinc-50 border border-zinc-200 rounded-xl">
-                                    <span id="bl-form-dur-label" class="font-bold text-zinc-800 text-sm">30m</span>
-                                </div>
-                                <button onclick="changeBacklogFormDuration(15)" class="w-12 h-12 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition active:scale-95"><i class="ph ph-plus font-bold text-lg"></i></button>
+                        <p class="fx-sec">Detalhes</p>
+                        <div class="fx-card">
+                            <!-- Duração (stepper igual rotinas — C13) -->
+                            <div class="fx-row">
+                                <i class="ph ph-timer fx-ic" aria-hidden="true"></i><span class="fx-lb">Duração</span>
+                                <span class="fx-stp"><button type="button" onclick="changeBacklogFormDuration(-15)" aria-label="Diminuir a duração"><i class="ph-bold ph-minus"></i></button><span id="bl-form-dur-label" class="fx-stv">30 min</span><button type="button" onclick="changeBacklogFormDuration(15)" aria-label="Aumentar a duração"><i class="ph-bold ph-plus"></i></button></span>
                             </div>
-                        </div>
-
-                        <!-- Tag opcional -->
-                        <div class="mb-6">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Tag (Opcional)</label>
-                            <div id="bl-form-tag-container" class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                                <!-- preenchido por updateBacklogFormVisuals() -->
-                            </div>
-                        </div>
-                        <!-- V40.34.0: meta ligada (vai junto quando a tarefa vira bloco) -->
-                        <div id="bl-form-goal-wrap" class="mb-6 hidden">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Meta (Opcional)</label>
-                            <div id="bl-form-goal-container" class="flex gap-2 overflow-x-auto no-scrollbar pb-1"></div>
-                        </div>
-
-                        <!-- V40.9.0: cor livre do cartão (independente da tag) -->
-                        <div class="mb-5">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Cor do cartão (Opcional)</label>
-                            <div id="bl-form-colors" class="flex flex-wrap items-center gap-2"></div>
-                        </div>
-
-                        <!-- Checklist (C14 — começa com 1 slot vazio) -->
-                        <div>
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Checklist (Opcional)</label>
-                            <div id="bl-form-microblocks" class="flex flex-col gap-2 mb-2">
-                                <!-- preenchido por renderBlFormMicroblocks() -->
-                            </div>
-                            <button onclick="addBacklogMicroblockForm()" class="w-full py-3 rounded-xl border border-zinc-200 bg-white text-zinc-600 text-xs font-bold hover:bg-zinc-50 transition flex items-center justify-center gap-1.5 mt-2 active:scale-[0.98]">
-                                <i class="ph ph-plus"></i> Adicionar item
+                            <button type="button" onclick="blPickTag()" aria-haspopup="dialog" class="fx-row">
+                                <i class="ph ph-tag fx-ic" aria-hidden="true"></i><span class="fx-lb">Tag</span><span id="bl-form-tag-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
                             </button>
+                            <!-- V40.34.0: meta ligada (vai junto quando a tarefa vira bloco); some sem meta nenhuma -->
+                            <button type="button" id="bl-form-goal-wrap" onclick="blPickGoal()" aria-haspopup="dialog" class="fx-row hidden">
+                                <i class="ph ph-target fx-ic" aria-hidden="true"></i><span class="fx-lb">Meta</span><span id="bl-form-goal-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                            </button>
+                            <!-- V40.9.0: cor livre do cartão (independente da tag) -->
+                            <button type="button" onclick="blPickColor()" aria-haspopup="dialog" class="fx-row">
+                                <i class="ph ph-palette fx-ic" aria-hidden="true"></i><span class="fx-lb">Cor do cartão</span><span id="bl-form-color-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                            </button>
+                        </div>
+
+                        <!-- Checklist (C14 — começa vazio) -->
+                        <p id="bl-form-ck-sec" class="fx-sec">Checklist</p>
+                        <div class="fx-card">
+                            <div id="bl-form-microblocks"><!-- preenchido por renderBlFormMicroblocks() --></div>
+                            <button type="button" onclick="addBacklogMicroblockForm()" class="fx-row fx-add"><i class="ph-bold ph-plus fx-ic" aria-hidden="true"></i><span class="fx-lb">Adicionar item</span></button>
                         </div>
                     </div>
 
                     <!-- V40.5.1-fix13: footer shrink-0 em vez de absolute bottom-0 (fix de teclado cobrindo input ativo) -->
-                    <div class="shrink-0 bg-white border-t border-zinc-100 p-4 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
-                        <button onclick="saveBacklogForm()" class="w-full h-12 flex items-center justify-center bg-app-focus text-white rounded-xl font-bold hover:shadow-lg transition active:scale-95 text-sm">
-                            Salvar na Lista
-                        </button>
+                    <div class="fx-foot">
+                        <button type="button" onclick="saveBacklogForm()" class="fx-save">Salvar</button>
                     </div>
                 </div>
             </div>
@@ -483,76 +460,49 @@
                      V40.3.2-fix3: flex-1 + min-h-0 (era h-full) pra propagar altura corretamente
                      dentro da hierarquia flex da list-sheet. Sem isso, o botão "Salvar" e o 
                      "+ Adicionar item" ficavam fora da área visível. -->
-                <div data-form="rotina" id="routines-form-view" class="hidden flex-1 flex-col min-h-0 relative bg-white">
-                    <div class="shrink-0 px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <button data-voltar onclick="closeRoutineForm()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-full hover:bg-zinc-200 transition active:scale-90">
-                                <i class="ph ph-arrow-left text-sm"></i>
-                            </button>
-                            <h3 id="rt-form-title-label" class="font-bold text-zinc-800 text-sm">Nova Rotina</h3>
-                        </div>
-                        <button id="rt-form-delete-btn" onclick="deleteRoutineFromForm()" class="hidden w-8 h-8 items-center justify-center text-zinc-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition">
-                            <i class="ph ph-trash"></i>
-                        </button>
+                <!-- V40.51.0: FICHA (igual à da tarefa): emoji + nome grandes; Duração, Tipo (Foco/Descanso), Tag e Meta numa ficha;
+                     o checklist dela; Salvar no pé (agora no fluxo, não mais por cima do fim da lista); Apagar no ⋯ -->
+                <div data-form="rotina" id="routines-form-view" class="hidden flex-1 flex-col min-h-0 relative fx-view">
+                    <div class="fx-head">
+                        <button type="button" data-voltar onclick="closeRoutineForm()" aria-label="Voltar" class="fx-back"><i class="ph-bold ph-arrow-left"></i></button>
+                        <h3 id="rt-form-title-label" class="fx-title">Nova rotina</h3>
+                        <button type="button" id="rt-form-more-btn" onclick="rtFormMore()" aria-label="Mais opções da rotina" aria-haspopup="dialog" class="fx-more hidden"><i class="ph-bold ph-dots-three"></i></button>
                     </div>
 
-                    <div class="flex-1 overflow-y-auto no-scrollbar p-4 pb-24">
-                        
-                        <div class="flex gap-2 mb-5">
-                            <div class="shrink-0 relative w-14">
-                                <input type="text" id="rt-form-emoji" class="w-full h-12 bg-zinc-50 border border-zinc-200 rounded-xl text-center text-xl outline-none focus:border-app-focus focus:bg-white transition" placeholder="🌞" maxlength="2">
-                            </div>
-                            <div class="flex-1 relative">
-                                <input type="text" id="rt-form-title" class="w-full h-12 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Nome da rotina" maxlength="40">
-                            </div>
+                    <div class="fx-body no-scrollbar">
+                        <div class="fx-namerow">
+                            <input type="text" id="rt-form-emoji" class="fx-emoji" placeholder="🌞" maxlength="2" autocomplete="off" aria-label="Emoji da rotina">
+                            <input type="text" id="rt-form-title" class="fx-name" placeholder="Nome da rotina" maxlength="40" autocomplete="off" aria-label="Nome da rotina">
                         </div>
 
-                        <div class="mb-5">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Duração Total</label>
-                            <div class="flex items-center gap-3">
-                                <button onclick="changeRoutineFormDuration(-15)" class="w-12 h-12 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition active:scale-95"><i class="ph ph-minus font-bold text-lg"></i></button>
-                                <div class="flex-1 h-12 flex items-center justify-center bg-zinc-50 border border-zinc-200 rounded-xl">
-                                    <span id="rt-form-dur-label" class="font-bold text-zinc-800 text-sm">2h 0m</span>
-                                </div>
-                                <button onclick="changeRoutineFormDuration(15)" class="w-12 h-12 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-xl hover:bg-zinc-200 transition active:scale-95"><i class="ph ph-plus font-bold text-lg"></i></button>
+                        <p class="fx-sec">Detalhes</p>
+                        <div class="fx-card">
+                            <div class="fx-row">
+                                <i class="ph ph-timer fx-ic" aria-hidden="true"></i><span class="fx-lb">Duração</span>
+                                <span class="fx-stp"><button type="button" onclick="changeRoutineFormDuration(-15)" aria-label="Diminuir a duração"><i class="ph-bold ph-minus"></i></button><span id="rt-form-dur-label" class="fx-stv">2h</span><button type="button" onclick="changeRoutineFormDuration(15)" aria-label="Aumentar a duração"><i class="ph-bold ph-plus"></i></button></span>
                             </div>
-                        </div>
-
-                        <div class="mb-5">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Tipo</label>
-                            <div class="flex gap-2">
-                                <button onclick="selectRoutineFormTheme('focus')" id="rt-theme-focus" class="flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-app-focus text-white border-transparent shadow-sm">Foco</button>
-                                <button onclick="selectRoutineFormTheme('rest')" id="rt-theme-rest" class="flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50">Descanso</button>
+                            <div class="fx-row">
+                                <i class="ph ph-lightning fx-ic" aria-hidden="true"></i><span class="fx-lb">Tipo</span>
+                                <span class="fx-seg" role="group" aria-label="Tipo da rotina"><button type="button" id="rt-theme-focus" onclick="selectRoutineFormTheme('focus')" class="on" aria-pressed="true">Foco</button><button type="button" id="rt-theme-rest" onclick="selectRoutineFormTheme('rest')" aria-pressed="false">Descanso</button></span>
                             </div>
-                        </div>
-
-                        <div class="mb-6">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Tag (Opcional)</label>
-                            <div id="rt-form-tag-container" class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                                <!-- preenchido por updateRtFormVisuals() -->
-                            </div>
-                        </div>
-                        <!-- V40.34.0: meta ligada (cada bloco que a rotina criar conta nela) -->
-                        <div id="rt-form-goal-wrap" class="mb-6 hidden">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Meta (Opcional)</label>
-                            <div id="rt-form-goal-container" class="flex gap-2 overflow-x-auto no-scrollbar pb-1"></div>
-                        </div>
-
-                        <div>
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Checklist Interna</label>
-                            <div id="rt-form-microblocks" class="flex flex-col gap-2 mb-2">
-                                <!-- preenchido por renderRtFormMicroblocks() -->
-                            </div>
-                            <button onclick="addRoutineMicroblockForm()" class="w-full py-3 rounded-xl border border-zinc-200 bg-white text-zinc-600 text-xs font-bold hover:bg-zinc-50 transition flex items-center justify-center gap-1.5 mt-2 active:scale-[0.98]">
-                                <i class="ph ph-plus"></i> Adicionar item
+                            <button type="button" onclick="rtPickTag()" aria-haspopup="dialog" class="fx-row">
+                                <i class="ph ph-tag fx-ic" aria-hidden="true"></i><span class="fx-lb">Tag</span><span id="rt-form-tag-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
                             </button>
+                            <!-- V40.34.0: meta ligada (cada bloco que a rotina criar conta nela); some sem meta nenhuma -->
+                            <button type="button" id="rt-form-goal-wrap" onclick="rtPickGoal()" aria-haspopup="dialog" class="fx-row hidden">
+                                <i class="ph ph-target fx-ic" aria-hidden="true"></i><span class="fx-lb">Meta</span><span id="rt-form-goal-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                            </button>
+                        </div>
+
+                        <p class="fx-sec">Checklist</p>
+                        <div class="fx-card">
+                            <div id="rt-form-microblocks"><!-- preenchido por renderRtFormMicroblocks() --></div>
+                            <button type="button" onclick="addRoutineMicroblockForm()" class="fx-row fx-add"><i class="ph-bold ph-plus fx-ic" aria-hidden="true"></i><span class="fx-lb">Adicionar item</span></button>
                         </div>
                     </div>
 
-                    <div class="ios-safe-bottom absolute bottom-0 left-0 right-0 bg-white border-t border-zinc-100 p-4 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
-                        <button onclick="saveRoutine()" class="w-full h-12 flex items-center justify-center bg-app-focus text-white rounded-xl font-bold hover:shadow-lg transition active:scale-95 text-sm">
-                            Salvar Rotina
-                        </button>
+                    <div class="fx-foot">
+                        <button type="button" onclick="saveRoutine()" class="fx-save">Salvar</button>
                     </div>
                 </div>
             </div>
@@ -581,19 +531,24 @@
                     </button>
                 </div>
 
-                <!-- Estado B: Form aberto (criando nota) -->
-                <div data-form="nota" id="notes-form" class="shrink-0 mb-4 mx-4 bg-zinc-50 border border-zinc-200 p-3 rounded-2xl hidden">
-                    <div class="flex items-center justify-between mb-2">
-                        <span id="notes-form-label" class="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Nova nota</span>
-                        <button data-voltar onclick="cancelNoteForm()" class="w-7 h-7 flex items-center justify-center bg-white border border-zinc-200 text-zinc-500 rounded-lg hover:bg-zinc-100 transition" title="Cancelar">
-                            <i class="ph ph-x text-sm"></i>
-                        </button>
+                <!-- Estado B: Form aberto (criando nota)
+                     V40.51.0: FICHA: a nota abre numa tela só dela (era um quadro no meio da lista): título grande, o texto
+                     ocupando o resto da tela e o Salvar no pé. Apagar (ao editar) no ⋯. -->
+                <div data-form="nota" id="notes-form" class="hidden flex-1 flex-col min-h-0 fx-view">
+                    <div class="fx-head">
+                        <button type="button" data-voltar onclick="cancelNoteForm()" aria-label="Voltar" class="fx-back"><i class="ph-bold ph-arrow-left"></i></button>
+                        <h3 id="notes-form-label" class="fx-title">Nova nota</h3>
+                        <button type="button" id="notes-form-more-btn" onclick="noteFormMore()" aria-label="Mais opções da nota" aria-haspopup="dialog" class="fx-more hidden"><i class="ph-bold ph-dots-three"></i></button>
                     </div>
-                    <input type="text" id="note-title-input" placeholder="Título (opcional)" autocomplete="off" class="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:border-app-focus outline-none mb-2 transition-colors">
-                    <textarea id="note-content-input" placeholder="Anote uma ideia, lembrete, observação..." rows="3" class="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:border-app-focus outline-none mb-3 transition-colors resize-none"></textarea>
-                    <button id="notes-form-save-btn" onclick="addNote()" class="w-full bg-app-focus-soft border border-app-focus-soft text-app-focus font-bold py-2.5 rounded-xl hover:bg-app-focus-soft-strong active:scale-[0.98] transition text-sm">
-                        Salvar Nota
-                    </button>
+                    <div class="fx-body col no-scrollbar">
+                        <input type="text" id="note-title-input" placeholder="Título (opcional)" autocomplete="off" aria-label="Título da nota" class="fx-name">
+                        <div class="fx-card fx-notecard">
+                            <textarea id="note-content-input" placeholder="Anote uma ideia, lembrete, observação..." rows="6" aria-label="Texto da nota" class="fx-area"></textarea>
+                        </div>
+                    </div>
+                    <div class="fx-foot">
+                        <button type="button" id="notes-form-save-btn" onclick="addNote()" class="fx-save">Salvar</button>
+                    </div>
                 </div>
 
                 <!-- Estado C: Lista de notas existentes -->
@@ -652,82 +607,62 @@
                 </div>
 
                 <!-- Sub-view 2: Form criar/editar -->
-                <div data-form="despesa" id="financial-form-view" class="hidden flex-1 flex-col min-h-0 relative bg-white">
-                    <div class="shrink-0 px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <button data-voltar onclick="closeFinancialForm()" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-full hover:bg-zinc-200 transition active:scale-90">
-                                <i class="ph ph-arrow-left text-sm"></i>
-                            </button>
-                            <h3 id="fin-form-title-label" class="font-bold text-zinc-800 text-sm">Nova Despesa</h3>
-                        </div>
-                        <button id="fin-form-delete-btn" onclick="deleteFinancialFromForm()" class="hidden w-8 h-8 items-center justify-center text-zinc-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition">
-                            <i class="ph ph-trash"></i>
-                        </button>
+                <!-- V40.51.0: FICHA: o nome grande; Valor e Vencimento na própria linha; Tipo (Avulsa | Recorrente | Parcelada),
+                     as parcelas e o aviso da recorrente; "Paga" num liga/desliga; Salvar no pé; Apagar no ⋯ -->
+                <div data-form="despesa" id="financial-form-view" class="hidden flex-1 flex-col min-h-0 relative fx-view">
+                    <div class="fx-head">
+                        <button type="button" data-voltar onclick="closeFinancialForm()" aria-label="Voltar" class="fx-back"><i class="ph-bold ph-arrow-left"></i></button>
+                        <h3 id="fin-form-title-label" class="fx-title">Nova despesa</h3>
+                        <button type="button" id="fin-form-more-btn" onclick="finFormMore()" aria-label="Mais opções da despesa" aria-haspopup="dialog" class="fx-more hidden"><i class="ph-bold ph-dots-three"></i></button>
                     </div>
 
-                    <div class="flex-1 overflow-y-auto no-scrollbar p-4 pb-24">
-                        
+                    <div class="fx-body no-scrollbar">
                         <!-- Nome -->
-                        <div class="mb-5">
-                            <input type="text" id="financial-input" class="w-full h-12 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: Luz, Netflix, Mercado..." maxlength="60" autocomplete="off">
-                        </div>
+                        <input type="text" id="financial-input" class="fx-name" placeholder="Ex: Luz, Netflix, Mercado..." maxlength="60" autocomplete="off" aria-label="Nome da despesa">
 
-                        <!-- Valor (R$) -->
-                        <div class="mb-5">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Valor</label>
-                            <div class="relative">
-                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-zinc-500">R$</span>
-                                <input type="number" id="financial-amount-input" step="0.01" min="0" inputmode="decimal" class="w-full h-12 bg-zinc-50 border border-zinc-200 rounded-xl pl-10 pr-4 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="0,00">
-                            </div>
-                        </div>
-
-                        <!-- V40.4.3: Dia do vencimento (opcional, 1-31) -->
-                        <div class="mb-5">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Vencimento <span class="normal-case font-normal text-zinc-400">(opcional)</span></label>
-                            <div class="flex items-center gap-2">
-                                <span class="text-sm font-bold text-zinc-500">Dia</span>
-                                <input type="number" id="financial-dueday-input" min="1" max="31" inputmode="numeric" class="flex-1 h-12 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: 15">
-                            </div>
-                        </div>
-
-                        <!-- 3 botões de tipo (V40.4.4 ativará Recorrente + Parcelada) -->
-                        <div class="mb-5">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Tipo</label>
-                            <div class="flex gap-2">
-                                <button onclick="selectFinancialType('oneshot')" id="fin-type-oneshot" class="flex-1 py-2.5 rounded-lg bg-app-focus text-white border border-app-focus text-xs font-bold transition active:scale-95">Avulsa</button>
-                                <button onclick="selectFinancialType('recurring')" id="fin-type-recurring" class="flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-600 border border-zinc-200 text-xs font-bold transition active:scale-95 hover:bg-zinc-100">Recorrente</button>
-                                <button onclick="selectFinancialType('installment')" id="fin-type-installment" class="flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-600 border border-zinc-200 text-xs font-bold transition active:scale-95 hover:bg-zinc-100">Parcelada</button>
-                            </div>
-                            <!-- V40.4.4: Input "Quantas parcelas?" só aparece quando 'Parcelada' selecionada (decisão 2I) -->
-                            <div id="fin-installments-wrapper" class="hidden mt-3">
-                                <label class="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Quantas parcelas?</label>
-                                <input type="number" id="financial-installments-input" min="2" max="60" inputmode="numeric" value="2" class="w-full h-11 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: 10">
-                            </div>
-                            <!-- V40.4.4: Aviso pra Recorrente · V40.30.0: sem fim, até encerrar -->
-                            <div id="fin-recurring-info" class="hidden mt-3 px-1">
-                                <p class="text-[11px] text-zinc-500 leading-relaxed"><i class="ph-fill ph-info text-zinc-400"></i> <span id="fin-recurring-text">Repete todo mês, sem fim.</span></p>
-                                <div class="flex flex-wrap gap-2 mt-2">
-                                    <button type="button" id="fin-end-btn" onclick="endRecurringFromForm()" class="hidden items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-zinc-50 active:scale-95 transition"><i class="ph ph-calendar-x text-sm"></i><span id="fin-end-label">Encerrar</span></button>
-                                    <button type="button" id="fin-reopen-btn" onclick="reopenRecurringFromForm()" class="hidden items-center gap-1.5 px-3 py-2 rounded-lg border border-zinc-200 bg-white text-xs font-bold text-zinc-700 hover:bg-zinc-50 active:scale-95 transition"><i class="ph ph-repeat text-sm"></i>Repetir sem fim de novo</button>
+                        <p class="fx-sec">Detalhes</p>
+                        <div class="fx-card">
+                            <!-- Valor (R$) -->
+                            <label class="fx-row" for="financial-amount-input">
+                                <i class="ph ph-currency-circle-dollar fx-ic" aria-hidden="true"></i><span class="fx-lb">Valor</span>
+                                <span class="fx-field"><span class="fx-pre">R$</span><input type="number" id="financial-amount-input" step="0.01" min="0" inputmode="decimal" placeholder="0,00" class="fx-inp"></span>
+                            </label>
+                            <!-- V40.4.3: Dia do vencimento (opcional, 1-31) -->
+                            <label class="fx-row" for="financial-dueday-input">
+                                <i class="ph ph-calendar-blank fx-ic" aria-hidden="true"></i><span class="fx-lb">Vencimento<span class="fx-sub">opcional</span></span>
+                                <span class="fx-field"><span class="fx-pre">Dia</span><input type="number" id="financial-dueday-input" min="1" max="31" inputmode="numeric" placeholder="—" class="fx-inp sm"></span>
+                            </label>
+                            <!-- 3 tipos (V40.4.4: Recorrente + Parcelada) -->
+                            <div class="fx-row stack">
+                                <div class="fx-rowtop"><i class="ph ph-repeat fx-ic" aria-hidden="true"></i><span class="fx-lb">Tipo</span></div>
+                                <span class="fx-seg full" role="group" aria-label="Tipo da despesa">
+                                    <button type="button" id="fin-type-oneshot" onclick="selectFinancialType('oneshot')" class="on" aria-pressed="true">Avulsa</button>
+                                    <button type="button" id="fin-type-recurring" onclick="selectFinancialType('recurring')" aria-pressed="false">Recorrente</button>
+                                    <button type="button" id="fin-type-installment" onclick="selectFinancialType('installment')" aria-pressed="false">Parcelada</button>
+                                </span>
+                                <!-- V40.4.4: Aviso pra Recorrente · V40.30.0: sem fim, até encerrar -->
+                                <div id="fin-recurring-info" class="hidden">
+                                    <p class="fx-info"><span id="fin-recurring-text">Repete todo mês, sem fim.</span></p>
+                                    <div class="flex flex-wrap gap-2 mt-2">
+                                        <button type="button" id="fin-end-btn" onclick="endRecurringFromForm()" class="fx-mini hidden"><i class="ph ph-calendar-x text-sm"></i><span id="fin-end-label">Encerrar</span></button>
+                                        <button type="button" id="fin-reopen-btn" onclick="reopenRecurringFromForm()" class="fx-mini hidden"><i class="ph ph-repeat text-sm"></i>Repetir sem fim de novo</button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- V40.4.2: Toggle "Pago" no form -->
-                        <div class="mb-5">
-                            <button onclick="toggleFinancialFormPaid()" id="fin-form-paid-btn" type="button" class="w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 transition active:scale-[0.98]">
-                                <div id="fin-form-paid-check" class="w-6 h-6 rounded-full border-2 border-zinc-300 bg-white flex items-center justify-center shrink-0 transition">
-                                    <i class="ph-bold ph-check text-xs text-white hidden" id="fin-form-paid-icon"></i>
-                                </div>
-                                <span class="text-sm font-bold text-zinc-700">Marcar como paga</span>
+                            <!-- V40.4.4: "Quantas parcelas?" só em Parcelada (decisão 2I) -->
+                            <label id="fin-installments-wrapper" class="fx-row hidden" for="financial-installments-input">
+                                <i class="ph ph-stack fx-ic" aria-hidden="true"></i><span class="fx-lb">Parcelas<span class="fx-sub">de 2 a 60</span></span>
+                                <span class="fx-field"><input type="number" id="financial-installments-input" min="2" max="60" inputmode="numeric" value="2" placeholder="10" class="fx-inp sm"><span class="fx-suf">vezes</span></span>
+                            </label>
+                            <!-- V40.4.2: "Paga" (no mês da tela) -->
+                            <button type="button" id="fin-form-paid-btn" onclick="toggleFinancialFormPaid()" role="switch" aria-checked="false" class="fx-row">
+                                <i class="ph ph-check-circle fx-ic" aria-hidden="true"></i><span class="fx-lb">Paga<span id="fin-paid-month" class="fx-sub">neste mês</span></span><span id="fin-form-paid-check" class="fx-sw" aria-hidden="true"></span>
                             </button>
                         </div>
                     </div>
 
-                    <div class="ios-safe-bottom absolute bottom-0 left-0 right-0 bg-white border-t border-zinc-100 p-4 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
-                        <button onclick="saveFinancialForm()" class="w-full h-12 flex items-center justify-center bg-app-focus text-white rounded-xl font-bold hover:shadow-lg transition active:scale-95 text-sm">
-                            Salvar Despesa
-                        </button>
+                    <div class="fx-foot">
+                        <button type="button" onclick="saveFinancialForm()" class="fx-save">Salvar</button>
                     </div>
                 </div>
             </div>
@@ -758,78 +693,69 @@
                 </div>
 
                 <!-- Sub-view 2: criar / editar meta -->
-                <div data-form="meta" id="goals-form-view" class="hidden flex-1 flex-col min-h-0 relative bg-white">
-                    <div class="shrink-0 px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <button data-voltar onclick="closeGoalForm()" aria-label="Voltar" class="w-8 h-8 flex items-center justify-center bg-zinc-100 text-zinc-600 rounded-full hover:bg-zinc-200 transition active:scale-90">
-                                <i class="ph ph-arrow-left text-sm"></i>
-                            </button>
-                            <h3 id="goal-form-title" class="font-bold text-zinc-800 text-sm">Nova meta</h3>
-                        </div>
-                        <button id="goal-form-delete-btn" onclick="deleteGoalFromForm()" aria-label="Apagar meta" class="hidden w-8 h-8 items-center justify-center text-zinc-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition">
-                            <i class="ph ph-trash"></i>
-                        </button>
+                <!-- V40.51.0: FICHA: ao criar, as Sugestões em cima; emoji + nome grandes; ao editar, o gráfico logo embaixo do
+                     nome; Categoria (folha de baixo), Frequência, Contar em, Meta e "Cada + soma" numa ficha; Salvar no pé;
+                     Apagar no ⋯ -->
+                <div data-form="meta" id="goals-form-view" class="hidden flex-1 flex-col min-h-0 relative fx-view">
+                    <div class="fx-head">
+                        <button type="button" data-voltar onclick="closeGoalForm()" aria-label="Voltar" class="fx-back"><i class="ph-bold ph-arrow-left"></i></button>
+                        <h3 id="goal-form-title" class="fx-title">Nova meta</h3>
+                        <button type="button" id="goal-form-more-btn" onclick="goalFormMore()" aria-label="Mais opções da meta" aria-haspopup="dialog" class="fx-more hidden"><i class="ph-bold ph-dots-three"></i></button>
                     </div>
 
-                    <div class="flex-1 overflow-y-auto no-scrollbar p-4 pb-24">
+                    <div class="fx-body no-scrollbar">
+                        <!-- Sugestões (só ao criar) -->
+                        <div id="goal-templates-wrap">
+                            <p class="fx-sec" style="margin-top: 4px">Sugestões</p>
+                            <div id="goal-templates" class="fx-chips"></div>
+                        </div>
+
+                        <div class="fx-namerow">
+                            <input type="text" id="goal-emoji-input" maxlength="16" autocomplete="off" aria-label="Emoji da meta" placeholder="🎯" class="fx-emoji">
+                            <input type="text" id="goal-title-input" maxlength="60" autocomplete="off" aria-label="Nome da meta" placeholder="Ex: Beber água, ler..." class="fx-name">
+                        </div>
+
                         <!-- V40.34.0: gráfico da meta (só ao abrir uma que já existe) -->
-                        <div id="goal-chart-wrap" class="hidden mb-5 bg-zinc-50 border border-zinc-100 rounded-2xl p-3.5">
+                        <div id="goal-chart-wrap" class="hidden fx-card fx-chart">
                             <div id="goal-chart"></div>
                         </div>
-                        <!-- Sugestões (só ao criar) -->
-                        <div id="goal-templates-wrap" class="mb-5">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Sugestões</label>
-                            <div id="goal-templates" class="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4"></div>
-                        </div>
 
-                        <div class="mb-5 flex gap-2">
-                            <input type="text" id="goal-emoji-input" maxlength="16" autocomplete="off" aria-label="Emoji da meta" placeholder="🎯" class="w-14 h-12 shrink-0 bg-zinc-50 border border-zinc-200 rounded-xl text-center text-xl outline-none focus:border-app-focus focus:bg-white transition">
-                            <input type="text" id="goal-title-input" maxlength="60" autocomplete="off" placeholder="Ex: Beber água, correr, ler..." class="flex-1 min-w-0 h-12 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm font-bold text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition">
-                        </div>
-
-                        <div class="mb-5">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Categoria</label>
-                            <div id="goal-list-options" class="flex flex-wrap gap-2"></div>
-                        </div>
-
-                        <div class="mb-5">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Frequência</label>
-                            <div class="flex gap-2">
-                                <button type="button" onclick="selectGoalPeriod('dia')" id="goal-period-dia" class="flex-1 py-2.5 rounded-lg border text-xs font-bold transition active:scale-95">Diária</button>
-                                <button type="button" onclick="selectGoalPeriod('semana')" id="goal-period-semana" class="flex-1 py-2.5 rounded-lg border text-xs font-bold transition active:scale-95">Semanal</button>
-                                <button type="button" onclick="selectGoalPeriod('mes')" id="goal-period-mes" class="flex-1 py-2.5 rounded-lg border text-xs font-bold transition active:scale-95">Mensal</button>
+                        <p class="fx-sec">Detalhes</p>
+                        <div class="fx-card">
+                            <button type="button" onclick="goalPickList()" aria-haspopup="dialog" class="fx-row">
+                                <i class="ph ph-folder-simple fx-ic" aria-hidden="true"></i><span class="fx-lb">Categoria</span><span id="goal-list-val" class="fx-val on"><span class="fx-vt">Pessoal</span></span><i class="ph-bold ph-caret-right fx-car" aria-hidden="true"></i>
+                            </button>
+                            <div class="fx-row stack">
+                                <div class="fx-rowtop"><i class="ph ph-calendar-dots fx-ic" aria-hidden="true"></i><span class="fx-lb">Frequência</span></div>
+                                <span class="fx-seg full" role="group" aria-label="Frequência">
+                                    <button type="button" onclick="selectGoalPeriod('dia')" id="goal-period-dia" aria-pressed="false">Diária</button>
+                                    <button type="button" onclick="selectGoalPeriod('semana')" id="goal-period-semana" aria-pressed="false">Semanal</button>
+                                    <button type="button" onclick="selectGoalPeriod('mes')" id="goal-period-mes" aria-pressed="false">Mensal</button>
+                                </span>
                             </div>
+                            <div class="fx-row stack">
+                                <div class="fx-rowtop"><i class="ph ph-hash fx-ic" aria-hidden="true"></i><span class="fx-lb">Contar em</span></div>
+                                <span class="fx-seg full" role="group" aria-label="Contar em">
+                                    <button type="button" onclick="selectGoalUnit('vezes')" id="goal-unit-vezes" aria-pressed="false">Vezes</button>
+                                    <button type="button" onclick="selectGoalUnit('minutos')" id="goal-unit-minutos" aria-pressed="false">Minutos</button>
+                                    <button type="button" onclick="selectGoalUnit('reais')" id="goal-unit-reais" aria-pressed="false">Reais</button>
+                                </span>
+                            </div>
+                            <label class="fx-row" for="goal-target-input">
+                                <i class="ph ph-flag-checkered fx-ic" aria-hidden="true"></i><span class="fx-lb">Meta<span id="goal-target-suffix" class="fx-sub">vezes por dia</span></span>
+                                <span class="fx-field"><input type="text" id="goal-target-input" inputmode="decimal" autocomplete="off" oninput="goalFieldTouched()" class="fx-inp"></span>
+                            </label>
+                            <label class="fx-row" for="goal-step-input">
+                                <i class="ph ph-plus-circle fx-ic" aria-hidden="true"></i><span class="fx-lb">Cada + soma<span id="goal-step-suffix" class="fx-sub">vez</span></span>
+                                <span class="fx-field"><input type="text" id="goal-step-input" inputmode="decimal" autocomplete="off" oninput="goalFieldTouched()" class="fx-inp"></span>
+                            </label>
                         </div>
 
-                        <div class="mb-5">
-                            <label class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Contar em</label>
-                            <div class="flex gap-2">
-                                <button type="button" onclick="selectGoalUnit('vezes')" id="goal-unit-vezes" class="flex-1 py-2.5 rounded-lg border text-xs font-bold transition active:scale-95">Vezes</button>
-                                <button type="button" onclick="selectGoalUnit('minutos')" id="goal-unit-minutos" class="flex-1 py-2.5 rounded-lg border text-xs font-bold transition active:scale-95">Minutos</button>
-                                <button type="button" onclick="selectGoalUnit('reais')" id="goal-unit-reais" class="flex-1 py-2.5 rounded-lg border text-xs font-bold transition active:scale-95">Reais</button>
-                            </div>
-                        </div>
-
-                        <div class="mb-5 grid grid-cols-2 gap-3">
-                            <div>
-                                <label for="goal-target-input" class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Meta</label>
-                                <input type="text" id="goal-target-input" inputmode="decimal" autocomplete="off" oninput="goalFieldTouched()" class="w-full h-12 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm font-bold text-zinc-800 outline-none focus:border-app-focus focus:bg-white transition tabular-nums">
-                                <p id="goal-target-suffix" class="mt-1 text-[11px] text-zinc-500 px-1">vezes por dia</p>
-                            </div>
-                            <div>
-                                <label for="goal-step-input" class="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-2">Cada + soma</label>
-                                <input type="text" id="goal-step-input" inputmode="decimal" autocomplete="off" oninput="goalFieldTouched()" class="w-full h-12 bg-zinc-50 border border-zinc-200 rounded-xl px-4 text-sm font-bold text-zinc-800 outline-none focus:border-app-focus focus:bg-white transition tabular-nums">
-                                <p id="goal-step-suffix" class="mt-1 text-[11px] text-zinc-500 px-1">vez</p>
-                            </div>
-                        </div>
-
-                        <p id="goal-points-info" class="text-[11px] text-zinc-500 px-1 leading-relaxed"></p>
+                        <p id="goal-points-info" class="fx-hint"></p>
                     </div>
 
-                    <div class="ios-safe-bottom absolute bottom-0 left-0 right-0 bg-white border-t border-zinc-100 p-4 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
-                        <button onclick="saveGoalForm()" class="w-full h-12 flex items-center justify-center bg-app-focus text-white rounded-xl font-bold hover:shadow-lg transition active:scale-95 text-sm">
-                            Salvar meta
-                        </button>
+                    <div class="fx-foot">
+                        <button type="button" onclick="saveGoalForm()" class="fx-save">Salvar</button>
                     </div>
                 </div>
             </div>
@@ -1703,6 +1629,16 @@
             </div>
         </div>
 
+        <!-- V40.51.0: A FOLHA DE BAIXO DA FICHA: escolher a tag, a meta, a cor ou a categoria de um formulário das Listas, e o ⋯
+             deles (Arquivar, Apagar). Tocar numa opção escolhe e fecha; o fundo escuro e o voltar do celular fecham sem mudar
+             nada. Desenhada pelo fxPick() (app.js). -->
+        <div id="fx-pick-modal" role="dialog" aria-modal="true" aria-labelledby="fx-pick-title" class="absolute inset-x-0 bottom-0 z-[60] hidden flex-col">
+            <div class="fx-grab" aria-hidden="true"></div>
+            <h3 id="fx-pick-title" class="fx-ph">Escolher</h3>
+            <div id="fx-pick-list" class="fx-opts"></div>
+            <button type="button" data-voltar onclick="fxPickClose()" class="sr-only">Fechar</button>
+        </div>
+
         <!-- V40.46.0: "DESCARTAR?" ao fechar um formulário com texto não salvo (pelo X, pelo ←, pelo voltar do celular ou
              pelo fundo escuro). Fica por cima de tudo (z 70); o "Continuar escrevendo" é o que o voltar toca. -->
         <div id="discard-modal" role="alertdialog" aria-modal="true" aria-labelledby="discard-title" aria-describedby="discard-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[85%] max-w-[320px] bg-white rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[70] hidden flex-col border border-zinc-100">
@@ -1739,7 +1675,7 @@
         <!-- V40.5.1-fix9: badge de versão pra debug. Fica MUITO pequeno no canto inferior direito,
              permitindo verificar SEMPRE qual versão do app está rodando. Se aparecer 'fix9' mas
              user reclama de bug antigo = cache não atualizou. -->
-        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.50.1</div>
+        <div class="absolute bottom-1 right-2 text-[8px] text-zinc-300 font-mono z-[5] pointer-events-none select-none">v40.51.0</div>
 
     </div>
 

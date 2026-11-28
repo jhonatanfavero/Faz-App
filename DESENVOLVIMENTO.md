@@ -209,6 +209,16 @@ chaves `tb__*` são internas do aparelho (estado do sync, preferências de tela)
     variável só vale no iOS instalado (o `@supports (-webkit-touch-callout: none)` + `display-mode: standalone` do
     `style.css`) e vira 0 com a área segura 0 (iPhone deitado). Elemento novo preso ao topo usa a mesma soma; o
     `tests/navegador/iphone.js` reprova botão que comece na faixa ("na faixa que o iOS 26 embaça").
+29. **Formulário novo das Listas usa a Ficha (V40.51.0).** Tarefa, rotina, nota, despesa e meta (celular) e o cartão e
+    as janelas de rotina, despesa e meta (PC) seguem o mesmo desenho, escolhido por ele: o que é em cima com o ⋯
+    (Arquivar/Apagar), o nome grande (`.fx-name`), a ficha (`.fx-card` com uma `.fx-row` por ajuste, o escolhido na
+    direita em `.fx-val`, "Nenhuma" apagado) e o Salvar no pé. Escolher numa lista: no celular, `fxPick({ title, items |
+    colors, onPick })` abre a folha `#fx-pick-modal` (o voltar e o fundo escuro fecham sem mexer); no PC, a linha com
+    `data-fx-pop="<id>"` abre a `.fx-pop` presa nela (`fxPopOpen`/`fxPopClose`; o Esc e o clique fora fecham só ela).
+    Formulário aberto no celular = `#list-sheet.fx-open` (`fxSync`): somem o "Menu", o X e as abas; formulário novo entra
+    na lista do `fxSync` e o voltar dele é o ← com `data-voltar`. Linha que some (Meta sem metas, Parcelas) liga e
+    desliga só com `.hidden` (o CSS dá `display` em `:not(.hidden)`). Texto de rótulo muda com `textContent`, não com
+    `innerText` (o jsdom dos testes não tem `innerText`). O `tests/test_v40510.js` confere tudo isso.
 
 ## Publicar uma versão
 

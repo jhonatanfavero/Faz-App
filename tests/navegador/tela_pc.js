@@ -289,7 +289,7 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   const cz = await cartao(idsZ[1]).boundingBox();
   await p.mouse.move(cz.x + 30, cz.y + 10); await p.waitForTimeout(120);
   await cartao(idsZ[1]).locator('[data-more]').click(); await p.waitForTimeout(150);
-  const mz = await p.evaluate((id) => { const b = document.querySelector(`.card[data-id="${id}"] [data-more]`).getBoundingClientRect(), m = document.querySelector('[role="menu"]'); if (!m) return null; const r = m.getBoundingClientRect(); return { dy: r.top - b.bottom, dx: Math.min(Math.abs(r.right - b.right), Math.abs(r.left - b.left)) }; }, idsZ[1]);
+  const mz = await p.evaluate((id) => { const b = document.querySelector(`.card[data-id="${id}"] [data-more]`).getBoundingClientRect(), m = [...document.querySelectorAll('[role="menu"]')].find((x) => x.getClientRects().length); if (!m) return null; /* V40.51.0: os ⋯ das janelas (escondidos) também são menus */ const r = m.getBoundingClientRect(); return { dy: r.top - b.bottom, dx: Math.min(Math.abs(r.right - b.right), Math.abs(r.left - b.left)) }; }, idsZ[1]);
   ok(!!mz && mz.dy >= 0 && mz.dy <= 10 && mz.dx <= 12, 'o menu dos 3 pontinhos abre logo abaixo do botão (' + (mz ? Math.round(mz.dy) + 'px' : 'não abriu') + ')');
   await p.keyboard.press('Escape');
   const bb = await p.locator('#board').boundingBox();
@@ -375,6 +375,7 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   ok(await p.evaluate(() => document.getElementById('modal-tags').classList.contains('hidden')), 'Esc fecha');
   // cartão: Gerenciar tags por cima
   await p.locator('section.col .card').first().click(); await p.waitForTimeout(150);
+  await p.locator('#f-tag-row').click(); await p.waitForTimeout(120); // V40.51.0 (Ficha): a linha Tag abre a lista, com o "Gerenciar tags" no fim
   await p.locator('#f-tags [data-manage-tags]').click(); await p.waitForTimeout(150);
   const empilhadas = await p.evaluate(() => { const t = document.getElementById('modal-tags'), c = document.getElementById('modal-task'); const r = t.querySelector('#tg-new-name').getBoundingClientRect(); return !t.classList.contains('hidden') && !c.classList.contains('hidden') && document.elementFromPoint(r.x + 5, r.y + 5) === t.querySelector('#tg-new-name'); });
   ok(empilhadas, '"Gerenciar tags" abre a janela por cima do cartão, e ela recebe o clique');
@@ -880,7 +881,7 @@ const hhmm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m
   await p.locator(`.card[data-id="${c0}"]`).click({ position: { x: 30, y: 14 } }); await p.waitForTimeout(250);
   const gsel = await p.evaluate(() => { const w = document.getElementById('f-goal-wrap'), s = document.getElementById('f-goal'), r = document.querySelector('#modal-task > div').getBoundingClientRect();
     return { vis: !w.classList.contains('hidden') && w.getBoundingClientRect().height > 0, opts: [...s.options].map((o) => o.textContent.trim()), cabe: r.top >= 0 && r.bottom <= innerHeight }; });
-  ok(gsel.vis && gsel.opts[0] === 'Sem meta' && gsel.opts.length >= 4 && gsel.cabe, 'cartão da Lista: o campo "Meta" aparece ("Sem meta" + ' + (gsel.opts.length - 1) + ' metas) e a janela cabe na tela');
+  ok(gsel.vis && gsel.opts[0] === 'Nenhuma' && gsel.opts.length >= 4 && gsel.cabe, 'cartão da Lista: o campo "Meta" aparece ("Nenhuma" + ' + (gsel.opts.length - 1) + ' metas) e a janela cabe na tela');
   const gid = await p.evaluate(() => { const s = document.getElementById('f-goal'); return [...s.options].find((o) => o.value).value; });
   await p.selectOption('#f-goal', gid); await p.waitForTimeout(100);
   await p.evaluate(() => { const s = document.getElementById('f-goal'); s.scrollIntoView({ block: 'center' }); }); await p.waitForTimeout(100);

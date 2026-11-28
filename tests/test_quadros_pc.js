@@ -169,7 +169,8 @@ async function pc(uid, email) {
 
   console.log('\nF) A janelinha do quadro (o da pessoa) e o menu da lista do outro:');
   click(sec(AL).querySelector('.col-menu-btn'));
-  const menuTxt = T(d.querySelector('[role="menu"]'));
+  const openMenu = (doc) => [...doc.querySelectorAll('[role="menu"]')].find((m) => !m.classList.contains('hidden')); // V40.51.0: os ⋯ das janelas (escondidos) também são menus
+  const menuTxt = T(openMenu(d));
   ok(/Lista de dono@teste\.com · quadro Casa/.test(menuTxt) && !/Renomear|Apagar lista/.test(menuTxt) && /Ver o quadro/.test(menuTxt), 'menu da lista do outro: de quem é, sem Renomear nem Apagar, com "Ver o quadro"');
   click([...d.querySelectorAll('[role="menu"] button')].find((b) => /Ver o quadro/.test(b.textContent)));
   await waitFor(() => !$('modal-qb').classList.contains('hidden') && /Casa/.test(T($('qb-box'))));
@@ -191,7 +192,7 @@ async function pc(uid, email) {
   aclick(asec(GAMA).querySelector('.col-menu-btn'));
   aclick([...ad.querySelectorAll('[role="menu"] button, body > div.fixed button')].find((b) => /Mudar de quadro/.test(b.textContent)));
   await waitFor(() => [...ad.querySelectorAll('[data-share]')].length >= 2);
-  ok(/Pessoal/.test(T(ad.querySelector('[role="menu"]'))) && [...ad.querySelectorAll('[data-share]')].some((b) => b.dataset.share === CASA), 'V40.48.0 "Mudar de quadro…": "Pessoal" e os quadros dele');
+  ok(/Pessoal/.test(T(openMenu(ad))) && [...ad.querySelectorAll('[data-share]')].some((b) => b.dataset.share === CASA), 'V40.48.0 "Mudar de quadro…": "Pessoal" e os quadros dele');
   aclick([...ad.querySelectorAll('[data-share]')].find((b) => b.dataset.share === CASA));
   await waitFor(() => server.get('listas', DONO, GAMA).quadro_id === CASA);
   ok(server.get('listas', DONO, GAMA).quadro_id === CASA, 'escolheu "Casa": a GAMA foi pro quadro');

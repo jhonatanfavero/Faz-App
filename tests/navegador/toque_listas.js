@@ -247,13 +247,13 @@ const { abrir } = require('./apoio');
   ok(mt0.aberta && mt0.listas.join('|') === 'Pessoal|Profissional|Financeiro' && mt0.nivel === 'Iniciante' && mt0.nivelNaTela && mt0.botao, 'abre com o nível em cima, uma tela só com as categorias Pessoal, Profissional e Financeiro e o "Nova meta" embaixo, à vista');
   await m.tap('#goals-list-view > button'); await m.waitForTimeout(300);
   await m.tap('#goal-templates button:has-text("Beber água")'); await m.waitForTimeout(150);
-  const form = await m.evaluate(() => { const b = document.querySelector('#goals-form-view .ios-safe-bottom button').getBoundingClientRect(); return { nome: document.getElementById('goal-title-input').value, salvarNaTela: b.bottom <= innerHeight && b.top > 0, sugestoesRolam: document.getElementById('goal-templates').scrollWidth > document.getElementById('goal-templates').clientWidth }; });
+  const form = await m.evaluate(() => { const b = document.querySelector('#goals-form-view .fx-save').getBoundingClientRect(); return { nome: document.getElementById('goal-title-input').value, salvarNaTela: b.bottom <= innerHeight && b.top > 0, sugestoesRolam: document.getElementById('goal-templates').scrollWidth > document.getElementById('goal-templates').clientWidth }; });
   ok(form.nome === 'Beber água' && form.salvarNaTela && form.sugestoesRolam, 'Nova meta: as sugestões rolam pro lado, tocar em "Beber água" preenche, e o Salvar fica à vista');
   await foto(m, 'cel-metas-form.png');
-  await m.tap('#goals-form-view .ios-safe-bottom button'); await m.waitForTimeout(300);
+  await m.tap('#goals-form-view .fx-save'); await m.waitForTimeout(300);
   await m.tap('#goals-list-view > button'); await m.waitForTimeout(250);
   await m.tap('#goal-templates button:has-text("Correr")'); await m.waitForTimeout(100);
-  await m.tap('#goals-form-view .ios-safe-bottom button'); await m.waitForTimeout(300);
+  await m.tap('#goals-form-view .fx-save'); await m.waitForTimeout(300);
   const plus = () => m.evaluate(() => { const b = document.querySelector('#goals-container .goal-plus').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
   for (let i = 0; i < 8; i++) { const pt = await plus(); await m.touchscreen.tap(pt.x, pt.y); await m.waitForTimeout(90); }
   const mt1 = await m.evaluate(() => {

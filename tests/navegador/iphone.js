@@ -216,6 +216,15 @@ const IPHONES = [
         ['Lista: Metas', "closeAllSheets(); openListSheet(); switchListTab('goals');", '#list-sheet', { fim: true }],
         ['Lista: nova meta', 'openGoalForm(null);', '#list-sheet', { fim: true }],
         ['Lista: meta com gráfico', "openGoalForm(goalsDb.find((g) => g.title === 'Ler').id);", '#list-sheet'], // V40.34.0: o gráfico fica no topo
+        // V40.51.0: a Ficha (os formulários das Listas sem o "Menu" e as abas), a folha de baixo e o ⋯
+        ['Ficha: tarefa editando', "closeAllSheets(); openListSheet(); switchListTab('backlog'); openBacklogForm(backlogDb[0].id); currentBlMicroblocks = [{ title: 'Primeiro item', done: true }, { title: 'Segundo item, com um nome bem comprido pra ver se cabe', done: false }]; renderBlFormMicroblocks();", '#list-sheet', { fim: true }],
+        ['Ficha: folha da tag', 'blPickTag();', '#fx-pick-modal', { depois: 'fxPickClose();' }],
+        ['Ficha: folha da cor', 'blPickColor();', '#fx-pick-modal', { depois: 'fxPickClose();' }],
+        ['Ficha: o ⋯ da tarefa', 'blFormMore();', '#fx-pick-modal', { depois: 'fxPickClose(); closeBacklogForm(true); closeAllSheets();' }],
+        ['Ficha: rotina editando', "closeAllSheets(); openListSheet(); switchListTab('routines'); openRoutineForm(routinesDb[0].id);", '#list-sheet', { fim: true, depois: 'closeRoutineForm(true);' }],
+        ['Ficha: despesa parcelada', "closeAllSheets(); openListSheet(); switchListTab('financial'); openFinancialForm(); selectFinancialType('installment');", '#list-sheet', { fim: true, depois: 'closeFinancialForm(true);' }],
+        ['Ficha: editar nota', "closeAllSheets(); openListSheet(); switchListTab('notes'); openEditNote(notesDb[0].id);", '#list-sheet', { depois: 'cancelNoteForm();' }],
+        ['Ficha: categoria da meta', "closeAllSheets(); openListSheet(); switchListTab('goals'); openGoalForm(goalsDb[0].id); goalPickList();", '#fx-pick-modal', { depois: 'fxPickClose(); closeGoalForm(); closeAllSheets();' }],
         ['Agenda: selos das metas', `closeAllSheets(); activeDateObj = new Date(2026, 10, 16); renderTimeline(); setTimeout(() => { const el = document.querySelector('.block-item .goal-badge'); if (el) el.closest('.block-item').scrollIntoView({ block: 'center' }); }, 50);`, null], // V40.34.0
         // V40.45.0: o filtro da agenda ligado (o botão TAGs com a tag e o olho; os escondidos viram contorno)
         ['Agenda: filtro por tag', "closeAllSheets(); activeDateObj = new Date(2026, 10, 16); agTagFilter = tagsDb[0].id; agHideDone = true; renderTimeline(); document.getElementById('timeline-scroll').scrollTop = 0;", null, { depois: "agTagFilter = ''; agHideDone = false; agFilterSave(); renderTimeline();" }],

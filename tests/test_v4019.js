@@ -22,7 +22,7 @@ const ok = (c, m) => { if (c) { pass++; console.log('  ✅', m); } else { fail++
 
   console.log('A) Só o nome, num mês com valor próprio:');
   w.openFinancialForm('fin_rec');
-  ok($('financial-amount-input').value === '1100', 'o formulário mostra o valor de novembro (1100)');
+  ok($('financial-amount-input').value === '1100.00', 'o formulário mostra o valor de novembro (1100.00: V40.51.0, com os centavos)');
   $('financial-input').value = 'Aluguel do escritório';
   w.saveFinancialForm();
   let f = item('fin_rec');

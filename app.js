@@ -3847,7 +3847,7 @@ function closeTopmostModal() {
 window.onOverlayClick = function() {
     const m = getOpenModal();
     if (m) {
-        if (m.querySelector('input:not([type="hidden"]), textarea')) return;
+        if (m.querySelector('input:not([type="hidden"]):not([type="color"]), textarea')) return; // V40.51.0: o "Outra" cor da Ficha não é campo de digitar
         const b = navButton(m);
         if (b) b.click(); else closeTopmostModal();
         return;
@@ -4298,7 +4298,7 @@ window.exportFazBackup = async function() {
         payload = JSON.stringify({
             signature: FAZ_BACKUP_SIGNATURE,
             app: 'Faz / TimeBlock',
-            version: 'v40.50.1',
+            version: 'v40.51.0',
             exportedAt: new Date().toISOString(),
             summary: fazDataSummary(data),
             data: data
@@ -4771,10 +4771,11 @@ function renderBacklogCard(item) {
     const visibleMbs = isExpanded ? mbsView : mbsView.slice(0, PREVIEW_COUNT);
     const extraCount = mbs.length - PREVIEW_COUNT;
     
+    // V40.51.0: item feito (marcado na Ficha ou no PC) com o ✓ verde e riscado
     let mbHtml = visibleMbs.map(mb => `
         <div class="flex items-center gap-1.5 mt-1">
-            <i class="ph-bold ph-check text-[10px] text-zinc-300 shrink-0"></i>
-            <span class="text-[11px] text-zinc-500 truncate">${txt(mb.title)}</span>
+            <i class="ph-bold ph-check text-[10px] ${mb.done ? 'text-emerald-500' : 'text-zinc-300'} shrink-0"></i>
+            <span class="text-[11px] ${mb.done ? 'text-zinc-400 line-through' : 'text-zinc-500'} truncate">${txt(mb.title)}</span>
         </div>
     `).join('');
     
@@ -6425,7 +6426,7 @@ function goalChartHtml(g) {
     if (x.streak) stats.push('🔥 ' + M.streakLabel(g.period, x.streak));
     stats.push('⭐ ' + x.stars);
     stats.push('Total: ' + rec.totalText);
-    return `<div class="flex items-center justify-between mb-2"><span class="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">${per}</span>` +
+    return `<div class="flex items-center justify-between mb-2"><span class="text-[12.5px] font-semibold text-zinc-500">${per}</span>` + // V40.51.0: sem MAIÚSCULAS (Ficha)
         `<span class="goal-chart-now text-[11px] font-bold ${x.complete ? 'text-emerald-600' : 'text-zinc-600'}">${escapeHtml(x.text)}</span></div>` +
         `<div class="goal-bars flex items-end gap-1.5">${bars}</div>` +
         `<p class="goal-chart-stats mt-2.5 text-[11px] text-zinc-500 leading-relaxed">${escapeHtml(stats.join(' · '))}</p>` +
@@ -6433,20 +6434,15 @@ function goalChartHtml(g) {
 }
 
 // ---------- formulário (criar / editar meta) ----------
+// V40.51.0 (Ficha): Frequência e Contar em viraram uma escolha só cada (o escolhido em branco, .on); a Categoria é uma
+// linha que abre a folha de baixo (goalPickList), com "Nova categoria" no fim
 function goalFormUi() {
     const M = window.FazMetas, f = goalForm;
-    ['dia', 'semana', 'mes'].forEach(p => {
-        const b = document.getElementById('goal-period-' + p), on = f.period === p;
-        b.className = 'flex-1 py-2.5 rounded-lg border text-xs font-bold transition active:scale-95 ' + (on ? 'bg-app-focus text-white border-app-focus' : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100');
-    });
-    ['vezes', 'minutos', 'reais'].forEach(u => {
-        const b = document.getElementById('goal-unit-' + u), on = f.unit === u;
-        b.className = 'flex-1 py-2.5 rounded-lg border text-xs font-bold transition active:scale-95 ' + (on ? 'bg-app-focus text-white border-app-focus' : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100');
-    });
-    document.getElementById('goal-list-options').innerHTML = goalListsDb.map(l => {
-        const on = l.id === f.listId;
-        return `<button type="button" onclick="selectGoalFormList('${goalJsId(l.id)}')" class="px-3 py-2 rounded-lg border text-xs font-bold transition active:scale-95 ${on ? 'bg-app-focus text-white border-app-focus' : 'bg-zinc-50 text-zinc-600 border-zinc-200'}">${escapeHtml(l.name || 'Sem nome')}</button>`;
-    }).join('') + `<button type="button" onclick="openCreateGoalList(true)" class="px-3 py-2 rounded-lg border border-dashed border-zinc-300 text-xs font-bold text-zinc-500 transition active:scale-95"><i class="ph ph-plus"></i> Nova</button>`;
+    const seg = (id, on) => { const b = document.getElementById(id); if (b) { b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); } };
+    ['dia', 'semana', 'mes'].forEach(p => seg('goal-period-' + p, f.period === p));
+    ['vezes', 'minutos', 'reais'].forEach(u => seg('goal-unit-' + u, f.unit === u));
+    const cat = goalListsDb.find(l => l.id === f.listId);
+    fxVal('goal-list-val', true, '', cat ? (cat.name || 'Sem nome') : 'Escolher');
     const per = M.PERIODS[f.period].per, unit = f.unit;
     document.getElementById('goal-target-suffix').textContent = (unit === 'vezes' ? 'vezes ' : unit === 'minutos' ? 'minutos ' : 'reais ') + per;
     document.getElementById('goal-step-suffix').textContent = unit === 'vezes' ? 'vez(es) por toque' : unit === 'minutos' ? 'minutos por toque' : 'reais por toque';
@@ -6470,22 +6466,22 @@ window.openGoalForm = function(id, listId) {
     document.getElementById('goal-emoji-input').value = g ? (g.emoji || '') : '';
     document.getElementById('goal-target-input').value = goalNumField(n ? n.target : M.UNITS.vezes.target);
     document.getElementById('goal-step-input').value = goalNumField(n ? n.step : M.UNITS.vezes.step);
-    const del = document.getElementById('goal-form-delete-btn');
-    del.classList.toggle('hidden', !g);
-    del.classList.toggle('flex', !!g);
+    document.getElementById('goal-form-more-btn').classList.toggle('hidden', !g); // V40.51.0 (Ficha): o Apagar foi pro ⋯
     document.getElementById('goal-templates-wrap').classList.toggle('hidden', !!g);
     const chart = document.getElementById('goal-chart-wrap'); // V40.34.0: o gráfico da meta
     chart.classList.toggle('hidden', !g);
     document.getElementById('goal-chart').innerHTML = g ? goalChartHtml(g) : '';
     if (!g) document.getElementById('goal-templates').innerHTML = M.TEMPLATES.map((t, i) =>
-        `<button type="button" onclick="applyGoalTemplate(${i})" class="shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-xs font-bold text-zinc-700 active:scale-95 transition"><span class="text-base leading-none">${t.emoji}</span>${escapeHtml(t.title)}</button>`).join('');
+        `<button type="button" onclick="applyGoalTemplate(${i})" class="fx-chip"><span class="e">${t.emoji}</span>${escapeHtml(t.title)}</button>`).join('');
     goalFormUi();
     document.getElementById('goals-list-view').classList.add('hidden');
     const form = document.getElementById('goals-form-view');
     form.classList.remove('hidden');
     form.classList.add('flex');
-    const scroller = form.querySelector('.overflow-y-auto'); // V40.34.0: abre sempre do topo (o gráfico fica lá em cima)
-    if (scroller) scroller.scrollTop = 0;
+    fxTop('goals-form-view'); // V40.34.0: abre sempre do topo (o gráfico fica lá em cima)
+    const tpl = document.getElementById('goal-templates');
+    if (tpl) tpl.scrollLeft = 0;
+    fxSync();
     // Regra de Ouro: sem .focus() programático (o teclado do Android empurra a tela)
 };
 window.closeGoalForm = function(silent) {
@@ -6495,7 +6491,21 @@ window.closeGoalForm = function(silent) {
     if (list) list.classList.remove('hidden');
     goalEditId = null;
     goalForm = null;
+    fxSync(); // V40.51.0
     renderGoals();
+};
+// V40.51.0 (Ficha): a Categoria na folha de baixo ("Nova categoria" no fim cria e já deixa escolhida, como o "+ Nova")
+window.goalPickList = function() {
+    if (!goalForm) return;
+    fxPick({ title: 'Categoria', items: goalListsDb.map(l => ({ k: l.id, label: l.name || 'Sem nome', on: l.id === goalForm.listId }))
+        .concat([{ k: '+nova', label: 'Nova categoria', ic: 'ph-bold ph-plus', add: true }]),
+        onPick: (k) => { if (k === '+nova') openCreateGoalList(true); else if (goalListsDb.some(l => l.id === k)) selectGoalFormList(k); } });
+};
+window.goalFormMore = function() {
+    const g = goalEditId ? goalsDb.find(x => x.id === goalEditId) : null;
+    if (!g) return;
+    fxPick({ title: ((g.emoji ? g.emoji + ' ' : '') + (g.title || 'Meta')), items: [{ k: 'apagar', label: 'Apagar', ic: 'ph ph-trash', danger: true }],
+        onPick: (k) => { if (k === 'apagar') deleteGoalFromForm(); } });
 };
 window.selectGoalFormList = function(id) { if (!goalForm) return; goalForm.listId = id; goalFormUi(); };
 window.goalFieldTouched = function() { if (goalForm) goalForm.targetTouched = goalForm.stepTouched = true; }; // digitou: trocar a medida não apaga
@@ -6706,39 +6716,52 @@ window.cancelGoalAction = function() {
 };
 
 // V40.1.1: abre o form (Estado B) — modo criar
+// V40.51.0: os campos são preenchidos ANTES de a tela da nota aparecer (eram 50 ms depois): o "Descartar?" (V40.46.0) guarda
+// o texto do começo assim que o formulário aparece, e com o atraso abrir uma nota e voltar sem mexer perguntava "Descartar?".
 window.openNoteForm = function() {
     notesFormOpen = true;
     editingNoteId = null; // V40.1.2: garantir que NÃO está em modo edição
-    renderNotes();
     // V40.2.17 (Regra de Ouro PWA - Jules): REMOVIDO .focus() programático.
     // Forçar teclado via JS em PWA com 100dvh fazia Chrome Android empurrar body inteiro pra cima,
     // descolando a sheet do fundo e criando "buraco branco" embaixo. Usuário toca no campo manualmente.
-    setTimeout(() => {
-        const titleInput = document.getElementById('note-title-input');
-        const contentInput = document.getElementById('note-content-input');
-        if (titleInput) titleInput.value = '';
-        if (contentInput) contentInput.value = '';
-    }, 50);
+    const titleInput = document.getElementById('note-title-input');
+    const contentInput = document.getElementById('note-content-input');
+    if (titleInput) titleInput.value = '';
+    if (contentInput) contentInput.value = '';
+    renderNotes();
+    fxTop('notes-form');
 }
 
 // V40.1.2: abre o form em modo edição (Estado B com pré-preenchimento)
 window.openEditNote = function(id) {
     const note = notesDb.find(n => n.id === id);
     if (!note) return;
-    
+
     notesFormOpen = true;
     editingNoteId = id;
-    renderNotes();
-    
     // V40.2.17 (Regra de Ouro PWA - Jules): REMOVIDO .focus() programático.
-    // Mesmo motivo do openNoteForm. setTimeout preservado só pra preencher os campos após reflow.
-    setTimeout(() => {
-        const titleInput = document.getElementById('note-title-input');
-        const contentInput = document.getElementById('note-content-input');
-        if (titleInput) titleInput.value = note.title || '';
-        if (contentInput) contentInput.value = note.content || '';
-    }, 50);
+    const titleInput = document.getElementById('note-title-input');
+    const contentInput = document.getElementById('note-content-input');
+    if (titleInput) titleInput.value = note.title || '';
+    if (contentInput) contentInput.value = note.content || '';
+    renderNotes();
+    fxTop('notes-form');
 }
+// V40.51.0 (Ficha): o ⋯ da nota aberta (Apagar; a lixeira do cartão continua na lista)
+window.noteFormMore = function() {
+    const n = editingNoteId ? notesDb.find(x => x.id === editingNoteId) : null;
+    if (!n) return;
+    fxPick({ title: n.title || 'Nota', items: [{ k: 'apagar', label: 'Apagar', ic: 'ph ph-trash', danger: true }], onPick: (k) => {
+        if (k !== 'apagar' || !notesDb.some(x => x.id === n.id)) return;
+        notesFormOpen = false;
+        editingNoteId = null;
+        pendingLinkBlockId = null;
+        const ti = document.getElementById('note-title-input'), ci = document.getElementById('note-content-input');
+        if (ti) ti.value = '';
+        if (ci) ci.value = '';
+        deleteNote(n.id); // apaga (tira dos blocos ligados) e redesenha a aba sem o formulário
+    } });
+};
 
 // V40.1.1: cancela o form (volta pra Estado A ou C)
 window.cancelNoteForm = function() {
@@ -6853,14 +6876,14 @@ window.renderNotes = function() {
     
     const hasNotes = notesDb.length > 0;
     
+    // V40.51.0 (Ficha): o formulário é uma tela só dele (flex) e esconde tudo da lista, cabeçalho inclusive
+    form.classList.toggle('flex', notesFormOpen);
     if (notesFormOpen) {
         // Estado B: Form aberto. Esconde empty, esconde lista, mostra form.
-        // Header só fica visível se já existem notas (pra não poluir tela vazia)
         empty.classList.add('hidden');
         container.classList.add('hidden');
         form.classList.remove('hidden');
-        if (hasNotes) header.classList.remove('hidden');
-        else header.classList.add('hidden');
+        header.classList.add('hidden');
         if (fabBtn) fabBtn.classList.add('hidden'); // V40.4.4-fix: esconde botão durante form
     } else if (!hasNotes) {
         // Estado A: Empty. Mostra só o convite central.
@@ -6877,19 +6900,13 @@ window.renderNotes = function() {
         header.classList.remove('hidden');
         if (fabBtn) fabBtn.classList.remove('hidden'); // V40.4.4-fix: mostra botão tracejado
     }
-    
-    // V40.1.2: atualizar labels do form conforme modo (criar vs editar)
+
+    // V40.1.2: atualizar labels do form conforme modo (criar vs editar). V40.51.0: o botão é sempre "Salvar"; o ⋯ só ao editar
     const formLabel = document.getElementById('notes-form-label');
-    const formSaveBtn = document.getElementById('notes-form-save-btn');
-    if (formLabel && formSaveBtn) {
-        if (editingNoteId) {
-            formLabel.innerText = 'Editar nota';
-            formSaveBtn.innerText = 'Atualizar Nota';
-        } else {
-            formLabel.innerText = 'Nova nota';
-            formSaveBtn.innerText = 'Salvar Nota';
-        }
-    }
+    if (formLabel) formLabel.textContent = editingNoteId ? 'Editar nota' : 'Nova nota';
+    const more = document.getElementById('notes-form-more-btn');
+    if (more) more.classList.toggle('hidden', !editingNoteId);
+    fxSync();
     
     // Sempre re-renderizar a lista (idempotente)
     container.innerHTML = notesDb.map(n => {
@@ -7744,11 +7761,12 @@ window.openRoutineForm = function(id = null) {
     document.getElementById('routines-form-view').classList.add('flex');
     
     currentRtId = id;
-    
+
+    const more = document.getElementById('rt-form-more-btn'); // V40.51.0 (Ficha): o Apagar foi pro ⋯ (só ao editar)
     if (id) {
         const r = routinesDb.find(x => x.id === id);
         if (!r) return;
-        document.getElementById('rt-form-title-label').innerText = 'Editar Rotina';
+        document.getElementById('rt-form-title-label').textContent = 'Editar rotina';
         document.getElementById('rt-form-emoji').value = r.emoji || '';
         document.getElementById('rt-form-title').value = r.title;
         currentRtDur = r.duration;
@@ -7756,10 +7774,9 @@ window.openRoutineForm = function(id = null) {
         currentRtTagId = r.tagId;
         currentRtGoalId = goalKeep(r.goalId); // V40.34.0
         currentRtMicroblocks = JSON.parse(JSON.stringify(r.microblocks || []));
-        document.getElementById('rt-form-delete-btn').classList.remove('hidden');
-        document.getElementById('rt-form-delete-btn').classList.add('flex');
+        if (more) more.classList.remove('hidden');
     } else {
-        document.getElementById('rt-form-title-label').innerText = 'Nova Rotina';
+        document.getElementById('rt-form-title-label').textContent = 'Nova rotina';
         document.getElementById('rt-form-emoji').value = '';
         document.getElementById('rt-form-title').value = '';
         currentRtDur = 120;
@@ -7767,12 +7784,13 @@ window.openRoutineForm = function(id = null) {
         currentRtTagId = null;
         currentRtGoalId = null; // V40.34.0
         currentRtMicroblocks = [{title: ''}];
-        document.getElementById('rt-form-delete-btn').classList.add('hidden');
-        document.getElementById('rt-form-delete-btn').classList.remove('flex');
+        if (more) more.classList.add('hidden');
     }
-    
+
     updateRtFormVisuals();
     renderRtFormMicroblocks();
+    fxTop('routines-form-view');
+    fxSync();
 }
 
 window.closeRoutineForm = function(force = false) {
@@ -7782,6 +7800,7 @@ window.closeRoutineForm = function(force = false) {
     formView.classList.add('hidden');
     formView.classList.remove('flex');
     listView.classList.remove('hidden');
+    fxSync(); // V40.51.0
     if (!force) renderRoutinesList();
 }
 
@@ -8060,35 +8079,30 @@ window.selectRoutineFormTag = function(tagId) {
 }
 window.selectRoutineFormGoal = function(id) { currentRtGoalId = goalKeep(id || null); updateRtFormVisuals(); }; // V40.34.0
 
+// V40.51.0 (Ficha): Tipo em Foco | Descanso na própria linha; Tag e Meta abrem a folha de baixo (rtPickTag/Goal)
 function updateRtFormVisuals() {
-    document.getElementById('rt-form-dur-label').innerText = formatDur(currentRtDur);
-    
-    const btnFocus = document.getElementById('rt-theme-focus');
-    const btnRest = document.getElementById('rt-theme-rest');
-    if (currentRtTheme === 'focus') {
-        btnFocus.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-app-focus text-white border-transparent shadow-sm';
-        btnRest.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50';
-    } else {
-        btnRest.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-zinc-700 text-white border-transparent shadow-sm';
-        btnFocus.className = 'flex-1 py-2.5 rounded-xl font-bold text-sm transition border bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50';
-    }
-
-    const tagContainer = document.getElementById('rt-form-tag-container');
-    if (tagContainer) {
-        let html = `<button onclick="selectRoutineFormTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-xs font-bold transition whitespace-nowrap ${currentRtTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'}">Sem Tag</button>`;
-        tagsDb.forEach(t => {
-            const isActive = currentRtTagId === t.id;
-            const bgColor = isActive ? t.color : t.color + '15';
-            const textColor = isActive ? '#fff' : t.color;
-            const borderColor = isActive ? t.color : t.color + '40';
-            const dotColor = isActive ? '#fff' : t.color;
-            const extraClass = isActive ? 'shadow-md' : 'opacity-80 hover:opacity-100';
-            html += `<button onclick="selectRoutineFormTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold transition whitespace-nowrap ${extraClass}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid ${borderColor}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${dotColor};"></div>${escapeHtml(t.name)}</button>`;
-        });
-        tagContainer.innerHTML = html;
-    }
-    goalPickFill('rt-form-goal-wrap', 'rt-form-goal-container', currentRtGoalId, 'selectRoutineFormGoal'); // V40.34.0
+    document.getElementById('rt-form-dur-label').textContent = fxDur(currentRtDur);
+    ['focus', 'rest'].forEach(th => {
+        const b = document.getElementById('rt-theme-' + th), on = (currentRtTheme === 'focus') === (th === 'focus'); // como antes: o que não é Foco aparece como Descanso
+        if (!b) return;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    fxTagVal('rt-form-tag-val', currentRtTagId);
+    fxGoalVal('rt-form-goal-wrap', 'rt-form-goal-val', currentRtGoalId); // V40.34.0
 }
+window.rtPickTag = function() {
+    fxPick({ title: 'Tag', items: fxTagItems(currentRtTagId), onPick: (k) => { currentRtTagId = k || null; updateRtFormVisuals(); } });
+};
+window.rtPickGoal = function() {
+    fxPick({ title: 'Meta', items: fxGoalItems(currentRtGoalId), onPick: (k) => selectRoutineFormGoal(k) });
+};
+window.rtFormMore = function() {
+    const r = currentRtId ? routinesDb.find(x => x.id === currentRtId) : null;
+    if (!r) return;
+    fxPick({ title: ((r.emoji ? r.emoji + ' ' : '') + (r.title || 'Rotina')), items: [{ k: 'apagar', label: 'Apagar', ic: 'ph ph-trash', danger: true }],
+        onPick: (k) => { if (k === 'apagar') deleteRoutineFromForm(); } });
+};
 
 function syncRtMicroblocksFromDOM() {
     currentRtMicroblocks = Array.from(document.querySelectorAll('.rt-mb-input')).map(input => ({ title: input.value }));
@@ -8109,11 +8123,13 @@ window.removeRoutineMicroblockForm = function(index) {
 function renderRtFormMicroblocks() {
     const container = document.getElementById('rt-form-microblocks');
     if (!container) return;
+    // V40.51.0 (Ficha): uma linha da ficha por item. A rotina é um modelo (cada bloco que ela cria começa desmarcado):
+    // um pontinho na frente, não a bolinha de marcar
     container.innerHTML = currentRtMicroblocks.map((mb, i) => `
-        <div class="flex items-center gap-2">
-            <div class="w-5 h-5 rounded-md border border-zinc-300 shrink-0 bg-zinc-50 flex items-center justify-center"><i class="ph ph-check text-[10px] text-zinc-300"></i></div>
-            <input type="text" class="rt-mb-input flex-1 h-10 bg-zinc-50 border border-zinc-200 rounded-lg px-3 text-sm text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: Ler 10 páginas" value="${escapeHtml(mb.title)}">
-            <button onclick="removeRoutineMicroblockForm(${i})" class="w-8 h-10 flex items-center justify-center text-zinc-400 hover:text-red-500 transition shrink-0"><i class="ph ph-x"></i></button>
+        <div class="fx-row fx-ckrow">
+            <span class="fx-bul" aria-hidden="true"></span>
+            <input type="text" class="rt-mb-input fx-ckin" placeholder="Ex: Ler 10 páginas" value="${escapeHtml(mb.title)}" aria-label="Item ${i + 1} do checklist">
+            <button type="button" onclick="removeRoutineMicroblockForm(${i})" class="fx-x" aria-label="Tirar o item"><i class="ph ph-x"></i></button>
         </div>
     `).join('');
 }
@@ -8225,7 +8241,7 @@ window.cancelDeleteRoutine = function() {
 
 let currentBlId = null;
 let currentBlColor = null; // V40.9.0: cor livre do cartão
-window.fazPickBlColor = function(c) { currentBlColor = fazCardColor(c); fazRenderColorPicker('bl-form-colors', currentBlColor, 'fazPickBlColor'); };
+window.fazPickBlColor = function(c) { currentBlColor = fazCardColor(c); updateBacklogFormVisuals(); }; // V40.51.0: a linha "Cor do cartão" da Ficha
 let currentBlDur = 30;
 let currentBlTagId = null;
 let currentBlGoalId = null; // V40.34.0
@@ -8241,37 +8257,34 @@ window.openBacklogForm = function(id = null) {
     
     currentBlId = id;
     
+    // V40.51.0 (Ficha): títulos com só a 1ª maiúscula; Arquivar e Apagar no ⋯ (bl-form-more-btn), que só aparece ao editar
+    const more = document.getElementById('bl-form-more-btn');
     if (id) {
         const item = backlogDb.find(x => x.id === id);
         if (!item) return;
-        document.getElementById('bl-form-title-label').innerText = 'Editar Tarefa';
+        document.getElementById('bl-form-title-label').textContent = 'Editar tarefa';
         document.getElementById('backlog-input').value = item.title;
         currentBlDur = item.duration;
         currentBlTagId = item.tagId || null;
         currentBlGoalId = goalKeep(item.goalId); // V40.34.0
         currentBlColor = fazCardColor(item.color);
         currentBlMicroblocks = JSON.parse(JSON.stringify(item.microblocks || []));
-        document.getElementById('bl-form-delete-btn').classList.remove('hidden');
-        document.getElementById('bl-form-delete-btn').classList.add('flex');
-        document.getElementById('bl-form-archive-btn').classList.remove('hidden');
-        document.getElementById('bl-form-archive-btn').classList.add('flex');
+        if (more) more.classList.remove('hidden');
     } else {
-        document.getElementById('bl-form-title-label').innerText = 'Nova Tarefa';
+        document.getElementById('bl-form-title-label').textContent = 'Nova tarefa';
         document.getElementById('backlog-input').value = '';
         currentBlDur = 30;
         currentBlTagId = null;
         currentBlGoalId = null; // V40.34.0
         currentBlColor = null;
         currentBlMicroblocks = []; // C14: começa vazio
-        document.getElementById('bl-form-delete-btn').classList.add('hidden');
-        document.getElementById('bl-form-delete-btn').classList.remove('flex');
-        document.getElementById('bl-form-archive-btn').classList.add('hidden');
-        document.getElementById('bl-form-archive-btn').classList.remove('flex');
+        if (more) more.classList.add('hidden');
     }
-    
+
     updateBacklogFormVisuals();
     renderBlFormMicroblocks();
-    fazRenderColorPicker('bl-form-colors', currentBlColor, 'fazPickBlColor'); // V40.9.0
+    fxTop('backlog-form-view');
+    fxSync();
 }
 
 window.closeBacklogForm = function(force = false) {
@@ -8281,6 +8294,7 @@ window.closeBacklogForm = function(force = false) {
     formView.classList.add('hidden');
     formView.classList.remove('flex');
     listView.classList.remove('hidden');
+    fxSync(); // V40.51.0: o "Menu" e as abas voltam
     if (!force) renderBacklog();
 }
 
@@ -8295,37 +8309,51 @@ window.selectBacklogFormTag = function(tagId) {
 }
 window.selectBacklogFormGoal = function(id) { currentBlGoalId = goalKeep(id || null); updateBacklogFormVisuals(); }; // V40.34.0
 
+// V40.51.0 (Ficha): cada linha mostra o que está escolhido; Tag, Meta e Cor abrem a folha de baixo (blPickTag/Goal/Color)
 function updateBacklogFormVisuals() {
     const durLabel = document.getElementById('bl-form-dur-label');
-    if (durLabel) durLabel.innerText = formatDur(currentBlDur);
-    
-    const tagContainer = document.getElementById('bl-form-tag-container');
-    if (tagContainer) {
-        let html = `<button onclick="selectBacklogFormTag(null)" class="shrink-0 px-4 py-2 rounded-full border text-xs font-bold transition whitespace-nowrap ${currentBlTagId === null ? 'bg-app-focus border-app-focus text-white shadow-md' : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:bg-zinc-100'}">Sem Tag</button>`;
-        tagsDb.forEach(t => {
-            const isActive = currentBlTagId === t.id;
-            const bgColor = isActive ? t.color : t.color + '15';
-            const textColor = isActive ? '#fff' : t.color;
-            const borderColor = isActive ? t.color : t.color + '40';
-            const dotColor = isActive ? '#fff' : t.color;
-            const extraClass = isActive ? 'shadow-md' : 'opacity-80 hover:opacity-100';
-            html += `<button onclick="selectBacklogFormTag('${t.id}')" class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold transition whitespace-nowrap ${extraClass}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid ${borderColor}"><div class="w-2.5 h-2.5 rounded-full" style="background-color: ${dotColor};"></div>${escapeHtml(t.name)}</button>`;
-        });
-        tagContainer.innerHTML = html;
-    }
-    goalPickFill('bl-form-goal-wrap', 'bl-form-goal-container', currentBlGoalId, 'selectBacklogFormGoal'); // V40.34.0
+    if (durLabel) durLabel.textContent = fxDur(currentBlDur);
+    fxTagVal('bl-form-tag-val', currentBlTagId);
+    fxGoalVal('bl-form-goal-wrap', 'bl-form-goal-val', currentBlGoalId); // V40.34.0
+    fxColorVal('bl-form-color-val', currentBlColor); // V40.9.0
     goalNamePlaceholder('backlog-input', currentBlGoalId, 'Nome da tarefa'); // V40.36.1
 }
+window.blPickTag = function() {
+    fxPick({ title: 'Tag', items: fxTagItems(currentBlTagId), onPick: (k) => { currentBlTagId = k || null; updateBacklogFormVisuals(); } });
+};
+window.blPickGoal = function() {
+    fxPick({ title: 'Meta', items: fxGoalItems(currentBlGoalId), onPick: (k) => selectBacklogFormGoal(k) });
+};
+window.blPickColor = function() {
+    fxPick({ title: 'Cor do cartão', colors: true, cur: currentBlColor, onPick: (k) => fazPickBlColor(k || null) });
+};
+// O ⋯ (só ao editar): Arquivar e Apagar, que ficavam em dois botões no topo
+window.blFormMore = function() {
+    const item = currentBlId ? backlogDb.find(x => x.id === currentBlId) : null;
+    if (!item) return;
+    fxPick({ title: item.title || 'Tarefa', items: [
+        { k: 'arquivar', label: 'Arquivar', ic: 'ph ph-archive' },
+        { k: 'apagar', label: 'Apagar', ic: 'ph ph-trash', danger: true }
+    ], onPick: (k) => { if (k === 'arquivar') fazArchiveTask(item.id); else if (k === 'apagar') deleteBacklogFromForm(); } });
+};
 
+// V40.51.0: o "feito" de cada item agora vem junto (o PC já marcava; salvar aqui desmarcava tudo)
 function syncBlMicroblocksFromDOM() {
-    currentBlMicroblocks = Array.from(document.querySelectorAll('.bl-mb-input')).map(input => ({ title: input.value }));
+    currentBlMicroblocks = Array.from(document.querySelectorAll('.bl-mb-input')).map((input, i) => ({ title: input.value, done: !!(currentBlMicroblocks[i] && currentBlMicroblocks[i].done) }));
 }
 
 window.addBacklogMicroblockForm = function() {
     syncBlMicroblocksFromDOM();
-    currentBlMicroblocks.push({title: ''});
+    currentBlMicroblocks.push({ title: '', done: false });
     renderBlFormMicroblocks();
 }
+window.toggleBlFormMb = function(index) {
+    syncBlMicroblocksFromDOM();
+    const mb = currentBlMicroblocks[index];
+    if (!mb) return;
+    mb.done = !mb.done;
+    renderBlFormMicroblocks();
+};
 
 window.removeBacklogMicroblockForm = function(index) {
     syncBlMicroblocksFromDOM();
@@ -8338,14 +8366,20 @@ function renderBlFormMicroblocks() {
     if (!container) return;
     // V40.3.5 Ajuste 1: removido texto "Sem checklist (opcional)" — vazio fica vazio mesmo.
     // User adiciona via botão "+ Adicionar item" embaixo.
+    // V40.51.0 (Ficha): uma linha da ficha por item, com a bolinha de feito (toque marca/desmarca) e o x pra tirar
     container.innerHTML = currentBlMicroblocks.map((mb, i) => `
-        <div class="flex items-center gap-2">
-            <div class="w-5 h-5 rounded-md border border-zinc-300 shrink-0 bg-zinc-50 flex items-center justify-center"><i class="ph ph-check text-[10px] text-zinc-300"></i></div>
-            <input type="text" data-mb-idx="${i}" class="bl-mb-input flex-1 h-10 bg-zinc-50 border border-zinc-200 rounded-lg px-3 text-sm text-zinc-800 placeholder-zinc-400 outline-none focus:border-app-focus focus:bg-white transition" placeholder="Ex: Comprar leite" value="${escapeHtml(mb.title)}">
-            <button onclick="removeBacklogMicroblockForm(${i})" class="w-8 h-10 flex items-center justify-center text-zinc-400 hover:text-red-500 transition shrink-0"><i class="ph ph-x"></i></button>
+        <div class="fx-row fx-ckrow">
+            <button type="button" onclick="toggleBlFormMb(${i})" class="fx-ck${mb.done ? ' on' : ''}" aria-pressed="${mb.done ? 'true' : 'false'}" aria-label="${mb.done ? 'Desmarcar o item' : 'Marcar o item como feito'}"><i class="ph-bold ph-check"></i></button>
+            <input type="text" data-mb-idx="${i}" class="bl-mb-input fx-ckin${mb.done ? ' done' : ''}" placeholder="Ex: Comprar leite" value="${escapeHtml(mb.title)}" aria-label="Item ${i + 1} do checklist">
+            <button type="button" onclick="removeBacklogMicroblockForm(${i})" class="fx-x" aria-label="Tirar o item"><i class="ph ph-x"></i></button>
         </div>
     `).join('');
-    
+    const sec = document.getElementById('bl-form-ck-sec'); // "Checklist · 1 de 2" quando algum já está feito
+    if (sec) {
+        const all = currentBlMicroblocks.filter(m => String(m.title || '').trim()), done = all.filter(m => m.done).length;
+        sec.textContent = done ? `Checklist · ${done} de ${all.length}` : 'Checklist';
+    }
+
     // V40.3.8: setup do listener de Enter uma vez (idempotente — flag impede attach duplicado).
     if (!container.dataset.enterListenerAttached) {
         container.addEventListener('keypress', (e) => {
@@ -8415,7 +8449,7 @@ window.saveBacklogForm = function() {
     if (!title) return showToast('A tarefa precisa de um nome.');
 
     syncBlMicroblocksFromDOM();
-    const validMbs = currentBlMicroblocks.filter(mb => mb.title.trim() !== '').map(mb => ({ title: mb.title.trim(), done: false }));
+    const validMbs = currentBlMicroblocks.filter(mb => mb.title.trim() !== '').map(mb => ({ title: mb.title.trim(), done: !!mb.done })); // V40.51.0: guarda o feito
 
     if (currentBlId) {
         const item = backlogDb.find(x => x.id === currentBlId);
@@ -9233,6 +9267,141 @@ function hideModal(id) {
     }
 }
 
+// =====================================================
+// V40.51.0 — FICHA: os formulários das Listas (Tarefa, Rotina, Nota, Despesa e Meta)
+// =====================================================
+// Pedido do Jhonatan (28/11/2026): "tô achando muito poluído e confuso, cria alguns modelos reorganizando de forma clean,
+// profissional e confortável". Dos 3 modelos ele escolheu a "1. Ficha", em todos: o nome grande em cima, uma ficha com
+// uma linha por ajuste (o escolhido na direita; nada escolhido = "Nenhuma", discreto), o Salvar no pé e Arquivar/Apagar
+// no ⋯. Tag, Meta, Cor e Categoria abrem a folha de baixo (#fx-pick-modal): tocar escolhe e fecha. Visual: style.css (fx-).
+// Com um formulário aberto, a tela das Listas ganha .fx-open (somem o "Menu", o X e as abas): fxSync, chamada por quem
+// abre ou fecha e por um observador (troca de aba, menu grande, fechar a tela...).
+// (var e listas dentro das funções: nada aqui pode quebrar se for chamado antes desta linha rodar)
+
+// Os nomes das 12 cores do cartão, na ordem do FAZ_CARD_COLORS.
+var FX_COLOR_NAMES = ['Vermelho', 'Laranja', 'Âmbar', 'Verde-limão', 'Verde', 'Verde-água', 'Azul', 'Anil', 'Roxo', 'Pink', 'Rosa', 'Cinza'];
+function fxColorName(c) { c = fazCardColor(c); if (!c) return 'Nenhuma'; const i = FAZ_CARD_COLORS.indexOf(c); return i >= 0 ? FX_COLOR_NAMES[i] : 'Outra cor'; }
+// Duração do jeito que se fala: "45 min", "2h", "1h30".
+function fxDur(m) { m = Math.max(0, Math.round(Number(m) || 0)); const h = Math.floor(m / 60), r = m % 60; return !h ? r + ' min' : h + 'h' + (r ? String(r).padStart(2, '0') : ''); }
+
+// O valor de uma linha (o que está escolhido, na direita): com bolinha/emoji na frente, ou "Nenhuma" (apagado).
+function fxVal(id, on, lead, text) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('on', !!on);
+    el.innerHTML = (lead || '') + '<span class="fx-vt">' + escapeHtml(text) + '</span>';
+}
+function fxTagVal(id, tagId) {
+    const t = tagId ? tagsDb.find(x => x.id === tagId) : null;
+    if (t) fxVal(id, true, `<span class="fx-dot" style="background:${escapeHtml(t.color)}" aria-hidden="true"></span>`, t.name || 'Sem nome');
+    else fxVal(id, false, '', 'Nenhuma');
+}
+// A linha "Meta" some quando não existe meta nenhuma (como a dos chips, V40.34.0).
+function fxGoalVal(rowId, valId, goalId) {
+    const row = document.getElementById(rowId);
+    if (row) row.classList.toggle('hidden', !goalsDb.length);
+    const g = goalById(goalKeep(goalId));
+    if (g) fxVal(valId, true, `<span class="fx-ve" aria-hidden="true">${escapeHtml(g.emoji || '🎯')}</span>`, g.title || 'Sem nome');
+    else fxVal(valId, false, '', 'Nenhuma');
+}
+function fxColorVal(id, c) {
+    c = fazCardColor(c);
+    if (c) fxVal(id, true, `<span class="fx-dot lg" style="background:${c}" aria-hidden="true"></span>`, fxColorName(c));
+    else fxVal(id, false, '', 'Nenhuma');
+}
+// O que a folha mostra pra Tag e pra Meta ("Nenhuma" + todas; as metas na ordem das categorias, como os chips antigos).
+function fxTagItems(cur) {
+    return [{ k: '', label: 'Nenhuma', none: true, on: !cur }].concat(tagsDb.map(t => ({ k: t.id, label: t.name || 'Sem nome', dot: t.color, on: cur === t.id })));
+}
+function fxGoalItems(cur) {
+    const M = window.FazMetas, order = M ? goalListsDb.map(l => l.id) : [];
+    cur = goalKeep(cur);
+    const goals = goalsDb.slice().sort((a, b) => order.indexOf(M ? M.listOf(a, goalListsDb) : '') - order.indexOf(M ? M.listOf(b, goalListsDb) : ''));
+    return [{ k: '', label: 'Nenhuma', none: true, on: !cur }].concat(goals.map(g => ({ k: g.id, label: g.title || 'Sem nome', emoji: g.emoji || '🎯', on: cur === g.id })));
+}
+
+// A folha de baixo. o = { title, items: [{ k, label, on, none, dot, emoji, ic, danger, add }], onPick(k) } ou, pra cor,
+// { title, colors: true, cur, onPick(cor ou '') }. on (true/false) = opção que se escolhe (com o ✓); sem on = ação (⋯).
+var fxPickCb = null;
+function fxOptHtml(it) {
+    const lead = it.ic ? `<i class="${it.ic} fx-oi" aria-hidden="true"></i>`
+        : it.dot ? `<span class="fx-dot" style="background:${escapeHtml(it.dot)}" aria-hidden="true"></span>`
+        : it.emoji ? `<span class="fx-oe" aria-hidden="true">${escapeHtml(it.emoji)}</span>`
+        : it.none ? '<i class="ph ph-prohibit fx-no" aria-hidden="true"></i>' : '';
+    const pick = typeof it.on === 'boolean';
+    return `<button type="button" class="fx-opt${it.danger ? ' danger' : ''}${it.add ? ' add' : ''}" data-fx-k="${escapeHtml(it.k)}"${pick ? ` role="radio" aria-checked="${it.on}"` : ''}>` +
+        `${lead}<span class="fx-ot">${escapeHtml(it.label)}</span>${it.on ? '<i class="ph-bold ph-check fx-tk" aria-hidden="true"></i>' : ''}</button>`;
+}
+function fxColorGridHtml(cur) {
+    cur = fazCardColor(cur);
+    const custom = !!cur && !FAZ_CARD_COLORS.includes(cur);
+    const cell = (k, on, dot, name) => `<button type="button" class="fx-copt${on ? ' on' : ''}" data-fx-k="${k}" role="radio" aria-checked="${on}">${dot}<span>${name}</span></button>`;
+    return cell('', !cur, '<span class="fx-cdot none" aria-hidden="true"><i class="ph-bold ph-prohibit"></i></span>', 'Nenhuma') +
+        FAZ_CARD_COLORS.map((c, i) => cell(c, cur === c, `<span class="fx-cdot${fazIsDark(c) ? '' : ' lt'}" style="background:${c}" aria-hidden="true"><i class="ph-bold ph-check"></i></span>`, FX_COLOR_NAMES[i])).join('') +
+        `<label class="fx-copt${custom ? ' on' : ''}" title="Outra cor"><span class="fx-cdot${custom ? (fazIsDark(cur) ? '' : ' lt') : ' rb'}"${custom ? ` style="background:${cur}"` : ''} aria-hidden="true"><i class="ph-bold ph-check"></i></span>` +
+        `<span>Outra</span><input type="color" value="${cur || '#ec4899'}" aria-label="Escolher outra cor"></label>`;
+}
+function fxPick(o) {
+    const box = document.getElementById('fx-pick-list');
+    if (!box || !o) return;
+    fxPickCb = typeof o.onPick === 'function' ? o.onPick : null;
+    document.getElementById('fx-pick-title').textContent = o.title || '';
+    const items = o.items || [];
+    box.className = o.colors ? 'fx-cgrid' : 'fx-opts';
+    if (o.colors || items.some(it => typeof it.on === 'boolean')) box.setAttribute('role', 'radiogroup'); else box.removeAttribute('role');
+    box.innerHTML = o.colors ? fxColorGridHtml(o.cur) : items.map(fxOptHtml).join('');
+    box.scrollTop = 0;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); // baixa o teclado: a folha fica inteira à vista
+    showModal('fx-pick-modal');
+}
+function fxPickDo(k) { const cb = fxPickCb; fxPickClose(); if (cb) cb(k); }
+// Fecha sem escolher (o "Fechar" escondido, que o voltar do celular e o fundo escuro tocam).
+window.fxPickClose = function() {
+    fxPickCb = null;
+    const m = document.getElementById('fx-pick-modal');
+    if (!m || m.classList.contains('hidden')) return;
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+    const ov = document.getElementById('overlay');
+    if (!ov || getOpenModal()) return; // outra janelinha embaixo dela: o fundo escuro fica
+    ov.style.zIndex = '';
+    if (!navOpenSheets().length) ov.classList.add('opacity-0', 'pointer-events-none'); // com a tela aberta, o fundo volta pra trás dela
+};
+(function () {
+    const box = document.getElementById('fx-pick-list');
+    if (!box) return;
+    box.addEventListener('click', (e) => {
+        const b = e.target && e.target.closest ? e.target.closest('[data-fx-k]') : null;
+        if (b && box.contains(b)) fxPickDo(b.getAttribute('data-fx-k'));
+    });
+    box.addEventListener('change', (e) => { // "Outra" cor: o seletor do sistema
+        const t = e.target;
+        if (t && t.type === 'color' && box.contains(t)) fxPickDo(t.value);
+    });
+})();
+
+// A tela das Listas sem o "Menu", o X e as abas enquanto um formulário aparece.
+function fxSync() {
+    const sh = document.getElementById('list-sheet');
+    if (!sh) return;
+    const open = ['backlog-form-view', 'routines-form-view', 'notes-form', 'financial-form-view', 'goals-form-view']
+        .some(id => { const f = document.getElementById(id); return !!f && navShown(f, sh); });
+    if (sh.classList.contains('fx-open') !== open) sh.classList.toggle('fx-open', open);
+}
+(function () {
+    const sh = document.getElementById('list-sheet');
+    if (!sh || typeof MutationObserver === 'undefined') return;
+    const seen = new Set();
+    ['backlog-form-view', 'routines-form-view', 'notes-form', 'financial-form-view', 'goals-form-view'].forEach(id => {
+        for (let p = document.getElementById(id); p && p !== sh; p = p.parentElement) seen.add(p);
+    });
+    const obs = new MutationObserver(fxSync);
+    seen.forEach(el => obs.observe(el, { attributes: true, attributeFilter: ['class', 'style'] }));
+    fxSync();
+})();
+// Abre do topo (o mesmo formulário serve pra todos os itens: sem isto, abria rolado onde o anterior ficou).
+function fxTop(formId) { const b = document.querySelector('#' + formId + ' .fx-body'); if (b) b.scrollTop = 0; }
+
 
 // =====================================================
 // V40.4.1 — ABA FINANCEIRO (MVP — despesa avulsa + mês atual)
@@ -9470,17 +9639,12 @@ window.toggleFinancialFormPaid = function() {
     updateFinancialFormPaidUI();
 }
 
+// V40.51.0 (Ficha): liga/desliga "Paga", com o mês da tela embaixo ("em novembro")
 function updateFinancialFormPaidUI() {
-    const checkBox = document.getElementById('fin-form-paid-check');
-    const icon = document.getElementById('fin-form-paid-icon');
-    if (!checkBox || !icon) return;
-    if (currentFinPaid) {
-        checkBox.className = 'w-6 h-6 rounded-full border-2 border-app-focus bg-app-focus flex items-center justify-center shrink-0 transition';
-        icon.classList.remove('hidden');
-    } else {
-        checkBox.className = 'w-6 h-6 rounded-full border-2 border-zinc-300 bg-white flex items-center justify-center shrink-0 transition';
-        icon.classList.add('hidden');
-    }
+    const btn = document.getElementById('fin-form-paid-btn');
+    if (btn) btn.setAttribute('aria-checked', currentFinPaid ? 'true' : 'false');
+    const mes = document.getElementById('fin-paid-month');
+    if (mes) mes.textContent = 'em ' + finMonthShort(currentFinanceMonth);
 }
 
 window.openFinancialForm = function(id = null) {
@@ -9490,14 +9654,16 @@ window.openFinancialForm = function(id = null) {
     
     currentFinId = id;
     currentFinType = 'oneshot';
-    
+
+    const more = document.getElementById('fin-form-more-btn'); // V40.51.0 (Ficha): o Apagar foi pro ⋯ (só ao editar)
     if (id) {
         const item = financialDb.find(x => x.id === id);
         if (!item) return;
-        document.getElementById('fin-form-title-label').innerText = 'Editar Despesa';
+        document.getElementById('fin-form-title-label').textContent = 'Editar despesa';
         document.getElementById('financial-input').value = item.title;
         // V40.4.5 (fix14): mostra o valor do mês atual (com override se houver) em vez do item.amount global
-        document.getElementById('financial-amount-input').value = getAmountInMonth(item, currentFinanceMonth) || '';
+        const amt = Number(getAmountInMonth(item, currentFinanceMonth)) || 0;
+        document.getElementById('financial-amount-input').value = amt ? amt.toFixed(2) : ''; // V40.51.0: com os centavos ("40.90", não "40.9")
         document.getElementById('financial-dueday-input').value = item.dueDay || '';
         // V40.4.4: deduz tipo a partir do schema (retrocompat com itens antigos)
         const duration = item.durationMonths || 1;
@@ -9511,22 +9677,28 @@ window.openFinancialForm = function(id = null) {
         }
         // V40.4.4: paid usa isPaidInMonth com retrocompat (item.paid bool antigo)
         currentFinPaid = isPaidInMonth(item, currentFinanceMonth);
-        document.getElementById('fin-form-delete-btn').classList.remove('hidden');
-        document.getElementById('fin-form-delete-btn').classList.add('flex');
+        if (more) more.classList.remove('hidden');
     } else {
-        document.getElementById('fin-form-title-label').innerText = 'Nova Despesa';
+        document.getElementById('fin-form-title-label').textContent = 'Nova despesa';
         document.getElementById('financial-input').value = '';
         document.getElementById('financial-amount-input').value = '';
         document.getElementById('financial-dueday-input').value = '';
         document.getElementById('financial-installments-input').value = '2';
         currentFinPaid = false;
-        document.getElementById('fin-form-delete-btn').classList.add('hidden');
-        document.getElementById('fin-form-delete-btn').classList.remove('flex');
+        if (more) more.classList.add('hidden');
     }
-    
+
     updateFinancialFormPaidUI();
     updateFinancialTypeButtonsUI(); // V40.4.4: sincroniza visual dos 3 botões de tipo
+    fxTop('financial-form-view');
+    fxSync();
 }
+window.finFormMore = function() {
+    const item = currentFinId ? financialDb.find(x => x.id === currentFinId) : null;
+    if (!item) return;
+    fxPick({ title: item.title || 'Despesa', items: [{ k: 'apagar', label: 'Apagar', ic: 'ph ph-trash', danger: true }],
+        onPick: (k) => { if (k === 'apagar') deleteFinancialFromForm(); } });
+};
 
 window.closeFinancialForm = function(force = false) {
     const formView = document.getElementById('financial-form-view');
@@ -9535,20 +9707,19 @@ window.closeFinancialForm = function(force = false) {
     formView.classList.add('hidden');
     formView.classList.remove('flex');
     listView.classList.remove('hidden');
+    fxSync(); // V40.51.0
     if (!force) renderFinancial();
 }
 
 // V40.4.4: atualiza visual dos 3 botões + mostra/esconde inputs auxiliares.
+// V40.51.0 (Ficha): os 3 viraram uma escolha só (o escolhido em branco, .on)
 function updateFinancialTypeButtonsUI() {
     const types = ['oneshot', 'recurring', 'installment'];
     types.forEach(t => {
         const btn = document.getElementById(`fin-type-${t}`);
         if (!btn) return;
-        if (t === currentFinType) {
-            btn.className = 'flex-1 py-2.5 rounded-lg bg-app-focus text-white border border-app-focus text-xs font-bold transition active:scale-95';
-        } else {
-            btn.className = 'flex-1 py-2.5 rounded-lg bg-zinc-50 text-zinc-600 border border-zinc-200 text-xs font-bold transition active:scale-95 hover:bg-zinc-100';
-        }
+        btn.classList.toggle('on', t === currentFinType);
+        btn.setAttribute('aria-pressed', t === currentFinType ? 'true' : 'false');
     });
     
     // Input "Quantas parcelas?" só aparece em Parcelada

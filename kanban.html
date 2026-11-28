@@ -288,6 +288,117 @@
     .qb-d-ico { width: 38px; height: 38px; flex: none; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; font-size: 19px; color: var(--focus); background: color-mix(in srgb, var(--focus) 12%, #fff); }
     .col.col-shared { border-style: dashed; border-color: #d4d4d8; }
     #toast { transition: opacity .2s, transform .2s; }
+    /* V40.51.0 — FICHA (a mesma do celular, escolhida em 28/11/2026 "em todos"): o cartão e as janelas de rotina, despesa
+       e meta com o nome grande em cima, uma ficha branca com uma linha por ajuste (o escolhido na direita) e Apagar /
+       Arquivar no ⋯. Tag e Cor abrem uma lista (.fx-pop) presa na linha; Lista, Duração, Meta e Categoria são o seletor
+       do sistema com cara de linha. REGRA (a mesma do celular): display só em :not(.hidden). */
+    .fx-panel { background: #f8fafc; }
+    .fx-top { display: flex; align-items: center; gap: 8px; margin: -6px -8px 2px 0; min-height: 34px; }
+    .fx-kicker { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: #8b8b94; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fx-more:not(.hidden) { display: inline-flex; }
+    .fx-more { width: 34px; height: 34px; flex: none; border-radius: 9999px; align-items: center; justify-content: center; font-size: 19px; color: #52525b; }
+    .fx-more:hover, .fx-more[aria-expanded="true"] { background: #e9ebef; color: #18181b; }
+    .fx-name { display: block; width: 100%; min-width: 0; padding: 2px 2px 10px; font-size: 21px; line-height: 1.3; font-weight: 700; letter-spacing: -.015em; color: #18181b; background: transparent; border: 0; border-bottom: 1px solid #e6e7eb !important; border-radius: 0; outline: none; caret-color: var(--focus); }
+    .fx-name::placeholder { color: #c4c4cc; font-weight: 600; }
+    .fx-name:focus { border-bottom-color: var(--focus) !important; }
+    .fx-namerow { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid #e6e7eb; }
+    .fx-namerow:focus-within { border-bottom-color: var(--focus); }
+    .fx-namerow .fx-name { flex: 1; padding: 0 2px; border-bottom: 0 !important; }
+    .fx-emoji { width: 48px; height: 48px; flex: none; padding: 0; border-radius: 13px; background: #fff; border: 1px solid #e6e7eb; text-align: center; font-size: 24px; outline: none; }
+    .fx-sec { margin: 18px 2px 7px; font-size: 12px; font-weight: 600; color: #8b8b94; }
+    .fx-card { background: #fff; border: 1px solid #e6e7eb; border-radius: 14px; overflow: hidden; }
+    .fx-row:not(.hidden) { display: flex; }
+    .fx-row { width: 100%; align-items: center; gap: 12px; min-height: 48px; padding: 0 8px 0 14px; margin-top: -1px; border-top: 1px solid #f1f1f4; text-align: left; color: #27272a; }
+    button.fx-row:hover, button.fx-row[aria-expanded="true"] { background: #fafafb; }
+    .fx-row.stack { flex-direction: column; align-items: stretch; gap: 9px; padding: 12px 14px; }
+    .fx-rowtop { display: flex; align-items: center; gap: 12px; }
+    .fx-ic { width: 20px; flex: none; text-align: center; font-size: 18px; color: #71717a; }
+    .fx-lb { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; color: #27272a; }
+    .fx-sub { display: block; margin-top: 1px; font-size: 11.5px; font-weight: 500; color: #a1a1aa; }
+    .fx-val { min-width: 0; max-width: 62%; display: inline-flex; align-items: center; gap: 7px; padding: 6px 2px 6px 8px; font-size: 13.5px; font-weight: 500; color: #a1a1aa; white-space: nowrap; }
+    .fx-val.on { color: #27272a; }
+    .fx-vt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .fx-ve { flex: none; font-size: 15px; line-height: 1; }
+    .fx-car { flex: none; margin-right: 6px; font-size: 12px; color: #a1a1aa; }
+    .fx-dot { width: 11px; height: 11px; flex: none; border-radius: 9999px; display: inline-block; }
+    .fx-dot.lg { width: 15px; height: 15px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+    /* o seletor do sistema como valor da linha */
+    .fx-sel { appearance: none; -webkit-appearance: none; min-width: 0; max-width: 62%; border: 0 !important; border-radius: 8px; padding: 6px 30px 6px 10px; font-size: 13.5px; font-weight: 500; color: #27272a; text-align: right; text-align-last: right; cursor: pointer; text-overflow: ellipsis;
+        background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath fill='none' stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='26' d='M64 100l64 64 64-64'/%3E%3C/svg%3E") no-repeat right 8px center / 13px; }
+    .fx-sel:hover { background-color: #f4f4f5; }
+    .fx-sel.tm { max-width: none; width: 62px; padding: 6px 24px 6px 8px; text-align: center; text-align-last: center; font-variant-numeric: tabular-nums; background-position: right 6px center; }
+    .fx-pickbtn { display: inline-flex; align-items: center; gap: 7px; min-width: 0; max-width: 62%; padding: 6px 10px; border-radius: 8px; font-size: 13.5px; font-weight: 500; color: #27272a; }
+    .fx-pickbtn:hover { background: #f4f4f5; }
+    .fx-pickbtn i { color: #a1a1aa; }
+    /* campos curtos na própria linha (valor, dia, parcelas, meta) */
+    .fx-field { display: inline-flex; align-items: center; gap: 6px; flex: none; height: 34px; padding: 0 10px; border-radius: 9px; background: #f1f2f5; cursor: text; }
+    .fx-field:focus-within { background: #fff; box-shadow: 0 0 0 1.5px var(--focus); }
+    .fx-pre, .fx-suf { font-size: 13px; font-weight: 600; color: #a1a1aa; white-space: nowrap; }
+    .fx-inp { width: 96px; min-width: 0; height: 100%; padding: 0; border: 0 !important; background: transparent; outline: none; text-align: right; font-size: 14px; font-weight: 700; color: #18181b; font-variant-numeric: tabular-nums; }
+    .fx-inp.sm { width: 40px; }
+    .fx-inp::placeholder { color: #c4c4cc; font-weight: 600; }
+    .fx-seg { display: inline-flex; flex: none; gap: 2px; padding: 3px; border-radius: 10px; background: #f1f2f5; }
+    .fx-seg.full { display: flex; }
+    .fx-seg > button { height: 30px; padding: 0 12px; border-radius: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .fx-seg.full > button { flex: 1; min-width: 0; }
+    .fx-sw { width: 40px; height: 24px; flex: none; border-radius: 9999px; background: #d4d4d8; position: relative; transition: background-color .15s; }
+    .fx-sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 9999px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+    [aria-pressed="true"] > .fx-sw { background: var(--focus); }
+    [aria-pressed="true"] > .fx-sw::after { transform: translateX(16px); }
+    /* checklist */
+    .fx-ckrow { min-height: 44px; padding-right: 6px; }
+    .fx-ckrow input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 20px; height: 20px; flex: none; margin: 0; border-radius: 9999px; border: 1.8px solid #d4d4d8 !important; background: #fff center / 12px no-repeat; cursor: pointer; }
+    .fx-ckrow input[type="checkbox"]:checked { border-color: var(--focus) !important; background-color: var(--focus); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='32' d='M48 136l48 48 112-112'/%3E%3C/svg%3E"); }
+    .fx-ckin { flex: 1; min-width: 0; height: 42px; padding: 0; border: 0 !important; background: transparent; outline: none; font-size: 14px; color: #27272a; }
+    .fx-ckin.done { color: #a1a1aa; text-decoration: line-through; }
+    .fx-bul { width: 20px; height: 20px; flex: none; display: inline-flex; align-items: center; justify-content: center; }
+    .fx-bul::before { content: ''; width: 6px; height: 6px; border-radius: 9999px; background: #c4c4cc; }
+    .fx-x { width: 30px; height: 30px; flex: none; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; color: #c4c4cc; opacity: 0; }
+    .fx-ckrow:hover .fx-x, .fx-x:focus { opacity: 1; }
+    .fx-x:hover { background: #fee2e2; color: #dc2626; }
+    .fx-add .fx-ic, .fx-add input::placeholder { color: var(--focus); }
+    .fx-add input::placeholder { font-weight: 600; opacity: 1; }
+    .fx-hint { margin: 10px 4px 0; font-size: 12px; line-height: 1.5; color: #8b8b94; }
+    .fx-chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 10px; border-radius: 9999px; background: #fff; border: 1px solid #e4e4e9; font-size: 13px; font-weight: 600; color: #3f3f46; }
+    .fx-chip:hover { background: #f4f4f5; }
+    .fx-mini { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 9px; background: #f1f2f5; font-size: 12.5px; font-weight: 600; color: #3f3f46; }
+    .fx-mini:hover { background: #e4e6ea; }
+    .fx-foot { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 12px 24px 16px; }
+    .fx-save { height: 40px; padding: 0 22px; border-radius: 11px; background: var(--focus); color: #fff; font-size: 14px; font-weight: 700; box-shadow: 0 6px 14px -8px color-mix(in srgb, var(--focus) 90%, transparent); }
+    .fx-save:hover { filter: brightness(.96); }
+    .fx-cancel { height: 40px; padding: 0 14px; border-radius: 11px; font-size: 13.5px; font-weight: 600; color: #52525b; }
+    .fx-cancel:hover { background: #eceef1; }
+    .fx-act { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 10px; font-size: 13px; font-weight: 600; color: #3f3f46; }
+    .fx-act:hover { background: #eceef1; }
+    /* a lista presa na linha (Tag, Cor) e o ⋯: por cima de tudo, como o calendário */
+    .fx-pop { position: fixed; z-index: 80; width: 264px; max-height: min(360px, calc(100vh - 24px)); overflow-y: auto; padding: 6px; background: #fff; border: 1px solid #e4e4e7; border-radius: 14px; box-shadow: 0 18px 40px -14px rgba(0,0,0,.3); }
+    .fx-pop.menu { width: 220px; }
+    .fx-opt { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border-radius: 9px; font-size: 13.5px; font-weight: 500; color: #27272a; text-align: left; }
+    .fx-opt:hover, .fx-opt:focus-visible { background: #f4f4f5; }
+    .fx-opt.chip-on { box-shadow: none; background: transparent; }
+    .fx-opt.chip-on:hover { background: #f4f4f5; }
+    .fx-ot { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fx-tk { flex: none; font-size: 15px; color: var(--focus); visibility: hidden; }
+    .fx-opt.chip-on .fx-tk, .fx-opt[aria-checked="true"] .fx-tk { visibility: visible; }
+    .fx-no { width: 14px; flex: none; display: inline-flex; justify-content: center; color: #a1a1aa; }
+    .fx-oi { width: 18px; flex: none; text-align: center; font-size: 16px; color: #71717a; }
+    .fx-opt.danger, .fx-opt.danger .fx-oi { color: #dc2626; }
+    .fx-opt.danger:hover { background: #fef2f2; }
+    .fx-opt.add, .fx-opt.add .fx-oi { color: var(--focus); font-weight: 600; }
+    .fx-sep { height: 1px; margin: 4px 6px; background: #f1f1f4; }
+    .fx-cgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px 4px; }
+    .fx-copt { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 7px 2px; border-radius: 10px; font-size: 11.5px; font-weight: 600; color: #52525b; cursor: pointer; white-space: nowrap; }
+    .fx-copt:hover { background: #f4f4f5; }
+    .fx-cdot { width: 30px; height: 30px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+    .fx-cdot.lt { color: #27272a; }
+    .fx-cdot > i { opacity: 0; }
+    .fx-copt.on .fx-cdot { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #27272a; }
+    .fx-copt.on .fx-cdot > i { opacity: 1; }
+    .fx-cdot.none { background: #fff; border: 1.8px dashed #c4c4cc; color: #a1a1aa; box-shadow: none; }
+    .fx-cdot.none > i { opacity: 1; }
+    .fx-copt.on .fx-cdot.none { border: 2px solid #3f3f46; color: #3f3f46; box-shadow: none; }
+    .fx-cdot.rb { background: conic-gradient(#ef4444, #f59e0b, #84cc16, #10b981, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444); }
+    .fx-copt input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
     @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { transition: none !important; animation: none !important; }
     }
@@ -639,124 +750,124 @@
 
 <!-- V40.19.0: criar / editar despesa -->
 <div id="modal-fin" data-form="despesa" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="fn-f-head">
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
-        <div class="p-5 pb-3 overflow-y-auto thin-scroll">
-            <h3 id="fn-f-head" class="text-base font-bold text-zinc-900">Nova despesa</h3>
-            <p id="fn-f-sub" class="mt-0.5 text-[12px] text-zinc-500"></p>
-            <label class="block mt-4">
-                <span class="text-xs font-semibold text-zinc-500">Nome</span>
-                <input id="fn-f-title" maxlength="60" autocomplete="off" placeholder="Ex.: Luz, Internet, Mercado" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-800 outline-none">
-            </label>
-            <div class="grid grid-cols-2 gap-3 mt-3">
-                <label class="block">
-                    <span class="text-xs font-semibold text-zinc-500">Valor</span>
-                    <span class="relative mt-1 block">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500 pointer-events-none">R$</span>
-                        <input id="fn-f-amount" inputmode="decimal" autocomplete="off" placeholder="0,00" class="w-full border border-zinc-300 rounded-lg pl-9 pr-3 py-2 text-sm font-semibold text-zinc-800 outline-none tabular-nums">
-                    </span>
-                </label>
-                <label class="block">
-                    <span class="text-xs font-semibold text-zinc-500">Vence no dia <span class="font-normal text-zinc-400">(opcional)</span></span>
-                    <input id="fn-f-due" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="1 a 31" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-800 outline-none tabular-nums">
-                </label>
+    <!-- V40.51.0: FICHA: o nome grande; Valor e Vencimento na própria linha; Tipo, parcelas e o aviso da recorrente; Paga num
+         liga/desliga; Apagar no ⋯ -->
+    <div class="fx-panel w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div class="px-6 pt-5 pb-2 overflow-y-auto thin-scroll">
+            <div class="fx-top">
+                <h3 id="fn-f-head" class="fx-kicker">Nova despesa</h3>
+                <button id="fn-f-more" type="button" class="fx-more" data-fx-pop="fn-f-more-pop" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções" title="Mais opções"><i class="ph-bold ph-dots-three"></i></button>
             </div>
-            <div class="mt-4">
-                <span class="text-xs font-semibold text-zinc-500">Tipo</span>
-                <div id="fn-f-type" class="mt-1 flex p-1 bg-zinc-100 rounded-xl" role="radiogroup" aria-label="Tipo da despesa">
-                    <button type="button" data-type="oneshot" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Avulsa</button>
-                    <button type="button" data-type="recurring" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Recorrente</button>
-                    <button type="button" data-type="installment" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Parcelada</button>
+            <input id="fn-f-title" maxlength="60" autocomplete="off" placeholder="Ex.: Luz, Internet, Mercado" aria-label="Nome da despesa" class="fx-name outline-none">
+            <p id="fn-f-sub" class="mt-1.5 px-0.5 text-[12px] text-zinc-500"></p>
+            <p class="fx-sec">Detalhes</p>
+            <div class="fx-card">
+                <label class="fx-row">
+                    <i class="ph ph-currency-circle-dollar fx-ic" aria-hidden="true"></i><span class="fx-lb">Valor</span>
+                    <span class="fx-field"><span class="fx-pre">R$</span><input id="fn-f-amount" inputmode="decimal" autocomplete="off" placeholder="0,00" class="fx-inp outline-none"></span>
+                </label>
+                <label class="fx-row">
+                    <i class="ph ph-calendar-blank fx-ic" aria-hidden="true"></i><span class="fx-lb">Vence no dia<span class="fx-sub">opcional</span></span>
+                    <span class="fx-field"><input id="fn-f-due" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="1 a 31" class="fx-inp outline-none" style="width:52px"></span>
+                </label>
+                <div class="fx-row stack">
+                    <div class="fx-rowtop"><i class="ph ph-repeat fx-ic" aria-hidden="true"></i><span class="fx-lb">Tipo</span></div>
+                    <div id="fn-f-type" class="fx-seg full" role="radiogroup" aria-label="Tipo da despesa">
+                        <button type="button" data-type="oneshot" role="radio" class="rt-theme">Avulsa</button>
+                        <button type="button" data-type="recurring" role="radio" class="rt-theme">Recorrente</button>
+                        <button type="button" data-type="installment" role="radio" class="rt-theme">Parcelada</button>
+                    </div>
+                    <p id="fn-f-range" class="text-[12px] text-zinc-500"></p>
+                    <!-- V40.30.0: recorrente sem fim: encerrar depois do mês da tela, ou voltar a repetir sem fim -->
+                    <div id="fn-f-rec" class="hidden flex-wrap gap-2">
+                        <button type="button" id="fn-f-end" class="fx-mini"><i class="ph ph-calendar-x text-sm"></i><span id="fn-f-end-label">Encerrar</span></button>
+                        <button type="button" id="fn-f-reopen" class="fx-mini"><i class="ph ph-repeat text-sm"></i>Repetir sem fim de novo</button>
+                    </div>
                 </div>
-                <div id="fn-f-inst-wrap" class="hidden mt-2.5 items-center gap-2">
-                    <label for="fn-f-inst" class="text-sm text-zinc-600">Parcelas</label>
-                    <input id="fn-f-inst" inputmode="numeric" maxlength="2" autocomplete="off" class="w-16 border border-zinc-300 rounded-lg px-2 py-1.5 text-sm font-semibold text-center outline-none tabular-nums">
-                    <span class="text-[12px] text-zinc-500">(2 a 60)</span>
-                </div>
-                <p id="fn-f-range" class="mt-2 text-[12px] text-zinc-500"></p>
-                <!-- V40.30.0: recorrente sem fim: encerrar depois do mês da tela, ou voltar a repetir sem fim -->
-                <div id="fn-f-rec" class="hidden mt-2 flex-wrap gap-2">
-                    <button type="button" id="fn-f-end" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-[12.5px] font-semibold text-zinc-700 hover:bg-zinc-50"><i class="ph ph-calendar-x text-sm"></i><span id="fn-f-end-label">Encerrar</span></button>
-                    <button type="button" id="fn-f-reopen" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-[12.5px] font-semibold text-zinc-700 hover:bg-zinc-50"><i class="ph ph-repeat text-sm"></i>Repetir sem fim de novo</button>
-                </div>
+                <label id="fn-f-inst-wrap" class="fx-row hidden">
+                    <i class="ph ph-stack fx-ic" aria-hidden="true"></i><span class="fx-lb">Parcelas<span class="fx-sub">de 2 a 60</span></span>
+                    <span class="fx-field"><input id="fn-f-inst" inputmode="numeric" maxlength="2" autocomplete="off" class="fx-inp sm outline-none"><span class="fx-suf">vezes</span></span>
+                </label>
+                <button type="button" id="fn-f-paid" aria-pressed="false" class="fx-row">
+                    <i class="ph ph-check-circle fx-ic" aria-hidden="true"></i><span id="fn-f-paid-label" class="fx-lb">Paga neste mês</span><span class="fx-sw" aria-hidden="true"></span>
+                </button>
             </div>
-            <button type="button" id="fn-f-paid" aria-pressed="false" class="mt-4 w-full flex items-center gap-3 p-3 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-left">
-                <span class="fn-check shrink-0"><i class="ph-bold ph-check"></i></span>
-                <span id="fn-f-paid-label" class="text-sm font-semibold text-zinc-700">Paga neste mês</span>
-            </button>
-            <p id="fn-f-note" class="hidden mt-3 text-[12px] text-zinc-500 leading-relaxed"></p>
+            <p id="fn-f-note" class="hidden fx-hint"></p>
         </div>
-        <div class="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
-            <button id="fn-f-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar despesa</button>
+        <div class="fx-foot">
             <div class="ml-auto flex gap-2">
-                <button id="fn-f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
-                <button id="fn-f-save" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Salvar</button>
+                <button id="fn-f-cancel" class="fx-cancel">Cancelar</button>
+                <button id="fn-f-save" class="fx-save">Salvar</button>
             </div>
         </div>
+    </div>
+    <div id="fn-f-more-pop" class="fx-pop menu hidden" role="menu" aria-label="Mais opções">
+        <button id="fn-f-delete" type="button" class="fx-opt danger" role="menuitem">Apagar despesa</button>
     </div>
 </div>
 
 <!-- V40.21.0: criar / editar meta -->
 <div id="modal-goal" data-form="meta" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="mt-f-head">
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
-        <div class="p-5 pb-3 overflow-y-auto thin-scroll">
-            <h3 id="mt-f-head" class="text-base font-bold text-zinc-900">Nova meta</h3>
+    <!-- V40.51.0: FICHA: as Sugestões (meta nova), emoji + nome grandes, o gráfico (meta que existe), a ficha com Categoria,
+         Frequência, Contar em, Meta e "Cada + soma"; Apagar no ⋯ -->
+    <div class="fx-panel w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div class="px-6 pt-5 pb-2 overflow-y-auto thin-scroll">
+            <div class="fx-top">
+                <h3 id="mt-f-head" class="fx-kicker">Nova meta</h3>
+                <button id="mt-f-more" type="button" class="fx-more" data-fx-pop="mt-f-more-pop" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções" title="Mais opções"><i class="ph-bold ph-dots-three"></i></button>
+            </div>
+            <div id="mt-f-tpl-wrap" class="mb-3">
+                <p class="fx-sec" style="margin-top: 2px">Sugestões</p>
+                <div id="mt-f-tpl" class="flex flex-wrap gap-1.5"></div>
+            </div>
+            <div class="fx-namerow">
+                <input id="mt-f-emoji" maxlength="16" autocomplete="off" placeholder="🎯" aria-label="Emoji da meta" class="fx-emoji outline-none">
+                <input id="mt-f-title" maxlength="60" autocomplete="off" placeholder="Ex.: Beber água, correr, ler" aria-label="Nome da meta" class="fx-name outline-none">
+            </div>
             <!-- V40.34.0: gráfico da meta (só ao abrir uma que já existe) -->
-            <div id="mt-f-chart-wrap" class="hidden mt-3 bg-zinc-50 border border-zinc-200 rounded-xl p-3"><div id="mt-f-chart"></div></div>
-            <div id="mt-f-tpl-wrap" class="mt-3">
-                <span class="text-xs font-semibold text-zinc-500">Sugestões</span>
-                <div id="mt-f-tpl" class="mt-1.5 flex flex-wrap gap-1.5"></div>
-            </div>
-            <div class="mt-4 flex gap-2">
-                <label class="block w-16 shrink-0">
-                    <span class="text-xs font-semibold text-zinc-500">Emoji</span>
-                    <input id="mt-f-emoji" maxlength="16" autocomplete="off" placeholder="🎯" class="mt-1 w-full border border-zinc-300 rounded-lg px-2 py-1.5 text-lg text-center outline-none">
+            <div id="mt-f-chart-wrap" class="hidden fx-card mt-4 p-3"><div id="mt-f-chart"></div></div>
+            <p class="fx-sec">Detalhes</p>
+            <div class="fx-card">
+                <label class="fx-row">
+                    <i class="ph ph-folder-simple fx-ic" aria-hidden="true"></i><span class="fx-lb">Categoria</span>
+                    <select id="mt-f-list" class="fx-sel"></select>
                 </label>
-                <label class="block min-w-0 flex-1">
-                    <span class="text-xs font-semibold text-zinc-500">Nome</span>
-                    <input id="mt-f-title" maxlength="60" autocomplete="off" placeholder="Ex.: Beber água, correr, ler" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-800 outline-none">
-                </label>
-            </div>
-            <label class="block mt-3">
-                <span class="text-xs font-semibold text-zinc-500">Categoria</span>
-                <select id="mt-f-list" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm text-zinc-800 bg-white outline-none"></select>
-            </label>
-            <div class="mt-3">
-                <span class="text-xs font-semibold text-zinc-500">Frequência</span>
-                <div id="mt-f-period" class="mt-1 flex p-1 bg-zinc-100 rounded-xl" role="radiogroup" aria-label="Frequência da meta">
-                    <button type="button" data-period="dia" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Diária</button>
-                    <button type="button" data-period="semana" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Semanal</button>
-                    <button type="button" data-period="mes" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Mensal</button>
+                <div class="fx-row stack">
+                    <div class="fx-rowtop"><i class="ph ph-calendar-dots fx-ic" aria-hidden="true"></i><span class="fx-lb">Frequência</span></div>
+                    <div id="mt-f-period" class="fx-seg full" role="radiogroup" aria-label="Frequência da meta">
+                        <button type="button" data-period="dia" role="radio" class="rt-theme">Diária</button>
+                        <button type="button" data-period="semana" role="radio" class="rt-theme">Semanal</button>
+                        <button type="button" data-period="mes" role="radio" class="rt-theme">Mensal</button>
+                    </div>
                 </div>
-            </div>
-            <div class="mt-3">
-                <span class="text-xs font-semibold text-zinc-500">Contar em</span>
-                <div id="mt-f-unit" class="mt-1 flex p-1 bg-zinc-100 rounded-xl" role="radiogroup" aria-label="Como contar a meta">
-                    <button type="button" data-unit="vezes" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Vezes</button>
-                    <button type="button" data-unit="minutos" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Minutos</button>
-                    <button type="button" data-unit="reais" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Reais</button>
+                <div class="fx-row stack">
+                    <div class="fx-rowtop"><i class="ph ph-hash fx-ic" aria-hidden="true"></i><span class="fx-lb">Contar em</span></div>
+                    <div id="mt-f-unit" class="fx-seg full" role="radiogroup" aria-label="Como contar a meta">
+                        <button type="button" data-unit="vezes" role="radio" class="rt-theme">Vezes</button>
+                        <button type="button" data-unit="minutos" role="radio" class="rt-theme">Minutos</button>
+                        <button type="button" data-unit="reais" role="radio" class="rt-theme">Reais</button>
+                    </div>
                 </div>
-            </div>
-            <div class="grid grid-cols-2 gap-3 mt-3">
-                <label class="block">
-                    <span class="text-xs font-semibold text-zinc-500">Meta</span>
-                    <input id="mt-f-target" inputmode="decimal" autocomplete="off" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-800 outline-none tabular-nums">
-                    <span id="mt-f-target-suf" class="mt-1 block text-[11.5px] text-zinc-500"></span>
+                <label class="fx-row">
+                    <i class="ph ph-flag-checkered fx-ic" aria-hidden="true"></i><span class="fx-lb">Meta<span id="mt-f-target-suf" class="fx-sub"></span></span>
+                    <span class="fx-field"><input id="mt-f-target" inputmode="decimal" autocomplete="off" class="fx-inp outline-none"></span>
                 </label>
-                <label class="block">
-                    <span class="text-xs font-semibold text-zinc-500">Cada + soma</span>
-                    <input id="mt-f-step" inputmode="decimal" autocomplete="off" class="mt-1 w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-800 outline-none tabular-nums">
-                    <span id="mt-f-step-suf" class="mt-1 block text-[11.5px] text-zinc-500"></span>
+                <label class="fx-row">
+                    <i class="ph ph-plus-circle fx-ic" aria-hidden="true"></i><span class="fx-lb">Cada + soma<span id="mt-f-step-suf" class="fx-sub"></span></span>
+                    <span class="fx-field"><input id="mt-f-step" inputmode="decimal" autocomplete="off" class="fx-inp outline-none"></span>
                 </label>
             </div>
-            <p id="mt-f-info" class="mt-3 text-[12px] text-zinc-500 leading-relaxed"></p>
+            <p id="mt-f-info" class="fx-hint"></p>
         </div>
-        <div class="px-5 py-3 border-t border-zinc-100 flex items-center gap-2">
-            <button id="mt-f-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar meta</button>
+        <div class="fx-foot">
             <div class="ml-auto flex gap-2">
-                <button id="mt-f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
-                <button id="mt-f-save" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Salvar</button>
+                <button id="mt-f-cancel" class="fx-cancel">Cancelar</button>
+                <button id="mt-f-save" class="fx-save">Salvar</button>
             </div>
         </div>
+    </div>
+    <div id="mt-f-more-pop" class="fx-pop menu hidden" role="menu" aria-label="Mais opções">
+        <button id="mt-f-delete" type="button" class="fx-opt danger" role="menuitem">Apagar meta</button>
     </div>
 </div>
 
@@ -778,149 +889,171 @@
 
 <!-- V40.17.0: editar rotina -->
 <div id="modal-rt" data-form="rotina" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="rt-f-title">
-    <div class="w-full max-w-lg bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
-        <div class="p-5 pb-3 overflow-y-auto thin-scroll">
-            <div class="flex items-center gap-2.5">
-                <input id="rt-f-emoji" maxlength="8" aria-label="Emoji da rotina" class="w-12 h-12 shrink-0 text-center text-2xl bg-zinc-50 border border-zinc-200 rounded-xl outline-none focus:border-zinc-400">
-                <input id="rt-f-title" maxlength="40" placeholder="Nome da rotina" class="min-w-0 flex-1 text-lg font-bold text-zinc-900 outline-none placeholder-zinc-300">
+    <!-- V40.51.0: FICHA: emoji + nome grandes, a ficha (Duração, Tipo, Tag, Meta), o checklist; Apagar no ⋯ -->
+    <div class="fx-panel w-full max-w-lg rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div class="px-6 pt-5 pb-2 overflow-y-auto thin-scroll">
+            <div class="fx-top">
+                <span id="rt-f-head" class="fx-kicker">Editar rotina</span>
+                <button id="rt-f-more" type="button" class="fx-more" data-fx-pop="rt-f-more-pop" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções" title="Mais opções"><i class="ph-bold ph-dots-three"></i></button>
             </div>
-            <div class="grid grid-cols-2 gap-3 mt-4">
-                <label class="block">
-                    <span class="text-xs font-semibold text-zinc-500">Duração</span>
-                    <select id="rt-f-dur" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
+            <div class="fx-namerow">
+                <input id="rt-f-emoji" maxlength="8" aria-label="Emoji da rotina" class="fx-emoji outline-none">
+                <input id="rt-f-title" maxlength="40" placeholder="Nome da rotina" class="fx-name outline-none">
+            </div>
+            <p class="fx-sec">Detalhes</p>
+            <div class="fx-card">
+                <label class="fx-row">
+                    <i class="ph ph-timer fx-ic" aria-hidden="true"></i><span class="fx-lb">Duração</span>
+                    <select id="rt-f-dur" class="fx-sel"></select>
                 </label>
-                <div>
-                    <span class="text-xs font-semibold text-zinc-500">Tipo</span>
-                    <div id="rt-f-theme" class="mt-1 flex p-1 bg-zinc-100 rounded-xl" role="radiogroup" aria-label="Tipo da rotina">
-                        <button type="button" data-theme="focus" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Foco</button>
-                        <button type="button" data-theme="rest" role="radio" class="rt-theme flex-1 px-3 py-1.5 rounded-lg text-[13px] font-semibold">Descanso</button>
+                <div class="fx-row">
+                    <i class="ph ph-lightning fx-ic" aria-hidden="true"></i><span class="fx-lb">Tipo</span>
+                    <div id="rt-f-theme" class="fx-seg" role="radiogroup" aria-label="Tipo da rotina">
+                        <button type="button" data-theme="focus" role="radio" class="rt-theme">Foco</button>
+                        <button type="button" data-theme="rest" role="radio" class="rt-theme">Descanso</button>
                     </div>
                 </div>
+                <button id="rt-f-tag-row" type="button" class="fx-row" data-fx-pop="rt-f-tags" aria-haspopup="listbox" aria-expanded="false">
+                    <i class="ph ph-tag fx-ic" aria-hidden="true"></i><span class="fx-lb">Tag</span><span id="rt-f-tag-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-down fx-car" aria-hidden="true"></i>
+                </button>
+                <!-- V40.34.0: meta ligada (cada bloco que a rotina colocar na Agenda conta nela) -->
+                <label id="rt-f-goal-wrap" class="fx-row hidden">
+                    <i class="ph ph-target fx-ic" aria-hidden="true"></i><span class="fx-lb">Meta</span>
+                    <select id="rt-f-goal" class="fx-sel"></select>
+                </label>
             </div>
-            <div class="mt-4">
-                <span class="text-xs font-semibold text-zinc-500">Tag</span>
-                <div id="rt-f-tags" class="mt-1.5 flex flex-wrap gap-1.5"></div>
-            </div>
-            <!-- V40.34.0: meta ligada (cada bloco que a rotina colocar na Agenda conta nela) -->
-            <label id="rt-f-goal-wrap" class="hidden mt-4 block">
-                <span class="text-xs font-semibold text-zinc-500">Meta</span>
-                <select id="rt-f-goal" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
-            </label>
-            <div class="mt-4">
-                <span class="text-xs font-semibold text-zinc-500">Checklist</span>
-                <div id="rt-f-mbs" class="mt-1 flex flex-col"></div>
-                <div class="mt-1 flex items-center gap-2 px-1">
-                    <i class="ph ph-plus text-zinc-400"></i>
-                    <input id="rt-f-mb-new" maxlength="200" placeholder="Novo item (Enter)" class="flex-1 text-sm outline-none py-1.5 bg-transparent">
-                </div>
+            <p class="fx-sec">Checklist</p>
+            <div class="fx-card">
+                <div id="rt-f-mbs"></div>
+                <label class="fx-row fx-add">
+                    <i class="ph-bold ph-plus fx-ic" aria-hidden="true"></i>
+                    <input id="rt-f-mb-new" maxlength="200" placeholder="Adicionar item (Enter)" class="fx-ckin outline-none">
+                </label>
             </div>
         </div>
-        <div class="px-5 py-3 border-t border-zinc-100 flex flex-wrap items-center gap-x-1 gap-y-2">
-            <button id="rt-f-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar rotina</button>
-            <button id="rt-f-hand" class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-100 px-3 py-2 rounded-lg" title="Vai pra Agenda com a rotina na mão: é só clicar onde quer colocar"><i class="ph ph-hand-pointing text-base"></i>Colocar na Agenda</button>
+        <div class="fx-foot">
+            <button id="rt-f-hand" class="fx-act" title="Vai pra Agenda com a rotina na mão: é só clicar onde quer colocar"><i class="ph ph-hand-pointing text-base"></i>Colocar na Agenda</button>
             <div class="ml-auto flex gap-2">
-                <button id="rt-f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
-                <button id="rt-f-save" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Salvar</button>
+                <button id="rt-f-cancel" class="fx-cancel">Cancelar</button>
+                <button id="rt-f-save" class="fx-save">Salvar</button>
             </div>
         </div>
+    </div>
+    <div id="rt-f-tags" class="fx-pop hidden" role="listbox" aria-label="Tag"></div>
+    <div id="rt-f-more-pop" class="fx-pop menu hidden" role="menu" aria-label="Mais opções">
+        <button id="rt-f-delete" type="button" class="fx-opt danger" role="menuitem">Apagar rotina</button>
     </div>
 </div>
 
 <!-- V40.8.0: detalhe do bloco da agenda (só leitura) -->
 <!-- Cartão aberto: tarefa (Listas) ou bloco (Agenda). V40.11.0: o bloco abre aqui também. -->
 <div id="modal-task" data-form="cartao" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-zinc-900/40" role="dialog" aria-modal="true" aria-labelledby="f-title">
-    <div class="w-full max-w-xl bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
-        <div class="p-5 pb-3 overflow-y-auto thin-scroll">
+    <!-- V40.51.0: FICHA (a mesma do celular): o que é em cima (com o ⋯ de Arquivar/Apagar), o nome grande, a ficha com uma
+         linha por ajuste (Lista, Dia, Início, Duração, Período, Tag, Meta, Cor; o escolhido na direita) e o checklist.
+         Os ids de sempre continuam (o resto do código e os testes usam). -->
+    <div class="fx-panel w-full max-w-xl rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div class="px-6 pt-5 pb-2 overflow-y-auto thin-scroll">
             <!-- V40.24.0: cartão de uma sublista aberto: volta pra sublista -->
             <button id="f-card-back" type="button" class="hidden mb-2 items-center gap-1.5 text-[12.5px] font-semibold text-amber-800 hover:underline"><i class="ph ph-arrow-left"></i><span></span></button>
+            <div class="fx-top">
+                <span id="f-head" class="fx-kicker">Editar tarefa</span>
+                <button id="f-more" type="button" class="fx-more" data-fx-pop="f-more-pop" aria-haspopup="menu" aria-expanded="false" aria-label="Mais opções" title="Mais opções"><i class="ph-bold ph-dots-three"></i></button>
+            </div>
             <div class="flex items-start gap-2">
                 <button id="f-done" type="button" class="ag-done hidden shrink-0 -ml-1 w-8 h-8 flex items-center justify-center hover:bg-emerald-50" aria-pressed="false"></button>
-                <textarea id="f-title" rows="1" maxlength="500" placeholder="Nome da tarefa" class="flex-1 min-w-0 resize-none text-lg font-bold text-zinc-900 leading-snug outline-none placeholder-zinc-300"></textarea>
+                <textarea id="f-title" rows="1" maxlength="500" placeholder="Nome da tarefa" class="fx-name flex-1 min-w-0 resize-none outline-none"></textarea>
             </div>
             <p id="f-status" class="hidden mt-1 text-[12.5px] font-semibold"></p>
-            <div id="f-grid" class="grid grid-cols-2 gap-3 mt-4">
-                <label id="f-col-wrap" class="block">
-                    <span class="text-xs font-semibold text-zinc-500">Lista</span>
-                    <select id="f-col" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
-                </label>
-                <!-- V40.12.0: calendário e hora próprios, sempre em português e 24h (os nativos seguem o idioma do navegador) -->
-                <div id="f-date-wrap" class="hidden">
-                    <span class="text-xs font-semibold text-zinc-500">Dia</span>
-                    <input id="f-date" type="hidden">
-                    <button type="button" class="date-btn mt-1 w-full flex items-center gap-2 bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm text-left outline-none hover:border-zinc-400" data-date-for="f-date" aria-haspopup="dialog"><i class="ph ph-calendar-blank text-zinc-500"></i><span class="date-label truncate"></span></button>
-                </div>
-                <div id="f-start-wrap" class="hidden">
-                    <span class="text-xs font-semibold text-zinc-500">Início</span>
-                    <input id="f-start" type="hidden">
-                    <div class="mt-1 flex items-center gap-1" data-time-for="f-start">
-                        <select class="time-h min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Hora"></select>
-                        <span class="text-zinc-400 font-semibold">:</span>
-                        <select class="time-m min-w-0 flex-1 bg-white border border-zinc-300 rounded-lg px-2 py-2 text-sm outline-none tabular-nums" aria-label="Minuto"></select>
+            <p class="fx-sec">Detalhes</p>
+            <div class="fx-card">
+                <div id="f-grid">
+                    <label id="f-col-wrap" class="fx-row">
+                        <i class="ph ph-kanban fx-ic" aria-hidden="true"></i><span class="fx-lb">Lista</span>
+                        <select id="f-col" class="fx-sel"></select>
+                    </label>
+                    <!-- V40.12.0: calendário e hora próprios, sempre em português e 24h (os nativos seguem o idioma do navegador) -->
+                    <div id="f-date-wrap" class="fx-row hidden">
+                        <i class="ph ph-calendar-blank fx-ic" aria-hidden="true"></i><span class="fx-lb">Dia</span>
+                        <input id="f-date" type="hidden">
+                        <button type="button" class="date-btn fx-pickbtn" data-date-for="f-date" aria-haspopup="dialog"><span class="date-label truncate"></span><i class="ph-bold ph-caret-down text-xs"></i></button>
                     </div>
+                    <div id="f-start-wrap" class="fx-row hidden">
+                        <i class="ph ph-clock fx-ic" aria-hidden="true"></i><span class="fx-lb">Início</span>
+                        <input id="f-start" type="hidden">
+                        <div class="flex items-center gap-1" data-time-for="f-start">
+                            <select class="time-h fx-sel tm" aria-label="Hora"></select>
+                            <span class="text-zinc-400 font-semibold">:</span>
+                            <select class="time-m fx-sel tm" aria-label="Minuto"></select>
+                        </div>
+                    </div>
+                    <label class="fx-row">
+                        <i class="ph ph-timer fx-ic" aria-hidden="true"></i><span class="fx-lb">Duração</span>
+                        <select id="f-dur" class="fx-sel"></select>
+                    </label>
                 </div>
-                <label class="block">
-                    <span class="text-xs font-semibold text-zinc-500">Duração</span>
-                    <select id="f-dur" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
+                <!-- V40.41.0: períodos (Manhã, Tarde... os mesmos do celular): no bloco novo, clicar preenche o horário e a duração -->
+                <div id="f-per-wrap" class="fx-row stack hidden">
+                    <div class="fx-rowtop"><i class="ph ph-sun-horizon fx-ic" aria-hidden="true"></i><span class="fx-lb">Período</span></div>
+                    <div id="f-pers" class="flex flex-wrap gap-1.5" role="group" aria-label="Período"></div>
+                </div>
+                <!-- V40.24.0: bloco novo pode ser uma sublista (um horário com vários cartões dentro, como no celular) -->
+                <label id="f-sub-wrap" class="fx-row hidden cursor-pointer select-none">
+                    <i class="ph ph-list-checks fx-ic text-amber-600" aria-hidden="true"></i><span class="fx-lb">Sublista<span class="fx-sub">vários cartões no mesmo horário</span></span>
+                    <input id="f-sub" type="checkbox" class="w-4 h-4 mr-2 accent-amber-500">
                 </label>
+                <button id="f-tag-row" type="button" class="fx-row" data-fx-pop="f-tags" aria-haspopup="listbox" aria-expanded="false">
+                    <i class="ph ph-tag fx-ic" aria-hidden="true"></i><span class="fx-lb">Tag</span><span id="f-tag-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-down fx-car" aria-hidden="true"></i>
+                </button>
+                <!-- V40.34.0: meta ligada (bloco ou cartão concluído conta nela; a tarefa leva a meta pro bloco). Some sem metas. -->
+                <label id="f-goal-wrap" class="fx-row hidden">
+                    <i class="ph ph-target fx-ic" aria-hidden="true"></i><span class="fx-lb">Meta</span>
+                    <select id="f-goal" class="fx-sel"></select>
+                </label>
+                <button id="f-color-row" type="button" class="fx-row" data-fx-pop="f-colors" aria-haspopup="listbox" aria-expanded="false">
+                    <i class="ph ph-palette fx-ic" aria-hidden="true"></i><span class="fx-lb">Cor do cartão</span><span id="f-color-val" class="fx-val"><span class="fx-vt">Nenhuma</span></span><i class="ph-bold ph-caret-down fx-car" aria-hidden="true"></i>
+                </button>
             </div>
-            <!-- V40.41.0: períodos (Manhã, Tarde... os mesmos do celular): no bloco novo, clicar preenche o horário e a duração -->
-            <div id="f-per-wrap" class="hidden mt-3">
-                <span class="text-xs font-semibold text-zinc-500">Período</span>
-                <div id="f-pers" class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label="Período"></div>
-            </div>
-            <!-- V40.24.0: bloco novo pode ser uma sublista (um horário com vários cartões dentro, como no celular) -->
-            <label id="f-sub-wrap" class="hidden mt-3 items-center gap-2 px-2.5 py-1.5 rounded-lg border border-dashed border-amber-400 bg-amber-50 text-[12.5px] font-semibold text-amber-900 cursor-pointer select-none">
-                <input id="f-sub" type="checkbox" class="w-4 h-4 accent-amber-500"><i class="ph-bold ph-list-checks"></i>Sublista: vários cartões no mesmo horário
-            </label>
-            <div class="mt-4">
-                <span class="text-xs font-semibold text-zinc-500">Tag</span>
-                <div id="f-tags" class="mt-1.5 flex flex-wrap gap-1.5"></div>
-            </div>
-            <!-- V40.34.0: meta ligada (bloco ou cartão concluído conta nela; a tarefa leva a meta pro bloco). Some sem metas. -->
-            <label id="f-goal-wrap" class="hidden mt-4 block">
-                <span class="text-xs font-semibold text-zinc-500">Meta</span>
-                <select id="f-goal" class="mt-1 w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-2 text-sm outline-none"></select>
-            </label>
-            <div class="mt-4">
-                <span class="text-xs font-semibold text-zinc-500">Cor do cartão</span>
-                <div id="f-colors" class="mt-1.5 flex flex-wrap items-center gap-2"></div>
-            </div>
-            <div id="f-mbs-wrap" class="mt-4">
-                <span class="text-xs font-semibold text-zinc-500">Checklist</span>
-                <div id="f-mbs" class="mt-1 flex flex-col"></div>
-                <div class="mt-1 flex items-center gap-2 px-1">
-                    <i class="ph ph-plus text-zinc-400"></i>
-                    <input id="f-mb-new" maxlength="200" placeholder="Novo item (Enter)" class="flex-1 text-sm outline-none py-1.5 bg-transparent">
+            <div id="f-mbs-wrap">
+                <p class="fx-sec">Checklist</p>
+                <div class="fx-card">
+                    <div id="f-mbs"></div>
+                    <label class="fx-row fx-add">
+                        <i class="ph-bold ph-plus fx-ic" aria-hidden="true"></i>
+                        <input id="f-mb-new" maxlength="200" placeholder="Adicionar item (Enter)" class="fx-ckin outline-none">
+                    </label>
                 </div>
             </div>
             <!-- V40.24.0: cartões da sublista. Marcar, abrir, voltar pra lista, tirar, criar e puxar da Lista valem na hora. -->
-            <div id="f-cards-wrap" class="hidden mt-4">
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-semibold text-zinc-500">Cartões da sublista</span>
-                    <span id="f-cards-count" class="text-xs text-zinc-400"></span>
-                    <button id="f-cards-return" type="button" class="hidden ml-auto items-center gap-1 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-50 px-2 py-1 rounded-lg"><i class="ph ph-arrow-u-up-left"></i><span></span></button>
+            <div id="f-cards-wrap" class="hidden">
+                <div class="fx-sec flex items-center gap-2">
+                    <span>Cartões da sublista</span>
+                    <span id="f-cards-count" class="font-medium text-zinc-400"></span>
+                    <button id="f-cards-return" type="button" class="hidden ml-auto items-center gap-1 text-[12px] font-semibold text-emerald-700 hover:bg-emerald-50 px-2 py-1 -my-1 rounded-lg"><i class="ph ph-arrow-u-up-left"></i><span></span></button>
                 </div>
-                <div id="f-cards" class="mt-1.5 flex flex-col gap-0.5"></div>
-                <div class="mt-1.5 flex items-center gap-2 px-1">
-                    <i class="ph ph-plus text-zinc-400"></i>
-                    <input id="f-card-new" maxlength="200" autocomplete="off" placeholder="Novo cartão (Enter)" class="min-w-0 flex-1 text-sm outline-none py-1.5 bg-transparent">
-                    <button id="f-card-pull" type="button" aria-expanded="false" class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50"><i class="ph ph-list-plus"></i>Puxar da Lista</button>
+                <div class="fx-card p-1.5">
+                <div id="f-cards" class="flex flex-col gap-0.5"></div>
+                <div class="mt-0.5 flex items-center gap-2 pl-3 pr-1">
+                    <i class="ph-bold ph-plus text-focus"></i>
+                    <input id="f-card-new" maxlength="200" autocomplete="off" placeholder="Novo cartão (Enter)" class="min-w-0 flex-1 text-sm outline-none py-2 bg-transparent">
+                    <button id="f-card-pull" type="button" aria-expanded="false" class="fx-mini shrink-0"><i class="ph ph-list-plus"></i>Puxar da Lista</button>
                 </div>
-                <div id="f-card-pick" class="hidden mt-2 p-2 rounded-xl border border-zinc-200 bg-zinc-50">
+                <div id="f-card-pick" class="hidden mt-1 p-2 rounded-xl border border-zinc-200 bg-zinc-50">
                     <label class="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-zinc-400 focus-within:border-zinc-400">
                         <i class="ph ph-magnifying-glass"></i>
                         <input id="f-card-q" data-fg-skip maxlength="80" autocomplete="off" placeholder="Buscar tarefa nas Listas" aria-label="Buscar tarefa pra pôr na sublista" class="min-w-0 flex-1 text-[13px] text-zinc-800 outline-none bg-transparent">
                     </label>
                     <div id="f-card-opts" class="mt-1.5 max-h-48 overflow-y-auto thin-scroll flex flex-col"></div>
                 </div>
+                </div>
             </div>
             <!-- V40.22.0: notas vinculadas ao bloco (as mesmas do app: linked_note_ids). Vincular e desvincular valem na hora. -->
-            <div id="f-notes-wrap" class="hidden mt-4">
-                <span class="text-xs font-semibold text-zinc-500">Notas</span>
-                <div id="f-notes" class="mt-1.5 flex flex-col gap-1.5"></div>
+            <div id="f-notes-wrap" class="hidden">
+                <p class="fx-sec">Notas</p>
+                <div class="fx-card p-2">
+                <div id="f-notes" class="flex flex-col gap-1.5"></div>
                 <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <button id="f-note-link" type="button" aria-expanded="false" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50"><i class="ph ph-link-simple"></i>Vincular nota</button>
-                    <button id="f-note-new" type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50"><i class="ph ph-note-pencil"></i>Nova nota</button>
+                    <button id="f-note-link" type="button" aria-expanded="false" class="fx-mini"><i class="ph ph-link-simple"></i>Vincular nota</button>
+                    <button id="f-note-new" type="button" class="fx-mini"><i class="ph ph-note-pencil"></i>Nova nota</button>
                 </div>
                 <div id="f-note-pick" class="hidden mt-2 p-2 rounded-xl border border-zinc-200 bg-zinc-50">
                     <label class="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-zinc-400 focus-within:border-zinc-400">
@@ -929,9 +1062,10 @@
                     </label>
                     <div id="f-note-opts" class="mt-1.5 max-h-48 overflow-y-auto thin-scroll flex flex-col"></div>
                 </div>
+                </div>
             </div>
             <!-- Agendar (só tarefa): aparece ao clicar em "Agendar" -->
-            <div id="f-sched" class="hidden mt-4 p-3.5 rounded-xl border border-zinc-200 bg-zinc-50">
+            <div id="f-sched" class="hidden mt-4 p-3.5 rounded-[14px] border border-[#e6e7eb] bg-white">
                 <p class="text-[13px] font-semibold text-zinc-800">Agendar esta tarefa</p>
                 <div class="mt-2 grid grid-cols-2 gap-3">
                     <div>
@@ -959,17 +1093,22 @@
                 </div>
             </div>
         </div>
-        <div class="px-5 py-3 border-t border-zinc-100 flex flex-wrap items-center gap-x-1 gap-y-2">
-            <button id="f-delete" class="text-[13px] font-semibold text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg">Apagar tarefa</button>
-            <button id="f-archive" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3 py-2 rounded-lg">Arquivar</button>
-            <button id="f-schedule" class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-100 px-3 py-2 rounded-lg"><i class="ph ph-calendar-plus text-base"></i>Agendar</button>
-            <button id="f-hand" class="inline-flex items-center justify-center w-9 h-9 text-zinc-700 hover:bg-zinc-100 rounded-lg" title="Levar pra Agenda e clicar onde quer colocar" aria-label="Levar pra Agenda e clicar onde quer colocar"><i class="ph ph-hand-pointing text-lg"></i></button>
-            <button id="f-tolist" class="hidden items-center gap-1.5 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-100 px-3 py-2 rounded-lg"><i class="ph ph-list-checks text-base"></i>Voltar pra lista</button>
+        <div class="fx-foot">
+            <button id="f-schedule" class="fx-act"><i class="ph ph-calendar-plus text-base"></i>Agendar</button>
+            <button id="f-hand" class="fx-act w-9 justify-center !px-0" title="Levar pra Agenda e clicar onde quer colocar" aria-label="Levar pra Agenda e clicar onde quer colocar"><i class="ph ph-hand-pointing text-lg"></i></button>
+            <button id="f-tolist" class="hidden fx-act"><i class="ph ph-list-checks text-base"></i>Voltar pra lista</button>
             <div class="ml-auto flex gap-2">
-                <button id="f-cancel" class="text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100 px-3.5 py-2 rounded-lg">Cancelar</button>
-                <button id="f-save" class="bg-focus text-white text-[13px] font-semibold px-4 py-2 rounded-lg hover:opacity-90">Salvar</button>
+                <button id="f-cancel" class="fx-cancel">Cancelar</button>
+                <button id="f-save" class="fx-save">Salvar</button>
             </div>
         </div>
+    </div>
+    <!-- V40.51.0: o que abre ao clicar na Tag, na Cor e no ⋯ (fixed, por cima de tudo, presas na linha clicada) -->
+    <div id="f-tags" class="fx-pop hidden" role="listbox" aria-label="Tag"></div>
+    <div id="f-colors" class="fx-pop hidden" role="listbox" aria-label="Cor do cartão"></div>
+    <div id="f-more-pop" class="fx-pop menu hidden" role="menu" aria-label="Mais opções">
+        <button id="f-archive" type="button" class="fx-opt" role="menuitem">Arquivar</button>
+        <button id="f-delete" type="button" class="fx-opt danger" role="menuitem">Apagar tarefa</button>
     </div>
 </div>
 
@@ -1174,7 +1313,7 @@
 <!-- V40.12.0: calendário próprio (um só, reposicionado embaixo do campo que abriu) -->
 <div id="cal-pop" class="hidden fixed z-[80] w-64 bg-white border border-zinc-200 rounded-xl shadow-xl p-3" role="dialog" aria-label="Escolher o dia"></div>
 <!-- Selo de versão: o mesmo número do app do celular -->
-<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.50.1</div>
+<div id="pc-version" class="fixed bottom-1 right-2 z-[5] text-[10px] text-zinc-400 font-mono pointer-events-none select-none">v40.51.0</div>
 <!-- V40.25.0: aviso com Desfazer (embaixo à esquerda) depois de apagar, arquivar, mudar de lista ou mexer em várias coisas.
      z 45: fica atrás das janelas (z 50+). Some sozinho. -->
 <div id="undo-pill" class="hidden fixed bottom-5 left-5 z-[45] items-center gap-1.5 bg-zinc-900 text-white text-[13px] font-medium pl-4 pr-1.5 py-1.5 rounded-xl shadow-lg max-w-[min(520px,calc(100vw-40px))]" role="status" aria-live="polite">
@@ -1242,6 +1381,7 @@
     function hex6(c) { return /^#[0-9a-fA-F]{6}$/.test(String(c || '')) ? String(c).toLowerCase() : null; }
     function isDark(hex) { var n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 165; }
     function paintOf(c) { var h = hex6(c); return h ? { cls: 'painted ' + (isDark(h) ? 'dark ' : ''), css: 'background-color:' + h + ';border-color:' + h + ';', hex: h } : { cls: '', css: '', hex: null }; }
+    function fxDur(m) { m = Math.max(0, Math.round(Number(m) || 0)); var h = Math.floor(m / 60), r = m % 60; return !h ? r + ' min' : h + 'h' + (r ? (r < 10 ? '0' : '') + r : ''); } // V40.51.0: a duração da Ficha (igual ao fxDur do app): "45 min", "2h", "1h30"
     function fmtDur(m) { // igual ao formatDur do app
         m = Math.max(0, Math.round(Number(m) || 0));
         var h = Math.floor(m / 60), r = m % 60;
@@ -3216,7 +3356,7 @@
         }
         var d = Number(r.duration) || 30;
         var durs = DURATIONS.indexOf(d) >= 0 ? DURATIONS : DURATIONS.concat([d]).sort(function (a, b) { return a - b; });
-        $('f-dur').innerHTML = durs.map(function (m) { return '<option value="' + m + '">' + fmtDur(m) + '</option>'; }).join('');
+        $('f-dur').innerHTML = durs.map(function (m) { return '<option value="' + m + '">' + fxDur(m) + '</option>'; }).join(''); // V40.51.0: "45 min", "1h30" (como a Ficha do celular)
         $('f-dur').value = String(d);
         $('f-mb-new').value = '';
         renderTagChips();
@@ -3244,6 +3384,9 @@
             $('f-delete').textContent = 'Apagar sublista';
             $('f-tolist').classList.add('hidden'); $('f-tolist').classList.remove('inline-flex'); // cada cartão volta sozinho
         }
+        $('f-head').textContent = isNew ? 'Novo bloco' : sub ? 'Editar sublista' : isB ? 'Editar bloco' : 'Editar tarefa'; // V40.51.0 (Ficha)
+        fxPopClose();
+        fxMoreSync('f-more', 'f-more-pop');
         $('f-card-new').value = '';
         cardPick(false);
         renderSubCards();
@@ -3629,6 +3772,9 @@
         fillGoalSelect('f-goal-wrap', 'f-goal', S.editing.goal); // V40.34.0
         goalPlaceholder(); // V40.36.1
         renderTagChips(); renderMbs(); renderColors(); renderDone();
+        $('f-head').textContent = 'Cartão da sublista'; // V40.51.0 (Ficha)
+        fxPopClose();
+        fxMoreSync('f-more', 'f-more-pop');
         var m = $('modal-task');
         m.classList.remove('hidden'); m.classList.add('flex');
         autoGrow($('f-title'));
@@ -3782,6 +3928,7 @@
 
     function closeTask() {
         closeCal();
+        fxPopClose(); // V40.51.0
         var m = $('modal-task');
         m.classList.add('hidden');
         m.classList.remove('flex');
@@ -3818,34 +3965,88 @@
         sync(); p.then(sync);
     }
     function tagManageChip() { // V40.18.0: dá pra criar e arrumar tags sem sair do cartão (quem só usa o computador não tinha como)
-        return '<button type="button" data-manage-tags class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed border-zinc-300 text-[12.5px] font-medium text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50" title="Criar, renomear, trocar a cor ou apagar tags"><i class="ph ph-pencil-simple"></i>' + (alive('tags').length ? 'Gerenciar tags' : 'Criar tag') + '</button>';
+        // V40.51.0 (Ficha): a última linha da lista da Tag
+        return '<div class="fx-sep"></div><button type="button" data-manage-tags class="fx-opt add" title="Criar, renomear, trocar a cor ou apagar tags"><i class="ph ph-pencil-simple fx-oi"></i>' + (alive('tags').length ? 'Gerenciar tags' : 'Criar tag') + '</button>';
+    }
+    // V40.51.0 (Ficha): a linha mostra o escolhido (bolinha + nome, ou "Nenhuma" apagado); a lista abre ao clicar nela.
+    // Cada opção continua sendo um button[data-tag] (a escolhida com .chip-on), como os chips de antes.
+    function fxTagOpt(id, label, color, on) {
+        return '<button type="button" data-tag="' + esc(id || '') + '" role="option" aria-selected="' + (on ? 'true' : 'false') + '" class="fx-opt' + (on ? ' chip-on' : '') + '">' +
+            (color ? '<span class="fx-dot" style="background:' + esc(safeColor(color)) + '"></span>' : '<i class="ph ph-prohibit fx-no"></i>') + '<span class="fx-ot">' + esc(label) + '</span><i class="ph-bold ph-check fx-tk"></i></button>';
+    }
+    function fxSetVal(id, on, lead, text) {
+        var el = $(id);
+        if (!el) return;
+        el.classList.toggle('on', !!on);
+        el.innerHTML = (lead || '') + '<span class="fx-vt">' + esc(text) + '</span>';
+    }
+    function fxTagRow(valId, tagId) {
+        var t = tagId ? tagOf(tagId) : null;
+        if (t) fxSetVal(valId, true, '<span class="fx-dot" style="background:' + esc(safeColor(t.color)) + '"></span>', t.name || 'Sem nome');
+        else fxSetVal(valId, false, '', 'Nenhuma');
     }
     function renderTagChips() {
         var ed = S.editing;
-        var chip = function (id, label, color) {
-            var on = (ed.tag || null) === id;
-            return '<button type="button" data-tag="' + esc(id || '') + '" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50' + (on ? ' chip-on' : '') + '">' +
-                (color ? '<span class="w-2.5 h-2.5 rounded-full" style="background:' + esc(safeColor(color)) + '"></span>' : '<i class="ph ph-prohibit text-zinc-400"></i>') + esc(label) + '</button>';
-        };
         if (ed.tag && !tagOf(ed.tag)) ed.tag = null; // V40.18.0: a tag escolhida foi apagada
-        var html = chip(null, 'Sem tag', null) + alive('tags').map(function (t) { return chip(t.id, t.name, t.color); }).join('') + tagManageChip();
+        var html = fxTagOpt(null, 'Nenhuma', null, !ed.tag) + alive('tags').map(function (t) { return fxTagOpt(t.id, t.name, t.color, ed.tag === t.id); }).join('') + tagManageChip();
         if ($('f-tags')._html !== html) { $('f-tags').innerHTML = html; $('f-tags')._html = html; }
+        fxTagRow('f-tag-val', ed.tag);
     }
+    var FX_COLOR_NAMES = ['Vermelho', 'Laranja', 'Âmbar', 'Verde-limão', 'Verde', 'Verde-água', 'Azul', 'Anil', 'Roxo', 'Pink', 'Rosa', 'Cinza']; // V40.51.0: as do celular
+    function fxColorName(c) { c = hex6(c); if (!c) return 'Nenhuma'; var i = CARD_COLORS.indexOf(c); return i >= 0 ? FX_COLOR_NAMES[i] : 'Outra cor'; }
+    function fxLight(hex) { var n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) >= 165; }
     function renderColors() {
+        // V40.51.0 (Ficha): "Nenhuma", as 12 cores com o nome e "Outra" numa grade; a linha mostra a escolhida
         var cur = S.editing.color, custom = cur && CARD_COLORS.indexOf(cur) < 0;
-        $('f-colors').innerHTML = '<button type="button" data-color="" class="h-7 px-2.5 rounded-full border text-[12px] font-semibold ' + (!cur ? 'bg-zinc-900 border-zinc-900 text-white' : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50') + '">Sem cor</button>' +
-            CARD_COLORS.map(function (c) { return '<button type="button" data-color="' + c + '" class="swatch' + (cur === c ? ' on' : '') + '" style="background:' + c + '" aria-label="Cor ' + c + '"></button>'; }).join('') +
-            '<label class="swatch relative overflow-hidden cursor-pointer' + (custom ? ' on' : '') + '" style="background:' + (custom ? cur : 'conic-gradient(#ef4444,#f59e0b,#10b981,#3b82f6,#8b5cf6,#ec4899,#ef4444)') + '" title="Outra cor">' +
-            '<input type="color" id="f-color-custom" value="' + (cur || '#ec4899') + '" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" aria-label="Escolher outra cor"></label>';
+        var cell = function (c, on, dot, name) { return '<button type="button" data-color="' + c + '" role="option" aria-selected="' + (on ? 'true' : 'false') + '" aria-label="' + name + '" class="fx-copt' + (on ? ' on' : '') + '">' + dot + '<span>' + name + '</span></button>'; };
+        $('f-colors').innerHTML = '<div class="fx-cgrid">' + cell('', !cur, '<span class="fx-cdot none"><i class="ph-bold ph-prohibit"></i></span>', 'Nenhuma') +
+            CARD_COLORS.map(function (c, i) { return cell(c, cur === c, '<span class="fx-cdot' + (fxLight(c) ? ' lt' : '') + '" style="background:' + c + '"><i class="ph-bold ph-check"></i></span>', FX_COLOR_NAMES[i]); }).join('') +
+            '<label class="fx-copt' + (custom ? ' on' : '') + '" title="Outra cor"><span class="fx-cdot' + (custom ? (fxLight(cur) ? ' lt' : '') : ' rb') + '"' + (custom ? ' style="background:' + cur + '"' : '') + '><i class="ph-bold ph-check"></i></span><span>Outra</span>' +
+            '<input type="color" id="f-color-custom" value="' + (cur || '#ec4899') + '" aria-label="Escolher outra cor"></label></div>';
+        if (cur) fxSetVal('f-color-val', true, '<span class="fx-dot lg" style="background:' + cur + '"></span>', fxColorName(cur));
+        else fxSetVal('f-color-val', false, '', 'Nenhuma');
     }
     function renderMbs() {
+        // V40.51.0 (Ficha): uma linha da ficha por item; a bolinha marca feito
         $('f-mbs').innerHTML = S.editing.mbs.map(function (m, i) {
-            return '<div class="group flex items-center gap-2 px-1 py-0.5 rounded-lg hover:bg-zinc-50">' +
-                '<input type="checkbox" data-mb-done="' + i + '" class="w-4 h-4 rounded accent-[var(--focus)]"' + (m.done ? ' checked' : '') + '>' +
-                '<input data-mb-title="' + i + '" value="' + esc(m.title) + '" maxlength="200" class="flex-1 text-sm py-1.5 outline-none bg-transparent' + (m.done ? ' line-through text-zinc-400' : '') + '">' +
-                '<button type="button" data-mb-del="' + i + '" class="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus:opacity-100" aria-label="Remover item"><i class="ph ph-x"></i></button>' +
+            return '<div class="fx-row fx-ckrow">' +
+                '<input type="checkbox" data-mb-done="' + i + '" aria-label="Feito"' + (m.done ? ' checked' : '') + '>' +
+                '<input data-mb-title="' + i + '" value="' + esc(m.title) + '" maxlength="200" aria-label="Item ' + (i + 1) + ' do checklist" class="fx-ckin outline-none' + (m.done ? ' done' : '') + '">' +
+                '<button type="button" data-mb-del="' + i + '" class="fx-x" aria-label="Remover item"><i class="ph ph-x"></i></button>' +
                 '</div>';
         }).join('');
+    }
+    // ---------- V40.51.0: FICHA — a lista presa na linha (Tag, Cor) e o ⋯ ----------
+    // Abre embaixo da linha clicada (sem espaço, em cima), alinhada à direita dela. Fecha ao escolher, clicando fora, no Esc,
+    // rolando a janela ou mudando o tamanho da tela. Uma aberta por vez.
+    var FXP = { pop: null, btn: null };
+    function fxPopOpen(popId, btn) {
+        fxPopClose();
+        var pop = $(popId);
+        if (!pop || !btn) return;
+        closeCal();
+        pop.classList.remove('hidden');
+        var r = btn.getBoundingClientRect(), w = pop.offsetWidth || 264, h = pop.offsetHeight || 300, top = r.bottom + 4;
+        if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
+        pop.style.top = top + 'px';
+        pop.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px';
+        FXP.pop = pop; FXP.btn = btn;
+        btn.setAttribute('aria-expanded', 'true');
+        var sel = pop.querySelector('.chip-on, .fx-copt.on') || pop.querySelector('button');
+        if (sel && sel.focus) sel.focus({ preventScroll: true });
+    }
+    function fxPopClose(refocus) {
+        var pop = FXP.pop, btn = FXP.btn;
+        FXP.pop = FXP.btn = null;
+        if (pop) pop.classList.add('hidden');
+        if (btn) { btn.setAttribute('aria-expanded', 'false'); if (refocus && btn.focus) btn.focus(); }
+    }
+    // O ⋯ aparece só quando tem o que mostrar (bloco novo: nada pra arquivar ou apagar).
+    function fxMoreSync(btnId, popId) {
+        var b = $(btnId), pop = $(popId);
+        if (!b || !pop) return;
+        var any = [].some.call(pop.querySelectorAll('.fx-opt'), function (o) { return !o.classList.contains('hidden'); });
+        b.classList.toggle('hidden', !any);
     }
     async function saveTask() {
         var ed = S.editing;
@@ -4066,7 +4267,7 @@
         var o = [5, 10];
         for (var m = 15; m <= 480; m += 15) o.push(m);
         if (o.indexOf(cur) < 0) { o.push(cur); o.sort(function (a, b) { return a - b; }); }
-        return o.map(function (m) { return '<option value="' + m + '"' + (m === cur ? ' selected' : '') + '>' + fmtDur(m) + '</option>'; }).join('');
+        return o.map(function (m) { return '<option value="' + m + '"' + (m === cur ? ' selected' : '') + '>' + fxDur(m) + '</option>'; }).join(''); // V40.51.0
     }
     function openRoutine(id) {
         var r = id ? S.rotinas[id] : null;
@@ -4081,12 +4282,16 @@
         $('rt-f-mb-new').value = '';
         renderRtTheme(); renderRtTags(); renderRtMbs();
         fillGoalSelect('rt-f-goal-wrap', 'rt-f-goal', S.rtEdit.goal); // V40.34.0
+        $('rt-f-head').textContent = id ? 'Editar rotina' : 'Nova rotina'; // V40.51.0 (Ficha)
+        fxPopClose();
+        fxMoreSync('rt-f-more', 'rt-f-more-pop');
         var m = $('modal-rt');
         m.classList.remove('hidden');
         m.classList.add('flex');
         $('rt-f-title').focus();
     }
     function closeRoutine() {
+        fxPopClose(); // V40.51.0
         S.rtEdit = null;
         $('modal-rt').classList.add('hidden');
         $('modal-rt').classList.remove('flex');
@@ -4098,23 +4303,20 @@
             b.setAttribute('aria-checked', on ? 'true' : 'false');
         });
     }
-    function renderRtTags() {
+    function renderRtTags() { // V40.51.0 (Ficha): a mesma lista da Tag do cartão
         var ed = S.rtEdit;
-        var chip = function (id, label, color) {
-            var on = (ed.tag || null) === id;
-            return '<button type="button" data-tag="' + esc(id || '') + '" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-200 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-50' + (on ? ' chip-on' : '') + '">' +
-                (color ? '<span class="w-2.5 h-2.5 rounded-full" style="background:' + esc(safeColor(color)) + '"></span>' : '<i class="ph ph-prohibit text-zinc-400"></i>') + esc(label) + '</button>';
-        };
         if (ed.tag && !tagOf(ed.tag)) ed.tag = null; // V40.18.0: a tag escolhida foi apagada
-        var html = chip(null, 'Sem tag', null) + alive('tags').map(function (t) { return chip(t.id, t.name, t.color); }).join('') + tagManageChip();
+        var html = fxTagOpt(null, 'Nenhuma', null, !ed.tag) + alive('tags').map(function (t) { return fxTagOpt(t.id, t.name, t.color, ed.tag === t.id); }).join('') + tagManageChip();
         if ($('rt-f-tags')._html !== html) { $('rt-f-tags').innerHTML = html; $('rt-f-tags')._html = html; }
+        fxTagRow('rt-f-tag-val', ed.tag);
     }
     function renderRtMbs() {
         $('rt-f-mbs').innerHTML = S.rtEdit.mbs.map(function (t, i) {
-            return '<div class="group flex items-center gap-2 px-1 py-1 rounded-lg hover:bg-zinc-50">' +
-                '<i class="ph ph-square text-zinc-400"></i>' +
-                '<input data-rt-mb="' + i + '" value="' + esc(t) + '" maxlength="200" class="flex-1 min-w-0 text-sm text-zinc-800 outline-none bg-transparent py-0.5" aria-label="Item ' + (i + 1) + ' da checklist">' +
-                '<button type="button" data-rt-mb-del="' + i + '" class="w-7 h-7 rounded-md flex items-center justify-center text-zinc-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 focus:opacity-100" aria-label="Tirar o item"><i class="ph ph-x"></i></button>' +
+            // V40.51.0 (Ficha): uma linha por item; a rotina é um modelo (o bloco começa desmarcado): pontinho, não caixa
+            return '<div class="fx-row fx-ckrow">' +
+                '<span class="fx-bul" aria-hidden="true"></span>' +
+                '<input data-rt-mb="' + i + '" value="' + esc(t) + '" maxlength="200" class="fx-ckin outline-none" aria-label="Item ' + (i + 1) + ' da checklist">' +
+                '<button type="button" data-rt-mb-del="' + i + '" class="fx-x" aria-label="Tirar o item"><i class="ph ph-x"></i></button>' +
                 '</div>';
         }).join('');
     }
@@ -4563,12 +4765,15 @@
         $('fn-f-note').classList.toggle('hidden', !special);
         fnTypeUi();
         fnPaidUi();
+        fxPopClose(); // V40.51.0 (Ficha)
+        fxMoreSync('fn-f-more', 'fn-f-more-pop');
         var box = $('modal-fin');
         box.classList.remove('hidden');
         box.classList.add('flex');
         $('fn-f-title').focus();
     }
     function closeFin() {
+        fxPopClose(); // V40.51.0
         if (S.fnScope) S.fnScope(null);
         S.fnEdit = null;
         $('modal-fin').classList.add('hidden');
@@ -4718,7 +4923,7 @@
         $(wrapId).classList.toggle('hidden', !goals.length);
         if (!goals.length) { $(selId).innerHTML = ''; return; }
         cur = goalKeep(cur);
-        var html = '<option value="">Sem meta</option>';
+        var html = '<option value="">Nenhuma</option>'; // V40.51.0 (Ficha): nada escolhido = "Nenhuma", como no celular
         lists.forEach(function (l) {
             var gs = goals.filter(function (g) { return M.listOf(g, lists) === l.id; });
             if (gs.length) html += '<optgroup label="' + esc(l.name || 'Sem nome') + '">' + gs.map(function (g) { return '<option value="' + esc(g.id) + '">' + esc((g.emoji || '🎯') + ' ' + (g.title || 'Sem nome')) + '</option>'; }).join('') + '</optgroup>';
@@ -4889,7 +5094,7 @@
         S.mtEdit = { id: id || null, period: g ? g.period : 'dia', unit: g ? g.unit : 'vezes', touched: !!g };
         $('mt-f-head').textContent = r ? 'Editar meta' : 'Nova meta';
         $('mt-f-tpl-wrap').classList.toggle('hidden', !!r);
-        $('mt-f-tpl').innerHTML = r ? '' : M.TEMPLATES.map(function (t, i) { return '<button type="button" class="mt-tpl text-[12.5px] font-medium px-2.5 py-1 rounded-full" data-mt-tpl="' + i + '">' + esc(t.emoji + ' ' + t.title) + '</button>'; }).join('');
+        $('mt-f-tpl').innerHTML = r ? '' : M.TEMPLATES.map(function (t, i) { return '<button type="button" class="fx-chip" data-mt-tpl="' + i + '">' + esc(t.emoji + ' ' + t.title) + '</button>'; }).join('');
         $('mt-f-emoji').value = g ? (g.emoji || '') : '';
         $('mt-f-title').value = g ? (g.title || '') : '';
         var lid = g ? M.listOf(g, lists) : (lists.some(function (l) { return l.id === listId; }) ? listId : lists[0].id);
@@ -4900,12 +5105,15 @@
         $('mt-f-chart-wrap').classList.toggle('hidden', !r); // V40.34.0
         $('mt-f-chart').innerHTML = r ? mtChartHtml(g) : '';
         mtFormUi();
+        fxPopClose(); // V40.51.0 (Ficha)
+        fxMoreSync('mt-f-more', 'mt-f-more-pop');
         var box = $('modal-goal');
         box.classList.remove('hidden');
         box.classList.add('flex');
         $('mt-f-title').focus();
     }
     function closeGoal() {
+        fxPopClose(); // V40.51.0
         S.mtEdit = null;
         $('modal-goal').classList.add('hidden');
         $('modal-goal').classList.remove('flex');
@@ -5878,7 +6086,7 @@
     }
     function setDurVal(d) { // a duração do período pode não estar na lista (ex.: 5h): entra nela
         var durs = DURATIONS.indexOf(d) >= 0 ? DURATIONS : DURATIONS.concat([d]).sort(function (a, b) { return a - b; });
-        $('f-dur').innerHTML = durs.map(function (m) { return '<option value="' + m + '">' + fmtDur(m) + '</option>'; }).join('');
+        $('f-dur').innerHTML = durs.map(function (m) { return '<option value="' + m + '">' + fxDur(m) + '</option>'; }).join(''); // V40.51.0: "45 min", "1h30" (como a Ficha do celular)
         $('f-dur').value = String(d);
     }
     function perPick(id) {
@@ -6530,7 +6738,7 @@
         $('f-goal').addEventListener('change', function () { if (S.editing) { S.editing.goal = this.value || null; goalPlaceholder(); } }); // V40.34.0; V40.36.1: nome da meta clarinho
         $('f-cancel').addEventListener('click', closeTaskUi);
         $('f-delete').addEventListener('click', deleteTask);
-        $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('modal-task', closeTaskUi); }); // V40.25.1: o 2º clique de um clique duplo não fecha
+        $('modal-task').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) { if (FXP.pop) return fxPopClose(); fgClose('modal-task', closeTaskUi); } }); // V40.51.0: com a lista da Tag/Cor/⋯ aberta, o clique fora só fecha ela // V40.25.1: o 2º clique de um clique duplo não fecha
 
         // V40.17.0: Rotinas
         $('rt-new').addEventListener('click', function () { openRoutine(null); });
@@ -6544,7 +6752,7 @@
             var c = e.target.closest && e.target.closest('[data-rt]');
             if (c && e.target === c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openRoutine(c.dataset.rt); }
         });
-        $('modal-rt').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('modal-rt', closeRoutine); }); // V40.25.1: o 2º clique de um clique duplo não fecha
+        $('modal-rt').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) { if (FXP.pop) return fxPopClose(); fgClose('modal-rt', closeRoutine); } }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('rt-f-cancel').addEventListener('click', closeRoutine);
         $('rt-f-save').addEventListener('click', function () { saveRoutine(); });
         $('rt-f-goal').addEventListener('change', function () { if (S.rtEdit) S.rtEdit.goal = this.value || null; }); // V40.34.0
@@ -6557,12 +6765,16 @@
             renderRtTheme();
         });
         $('rt-f-tags').addEventListener('click', function (e) {
-            if (e.target.closest('[data-manage-tags]')) return openTags(); // V40.18.0
+            if (e.target.closest('[data-manage-tags]')) { fxPopClose(); return openTags(); } // V40.18.0
             var b = e.target.closest('button[data-tag]');
             if (!b || !S.rtEdit) return;
             S.rtEdit.tag = b.dataset.tag || null;
             renderRtTags();
+            fxPopClose(true); // V40.51.0
         });
+        $('rt-f-more-pop').addEventListener('click', function () { fxPopClose(); }, true);
+        $('fn-f-more-pop').addEventListener('click', function () { fxPopClose(); }, true);
+        $('mt-f-more-pop').addEventListener('click', function () { fxPopClose(); }, true);
         $('rt-f-mbs').addEventListener('input', function (e) {
             var i = e.target.dataset.rtMb;
             if (i != null && S.rtEdit) S.rtEdit.mbs[Number(i)] = e.target.value;
@@ -6714,12 +6926,22 @@
         });
         $('modal-task').querySelector('.overflow-y-auto').addEventListener('scroll', closeCal);
         window.addEventListener('resize', closeCal);
+        // V40.51.0 (Ficha): a linha abre a lista dela (de novo: fecha); clicar fora fecha; o ⋯ fecha antes de fazer
+        document.addEventListener('click', function (e) {
+            var row = e.target.closest && e.target.closest('[data-fx-pop]');
+            if (row) { var open = FXP.btn === row; fxPopClose(); if (!open) fxPopOpen(row.dataset.fxPop, row); return; }
+            if (FXP.pop && !FXP.pop.contains(e.target)) fxPopClose();
+        });
+        document.addEventListener('scroll', function (e) { if (FXP.pop && !(e.target.nodeType === 1 && FXP.pop.contains(e.target))) fxPopClose(); }, true);
+        window.addEventListener('resize', function () { fxPopClose(); });
+        $('f-more-pop').addEventListener('click', function () { fxPopClose(); }, true);
         $('f-tags').addEventListener('click', function (e) {
-            if (e.target.closest('[data-manage-tags]')) return openTags(); // V40.18.0
+            if (e.target.closest('[data-manage-tags]')) { fxPopClose(); return openTags(); } // V40.18.0
             var b = e.target.closest('button[data-tag]');
             if (!b || !S.editing) return;
             S.editing.tag = b.dataset.tag || null;
             renderTagChips();
+            fxPopClose(true); // V40.51.0: escolheu, a lista fecha
         });
         $('f-mbs').addEventListener('change', function (e) {
             if (!S.editing) return;
@@ -6754,6 +6976,7 @@
             if (WZ) return wzStop(false, 'esc'); // V40.28.0: idem, puxando a duração na Semana
             if (!$('dialog').classList.contains('hidden')) return;
             if (!$('cal-pop').classList.contains('hidden')) return closeCal();
+            if (FXP.pop) return fxPopClose(true); // V40.51.0: a lista da Tag, da Cor ou o ⋯
             if (!$('modal-tags').classList.contains('hidden')) return fgClose('tg-new-box', closeTags); // V40.18.0: fica por cima do cartão; V40.46.0: "Descartar?"
             if (S.fnScope) return S.fnScope(null); // V40.19.0
             if (S.fnEdit) return fgClose('modal-fin', closeFin);
@@ -7233,7 +7456,7 @@
         $('fn-f-delete').addEventListener('click', function () { if (S.fnEdit && S.fnEdit.id) deleteFin(S.fnEdit.id); });
         $('fn-f-end').addEventListener('click', endFin); // V40.30.0
         $('fn-f-reopen').addEventListener('click', reopenFin);
-        $('modal-fin').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('modal-fin', closeFin); }); // V40.25.1: o 2º clique de um clique duplo não fecha
+        $('modal-fin').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) { if (FXP.pop) return fxPopClose(); fgClose('modal-fin', closeFin); } }); // V40.25.1: o 2º clique de um clique duplo não fecha
         // V40.21.0: Metas
         $('mt-new').addEventListener('click', function () { openGoal(null); });
         $('mt-new-cat').addEventListener('click', function () { createGoalList(); }); // V40.23.0
@@ -7272,7 +7495,7 @@
         $('mt-f-save').addEventListener('click', function () { saveGoal(); });
         $('mt-f-cancel').addEventListener('click', closeGoal);
         $('mt-f-delete').addEventListener('click', function () { if (S.mtEdit && S.mtEdit.id) deleteGoal(S.mtEdit.id); });
-        $('modal-goal').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) fgClose('modal-goal', closeGoal); }); // V40.25.1: o 2º clique de um clique duplo não fecha
+        $('modal-goal').addEventListener('mousedown', function (e) { if (e.target === this && e.detail < 2) { if (FXP.pop) return fxPopClose(); fgClose('modal-goal', closeGoal); } }); // V40.25.1: o 2º clique de um clique duplo não fecha
         $('ar-close').addEventListener('click', closeArchive);
         // V40.29.0: Relatórios
         $('ag-rep').addEventListener('click', openReports);
@@ -7356,11 +7579,13 @@
             if (!b || !S.editing) return;
             S.editing.color = hex6(b.dataset.color);
             renderColors();
+            fxPopClose(true); // V40.51.0: escolheu, a grade fecha
         });
         $('f-colors').addEventListener('change', function (e) {
             if (e.target.id !== 'f-color-custom' || !S.editing) return;
             S.editing.color = hex6(e.target.value);
             renderColors();
+            fxPopClose(true);
         });
 
         // login

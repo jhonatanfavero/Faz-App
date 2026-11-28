@@ -112,15 +112,15 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
 
   // criar pela sugestão "Beber água"
   w.openGoalForm();
-  ok(!$('goals-form-view').classList.contains('hidden') && $('goals-list-view').classList.contains('hidden') && d.querySelectorAll('#goal-templates button').length === M.TEMPLATES.length && $('goal-form-delete-btn').classList.contains('hidden'), 'Nova meta: formulário com as sugestões (sem o botão de apagar)');
-  ok($('goal-target-input').value === '1' && $('goal-step-input').value === '1' && $('goal-period-dia').className.includes('bg-app-focus') && $('goal-unit-vezes').className.includes('bg-app-focus') && $('goal-target-suffix').textContent === 'vezes por dia', 'começa com Diária, Vezes, meta 1 ("vezes por dia")');
+  ok(!$('goals-form-view').classList.contains('hidden') && $('goals-list-view').classList.contains('hidden') && d.querySelectorAll('#goal-templates button').length === M.TEMPLATES.length && $('goal-form-more-btn').classList.contains('hidden'), 'Nova meta: formulário com as sugestões (sem o ⋯ de apagar)');
+  ok($('goal-target-input').value === '1' && $('goal-step-input').value === '1' && $('goal-period-dia').classList.contains('on') && $('goal-unit-vezes').classList.contains('on') && $('goal-period-dia').getAttribute('aria-pressed') === 'true' && !$('goal-unit-minutos').classList.contains('on') && $('goal-target-suffix').textContent === 'vezes por dia' && $('goal-list-val').textContent === 'Pessoal', 'começa com Diária, Vezes, meta 1 ("vezes por dia"), na categoria Pessoal');
   w.selectGoalUnit('minutos');
   ok($('goal-target-input').value === '30' && $('goal-step-input').value === '15' && $('goal-target-suffix').textContent === 'minutos por dia', 'trocar pra Minutos sugere 30 min, +15');
   $('goal-target-input').value = '45'; $('goal-target-input').dispatchEvent(new w.Event('input', { bubbles: true }));
   w.selectGoalUnit('reais');
   ok($('goal-target-input').value === '45' && $('goal-target-suffix').textContent === 'reais por dia', 'depois de digitar o alvo, trocar a medida não apaga o que foi digitado');
   w.applyGoalTemplate(0);
-  ok($('goal-title-input').value === 'Beber água' && $('goal-emoji-input').value === '💧' && $('goal-target-input').value === '8' && $('goal-unit-vezes').className.includes('bg-app-focus'), 'a sugestão "💧 Beber água" preenche nome, emoji, 8 vezes por dia');
+  ok($('goal-title-input').value === 'Beber água' && $('goal-emoji-input').value === '💧' && $('goal-target-input').value === '8' && $('goal-unit-vezes').classList.contains('on'), 'a sugestão "💧 Beber água" preenche nome, emoji, 8 vezes por dia');
   w.saveGoalForm();
   const g1 = ev('goalsDb[0]');
   ok(ev('goalsDb.length') === 1 && /^meta_\d+$/.test(g1.id) && g1.listId === 'gl_pessoal' && g1.target === 8 && g1.step === 1 && g1.period === 'dia' && g1.unit === 'vezes' && lastToast() === 'Meta criada! 🎯', 'Salvar: meta criada (id meta_..., lista Pessoal, 8 vezes por dia)');
@@ -151,7 +151,13 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   ok(ev('goalListsDb.length') === 4 && ev('goalListsDb[3].name') === 'Saúde' && /^gl_\d+$/.test(ev('goalListsDb[3].id')) && secs()[3] === 'Saúde0' && lastToast() === 'Categoria criada!', 'categoria "Saúde" criada, no fim da tela');
   // "+ Meta em Saúde" já abre a meta nova nessa categoria
   w.openGoalForm(null, ev('goalListsDb[3].id'));
-  ok([...d.querySelectorAll('#goal-list-options button')].find((b) => b.textContent === 'Saúde').className.includes('bg-app-focus'), '"+ Meta em Saúde" abre a meta nova já na categoria Saúde');
+  ok($('goal-list-val').textContent === 'Saúde', '"+ Meta em Saúde" abre a meta nova já na categoria Saúde');
+  // V40.51.0 (Ficha): a linha Categoria abre a folha de baixo, com as 4 categorias (Saúde marcada) e "Nova categoria"
+  w.goalPickList();
+  const catOpts = () => [...$('fx-pick-list').querySelectorAll('[data-fx-k]')];
+  ok(!$('fx-pick-modal').classList.contains('hidden') && catOpts().map((b) => b.textContent.trim() + (b.getAttribute('aria-checked') === 'true' ? '*' : '')).join() === 'Pessoal,Profissional,Financeiro,Saúde*,Nova categoria', 'a Categoria abre a folha: as 4 categorias (Saúde marcada) e "Nova categoria" no fim');
+  catOpts()[1].click();
+  ok($('fx-pick-modal').classList.contains('hidden') && $('goal-list-val').textContent === 'Profissional', 'tocar em Profissional escolhe e fecha');
   w.applyGoalTemplate(2); // 🧘 Meditar, 15 min por dia, +5 (a sugestão é da Pessoal)
   w.selectGoalFormList(ev('goalListsDb[3].id'));
   $('goal-target-input').value = '25'; w.saveGoalForm();
@@ -159,8 +165,10 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   ok(med && med.listId === ev('goalListsDb[3].id') && med.unit === 'minutos' && med.target === 25 && med.step === 5 && secOf(med.listId).textContent.includes('0m de 25m hoje') && secOf(med.listId).querySelector('.goal-plus').textContent === '+5m', 'meta em minutos na categoria nova, com o botão "+5m"');
   // "+ Nova" dentro do formulário cria a categoria e já deixa escolhida
   w.openGoalForm();
-  w.openCreateGoalList(true); $('goal-list-name-input').value = 'Casa'; w.confirmGoalListName();
-  ok(!$('goals-form-view').classList.contains('hidden') && [...d.querySelectorAll('#goal-list-options button')].find((b) => b.textContent === 'Casa').className.includes('bg-app-focus'), '"+ Nova" dentro da meta cria a categoria "Casa" e ela já fica escolhida (o formulário continua aberto)');
+  w.goalPickList(); catOpts().pop().click(); // "Nova categoria" na folha
+  ok(!$('goal-list-name-modal').classList.contains('hidden') && $('fx-pick-modal').classList.contains('hidden'), '"Nova categoria" na folha abre o nome da categoria nova');
+  $('goal-list-name-input').value = 'Casa'; w.confirmGoalListName();
+  ok(!$('goals-form-view').classList.contains('hidden') && $('goal-list-val').textContent === 'Casa', '"Nova categoria" dentro da meta cria a categoria "Casa" e ela já fica escolhida (o formulário continua aberto)');
   w.closeGoalForm();
   w.openGoalListMenu(ev("goalListsDb.find((l) => l.name === 'Casa').id")); w.openDeleteGoalList();
   ok(/Ela está vazia/.test($('goal-confirm-text').textContent), 'apagar categoria vazia: "Ela está vazia..."');
@@ -178,7 +186,7 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
   ok(ev(`goalsDb[goalsDb.length - 1].id`) === gx && ev(`goalsDb.find((g) => g.id === '${gx}').listId`) === ev('goalListsDb[3].id') && secOf(ev('goalListsDb[3].id')).textContent.indexOf('Meditar') < secOf(ev('goalListsDb[3].id')).textContent.indexOf('<img'), 'mudar de categoria leva a meta pro fim da outra');
   // editar: trocar a frequência recomeça a contagem (com confirmação)
   w.openGoalForm(g1.id);
-  ok($('goal-form-title').textContent === 'Editar meta' && $('goal-title-input').value === 'Beber água' && !$('goal-form-delete-btn').classList.contains('hidden') && $('goal-templates-wrap').classList.contains('hidden'), 'tocar no cartão abre "Editar meta" (com apagar, sem sugestões)');
+  ok($('goal-form-title').textContent === 'Editar meta' && $('goal-title-input').value === 'Beber água' && !$('goal-form-more-btn').classList.contains('hidden') && $('goal-templates-wrap').classList.contains('hidden'), 'tocar no cartão abre "Editar meta" (com o ⋯ de apagar, sem sugestões)');
   $('goal-target-input').value = '10'; w.saveGoalForm();
   ok(ev(`goalsDb.find((g) => g.id === '${g1.id}').target`) === 10 && ev(`goalDaysDb.filter((x) => x.goalId === '${g1.id}').length`) === 1 && /8 de 10 hoje/.test($('goals-container').textContent) && lastToast() === 'Meta salva!', 'mudar só o alvo (8 → 10) mantém o que foi feito: "8 de 10 hoje"');
   w.openGoalForm(g1.id); w.selectGoalPeriod('semana'); w.saveGoalForm();
@@ -188,7 +196,9 @@ const dia = (goalId, date, amount, target) => ({ id: M.dayId(goalId, date), goal
 
   // apagar meta
   w.goalBump(gx, 1);
-  w.openGoalForm(gx); w.deleteGoalFromForm();
+  w.openGoalForm(gx); w.goalFormMore(); // V40.51.0 (Ficha): o Apagar fica no ⋯
+  ok([...$('fx-pick-list').querySelectorAll('[data-fx-k]')].map((b) => b.textContent.trim()).join() === 'Apagar', 'o ⋯ da meta mostra "Apagar"');
+  $('fx-pick-list').querySelector('[data-fx-k="apagar"]').click();
   ok(!$('goal-confirm-modal').classList.contains('hidden') && /Apagar a meta/.test($('goal-confirm-title').textContent), 'apagar a meta pede confirmação');
   w.confirmGoalAction();
   ok(!ev(`goalsDb.some((g) => g.id === '${gx}')`) && !ev(`goalDaysDb.some((x) => x.goalId === '${gx}')`) && lastToast() === 'Meta apagada', 'meta apagada leva junto o que foi marcado nela');
